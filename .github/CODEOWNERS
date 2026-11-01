@@ -1,0 +1,16 @@
+# Code owners for pi-jefferson.
+#
+# The ruleset on main requires a review from a code owner of the files a pull request
+# changes. GitHub reads this file from the base branch, and the LAST matching pattern
+# wins — so the catch-all comes first and anything wanting its own owner goes below it.
+#
+# To add a maintainer for the whole repository, add them to the line below.
+# To give one area a different owner, add its pattern underneath: that line then wins
+# for those files, and the catch-all keeps working everywhere else.
+
+* @joelleibow
+
+# For example — not in use yet:
+#
+#   /extensions/          @joelleibow @someone-else
+#   /.github/workflows/   @joelleibow
