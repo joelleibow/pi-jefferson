@@ -4,15 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      promote:
-        description: Publish the version in package.json to latest instead of a prerelease
-        type: boolean
-        default: false
 
 # contents: write creates the tag and the GitHub Release.
-# id-token: write is the whole of the npm authentication — trusted publishing exchanges
-# this for a short-lived credential, so no token exists anywhere.
+# id-token: write is the whole of the npm authentication. Trusted publishing exchanges it
+# for a short-lived credential, so no token exists anywhere.
 permissions:
   contents: write
   id-token: write
@@ -26,44 +21,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history, because the version base is the highest release tag reachable
+          # from this commit's parent.
+          fetch-depth: 0
 
-      # No package-manager cache here, deliberately. This workflow decides what reaches
-      # the registry and the tarball is permanent, so nothing restored from a cache should
-      # be able to influence it. npm's own trusted-publishing example disables it too.
+      # No package-manager cache here. This workflow decides what reaches the registry and
+      # a published tarball is permanent, so nothing restored from a cache should be able
+      # to influence it.
       - uses: actions/setup-node@v7
         with:
           node-version: 26
           package-manager-cache: false
 
-      # Self-gating: this workflow does not wait on CI, so it runs the checks itself. A
-      # red merge must not be able to publish.
+      # Self-gating: a push to main is what triggers this, and a red merge must not publish.
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
 
-      - name: Resolve the version and the dist-tag
+      # The bump comes from the pull request's labels: release:major, release:minor or
+      # release:patch. Anything else, including no label at all, is a patch. Labelling is
+      # the one judgement this cannot make for you, and a missing label under-bumps rather
+      # than over-bumps on purpose.
+      - name: Work out the bump
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          labels=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+                     --jq '.[0].labels[].name' 2>/dev/null || true)
+          if grep -qx "release:major" <<<"$labels"; then bump=major
+          elif grep -qx "release:minor" <<<"$labels"; then bump=minor
+          else bump=patch
+          fi
+          echo "labels seen: ${labels:-none}"
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the version
         id: v
         run: |
           set -euo pipefail
-          base=$(node -p "require('./package.json').version")
-          if [ "${{ inputs.promote }}" = "true" ]; then
-            echo "version=$base" >> "$GITHUB_OUTPUT"
-            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
-            echo "release_flags=" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=$base-pre.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-            echo "dist_tag=pre-release" >> "$GITHUB_OUTPUT"
-            echo "release_flags=--prerelease" >> "$GITHUB_OUTPUT"
-          fi
+          version=$(node .github/scripts/next-version.mjs "${{ steps.bump.outputs.bump }}")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "bump=${{ steps.bump.outputs.bump }} -> $version"
 
-      # `npm publish` publishes the version in package.json, not the version this workflow
-      # computed. Without this step every merge ships the base version as a real release,
-      # and the git tag names a version the registry never sees.
+      # `npm publish` publishes the version in package.json, not the version computed
+      # above. Without this the tarball and the tag disagree.
       - name: Apply the version to the manifest
         run: npm version "${{ steps.v.outputs.version }}" --no-git-tag-version --allow-same-version
 
-      # A re-run of a workflow whose publish already succeeded should tag and stop, not
-      # fail on a version npm will never accept twice.
+      # A re-run whose publish already succeeded finishes the tag and the release instead
+      # of failing on a version npm will never accept twice.
       - name: Is that version already on the registry?
         id: published
         run: |
@@ -76,19 +85,23 @@ jobs:
           fi
 
       # `publishConfig.provenance` is true, and that is also why this command only works
-      # here. Provenance is signed from a CI OIDC provider, so the identical command on a
+      # here: provenance is signed from a CI OIDC provider, so the identical command on a
       # workstation fails before it reaches the registry.
       - name: Publish
         if: steps.published.outputs.already == 'false'
-        run: npm publish --tag "${{ steps.v.outputs.dist_tag }}"
+        run: npm publish --tag latest
 
       - name: Tag and release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "v${{ steps.v.outputs.version }}" \
-            --target "${{ github.sha }}" \
-            --title "v${{ steps.v.outputs.version }}" \
-            --generate-notes \
-            ${{ steps.v.outputs.release_flags }}
+          tag="v${{ steps.v.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists; nothing to do"
+          else
+            gh release create "$tag" \
+              --target "${{ github.sha }}" \
+              --title "$tag" \
+              --generate-notes
+          fi
