@@ -1,0 +1,33 @@
+{
+  "name": "pi-jefferson",
+  "version": "0.0.0-alpha",
+  "description": "A starship-style statusline for pi — modules, a real layout, and per-module formatting.",
+  "license": "MIT",
+  "author": "Joel Leibow",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joelleibow/pi-jefferson.git"
+  },
+  "homepage": "https://github.com/joelleibow/pi-jefferson#readme",
+  "bugs": {
+    "url": "https://github.com/joelleibow/pi-jefferson/issues"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pi",
+    "statusline",
+    "prompt"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
