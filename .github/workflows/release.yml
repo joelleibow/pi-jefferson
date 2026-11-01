@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: Publish the version in package.json to latest instead of a prerelease
+        type: boolean
+        default: false
+
+# contents: write creates the tag and the GitHub Release.
+# id-token: write is the whole of the npm authentication — trusted publishing exchanges
+# this for a short-lived credential, so no token exists anywhere.
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+
+      # Self-gating: this workflow does not wait on CI, so it runs the checks itself. A
+      # red merge must not be able to publish.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Resolve the version and the dist-tag
+        id: v
+        run: |
+          set -euo pipefail
+          base=$(node -p "require('./package.json').version")
+          if [ "${{ inputs.promote }}" = "true" ]; then
+            echo "version=$base" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "release_flags=" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$base-pre.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=pre-release" >> "$GITHUB_OUTPUT"
+            echo "release_flags=--prerelease" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A re-run of a workflow whose publish already succeeded should tag and stop, not
+      # fail on a version npm will never accept twice.
+      - name: Is that version already on the registry?
+        id: published
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          if npm view "$name@${{ steps.v.outputs.version }}" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `publishConfig.provenance` is true, and that is also why this command only works
+      # here. Provenance is signed from a CI OIDC provider, so the identical command on a
+      # workstation fails before it reaches the registry.
+      - name: Publish
+        if: steps.published.outputs.already == 'false'
+        run: npm publish --tag "${{ steps.v.outputs.dist_tag }}"
+
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "v${{ steps.v.outputs.version }}" \
+            --target "${{ github.sha }}" \
+            --title "v${{ steps.v.outputs.version }}" \
+            --generate-notes \
+            ${{ steps.v.outputs.release_flags }}
