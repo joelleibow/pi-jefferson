@@ -56,6 +56,12 @@ jobs:
             echo "release_flags=--prerelease" >> "$GITHUB_OUTPUT"
           fi
 
+      # `npm publish` publishes the version in package.json, not the version this workflow
+      # computed. Without this step every merge ships the base version as a real release,
+      # and the git tag names a version the registry never sees.
+      - name: Apply the version to the manifest
+        run: npm version "${{ steps.v.outputs.version }}" --no-git-tag-version --allow-same-version
+
       # A re-run of a workflow whose publish already succeeded should tag and stop, not
       # fail on a version npm will never accept twice.
       - name: Is that version already on the registry?

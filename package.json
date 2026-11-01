@@ -1,6 +1,6 @@
 {
   "name": "pi-jefferson",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A starship-style statusline for pi — modules, a real layout, and per-module formatting.",
   "license": "MIT",
   "author": "Joel Leibow",
