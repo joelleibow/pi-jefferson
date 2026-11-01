@@ -64,17 +64,23 @@ mechanism rather than by a note in a file.
 
 ## Releasing
 
-Every push to `main` publishes a prerelease — `<version>-pre.<run-number>`, on the
-`pre-release` dist-tag, with a matching `v…` git tag and a GitHub Release marked as a
-prerelease. An unpinned install never picks one up.
+Merging to `main` releases. There is no separate release step and nothing to remember to
+do.
 
-To ship a real version, bump `version` in `package.json` in a pull request, which makes it
-the next release base, then run the **Release** workflow manually with `promote` set. That
-publishes the base version to `latest`.
+**The bump comes from a label on the pull request:** `release:major`, `release:minor`, or
+`release:patch`. No label means a patch. It defaults low on purpose — an unlabelled change
+should never ship a major version by accident.
+
+**The base comes from the git tags, not from `package.json`.** Main accepts no direct
+pushes, so the workflow cannot commit an updated version back to it, and `package.json`
+would drift from what actually shipped. Every release writes a `v…` tag, and those tags
+are the record. Specifically, the base is the highest release tag reachable from the
+commit *before* the one being released, which makes a re-run compute the same version it
+did the first time.
 
 Authentication is npm trusted publishing over OIDC. The workflow holds no token and the
-package is configured to accept publishes from this repository's `release.yml`, so there
-is nothing to rotate and nothing to leak.
+package accepts publishes from this repository's `release.yml`, so there is nothing to
+rotate and nothing to leak. Provenance is attached automatically.
 
 ## License
 
