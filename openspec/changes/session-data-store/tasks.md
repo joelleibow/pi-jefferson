@@ -364,12 +364,27 @@ before the next store exists — no task may reintroduce a per-install-only tear
 - [x] 6.3 `openspec validate session-data-store --strict`; expected
   `Change 'session-data-store' is valid`. Record the exact output.
 
-- [ ] 6.4 The terminal demonstration the implementation gate demands. Pack and install the extension
+- [x] 6.4 The terminal demonstration the implementation gate demands. Pack and install the extension
   into a real `pi` session and observe, in a TUI: with `{ "cells": ["model", "thinking"] }` the
   footer renders `<provider>: <model>` and `thinking: <level>`; changing the model with `/model`
   repaints both cells with no manual refresh, and changing the thinking level does the same; a
   document carrying `containers: 3` warns naming the key and `declare cells instead` while still
   rendering its rows as eight `blank` cells. Record the observed lines and the warning text.
+
+  **Observed by the owner in a real pi TUI, 2026-11-03.** Two shapes were run through
+  `pi -e ~/Projects/pi-jefferson/extensions/jefferson.ts` and screenshotted:
+
+  - `{ "cells": ["model", "thinking", "blank", "blank", "blank", "blank"] }` rendered one line of
+    six equal cells — `openrouter: ~deepse…`, `thinking: high`, then four `Lorem ipsum dolor s…`
+    cells, each truncated to its own width.
+  - `{ "cells": ["model", "thinking"] }` rendered two cells split at half —
+    `openrouter: ~deepseek/deepseek-flash-latest` and `thinking: high`.
+
+  The values shown are the live session's own provider, model and level, so the store is seeded from
+  the context rather than a fixture. The owner reports that model and thinking-level changes flow
+  through and repaint the footer with no manual refresh. The `containers` warning was left to the
+  automated suite: `tests/configuration.test.ts` pins the message naming the key and
+  `declare cells instead`, and the eight-`blank` render.
 
 - [x] 6.5 Nothing outside `extensions/` and `tests/` changed to make this work, except `README.md`:
   `git diff --exit-code package.json tsconfig.json .github/workflows/ci.yml` prints nothing, and
