@@ -4,12 +4,14 @@
  * Equal cells come from explicit `floor(W / N)` arithmetic recomputed inside
  * `render(width)` — the stack allocator drains greedily and must not divide the
  * row (D7). The width helpers cross the load boundary by injection from the
- * entry (D8): this module holds no host runtime import, so wide glyphs and ANSI
+ * entry (D8): this source file holds no host runtime import, so wide glyphs and ANSI
  * escapes are measured with the host's `visibleWidth`, never `String.length`.
- * Each cell truncates and pads its own content so a row is always one line (D10).
+ * Each cell's text is resolved from its instrument and then truncated and padded, so a row is
+ * always one line (D10, D12).
  */
 
 import type { Row } from "./configuration.ts";
+import type { Readings } from "./session-data-store.ts";
 
 /** The host's width helpers, injected by the entry (D8). */
 export interface WidthHelpers {
@@ -31,11 +33,16 @@ const GAP = 0;
  * occupies `floor((W - (N - 1) * GAP) / N)` columns, the remainder stays blank
  * at the right edge, and the composed line is padded to the full width.
  */
-export function renderRow(row: Row, width: number, helpers: WidthHelpers): string {
+export function renderRow(
+  row: Row,
+  width: number,
+  helpers: WidthHelpers,
+  readings: Readings,
+): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
   let line = "";
   for (const cell of row.cells) {
-    const truncated = helpers.truncateToWidth(cell.text, cellWidth);
+    const truncated = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
     line += truncated + " ".repeat(Math.max(0, cellWidth - helpers.visibleWidth(truncated)));
   }
   const remainder = width - helpers.visibleWidth(line);
@@ -43,11 +50,19 @@ export function renderRow(row: Row, width: number, helpers: WidthHelpers): strin
 }
 
 /** Build the footer component: one line per row, in declaration order. */
-export function createFooter(rows: Row[], helpers: WidthHelpers): Footer {
+export function createFooter(
+  rows: Row[],
+  sampleReadings: () => Readings,
+  helpers: WidthHelpers,
+): Footer {
   return {
     render(width: number): string[] {
-      return rows.map((row) => renderRow(row, width, helpers));
+      // One sample per render, handed to every row and every cell, so two cells reading one datum
+      // cannot disagree: agreement is structural, not procedural (D4).
+      const readings = sampleReadings();
+      return rows.map((row) => renderRow(row, width, helpers, readings));
     },
+    // The footer caches nothing, so there is nothing to invalidate.
     invalidate(): void {},
   };
 }

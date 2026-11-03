@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/configuration.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 
 /**
@@ -23,29 +23,127 @@ interface CommandDef {
   handler: (args: string, ctx: { ui: { notify(message: string): void } }) => Promise<void>;
 }
 
-interface Loaded {
-  commands: Map<string, CommandDef>;
-  handlers: Map<string, unknown>;
+type Handler = (event: unknown, ctx: unknown) => unknown;
+
+/** One `pi.on` registration: the event it was taken for, and how often its release ran. */
+interface Subscription {
+  event: string;
+  calls: number;
 }
 
-function load(): Loaded {
+/** The component the host keeps, so `render` and `dispose` are reachable from a test. */
+interface FakeFooter {
+  render(width: number): string[];
+  invalidate(): void;
+  dispose?(): void;
+}
+
+/** One session's host-facing side: what it was told, what it installed, what it subscribed to. */
+interface FakeSession {
+  notified: Array<{ message: string; type: string | undefined }>;
+  footers: FakeFooter[];
+  repaints: () => number;
+  subscriptions: Subscription[];
+  lines(width: number): string[];
+}
+
+interface SessionOptions {
+  reason?: string;
+  mode?: string;
+  cwd?: string;
+  trusted?: boolean;
+  /** Absent for a session the host restored with no model. */
+  model?: { provider: string; id: string };
+  thinkingLevel?: string;
+}
+
+interface Harness {
+  commands: Map<string, CommandDef>;
+  /** The host-facing order as it happened: `setFooter#n`, `unsubscribe:<event>`. */
+  log: string[];
+  start(options?: SessionOptions): Promise<FakeSession>;
+  dispatch(event: { type: string } & Record<string, unknown>): void;
+}
+
+/** A fake `pi`, the extension bound to it once, and the sessions it was started with. */
+function harness(): Harness {
   const commands = new Map<string, CommandDef>();
-  const handlers = new Map<string, unknown>();
+  const handlers = new Map<string, Handler>();
+  const subscriptions: Subscription[] = [];
+  const log: string[] = [];
+  let installs = 0;
+  let current: { ctx: unknown } | undefined;
+
   const fakePi = {
     registerCommand: (name: string, def: CommandDef) => void commands.set(name, def),
-    on: (event: string, handler: unknown) => void handlers.set(event, handler),
+    on: (event: string, handler: Handler): (() => void) => {
+      handlers.set(event, handler);
+      const subscription: Subscription = { event, calls: 0 };
+      subscriptions.push(subscription);
+      return () => {
+        subscription.calls += 1;
+        log.push(`unsubscribe:${event}`);
+      };
+    },
   };
   (jefferson as unknown as (pi: unknown) => void)(fakePi);
-  return { commands, handlers };
+
+  return {
+    commands,
+    log,
+    async start(options: SessionOptions = {}): Promise<FakeSession> {
+      const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
+      const notified: Array<{ message: string; type: string | undefined }> = [];
+      const footers: FakeFooter[] = [];
+      let repaints = 0;
+      const session: FakeSession = {
+        notified,
+        footers,
+        repaints: () => repaints,
+        subscriptions: [],
+        lines(width: number) {
+          return footers.at(-1)?.render(width) ?? [];
+        },
+      };
+      const ctx = {
+        mode: options.mode ?? "tui",
+        cwd,
+        model: options.model,
+        thinkingLevel: options.thinkingLevel,
+        isProjectTrusted: () => options.trusted ?? false,
+        ui: {
+          notify: (message: string, type?: string) => void notified.push({ message, type }),
+          setFooter: (factory: (tui: { requestRender(): void }) => FakeFooter) => {
+            log.push(`setFooter#${++installs}`);
+            const tui = { requestRender: () => void (repaints += 1) };
+            footers.push(factory(tui));
+          },
+        },
+      };
+      current = { ctx };
+
+      const handler = handlers.get("session_start");
+      assert.ok(handler, "no session_start handler registered");
+      const from = subscriptions.length;
+      await handler({ type: "session_start", reason: options.reason ?? "startup" }, ctx);
+      session.subscriptions = subscriptions.slice(from);
+      return session;
+    },
+    dispatch(event) {
+      const handler = handlers.get(event.type);
+      assert.ok(handler, `no handler registered for ${event.type}`);
+      handler(event, current?.ctx);
+    },
+  };
 }
 
 test("registers exactly one command", () => {
-  assert.deepEqual([...load().commands.keys()], ["jefferson"]);
+  assert.deepEqual([...harness().commands.keys()], ["jefferson"]);
 });
 
 test("the alpha announces that it is a name claim and nothing more", async () => {
   const notified: string[] = [];
-  const def = load().commands.get("jefferson");
+  const def = harness().commands.get("jefferson");
   assert.ok(def, "no jefferson command registered");
 
   await def.handler("", { ui: { notify: (message) => void notified.push(message) } });
@@ -53,42 +151,6 @@ test("the alpha announces that it is a name claim and nothing more", async () =>
   assert.deepEqual(notified, [`pi-jefferson ${VERSION} — the statusline is not built yet.`]);
   assert.equal(VERSION, "0.0.0-alpha");
 });
-
-interface FakeCtx {
-  mode: string;
-  cwd: string;
-  trusted: boolean;
-  notified: Array<{ message: string; type: string | undefined }>;
-  footers: Array<{ render(width: number): string[] }>;
-}
-
-function makeCtx(mode: string, cwd: string, trusted = false): FakeCtx {
-  const ctx: FakeCtx = { mode, cwd, trusted, notified: [], footers: [] };
-  return ctx;
-}
-
-/** Invoke the captured session_start handler against a fake ctx. */
-async function startSession(
-  ctx: FakeCtx,
-): Promise<void> {
-  const { handlers } = load();
-  const handler = handlers.get("session_start") as (
-    event: { type: string; reason: string },
-    ctx: unknown,
-  ) => Promise<void>;
-  assert.ok(handler, "no session_start handler registered");
-  const fakeCtx = {
-    mode: ctx.mode,
-    cwd: ctx.cwd,
-    isProjectTrusted: () => ctx.trusted,
-    ui: {
-      notify: (message: string, type?: string) => void ctx.notified.push({ message, type }),
-      setFooter: (factory: () => { render(width: number): string[] }) =>
-        void ctx.footers.push(factory()),
-    },
-  };
-  await handler({ type: "session_start", reason: "startup" }, fakeCtx);
-}
 
 /** Set PI_CODING_AGENT_DIR to a temp dir for one test and restore it after. */
 function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
@@ -102,28 +164,9 @@ function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
   return agentDir;
 }
 
-test("the session_start handler installs the footer in TUI mode", async (t) => {
-  useTempAgentDir(t);
-  const ctx = makeCtx("tui", mkdtempSync(join(tmpdir(), "jefferson-cwd-")));
-  await startSession(ctx);
-  assert.equal(ctx.footers.length, 1);
-  assert.deepEqual(ctx.notified, []);
-});
-
-test("the session_start handler does not install a footer outside TUI mode", async (t) => {
-  useTempAgentDir(t);
-  const ctx = makeCtx("print", mkdtempSync(join(tmpdir(), "jefferson-cwd-")));
-  await startSession(ctx);
-  assert.equal(ctx.footers.length, 0);
-});
-
-test("the footer is re-installed on every session_start", async (t) => {
-  useTempAgentDir(t);
-  const ctx = makeCtx("tui", mkdtempSync(join(tmpdir(), "jefferson-cwd-")));
-  await startSession(ctx); // startup
-  await startSession(ctx); // reload
-  assert.equal(ctx.footers.length, 2);
-});
+function writeAgentDocument(agentDir: string, document: unknown): void {
+  writeFileSync(join(agentDir, "pi-jefferson.json"), JSON.stringify(document));
+}
 
 function writeProjectDocument(cwd: string, document: unknown): void {
   const dir = join(cwd, CONFIG_DIR_NAME);
@@ -131,29 +174,47 @@ function writeProjectDocument(cwd: string, document: unknown): void {
   writeFileSync(join(dir, "pi-jefferson.json"), JSON.stringify(document));
 }
 
+test("the session_start handler installs the footer in TUI mode", async (t) => {
+  useTempAgentDir(t);
+  const session = await harness().start();
+  assert.equal(session.footers.length, 1);
+  assert.deepEqual(session.notified, []);
+});
+
+test("the session_start handler does not install a footer outside TUI mode", async (t) => {
+  useTempAgentDir(t);
+  const session = await harness().start({ mode: "print" });
+  assert.equal(session.footers.length, 0);
+});
+
+test("the footer is re-installed on every session_start", async (t) => {
+  useTempAgentDir(t);
+  const h = harness();
+  const first = await h.start({ reason: "startup" });
+  const second = await h.start({ reason: "reload" });
+  assert.equal(first.footers.length, 1);
+  assert.equal(second.footers.length, 1);
+});
+
 test("a trusted project's document wins end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeFileSync(join(agentDir, "pi-jefferson.json"), JSON.stringify({}));
+  writeAgentDocument(agentDir, {});
   const cwd = mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
   writeProjectDocument(cwd, { rows: [{}, {}] });
 
-  const ctx = makeCtx("tui", cwd, true);
-  await startSession(ctx);
-  assert.equal(ctx.footers.length, 1);
-  assert.equal(ctx.footers[0]?.render(80).length, 2, "the project's two rows render");
+  const session = await harness().start({ cwd, trusted: true });
+  assert.equal(session.footers.length, 1);
+  assert.equal(session.lines(80).length, 2, "the project's two rows render");
 });
 
 test("a rejected configuration warns and still installs the default row", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeFileSync(
-    join(agentDir, "pi-jefferson.json"),
-    JSON.stringify({ containers: 4, rows: [{}] }),
-  );
-  const ctx = makeCtx("tui", mkdtempSync(join(tmpdir(), "jefferson-cwd-")));
-  await startSession(ctx);
-  assert.equal(ctx.notified.length, 1);
-  assert.equal(ctx.notified[0]?.type, "warning");
-  const lines = ctx.footers[0]?.render(80) ?? [];
+  writeAgentDocument(agentDir, { cells: ["blank"], rows: [{}] });
+
+  const session = await harness().start();
+  assert.equal(session.notified.length, 1);
+  assert.equal(session.notified[0]?.type, "warning");
+  const lines = session.lines(80);
   assert.equal(lines.length, 1, "the default row renders");
   // One row of 8 cells at 80 columns: 10 columns each of the truncated placeholder.
   assert.equal(lines[0], truncateToWidth(DEFAULT_CELL_TEXT, 10).repeat(8));
@@ -168,22 +229,197 @@ test("the exported surface offers no way to supply or replace cell content", asy
   assert.deepEqual(Object.keys(renderer).sort(), ["createFooter", "renderRow"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
-  for (const key of Object.keys(configuration)) {
+  assert.deepEqual(
+    Object.keys(configuration).sort(),
+    ["DEFAULT_CELLS", "MAX_CELLS", "readConfiguration"],
+  );
+
+  const instrument = await import("../extensions/jefferson/instrument.ts");
+  const store = await import("../extensions/jefferson/session-data-store.ts");
+  for (const key of [...Object.keys(instrument), ...Object.keys(store)]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),
       `${key} looks like a contribution interface`,
     );
   }
+
+  // `instrumentNamed` is a lookup, not a registration path: an unimplemented name stays
+  // unimplemented, and asking for it changes neither file's exported surface.
+  const surface = [Object.keys(instrument).sort(), Object.keys(store).sort()];
+  assert.equal(instrument.instrumentNamed("nope"), undefined);
+  assert.equal(instrument.instrumentNamed("nope"), undefined);
+  assert.deepEqual([Object.keys(instrument).sort(), Object.keys(store).sort()], surface);
 });
 
 test("an untrusted project's document is ignored end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeFileSync(join(agentDir, "pi-jefferson.json"), JSON.stringify({}));
+  writeAgentDocument(agentDir, {});
   const cwd = mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
   writeProjectDocument(cwd, { rows: [{}, {}] });
 
-  const ctx = makeCtx("tui", cwd, false);
-  await startSession(ctx);
-  assert.equal(ctx.footers.length, 1);
-  assert.equal(ctx.footers[0]?.render(80).length, 1, "the agent document's one row renders");
+  const session = await harness().start({ cwd, trusted: false });
+  assert.equal(session.footers.length, 1);
+  assert.equal(session.lines(80).length, 1, "the agent document's one row renders");
+});
+
+for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
+  test(`a ${reason} session renders the model and thinking level it was seeded with`, async (t) => {
+    const agentDir = useTempAgentDir(t);
+    writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+
+    // The host reports no selection when it restores, so nothing here is dispatched.
+    const session = await harness().start({
+      reason,
+      model: { provider: "anthropic", id: "claude-opus-4" },
+      thinkingLevel: "high",
+    });
+
+    const [line] = session.lines(80);
+    assert.ok(line?.startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
+    assert.ok(line?.includes("thinking: high"), "the thinking cell renders the seed");
+    assert.deepEqual(session.notified, []);
+  });
+}
+
+test("in TUI mode a session takes exactly the two selection subscriptions", async (t) => {
+  useTempAgentDir(t);
+  const session = await harness().start();
+  assert.deepEqual(
+    session.subscriptions.map((subscription) => subscription.event),
+    ["model_select", "thinking_level_select"],
+    "the two pushed datums, and no branch subscription for the deferred one",
+  );
+});
+
+test("outside TUI mode a session takes no subscription", async (t) => {
+  useTempAgentDir(t);
+  const session = await harness().start({ mode: "print" });
+  assert.deepEqual(session.subscriptions, []);
+});
+
+test("a model selection push changes the line and requests one repaint", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+
+  h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5" } });
+
+  assert.ok(session.lines(80)[0]?.startsWith("openai: gpt-5"));
+  assert.equal(session.repaints(), 1);
+});
+
+test("a thinking-level push changes the line and requests one repaint", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+
+  h.dispatch({ type: "thinking_level_select", level: "low" });
+
+  assert.ok(session.lines(80)[0]?.includes("thinking: low"));
+  assert.equal(session.repaints(), 1);
+});
+
+test("a push carrying the values the store already holds requests no repaint", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+
+  h.dispatch({ type: "model_select", model: { provider: "anthropic", id: "claude-opus-4" } });
+  h.dispatch({ type: "thinking_level_select", level: "high" });
+
+  assert.equal(session.repaints(), 0);
+  assert.ok(session.lines(80)[0]?.startsWith("anthropic: claude-opus-4"));
+});
+
+test("a second session_start releases the first install before installing its own", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  const h = harness();
+
+  const first = await h.start({
+    reason: "startup",
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+  const second = await h.start({
+    reason: "new",
+    model: { provider: "openai", id: "gpt-5" },
+    thinkingLevel: "low",
+  });
+
+  assert.deepEqual(
+    first.subscriptions.map((subscription) => subscription.calls),
+    [1, 1],
+    "each of the first install's two unsubscribes fired exactly once",
+  );
+  assert.deepEqual(h.log, [
+    "setFooter#1",
+    "unsubscribe:model_select",
+    "unsubscribe:thinking_level_select",
+    "setFooter#2",
+  ]);
+
+  const [line] = second.lines(80);
+  assert.ok(line?.startsWith("openai: gpt-5"), "the second footer renders the second context");
+  assert.ok(line?.includes("thinking: low"), "never the first install's values");
+
+  h.dispatch({ type: "model_select", model: { provider: "google", id: "gemini-3" } });
+  assert.equal(second.repaints(), 1, "the repaint lands on the second tui");
+  assert.equal(first.repaints(), 0, "and never on the first");
+});
+
+test("disposing a footer then replacing the session releases the first install once", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  const h = harness();
+
+  const first = await h.start({
+    reason: "startup",
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+  first.footers[0]?.dispose?.();
+
+  h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5" } });
+  assert.equal(first.repaints(), 0, "a disposed footer requests no repaint");
+
+  const second = await h.start({
+    reason: "new",
+    model: { provider: "google", id: "gemini-3" },
+    thinkingLevel: "low",
+  });
+
+  assert.deepEqual(
+    first.subscriptions.map((subscription) => subscription.calls),
+    [1, 1],
+    "each unsubscribe fired exactly once in total, across both callers",
+  );
+  assert.deepEqual(h.log, [
+    "setFooter#1",
+    "unsubscribe:model_select",
+    "unsubscribe:thinking_level_select",
+    "setFooter#2",
+  ]);
+
+  h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5.1" } });
+  assert.equal(first.repaints(), 0, "the first tui is never asked again");
+  assert.equal(second.repaints(), 1);
+
+  assert.equal(
+    first.footers[0]?.render(80)[0],
+    " ".repeat(80),
+    "the disposed footer resolves empty cells rather than the old values",
+  );
 });
