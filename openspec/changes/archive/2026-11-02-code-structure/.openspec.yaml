@@ -1,0 +1,46 @@
+schema: marbleization
+created: 2026-11-01
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "18bbd186-16fa-4ea9-a0f4-fe53fab5a124"
+    chidi: "15f860f2-81ef-433e-a2d5-7582ce10c0d8"
+    eleanor: "61cc9744-52b8-4c7f-bde8-c6c8f2cc2442"
+    council_kimi: "d36830d7-07d7-4ecb-b038-67bb4fb03058"
+    council_argon: "6a10ac2a-8790-4c09-9a2e-6c2fc30f6f2a"
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+  note: >
+    Resume state, 2026-11-01. The owner's settled shape replaced the directory declaration the earlier
+    drafts carried, so design.md and tasks.md were revised and both gates re-run against them.
+    SETTLED SHAPE: extensions/jefferson.ts is the entry (the manifest names that FILE, value
+    "./extensions/jefferson.ts") and extensions/jefferson/ beside it holds the working parts. No file
+    move, so the test import is unchanged; files and tsconfig include unchanged; one new convention
+    (an import from the entry must name a file inside the directory, because a bare "./jefferson"
+    resolves to the file, measured as TS2835). The owner was offered extensions/index.ts and kept
+    jefferson.ts. spec.md is NOT changing. council.md's "Ruling amended - 2026-11-01" and
+    proposal.md's "Superseded, 2026-11-01" block still record the directory shape as adopted; that is
+    known, named in design.md's "Superseded artifacts" paragraph, and left in place as the trail.
+    GATES: ALL THREE APPROVED - council_owner approved; design approved (r3 full review, r4 bounded
+    re-review); tasks approved (r4).
+    Design gate r3 was a full review of the revised shape: one blocking finding, about the record,
+    everything else clean (all eight requirements satisfied; host mechanics and every measurement
+    independently reproduced on a scratch tree; the CI guard re-proved against real npm pack output;
+    the artifact-check override upheld; round 1's findings intact). The remedy was a "Superseded
+    artifacts" paragraph naming all four artifacts carrying the dead declaration, plus removal of the
+    unqualified "no reader has to reconcile two versions" claim, applied directly by the parent.
+    Design gate r4 (bounded re-review) returned APPROVE with one non-blocking concern - a sentence the
+    remedy had duplicated - fixed directly, so design is APPROVED. Plan gate r4 returned APPROVE, and it executed the plan
+    rather than reading it: tasks 4.1's discovery command verbatim (green, the stray-module case,
+    the remove-the-pi-field probe, both reds), the D3 guard verbatim against real npm pack --dry-run
+    --json output plus the .files read-back and the shasum snapshot/check, and npm run typecheck.
+    Scratch copies at /tmp/mj-r4-scratch and /tmp/mj-r4-guard with the pinned host 1.4.0 in place
+    (the pi CLI on this machine is 1.5.0). No step moves a file; the manifest, header and CI steps
+    all name extensions/jefferson.ts; coverage of D1-D6 is complete; nothing became vacuous.
+    IMPLEMENTATION IS STARTING: tasks.md groups 1-5, on a branch, PR per the repo ruleset.
+    Verdicts on disk: design-gate.md, design-gate-r2.md, design-gate-r3.md, design-gate-r4.md,
+    plan-gate.md, plan-gate-r2.md, plan-gate-r3.md, plan-gate-r4.md. Every gate runs fresh-context in
+    a workflow script with a verdict outputSchema; the retained forked Michael thread is retired.
+    NEXT: implementation gate, openspec archive code-structure, then the statusline change itself.
