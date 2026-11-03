@@ -26,6 +26,8 @@ jobs:
           # from this commit's parent.
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+
       # No package-manager cache here. This workflow decides what reaches the registry and
       # a published tarball is permanent, so nothing restored from a cache should be able
       # to influence it.
@@ -35,9 +37,9 @@ jobs:
           package-manager-cache: false
 
       # Self-gating: a push to main is what triggers this, and a red merge must not publish.
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
 
       # The bump comes from the pull request's labels: release:major, release:minor or
       # release:patch. Anything else, including no label at all, is a patch. Labelling is
@@ -66,10 +68,11 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "bump=${{ steps.bump.outputs.bump }} -> $version"
 
-      # `npm publish` publishes the version in package.json, not the version computed
-      # above. Without this the tarball and the tag disagree.
+      # `pnpm publish` publishes the version in package.json, not the version computed
+      # above. Without this the tarball and the tag disagree. `pnpm version` is used rather
+      # than `npm version` because npm would write a package-lock.json back into the tree.
       - name: Apply the version to the manifest
-        run: npm version "${{ steps.v.outputs.version }}" --no-git-tag-version --allow-same-version
+        run: pnpm version "${{ steps.v.outputs.version }}" --no-git-tag-version --allow-same-version
 
       # A re-run whose publish already succeeded finishes the tag and the release instead
       # of failing on a version npm will never accept twice.
@@ -78,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           name=$(node -p "require('./package.json').name")
-          if npm view "$name@${{ steps.v.outputs.version }}" version >/dev/null 2>&1; then
+          if pnpm view "$name@${{ steps.v.outputs.version }}" version >/dev/null 2>&1; then
             echo "already=true" >> "$GITHUB_OUTPUT"
           else
             echo "already=false" >> "$GITHUB_OUTPUT"
@@ -86,10 +89,14 @@ jobs:
 
       # `publishConfig.provenance` is true, and that is also why this command only works
       # here: provenance is signed from a CI OIDC provider, so the identical command on a
-      # workstation fails before it reaches the registry.
+      # workstation fails before it reaches the registry. No provenance flag is passed;
+      # under trusted publishing pnpm attaches the attestation itself.
+      #
+      # `--no-git-checks` is required: `pnpm version` above has just dirtied the working
+      # tree, so `pnpm publish` would otherwise refuse.
       - name: Publish
         if: steps.published.outputs.already == 'false'
-        run: npm publish --tag latest
+        run: pnpm publish --tag latest --no-git-checks
 
       - name: Tag and release
         env:

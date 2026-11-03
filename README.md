@@ -42,9 +42,9 @@ behind each module.
 Trunk-based: `main` is the only long-lived branch, and every merge to it is a release.
 
 ```bash
-npm install
-npm run typecheck
-npm test
+pnpm install
+pnpm typecheck
+pnpm test
 ```
 
 Tests live in `tests/`, never beside an extension. Pi loads every direct `.ts` file in
@@ -58,9 +58,9 @@ manifest configured that way.
 ### A workstation cannot publish
 
 `publishConfig.provenance` is `true`, and provenance is signed from a CI OIDC provider.
-The identical `npm publish` on a laptop fails with `Automatic provenance generation not
-supported for provider: null`. Publishing is CI's job, and that is enforced by the
-mechanism rather than by a note in a file.
+A workstation has neither that provider nor a trusted-publishing credential, so the
+identical `pnpm publish` fails before it reaches the registry. Publishing is CI's job,
+and that is enforced by the mechanism rather than by a note in a file.
 
 ## Releasing
 
