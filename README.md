@@ -14,7 +14,7 @@ Starship.
 The statusline is a footer of one line per configured row, each row divided into evenly
 spaced cells. A cell holds an instrument, and an instrument shows one piece of the session's
 own data — the active model, the thinking level — by reading a store kept current behind the
-scenes. With no configuration you get the default single row of empty cells. Formatting,
+scenes. With no configuration you get the default single row of placeholder cells. Formatting,
 alignment, and gaps are not built yet.
 
 ## Install

@@ -193,6 +193,19 @@ test("the jefferson command reports the installed footer and how many rows it re
   assert.equal(VERSION, "0.0.0-alpha");
 });
 
+test("outside TUI mode the jefferson command reports that no footer is installed", async (t) => {
+  useTempAgentDir(t);
+  const h = harness();
+  await h.start({ mode: "print" });
+  const def = h.commands.get("jefferson");
+  assert.ok(def, "no jefferson command registered");
+
+  // Print and RPC modes have no footer install, so the command is the only account of it.
+  const notified: string[] = [];
+  await def.handler("", { ui: { notify: (message) => void notified.push(message) } });
+  assert.deepEqual(notified, ["pi-jefferson — no statusline footer is installed."]);
+});
+
 test("the session_start handler installs the footer in TUI mode", async (t) => {
   useTempAgentDir(t);
   const session = await harness().start();

@@ -88,6 +88,11 @@ its cell does not render. No other key states a cell count.
 - **WHEN** a declared row carries an empty `cells` list
 - **THEN** the configuration is rejected, the default row renders, and the warning names the reason
 
+#### Scenario: a cells entry that is not a string
+
+- **WHEN** a declared row carries a `cells` entry that is not a string
+- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
+
 ### Requirement: Configuration designates each cell's instrument
 
 A row MAY declare `cells`, the names of instruments in cell order. The extension MUST render the
