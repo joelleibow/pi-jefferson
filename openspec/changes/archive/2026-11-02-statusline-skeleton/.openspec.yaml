@@ -1,0 +1,40 @@
+schema: marbleization
+created: 2026-11-02
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "034ac683-d4a8-4f57-80f6-ce03e604b875"
+    chidi: "edb4f0b4-6486-49f8-a640-6d783be229ff"
+    eleanor: "a391a10b-7c72-4928-896a-9fe3f466749a"
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+  note: >
+    Phase: Research COMPLETE (reports on disk); next is the proposal/specs step, then council (PL1),
+    owner decisions (PL2), design (PL3/PL4), tasks (PL6/PL7).
+    Grounding: challenged by the retained Michael thread (run 26116c76) as NOT SOUND ENOUGH at first
+    pass; resolved because the config location is bounded by pi's documented settings resolution plus
+    the pi-powerline-footer precedent, the layout mechanism was corrected to HStack/StackEntryOptions
+    (basis, grow, shrink, minSize, maxSize, visible) plus StackOptions (gap, align) and
+    allocateStackSizes -- which supersedes hand-rolled width arithmetic and likely dissolves the
+    remainder question -- and the objective was narrowed to: a footer row, evenly distributed cells,
+    rows declarable in configuration, Lorem content, no module/contribution interface in scope.
+    Change: openspec/changes/statusline-skeleton. Working dir state: existing_project.
+    Two facts the research previews already state and that touch the design: (1) Chidi examined TWO
+    platform versions because they differ in documentation coverage -- the project pins
+    @earendil-works/pi-coding-agent and pi-tui at 1.4.0 while the globally installed pi is 1.5.0;
+    (2) Eleanor reports the working-parts directory extensions/jefferson/ does not exist on disk yet,
+    so this change would create it.
+    NOT YET READ IN FULL by Conductor: both research reports were received as previews only.
+    PL1 COUNCIL COMPLETE: council-kimi (389ca6ca) and council-argon (95b2a9cd) both returned, neither
+    read the repo. Converged: equal widths require explicit floor(W/N) per render because
+    allocateStackSizes drains greedily left-to-right (66/34 for two grow:1 children at width 100) --
+    the grounding's "grow: 1" claim is WRONG and the drafted spec is right. Both also agree counts
+    should be scoped to the config surface, no module interface in this change, cells must truncate
+    and pad themselves, and width helpers must be injected from the entry because only it may
+    runtime-import the host package. Three disputed claims are each other's positions, so Pass 2 is
+    evidenced in the returns. council.md written with four Owner Decisions Required; PL2 gate is
+    PENDING and the process is stopped here until Joel rules.
