@@ -11,16 +11,26 @@
  * host package (`@earendil-works/*`); modules under `extensions/jefferson/` import
  * each other by relative path and use `import type` for host types. Because the
  * working-parts directory shares its stem with this file, an import from here must
- * name a file inside it (`./jefferson/rows.ts`), not the bare `./jefferson`.
+ * name a file inside it (`./jefferson/configuration.ts`), not the bare `./jefferson`.
  *
- * This file is the whole of 0.0.0-alpha, and its only job is to prove the package
- * installs and loads. It registers one command and touches nothing else: a name claim
- * should not be able to change anyone's session. The statusline itself does not exist
- * yet, and the design for it lives in `openspec/`.
+ * The entry registers the `/jefferson` version command and installs the statusline
+ * footer: on every `session_start` in TUI mode it reads `pi-jefferson.json` (agent
+ * directory, plus the trusted project copy), injects the host's width helpers into
+ * the renderer, and replaces the built-in footer with one line per declared row.
+ * Reload clears the custom footer, so the install re-runs on every `session_start`.
  */
 
-// Type-only, so this module resolves nothing at runtime and needs no dependency tree.
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
+
+import {
+  CONFIG_DIR_NAME,
+  type ExtensionAPI,
+  getAgentDir,
+} from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+
+import { readConfiguration } from "./jefferson/configuration.ts";
+import { createFooter } from "./jefferson/row-renderer.ts";
 
 export const VERSION = "0.0.0-alpha";
 
@@ -30,5 +40,18 @@ export default function jefferson(pi: ExtensionAPI): void {
     handler: async (_args, ctx) => {
       ctx.ui.notify(`pi-jefferson ${VERSION} — the statusline is not built yet.`, "info");
     },
+  });
+
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+
+    const { rows, warning } = readConfiguration({
+      agentPath: join(getAgentDir(), "pi-jefferson.json"),
+      projectPath: join(ctx.cwd, CONFIG_DIR_NAME, "pi-jefferson.json"),
+      projectTrusted: ctx.isProjectTrusted(),
+    });
+    if (warning !== undefined) ctx.ui.notify(warning, "warning");
+
+    ctx.ui.setFooter(() => createFooter(rows, { truncateToWidth, visibleWidth }));
   });
 }
