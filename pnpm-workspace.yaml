@@ -1,0 +1,9 @@
+# Deliberate denials. pnpm 11+ fails an install when a dependency's build script is
+# undecided, and these two are transitive dev dependencies of
+# @earendil-works/pi-coding-agent. Neither script builds anything — protobufjs's
+# postinstall prints a support notice and @google/genai's preinstall is an echo — and
+# neither can affect this package's build, tests, or published tarball. Do not delete
+# these entries: without them `pnpm install` fails with ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  '@google/genai': false
+  protobufjs: false

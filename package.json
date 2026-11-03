@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Joel Leibow",
   "type": "module",
+  "packageManager": "pnpm@12.17.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joelleibow/pi-jefferson.git"

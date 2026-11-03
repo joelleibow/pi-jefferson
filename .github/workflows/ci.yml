@@ -18,23 +18,37 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Before setup-node: `cache: pnpm` needs pnpm on PATH to locate the store.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v7
         with:
           node-version: 26
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
 
       # Catches a `files` mistake before it reaches a publish, where it is permanent, and pins
       # the load contract the manifest declares. Ordinary modules under extensions/jefferson/
       # are allowed; only the roots, the entry, and the manifest itself are pinned.
+      #
+      # The manifest is read from a real tarball, not from the repo's package.json: pnpm
+      # rewrites the manifest it packs (it strips packageManager and publish lifecycle
+      # scripts), so only the packed copy proves what a consumer would actually receive.
       - name: The tarball and the load contract are what we expect
         run: |
-          npm pack --dry-run --json | node -e '
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          pnpm pack --dry-run --json > "$tmp/shipping.json"
+          pnpm pack --pack-destination "$tmp" >/dev/null
+          tar -xOzf "$tmp"/*.tgz package/package.json > "$tmp/packed-package.json"
+
+          node -e '
             const fs = require("node:fs");
-            const [tarball] = JSON.parse(fs.readFileSync(0, "utf8"));
+            const tarball = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             const shipped = tarball.files.map((f) => f.path).sort();
             console.log("shipping:", shipped.join(", "));
 
@@ -46,7 +60,7 @@ jobs:
 
             const entry = "extensions/jefferson.ts";
             const loadRoot = ["./extensions/jefferson.ts"];
-            const declared = JSON.parse(fs.readFileSync("package.json", "utf8")).pi?.extensions;
+            const declared = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).pi?.extensions;
 
             const problems = [];
             const stray = shipped.filter((p) => !allowed(p));
@@ -61,4 +75,4 @@ jobs:
               console.error("tarball or load contract changed; " + problems.join("; "));
               process.exit(1);
             }
-          '
+          ' "$tmp/shipping.json" "$tmp/packed-package.json"
