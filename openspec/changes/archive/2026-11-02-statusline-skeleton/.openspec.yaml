@@ -3,7 +3,7 @@ created: 2026-11-02
 x-marbleization:
   working_dir_state: existing_project
   runs:
-    michael: "2a11bfb4-cdee-4ac8-83a0-9f691539fff9"
+    michael: "034ac683-d4a8-4f57-80f6-ce03e604b875"
     chidi: "edb4f0b4-6486-49f8-a640-6d783be229ff"
     eleanor: "a391a10b-7c72-4928-896a-9fe3f466749a"
   gates:
@@ -11,6 +11,7 @@ x-marbleization:
     design: approved
     tasks: approved
     implement: approved
+    validate: approved
   note: >
     Phase: Research COMPLETE (reports on disk); next is the proposal/specs step, then council (PL1),
     owner decisions (PL2), design (PL3/PL4), tasks (PL6/PL7).
