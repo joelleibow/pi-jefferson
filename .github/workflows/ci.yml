@@ -27,16 +27,38 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-      # Catches a `files` mistake before it reaches a publish, where it is permanent.
-      - name: The tarball is the file set we expect
+      # Catches a `files` mistake before it reaches a publish, where it is permanent, and pins
+      # the load contract the manifest declares. Ordinary modules under extensions/jefferson/
+      # are allowed; only the roots, the entry, and the manifest itself are pinned.
+      - name: The tarball and the load contract are what we expect
         run: |
           npm pack --dry-run --json | node -e '
-            const [tarball] = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            const fs = require("node:fs");
+            const [tarball] = JSON.parse(fs.readFileSync(0, "utf8"));
             const shipped = tarball.files.map((f) => f.path).sort();
             console.log("shipping:", shipped.join(", "));
-            const expected = ["LICENSE", "README.md", "extensions/jefferson.ts", "package.json"];
-            if (JSON.stringify(shipped) !== JSON.stringify(expected)) {
-              console.error("tarball contents changed; update the expectation deliberately");
+
+            const allowed = (p) =>
+              p === "package.json" ||
+              p === "README.md" ||
+              p === "LICENSE" ||
+              p.startsWith("extensions/");
+
+            const entry = "extensions/jefferson.ts";
+            const loadRoot = ["./extensions/jefferson.ts"];
+            const declared = JSON.parse(fs.readFileSync("package.json", "utf8")).pi?.extensions;
+
+            const problems = [];
+            const stray = shipped.filter((p) => !allowed(p));
+            if (stray.length) problems.push(`paths outside the expected roots: ${stray.join(", ")}`);
+            if (!shipped.includes(entry)) problems.push(`the declared entry is not shipped: ${entry}`);
+            const tests = shipped.filter((p) => p.endsWith(".test.ts"));
+            if (tests.length) problems.push(`test files shipped: ${tests.join(", ")}`);
+            if (JSON.stringify(declared) !== JSON.stringify(loadRoot))
+              problems.push(`pi.extensions is not exactly ${JSON.stringify(loadRoot)}: ${JSON.stringify(declared)}`);
+
+            if (problems.length) {
+              console.error("tarball or load contract changed; " + problems.join("; "));
               process.exit(1);
             }
           '

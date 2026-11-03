@@ -18,6 +18,11 @@
     "README.md",
     "LICENSE"
   ],
+  "pi": {
+    "extensions": [
+      "./extensions/jefferson.ts"
+    ]
+  },
   "keywords": [
     "pi",
     "statusline",
