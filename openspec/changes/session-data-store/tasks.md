@@ -75,7 +75,9 @@ has one reason to be red rather than two.
 - No datum beyond `provider`, `model`, `thinkingLevel`; `onBranchChange` is not subscribed.
 - No API by which third-party code supplies or replaces cell content; 5.5 keeps that checkable.
 - No manifest, `tsconfig`, or CI edit; 6.5 confirms it.
-- `package.json`, `README.md`, and the archive/validation bookkeeping are untouched by these tasks.
+- `package.json` and the archive/validation bookkeeping are untouched by these tasks. `README.md`
+  is allowed to change, for one reason: its prose had become false once the footer shipped, so the
+  status and concept text is corrected here rather than left shipping in the tarball.
 
 ## 1. The store (`extensions/jefferson/session-data-store.ts`)
 
@@ -217,9 +219,10 @@ imports and adds `./instrument.ts`. Its tests live in `tests/configuration.test.
   so the default-row assertion fails; a non-list `cells` is not handled as a rejection — `4` makes
   the parse throw outside the `RejectedConfiguration` channel, and `"4"` is iterated as one entry —
   so no default row with a warning comes back either way. **Then implement** both rejections inside
-  the existing `RejectedConfiguration` flow. D11's empty-array policy is flagged in `design.md`'s
-  Open Questions for the owner to confirm or reverse; this task executes it as approved. **Green:**
-  `node --test tests/configuration.test.ts`.
+  the existing `RejectedConfiguration` flow. The empty-array policy is not an open question: the
+  proposal delegates the error policy to design, D11 decides it, and the statusline delta states it
+  as the scenario `cells empty` under `A row's cells are its count and its placement`.
+  **Green:** `node --test tests/configuration.test.ts`.
 
 - [x] 3.3 `containers` is no longer read. **Test first:** a document carrying `containers: 3` is
   accepted, renders 8 `blank` cells and produces one warning naming the key and the migration
@@ -368,7 +371,26 @@ before the next store exists — no task may reintroduce a per-install-only tear
   document carrying `containers: 3` warns naming the key and `declare cells instead` while still
   rendering its rows as eight `blank` cells. Record the observed lines and the warning text.
 
-- [x] 6.5 Nothing outside `extensions/` and `tests/` changed to make this work:
-  `git diff --exit-code package.json tsconfig.json .github/workflows/ci.yml README.md` prints
-  nothing, and `pnpm pack --dry-run --json` lists both new source files under `extensions/jefferson/`
-  and no `*.test.ts`. The host pin stays `^1.4.0` (D14).
+- [x] 6.5 Nothing outside `extensions/` and `tests/` changed to make this work, except `README.md`:
+  `git diff --exit-code package.json tsconfig.json .github/workflows/ci.yml` prints nothing, and
+  `pnpm pack --dry-run --json` lists both new source files under `extensions/jefferson/` and no
+  `*.test.ts`. The host pin stays `^1.4.0` (D14). `README.md` is allowed to change because its prose
+  had become false: it claimed the package had no statusline, promised a contribution interface the
+  statusline delta forbids, and used a noun `owner-rulings.md` rejects.
+
+## Deferred debt
+
+Recorded so the next change inherits it knowingly; none of it is this change's to fix.
+
+- **`VERSION` drifts from `package.json`.** `extensions/jefferson.ts` exports
+  `VERSION = "0.0.0-alpha"` while `package.json` says `0.1.1`, so no user-facing message may print
+  it. Correcting it — deriving the string from the manifest, or dropping the export — is the
+  follow-up change's problem, not this one's: the exported-surface test pins the export and the
+  `/jefferson` message is written to avoid the wrong version.
+- **Most of the fake host stays `unknown`-typed.** `tests/jefferson.test.ts` declares
+  `type Handler = (event: unknown, ctx: unknown) => unknown`, builds the fake `pi` and `ctx` as
+  structurally unrelated literals, and casts the entry at the call, so `pnpm typecheck` cannot catch
+  a fake that drifts from `ExtensionContext` beyond the one parameter a `Pick<TUI, "requestRender">`
+  now checks. A full `satisfies Pick<ExtensionContext, …>`/`satisfies Pick<ExtensionAPI, …>` refactor
+  of the fake is deliberately not attempted here — it fights the narrower `CommandDef` and
+  `FakeFooter` shapes — and is left to whoever next needs a fake the compiler vouches for.

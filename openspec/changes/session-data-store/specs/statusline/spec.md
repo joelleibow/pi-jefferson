@@ -64,7 +64,9 @@ nothing and keeps its eight cells. A `cells` array longer than 8 is truncated to
 
 A row's `cells` array MUST be both the number of cells in the row and the instrument filling each
 of them. An absent value MUST mean eight cells, and the ceiling MUST be 8: a `cells` array longer
-than 8 MUST be truncated to 8 rather than rejected. No other key states a cell count.
+than 8 MUST be truncated to 8 rather than rejected. Every entry of a longer array MUST still be
+validated, so the ceiling applies to its length only: an unknown name past it still warns though
+its cell does not render. No other key states a cell count.
 
 #### Scenario: cells absent
 
@@ -80,6 +82,11 @@ than 8 MUST be truncated to 8 rather than rejected. No other key states a cell c
 
 - **WHEN** a declared row names 12 instruments in `cells`
 - **THEN** the row renders the first 8 cells and the configuration is accepted
+
+#### Scenario: cells empty
+
+- **WHEN** a declared row carries an empty `cells` list
+- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
 
 ### Requirement: Configuration designates each cell's instrument
 

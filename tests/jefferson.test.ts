@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
@@ -113,7 +114,10 @@ function harness(): Harness {
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
           notify: (message: string, type?: string) => void notified.push({ message, type }),
-          setFooter: (factory: (tui: { requestRender(): void }) => FakeFooter) => {
+          // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
+          // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
+          // drifting from the host it stands in for.
+          setFooter: (factory: (tui: Pick<TUI, "requestRender">) => FakeFooter) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
             footers.push(factory(tui));
@@ -141,17 +145,6 @@ test("registers exactly one command", () => {
   assert.deepEqual([...harness().commands.keys()], ["jefferson"]);
 });
 
-test("the alpha announces that it is a name claim and nothing more", async () => {
-  const notified: string[] = [];
-  const def = harness().commands.get("jefferson");
-  assert.ok(def, "no jefferson command registered");
-
-  await def.handler("", { ui: { notify: (message) => void notified.push(message) } });
-
-  assert.deepEqual(notified, [`pi-jefferson ${VERSION} — the statusline is not built yet.`]);
-  assert.equal(VERSION, "0.0.0-alpha");
-});
-
 /** Set PI_CODING_AGENT_DIR to a temp dir for one test and restore it after. */
 function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
   const agentDir = mkdtempSync(join(tmpdir(), "jefferson-agent-"));
@@ -173,6 +166,32 @@ function writeProjectDocument(cwd: string, document: unknown): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "pi-jefferson.json"), JSON.stringify(document));
 }
+
+test("the jefferson command reports the installed footer and how many rows it renders", async (t) => {
+  const agentDir = useTempAgentDir(t);
+
+  const notifiedBy = async (document: unknown): Promise<string[]> => {
+    writeAgentDocument(agentDir, document);
+    const h = harness();
+    await h.start();
+    const def = h.commands.get("jefferson");
+    assert.ok(def, "no jefferson command registered");
+
+    const notified: string[] = [];
+    await def.handler("", { ui: { notify: (message) => void notified.push(message) } });
+    return notified;
+  };
+
+  assert.deepEqual(await notifiedBy({}), [
+    "pi-jefferson — the statusline footer is installed, 1 row.",
+  ]);
+  assert.deepEqual(await notifiedBy({ rows: [{}, {}, {}] }), [
+    "pi-jefferson — the statusline footer is installed, 3 rows.",
+  ]);
+
+  // The message must not print it: `VERSION` is `0.0.0-alpha` while `package.json` says `0.1.1`.
+  assert.equal(VERSION, "0.0.0-alpha");
+});
 
 test("the session_start handler installs the footer in TUI mode", async (t) => {
   useTempAgentDir(t);

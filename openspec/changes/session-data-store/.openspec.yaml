@@ -5,12 +5,12 @@ goal: Documents hold instruments; instruments read from a store that owns
 x-marbleization:
   working_dir_state: existing_project
   runs:
-    michael: bc8a9904-5265-43a2-8852-5b8a51ca4b45
+    michael: 11c6fdd6-43f8-4171-8d05-22fee396ceec
     chidi: 08fe85ef-3b85-46da-9628-e7f008ae849a
     eleanor: d70bc70b-af8f-482b-aafc-924ca32486b9
   gates:
     council_owner: approved
     design: approved
     tasks: approved
-    implement: pending
-    validate: pending
+    implement: approved
+    validate: changes_requested

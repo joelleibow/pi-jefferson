@@ -469,7 +469,19 @@ resolve. `blank` renders its placeholder regardless — it reads no datum.
   behavior change is worse. The both-shapes guard that used to test `"containers" in doc || "id" in doc`
   now tests `"cells" in doc || "id" in doc`.
 - The ceiling applies to the array's length; no other key states a cell count, and a length mismatch
-  is no longer expressible.
+  is no longer expressible. Every entry of a longer array is validated before the ceiling truncates
+  it, so the ceiling clause applies to length only: an unknown name past the ceiling still warns
+  though its cell does not render.
+
+**Both error policies are settled here, not left open.** `proposal.md` delegates the error policy to
+design, listing what a `cells` array renders as when it is empty and whether a document that still
+carries a `containers` key is rejected, ignored, or warned about as its open questions for design —
+deciding them is this design's job, and D11 decides both, with the rationale above. The delta now
+states the empty-array rule as the scenario `cells empty` under `A row's cells are its count and its
+placement`, so the shipped rejection is a spec requirement rather than an unratified choice. The
+`containers` policy needs no spec requirement: the delta removes the key and its REMOVED requirement
+already carries the migration guidance, so warning rather than rejecting is stated where a returning
+user reads it.
 
 ### D12. The renderer's input is still text per cell; geometry is untouched
 
@@ -669,10 +681,6 @@ One row per requirement, for the two delta specs this change carries.
 
 ## Open Questions
 
-- **Does the owner confirm the empty-`cells` policy?** D11 rejects an empty `cells` array (warning plus
-  the default row) because `floor(W / 0)` has no geometry and `containers: 0` was already rejected. If
-  the owner prefers "empty means absent, eight `blank` cells", the change is one line in
-  `configuration.ts` and one test — no decision above changes.
 - **When the deferred datum arrives** (git branch first, per `owner-rulings.md`), does it enter as a
   pushed datum via `footerData.onBranchChange` — the provider's only change subscription — or as
   read-at-render? It changes no code here; it decides which of D3's unbuilt modes gets built first.

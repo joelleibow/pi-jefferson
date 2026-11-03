@@ -1,21 +1,21 @@
 # pi-jefferson
 
-**Pre-alpha. This claims the name and does nothing else yet.** Installing it registers a
-single command, `/jefferson`. There is no statusline in this package.
+**Pre-alpha.** Installing it registers a single command, `/jefferson`, and installs a
+statusline footer in TUI sessions.
 
-A starship-style statusline for [pi](https://github.com/earendil-works/pi): modules you
-turn on and off, a real layout, and per-module formatting.
+A starship-style statusline for [pi](https://github.com/earendil-works/pi): instruments you
+place in a row's cells, a real layout, and per-instrument formatting.
 
 The name is a nod to the lineage — Jefferson Airplane became Jefferson Starship became
 Starship.
 
 ## Status
 
-`0.1.0` is the base for the first real release. Until it ships you will get a prerelease
-if you install anything at all.
-
-What the first release will do: render one row from an ordered module list, with a module
-interface other extensions can contribute to. Nothing below that works today.
+The statusline is a footer of one line per configured row, each row divided into evenly
+spaced cells. A cell holds an instrument, and an instrument shows one piece of the session's
+own data — the active model, the thinking level — by reading a store kept current behind the
+scenes. With no configuration you get the default single row of empty cells. Formatting,
+alignment, and gaps are not built yet.
 
 ## Install
 
@@ -23,8 +23,7 @@ interface other extensions can contribute to. Nothing below that works today.
 pi install npm:pi-jefferson
 ```
 
-Then `/jefferson` reports the version. Nothing else happens, by design — a name claim
-should not be able to change anyone's session.
+Then `/jefferson` reports the footer this session installed and how many rows it renders.
 
 ## Why another statusline
 
@@ -34,8 +33,8 @@ by construction, a segment cannot carry another segment's value, and the `left` 
 / `secondary` groups are one flat list rather than rows or columns.
 
 This package is for the case where you want a layout — rows, alignment, per-gap spacing,
-a stated truncation priority — and per-module formatting, with the pi session's own data
-behind each module.
+a stated truncation priority — and per-instrument formatting, with the pi session's own data
+behind each instrument.
 
 ## Development
 

@@ -42,10 +42,23 @@ export default function jefferson(pi: ExtensionAPI): void {
   // exists (D5).
   let releasePrevious: (() => void) | undefined;
 
+  // Retained for the same reason: how many rows the footer this session installed renders, so
+  // `/jefferson` describes the installed footer rather than claiming there is none.
+  let footerRows: number | undefined;
+
   pi.registerCommand("jefferson", {
-    description: "Report the pi-jefferson version",
+    description: "Report the installed statusline footer",
     handler: async (_args, ctx) => {
-      ctx.ui.notify(`pi-jefferson ${VERSION} — the statusline is not built yet.`, "info");
+      // `VERSION` is deliberately not printed: it is `0.0.0-alpha` while `package.json` says
+      // `0.1.1`, so it would report a wrong version (see `tasks.md`'s deferred debt).
+      ctx.ui.notify(
+        footerRows === undefined
+          ? "pi-jefferson — no statusline footer is installed."
+          : `pi-jefferson — the statusline footer is installed, ${footerRows} ${
+              footerRows === 1 ? "row" : "rows"
+            }.`,
+        "info",
+      );
     },
   });
 
@@ -95,6 +108,7 @@ export default function jefferson(pi: ExtensionAPI): void {
     });
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
+    footerRows = rows.length;
     const footer = createFooter(rows, () => store.sample(), { truncateToWidth, visibleWidth });
 
     ctx.ui.setFooter((tui) => {
