@@ -9,7 +9,7 @@
  * tall, so a row always is.
  */
 
-import { HStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 
 import type { Row } from "./configuration.ts";
 import type { Readings } from "./session-data-store.ts";
@@ -35,8 +35,8 @@ export function renderRow(
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
 
-  /** One cell: clipped to the width the row gives it, padded so it occupies that width. */
-  const cellComponent = (text: string): Component => ({
+  /** One cell view: content in, one clipped and padded line out. It knows nothing of instruments. */
+  const cellView = (text: string): Component => ({
     render: (cellRenderWidth: number): string[] => {
       const clipped = truncateToWidth(text, cellRenderWidth);
       const pad = Math.max(0, cellRenderWidth - visibleWidth(clipped));
@@ -49,7 +49,7 @@ export function renderRow(
   // (once to measure, again to lay out), and an instrument must not pay for that twice.
   const resolved = row.cells.map((cell) => cell.instrument.resolve(readings));
   const composed = new HStack(
-    resolved.map((text) => ({ component: cellComponent(text), basis: cellWidth, grow: 0, shrink: 0 })),
+    resolved.map((text) => ({ component: cellView(text), basis: cellWidth, grow: 0, shrink: 0 })),
     { gap: GAP },
   ).render(width)[0] ?? "";
 
@@ -67,7 +67,12 @@ export function createFooter(
       // One sample per render, handed to every row and every cell, so two cells reading one datum
       // cannot disagree: agreement is structural, not procedural (D4).
       const readings = sampleReadings();
-      return rows.map((row) => renderRow(row, width, readings));
+      const rowViews = rows.map((row): Component => ({
+        render: (rowWidth: number): string[] => [renderRow(row, rowWidth, readings)],
+        invalidate: () => {},
+      }));
+      // The footer is one component holding a tree: a VStack of rows, each row an HStack of cells.
+      return new VStack(rowViews, { gap: 0 }).render(width);
     },
     // The footer caches nothing, so there is nothing to invalidate.
     invalidate(): void {},
