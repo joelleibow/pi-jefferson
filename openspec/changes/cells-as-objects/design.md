@@ -78,8 +78,8 @@ because neither report documents them.
 
 - `cells` is a list of cell objects carrying `instrument` and an optional `align`; a list of strings
   is not read, converted, or warned about as a near miss.
-- `align` is `left` (default) or `right`, and it moves only the pad's side inside the cell; clipping
-  stays the host's end-anchored clip.
+- `align` is `left` (default), `right` or `center`, and it moves only the pad's side inside the
+  cell; clipping stays the host's end-anchored clip.
 - The default row and the ceiling become ten cells, for the measured reason in D7.
 - Every requirement and scenario of `specs/statusline/spec.md` as amended is proven by a named
   test, with the alignment ones written so that alignment cannot pass unimplemented (D10).
@@ -88,8 +88,8 @@ because neither report documents them.
 
 **Non-Goals:**
 
-- `width`, a `spacer` instrument, `center`, a bare number as `cells`, and a `cellCount` key — not
-  built, not reserved, not scaffolded. A row that carries `cellCount` is still *ignored* rather than
+- `width`, a `spacer` instrument, a bare number as `cells`, and a `cellCount` key — not built, not
+  reserved, not scaffolded. A row that carries `cellCount` is still *ignored* rather than
   rejected: no scenario in the delta requires rejecting it, the baseline made the same promise, and
   rejecting unknown row keys is a rule the council did not rule (the shipped precedent for a
   known-but-unread row key, `containers`, warns rather than rejects).
@@ -108,7 +108,7 @@ because neither report documents them.
 
 ```ts
 // extensions/jefferson/configuration.ts
-export type CellAlign = "left" | "right";
+export type CellAlign = "left" | "right" | "center";
 
 /** A single cell of a row: the instrument whose text it displays, and the side it hugs. */
 export interface Cell {
@@ -121,8 +121,9 @@ export interface Cell {
   The alternative — an optional property, present only when declared — makes the parse result carry
   two shapes for one idea, and `tsconfig`'s `exactOptionalPropertyTypes` makes that distinction
   visible in the type system, so `renderRow` would need a fallback at every read. Normalizing once,
-  at parse time, leaves the renderer with one shape and one comparison. It also keeps the parse
-  result a *description* of what will be rendered rather than a partial echo of the document.
+  at parse time, leaves the renderer with one shape and one branch on three values. It also keeps
+  the parse result a *description* of what will be rendered rather than a partial echo of the
+  document.
 - **`renderRow` reads `cell.align`, required.** No `??`, no `"left"` literal in the renderer, no
   default stated twice.
 - **`blankCells` emits `{ instrument: blank, align: "left" }`**, so the default row renders exactly
@@ -133,9 +134,10 @@ export interface Cell {
 - **`tests/configuration.test.ts:305` changes with the shape**: `Object.keys(cell)` becomes
   `["instrument", "align"]` (insertion order, since `cellsFromNames` and `blankCells` build
   `{ instrument, align }`), the test's name becomes "every cell carries an instrument and an
-  alignment", and it additionally asserts `cell.align === "left"` for cells that declared none and
-  `"right"` for a cell that declared it. The old name claimed the object carried *only* an
-  instrument; the assertion now pins the two-key shape rather than a one-key one.
+  alignment", and it additionally asserts `cell.align === "left"` for cells that declared none,
+  `"right"` for a cell that declared that, and `"center"` for a cell that declared `center`. The old
+  name claimed the object carried *only* an instrument; the assertion now pins the two-key shape
+  rather than a one-key one.
 
 ### D2. The parse order, and why the ceiling stays last
 
@@ -148,7 +150,7 @@ change from strings to objects:
    rejects;
 3. **`instrument` is present**;
 4. **`instrument` is a non-empty string**;
-5. **`align`, when present, is `"left"` or `"right"`**;
+5. **`align`, when present, is `"left"`, `"right"` or `"center"`**;
 6. **resolve the instrument name** through `instrumentNamed` and collect an unknown into
    `notices.unknownInstruments` (the cell will render `blank`);
 7. **then the ceiling**: `if (cells.length === MAX_CELLS) break;`, then
@@ -188,7 +190,7 @@ values quoted, so the warning shows the offending value as it was written.
 | an unrecognised key on the cell object | `row ${index} has a cell with an unrecognised key ${JSON.stringify(key)}; a cell carries only instrument and align` |
 | the cell object has no `instrument` | `row ${index} has a cell with no instrument` |
 | `instrument` is not a non-empty string | `row ${index} has an instrument that is not a non-empty string` |
-| `align` is neither side | `row ${index} has an align that is not "left" or "right": ${JSON.stringify(value)}` |
+| `align` is outside the three | `row ${index} has an align that is not "left", "right" or "center": ${JSON.stringify(value)}` |
 
 - **The non-object message carries the new spelling with an example because it is the one every
   migrating user sees.** `"cells": ["model", "thinking"]` stops rendering its named cells, the
@@ -200,8 +202,9 @@ values quoted, so the warning shows the offending value as it was written.
 - **The align and key messages name the value or key**, which the delta requires of both scenarios
   ("the warning names the align value", "the warning names the key"). An empty string as `instrument`
   is rejected by the same message as a non-string: both are "not a non-empty string".
-- `align: null` and `align: 4` are the same failure as `align: "center"`; `JSON.stringify` prints
-  each as written. An absent `align` never reaches this check.
+- `align: null`, `align: 4` and `align: "middle"` are one failure; `JSON.stringify` prints each as
+  written. An absent `align` never reaches this check, and the message names all three accepted
+  values so a reader never has to infer the enum.
 - A JSON document cannot express `align: undefined`, so "absent" and "present" are the only two
   states the parser can observe.
 
@@ -234,23 +237,27 @@ export function renderRow(row: Row, width: number, helpers: WidthHelpers, readin
   for (const cell of row.cells) {
     const clipped = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
     const pad = cellWidth - helpers.visibleWidth(clipped);
-    if (cell.align === "right") line += spaces(pad);
+    const before = cell.align === "right" ? pad : cell.align === "center" ? Math.floor(pad / 2) : 0;
+    const after = cell.align === "left" ? pad : cell.align === "center" ? pad - Math.floor(pad / 2) : 0;
+    line += spaces(before);
     line += clipped;
     styleOpen = leavesStyleOpen(clipped);
-    if (cell.align !== "right") line += spaces(pad);
+    line += spaces(after);
   }
   line += spaces(width - helpers.visibleWidth(line));
   return line;
 }
 ```
 
-- `align: "right"` puts the pad **before** the cell's text; `left` puts it **after**. That is the
-  whole implementation of the owner's ruling — one comparison and the order of two appends.
+- `align: "right"` puts the whole pad **before** the cell's text; `left` puts it **after**;
+  `center` splits it — `floor(pad / 2)` columns before and `pad - floor(pad / 2)` after, so an odd
+  pad leaves its extra column on the right and the text sits half a column left of exact centre. That
+  is the whole implementation of the owner's ruling: two branch lines and the order of two appends.
 - `spaces` guards `count <= 0`, which subsumes the current `Math.max(0, …)` and keeps the
   fewer-cells-than-columns case (`cellWidth` 0) a line of the full width.
-- The `styleOpen` flag is what makes the reset land in the right place on **both** sides: for a
-  right-aligned cell the pad follows the *previous* cell's text, for a left-aligned one it follows
-  its own. D6 is the reason it exists.
+- The `styleOpen` flag is what makes the reset land in the right place on **both** sides: a pad
+  placed before the text follows the *previous* cell's text, a pad placed after it follows its own,
+  and a centred cell has one of each — all three go through `spaces`. D6 is the reason it exists.
 - **The row's remainder still lands at the right edge and is still not a cell.** Alignment hugs the
   cell's edge, so the `W mod N` columns sit after the last cell regardless of that cell's side: a
   right-aligned last cell ends `W mod N` columns short of the terminal edge — 2 columns at 132 with
@@ -267,17 +274,22 @@ export function renderRow(row: Row, width: number, helpers: WidthHelpers, readin
   wide glyph straddles the cut (fact 4), and clipping can leave escapes in the string, so measuring
   the clipped text is the only arithmetic that yields a cell of exactly `cellWidth` columns.
 - **The host's `truncateToWidth(..., pad: true)` is right-side only**, so it cannot implement
-  `right` alignment (fact 2). It is not used for either side; both pads come from the same
-  arithmetic, so `left` and `right` cannot disagree about a cell's width. The `WidthHelpers`
-  interface keeps its two-argument call, so `pad` stays `false` and no host behavior changes.
+  `right` alignment (fact 2). It is not used on either side; every pad comes from the same
+  arithmetic, so no alignment can disagree about a cell's width. The `WidthHelpers` interface keeps
+  its two-argument call, so `pad` stays `false` and no host behavior changes.
+- **Under `center` one pad becomes two that still sum to `pad`**: `floor(pad / 2)` columns before
+  the text and `pad - floor(pad / 2)` after. An odd pad therefore puts its extra column on the
+  right, which is the choice `owner-rulings.md` records, and it is why both halves come from one
+  `pad` rather than from two separate measurements.
 - **The pad is plain spaces with no styling of its own** (fact 5: a plain-space pad does not carry a
   background). D6 is the only thing the renderer adds in front of it, and only when needed.
-- **A cell still occupies `floor(W / N)` columns under either alignment**, including when the clip
+- **A cell still occupies `floor(W / N)` columns under any alignment**, including when the clip
   dropped a glyph: the deficit flows into the pad, so the row stays one line and the columns after
   the cell do not shift.
 - Measured fixtures that pin this (D10): `"ab漢字cd"` and `"ab😀cdef"` clip to 5 columns in a
   6-column cell (pad 1, glyph dropped); `"abe\u0301"` is 4 code units but 3 columns in a 6-column
-  cell (pad 3, which `length` arithmetic would get wrong as 2).
+  cell (pad 3, which `length` arithmetic would get wrong as 2; split as `center` that pad is 1
+  column to the left and 2 to the right).
 
 ### D6. The ANSI hazard is decided: a reset before any run of spaces whose preceding text left an SGR open
 
@@ -287,6 +299,8 @@ The council left this to design. It is real, and it has two sides:
   would style the pad that follows it: underline or a background painting trailing spaces.
 - **`right` (pad before the text).** The pad sits after the *previous* cell's text, so an
   unterminated SGR from that cell styles this cell's pad instead.
+- **`center` (pads on both sides).** Both hazards at once: the left half follows the previous
+  cell's text, the right half follows its own.
 
 The host does not save us: its reset is appended at the end of the rendered line (fact 5), after
 every pad this renderer writes. The host's own implementation closes underline and strikethrough
@@ -294,8 +308,9 @@ every pad this renderer writes. The host's own implementation closes underline a
 active at the end of a string (fact 5) — so this hazard is the host's own concern, evidenced in
 shipped code, not an inference from a terminal's behavior.
 
-**Decision: every run of spaces the renderer appends — a left-aligned pad, a right-aligned pad, and
-the row's remainder — is preceded by `"\x1b[0m"` when the text before it leaves styling open**,
+**Decision: every run of spaces the renderer appends — a left-aligned pad, a right-aligned pad, a
+centred cell's two pads, and the row's remainder — is preceded by `"\x1b[0m"` when the text before
+it leaves styling open**,
 which is `leavesStyleOpen`: the text contains an escape and does not end with `"\x1b[0m"` (D4's
 `styleOpen`). The reset adds no visible width — `visibleWidth` ignores ANSI (fact 1) — so geometry
 is untouched, and the pad carries none of that styling. The delta's ANSI scenario states that
@@ -315,9 +330,10 @@ Why this predicate rather than unconditional resets, and why it is not a no-op:
 - The guard covers SGR. An unterminated **OSC 8 hyperlink** is out of scope: a pad of spaces under a
   link is visually identical to unstyled spaces, and the host's own per-line close terminates it
   (fact 5).
-- **Residual, named rather than discovered: the guard covers runs of spaces only.** A cell whose text
-  exactly fills its cell leaves a zero pad, so no reset is emitted — and when that cell is
-  right-aligned and the *previous* cell's text left an SGR open, the cell's own text inherits that
+- **Residual, named rather than discovered: the guard covers runs of spaces only.** The trigger is
+  **no pad before the text**: a cell that fills its cell, or a centred cell whose left half rounds to
+  zero, leaves no pad before the text, so no reset is emitted — and when that cell is right-aligned
+  or centred and the *previous* cell's text left an SGR open, the cell's own text inherits that
   style. Measured: `[{text:"\x1b[4mabcdefghij"},{text:"abcdefghij",align:"right"}]` at width 20
   renders `"\x1b[4mabcdefghijabcdefghij"`, underlined throughout. That is pre-existing — today's
   renderer emits no reset at all — and it is outside this requirement's scope, which is about the
@@ -350,7 +366,7 @@ visible — `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)`.
 | Path | Diff |
 |---|---|
 | `extensions/jefferson/configuration.ts` | `CellAlign`, the two-key `Cell`, `10`/`10`, `cellsFromNames` → the object entry validation of D2/D3, `blankCells` emits `align: "left"` |
-| `extensions/jefferson/row-renderer.ts` | the loop of D4 (`spaces`, `styleOpen`, `leavesStyleOpen`, one branch on `cell.align`) |
+| `extensions/jefferson/row-renderer.ts` | the loop of D4 (`spaces`, `styleOpen`, `leavesStyleOpen`, and the three-way split of the pad on `cell.align`) |
 | `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts` | D10 |
 | `README.md` | the Status paragraph's "Formatting, alignment, and gaps are not built yet." loses "alignment" |
 | `extensions/jefferson.ts` | **no diff** — it injects the same two width helpers and passes the same `rows`; nothing in the parse or render change reaches it |
@@ -405,14 +421,14 @@ The expected strings are the host helpers' actual output (measured against `@ear
 | Requirement / scenario | Test | Pinned assertion |
 |---|---|---|
 | A row's cells are its count and its placement — object entries in order | `cells is both the count and the placement, in order` | fixture becomes `[{instrument:"model"},{instrument:"thinking"},{instrument:"blank"}]`; instruments deep-equal `[model, thinking, blank]` |
-| … the normalized shape (D1) | `every cell carries an instrument and an alignment` (renamed) | `Object.keys(cell)` is `["instrument","align"]`; `cell.align` is `"left"` when none was declared, `"right"` when one was |
+| … the normalized shape (D1) | `every cell carries an instrument and an alignment` (renamed) | `Object.keys(cell)` is `["instrument","align"]`; `cell.align` is `"left"` when none was declared, `"right"` and `"center"` when one was |
 | … default and ceiling are ten | `the cell-count constants are named for cells`; `cells naming 12 instruments keeps the first 10 and warns nothing` | `DEFAULT_CELLS`/`MAX_CELLS` are 10; 12 entries → 10 cells, no warning |
-| … the ceiling applies to length only | `a cells entry past the ceiling that is not an object rejects the document`; `an align past the ceiling that is not a side rejects the document`; `a cells entry past the ceiling naming an unknown instrument warns and renders ten cells` | a 12-entry fixture with position 11 malformed still rejects (D2's order); position 11 unknown still warns naming it, with 10 cells rendered |
+| … the ceiling applies to length only | `a cells entry past the ceiling that is not an object rejects the document`; `an align past the ceiling that is outside the three rejects the document`; `a cells entry past the ceiling naming an unknown instrument warns and renders ten cells` | a 12-entry fixture with position 11 malformed still rejects (D2's order); position 11 unknown still warns naming it, with 10 cells rendered |
 | … a cells entry that is not an object (D9's scenario) | `a cells entry that is not an object rejects and names the object spelling` | default row, warning matches `/not an object/` and `/declare \{"instrument": "model"\}/` |
 | … an unrecognised key | `a cell object with an unrecognised key rejects and names the key` | fixtures `{"instrument":"model","width":4}` and `{"instrument":"model","aling":"right"}`; warning matches `/unrecognised key/` and the key name |
 | … an entry that carries no instrument | `a cell object with no instrument rejects` | fixture `{"align":"right"}`; warning matches `/no instrument/` |
 | … an instrument that is not a name | `an instrument that is not a non-empty string rejects` | fixtures `{instrument: 4}` and `{instrument: ""}`; warning matches `/not a non-empty string/` |
-| A cell's alignment — an align that is neither side | `an align that is neither side rejects and names the value` | fixtures `"center"` and `4`; warning matches `/align/` and `/center/` |
+| A cell's alignment — an align outside the three | `an align outside the three rejects and names the value` | fixtures `"middle"`, `"Center"` and `4`; warning matches `/align/` and the offending value |
 | No compatibility path (Non-Goals) | `a cells list of strings is rejected with no converted read` | `{rows:[{cells:["model","thinking"]}]}` → default ten-cell row, warning matches `/not an object/` |
 | Declined spellings that were already rejected | `cells given as a number` / `a string` (kept), and the parametrized non-object entries (zero, negative, non-integer, `null`, an array) | default row + warning; the old `[{text:"x"}]` case moves to the unrecognised-key test, which now names `text` |
 
@@ -429,7 +445,9 @@ colliding with a synthesized id`, `an unparseable document`, and the trusted/age
 |---|---|---|
 | A cell that declares no align | `a left-aligned cell pads to the right of its text` | `"ab    ab    ab      "` byte-exact, `visibleWidth === 20` — with D1's normalization test this is the whole "absent means left" proof |
 | A right-aligned cell narrower than its cell | `a right-aligned cell pads to the left of its text` | `"    ab    ab    ab  "` byte-exact |
-| Text wider than the cell, under either alignment | `text wider than its cell renders identically under either alignment` | 2 cells at width 21 (`cellWidth` 10, remainder 1), text `"provider: a-very-long-model-name"`: both lines equal `"provide\x1b[0m...\x1b[0mprovide\x1b[0m...\x1b[0m "` — no pad remains and the alignments are indistinguishable |
+| A centred cell narrower than its cell | `a centred cell splits its pad across both sides` | text `"ab"` pads 4 into 2 and 2: `"  ab    ab    ab    "` byte-exact, `visibleWidth === 20` |
+| A centred cell at an odd pad | `a centred cell's odd pad puts its extra column on the right` | text `"abe\u0301"` (3 columns) pads 3 into 1 left and 2 right: `" abé   abé   abé    "` byte-exact — a rounded split would leave 2 on the left and read differently |
+| Text wider than the cell, under any alignment | `text wider than its cell renders identically under any alignment` | 2 cells at width 21 (`cellWidth` 10, remainder 1), text `"provider: a-very-long-model-name"`: all three lines equal `"provide\x1b[0m...\x1b[0mprovide\x1b[0m...\x1b[0m "` — no pad remains and the alignments are indistinguishable |
 | A wide glyph at the clip boundary | `a wide glyph dropped by the clip leaves a pad that keeps the cell's width` | text `"ab漢字cd"` clips to 5 columns in a 6-column cell (D5): left `"ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m   "`, right `" ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m  "`, both 20 wide |
 | An emoji in a cell | `an emoji clipped at the boundary leaves a one-column pad` | text `"ab😀cdef"` clips to 5 columns, same two expected lines as the wide-glyph case; the emoji never splits |
 | A combining mark in a cell | `a combining mark is measured in columns, not code units` | text `"abe\u0301"` (4 code units, 3 columns) pads 3: left `"abé   abé   abé     "`, right `"   abé   abé   abé  "` — `length` arithmetic would produce 2 |
@@ -471,13 +489,16 @@ show is decided here rather than in whatever window the session happens to have:
 |---|---|---|---|
 | the pad is visible under `right` | `[{instrument:"thinking"},{instrument:"thinking",align:"right"}]` | 80 | `cellWidth` 40, remainder 0; the right-aligned text occupies columns 67–80 |
 | the shortfall is visible | seven cells: six `{instrument:"thinking"}`, the last `{instrument:"thinking",align:"right"}` | 132 | `cellWidth` 18, remainder 6; the last cell's text ends on column 126, so its 6-column gap to the terminal edge is plainly visible |
-| the align is rejected | any row carrying `{instrument:"model",align:"center"}` | 80 | the notification `pi-jefferson: <path> was rejected (row 0 has an align that is not "left" or "right": "center"); rendering the default row` |
+| the centre split is visible, and its odd pad lands on the right | `[{instrument:"thinking"},{instrument:"thinking",align:"center"},{instrument:"thinking"}]` | 100 | `cellWidth` 33, remainder 1; the centred middle cell's text occupies columns 43–56, with a 9-column pad to its left and 10 to its right, so it sits half a column left of its cell's exact centre |
+| the align is rejected | any row carrying `{instrument:"model",align:"middle"}` | 80 | the notification `pi-jefferson: <path> was rejected (row 0 has an align that is not "left", "right" or "center": "middle"); rendering the default row` |
 
-Recorded for each observation: the terminal width, the observed line, and whether the right-aligned
+Recorded for each observation: the terminal width, the observed line, whether the right-aligned
 cell's text ends against its cell's edge, with the last cell ending `W mod N` columns short of the
 terminal edge — 6 columns for the seven-cell row at 132, and 2 columns for the ten-cell default at
-the same width, as the delta states. The record goes in the change's implementation record (not in
-a test), and this change is not complete until it holds the observed lines.
+the same width, as the delta states — and whether the centred cell's two pads are equal (an even
+pad) or heavier on the right by one column (an odd one). The record goes in the change's
+implementation record (not in a test), and this change is not complete until it holds the observed
+lines.
 
 **The task observes no wide glyph, because no configuration path stages one:** the model id is
 host-supplied, and `blank` is fixed ASCII Lorem text, so a wide-glyph instrument value cannot be

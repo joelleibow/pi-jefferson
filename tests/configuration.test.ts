@@ -146,9 +146,10 @@ test("an instrument that is not a non-empty string rejects", () => {
   }
 });
 
-test("an align that is neither side rejects and names the value", () => {
+test("an align outside the three rejects and names the value", () => {
   for (const [entry, expected] of [
-    [{ instrument: "model", align: "center" }, '"center"'],
+    [{ instrument: "model", align: "middle" }, '"middle"'],
+    [{ instrument: "model", align: "Center" }, '"Center"'],
     [{ instrument: "model", align: 4 }, ": 4"],
   ] as const) {
     const { rows, warning } = readDocument({ rows: [{ cells: [entry] }] });
@@ -207,9 +208,9 @@ test("a cells entry past the ceiling naming an unknown instrument warns and rend
   assert.match(warning, /brnach/);
 });
 
-test("an align past the ceiling that is not a side rejects the document", () => {
+test("an align past the ceiling that is outside the three rejects the document", () => {
   const cells: { instrument: string; align?: string }[] = Array.from({ length: 11 }, () => ({ instrument: "blank" }));
-  cells.push({ instrument: "blank", align: "center" });
+  cells.push({ instrument: "blank", align: "middle" });
   const { rows, warning } = readDocument({ rows: [{ cells }] });
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.cells.length, 10);
@@ -402,8 +403,14 @@ test("every cell carries an instrument and an alignment", () => {
     for (const cell of cells ?? []) {
       assert.deepEqual(Object.keys(cell), ["instrument", "align"]);
       assert.equal(cell.instrument, blank);
+      assert.equal(cell.align, "left");
     }
   }
+
+  const declared = readDocument({
+    rows: [{ cells: [{ instrument: "model", align: "right" }, { instrument: "thinking", align: "center" }] }],
+  });
+  assert.deepEqual(declared.rows[0]?.cells.map((cell) => cell.align), ["right", "center"]);
 });
 
 test("the default row's cells carry the left alignment", () => {

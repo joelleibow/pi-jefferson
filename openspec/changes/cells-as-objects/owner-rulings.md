@@ -23,8 +23,14 @@ are declined** — a relative share pool means deciding what the pool totals, wh
 overshoot, and how the remainder distributes, all to produce a gap that `align` already provides.
 Proportional layout is an addition to this shape if a real need appears later.
 
-`center` was not asked for and is not in scope. If a later change wants it, it is an addition to the
-same property.
+**`center` joins them on 2026-11-03**, after the first pass of this change was built: the owner
+corrected his own earlier scope, saying *"There should be left, right, and center."* So `align` is a
+three-valued enum — `left` (default), `right`, `center` — and an `align` outside those three still
+rejects the document, naming the value it refused.
+
+With an odd pad, centering cannot split evenly: `floor(pad / 2)` goes on the left and the remainder on
+the right, so an odd pad leaves its extra column on the right and the text sits half a column left of
+exact centre. That is the recorded choice, not an accident.
 
 ## Truncation stays at the end
 

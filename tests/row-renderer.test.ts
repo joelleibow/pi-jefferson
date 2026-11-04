@@ -89,7 +89,29 @@ test("a right-aligned cell pads to the left of its text", () => {
   assert.equal(visibleWidth(line), 20);
 });
 
-test("text wider than its cell renders identically under either alignment", () => {
+test("a centred cell splits its pad across both sides", () => {
+  const line = renderRow(
+    { id: "row-0", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "center" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(line, "  ab    ab    ab    ");
+  assert.equal(visibleWidth(line), 20);
+});
+
+test("a centred cell's odd pad puts its extra column on the right", () => {
+  const line = renderRow(
+    { id: "row-0", cells: rowOf(3, "abe\u0301").cells.map((cell) => ({ ...cell, align: "center" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(line, " abe\u0301   abe\u0301   abe\u0301    ");
+  assert.equal(visibleWidth(line), 20);
+});
+
+test("text wider than its cell renders identically under any alignment", () => {
   const row: Row = {
     id: "row-0",
     cells: [
@@ -104,7 +126,14 @@ test("text wider than its cell renders identically under either alignment", () =
     helpers,
     readings,
   );
+  const center = renderRow(
+    { ...row, cells: row.cells.map((cell) => ({ ...cell, align: "center" as const })) },
+    21,
+    helpers,
+    readings,
+  );
   assert.equal(right, left);
+  assert.equal(center, left);
   assert.equal(visibleWidth(left), 21);
   assert.equal(left, "provide\x1b[0m...\x1b[0mprovide\x1b[0m...\x1b[0m ");
 });

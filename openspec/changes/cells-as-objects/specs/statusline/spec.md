@@ -108,11 +108,11 @@ MUST render that cell as `blank`; the row's other cells MUST still render their 
 ### Requirement: Instrument text is bound by the row's geometry
 
 The text an instrument resolves to MUST be clipped at its end to its cell's width and padded to the
-cell's full width, on the side opposite the cell's `align`, so the row stays one line. Instrument
-text MUST NOT change the geometry: each of a row's N cells occupies `floor(W / N)` columns at width
-W, and the leftover `W mod N` columns MUST stay blank at the row's right edge. Alignment hugs its
-cell's edge, not the row's, so a right-aligned last cell ends `W mod N` columns short of that edge —
-2 columns at 132 with ten cells.
+cell's full width — on the side opposite the cell's `align`, or across both sides under `center` —
+so the row stays one line. Instrument text MUST NOT change the geometry: each of a row's N cells
+occupies `floor(W / N)` columns at width W, and the leftover `W mod N` columns MUST stay blank at
+the row's right edge. Alignment hugs its cell's edge, not the row's, so a right-aligned last cell
+ends `W mod N` columns short of that edge — 2 columns at 132 with ten cells.
 
 #### Scenario: An instrument's text is wider than its cell
 
@@ -128,11 +128,11 @@ cell's edge, not the row's, so a right-aligned last cell ends `W mod N` columns 
 
 ### Requirement: A cell's alignment is the padding side inside it
 
-A cell MAY declare `align`, whose value MUST be `left` or `right`; an absent value MUST mean
-`left`. Clipping stays at the text's end, with the ellipsis the row already uses, and the space the
-text leaves in its cell, whether or not clipping occurred, MUST be padding on the side opposite
-`align`, so the text sits against the side `align` names. The pad MUST be measured in visible
-terminal columns, the way the host measures them, after clipping — never in code units.
+A cell MAY declare `align`, whose value MUST be `left`, `right` or `center`; an absent value MUST
+mean `left`. Clipping stays at the text's end with the ellipsis the row already uses, and the space
+the text leaves in its cell, whether or not clipping occurred, MUST become padding that puts the
+text against the side `align` names — `center` splits it across both sides. The pad MUST be
+measured in visible terminal columns, after clipping, never in code units.
 
 #### Scenario: A cell that declares no align
 
@@ -145,16 +145,23 @@ terminal columns, the way the host measures them, after clipping — never in co
 - **WHEN** a cell declaring `align` `right` holds text narrower than the cell
 - **THEN** the pad sits to the text's left, so the text ends at the cell's right edge
 
-#### Scenario: Text wider than the cell, under either alignment
+#### Scenario: A centred cell narrower than its cell
+
+- **WHEN** a cell declaring `align` `center` holds text narrower than the cell
+- **THEN** the pad is split across both sides of the text, `floor(pad / 2)` columns to its left and
+  the remainder to its right, so an odd pad leaves its extra column on the right and the text sits
+  half a column left of exact centre
+
+#### Scenario: Text wider than the cell, under any alignment
 
 - **WHEN** a cell's text is wider than the cell, whichever `align` it declares
-- **THEN** clipping consumes the cell's whole width, no pad remains, and both alignments render the
+- **THEN** clipping consumes the cell's whole width, no pad remains, and every alignment renders the
   same columns
 
-#### Scenario: An align that is neither side
+#### Scenario: An align outside the three
 
-- **WHEN** a cell declares an `align` other than `left` or `right` — `center`, or a value that is
-  not a string
+- **WHEN** a cell declares an `align` other than `left`, `right` or `center` — `"middle"`,
+  `"Center"`, or a value that is not a string such as `4`
 - **THEN** the configuration is rejected, the default row renders, and the warning names the align
   value
 

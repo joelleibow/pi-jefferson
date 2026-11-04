@@ -24,11 +24,15 @@ to ten, so its cells divide more common terminal widths exactly.
   {"instrument": "model"}`). The migration is editing the document: each name becomes
   `{ "instrument": <name> }`. There is no deprecated read of the string form and no compatibility
   path — a list of strings is not accepted, not warned about, and not converted.
-- **`align` is a cell property**, `left` (the default, when `align` is absent) or `right`. It moves
-  the padding inside the cell, not the clipping: text is still clipped at its **end** with the
-  ellipsis the row already uses, and the pad lands on the side opposite `align`, so a right-aligned
-  cell whose text is narrower than the cell ends against the cell's right edge. Content wider than the cell looks
-  identical under both alignments, because clipping consumes the whole cell and leaves no pad.
+- **`align` is a three-valued cell property**, `left` (the default, when `align` is absent),
+  `right`, or `center`. It moves the padding inside the cell, not the clipping: text is still clipped
+  at its **end** with the ellipsis the row already uses, and the pad lands on the side opposite
+  `align`, so a right-aligned cell whose text is narrower than the cell ends against the cell's right
+  edge, while a centred cell splits its pad across both sides — `floor(pad / 2)` columns to the left
+  and the remainder to the right, so an odd pad leaves its extra column on the right and the text
+  sits half a column left of exact centre. Content wider than the cell looks identical under every
+  alignment, because clipping consumes the
+  whole cell and leaves no pad.
 - **The default and the ceiling move from 8 to 10 cells.** Ten divides 80, 100, 120, 160 and 200
   columns exactly under `floor(W / N)`; eight does not divide 100 or 132. Ten is not universal
   either — at 132 it leaves 2 columns against eight's 4 — so the claim is the measured one: ten
@@ -44,14 +48,14 @@ to ten, so its cells divide more common terminal widths exactly.
   reset before the pad is how the renderer may achieve that — and the host's line-end reset is
   untouched.
 - **Declined, and absent from this change:** `width`, a `spacer` instrument, a bare number as
-  `cells`, a `cellCount` key, and `center`. Proportional layout means deciding what a share pool
-  totals, what happens when shares overshoot, and how the remainder distributes, all to produce a
-  gap `align` already provides; a count key would serve only widths the default does not cover, at
-  the price of a second spelling for one idea.
+  `cells`, and a `cellCount` key. Proportional layout means deciding what a share pool totals, what
+  happens when shares overshoot, and how the remainder distributes, all to produce a gap `align`
+  already provides; a count key would serve only widths the default does not cover, at the price of
+  a second spelling for one idea.
 - **The error policy follows the shipped split.** A shape or type error rejects the whole document,
   and the default row renders with a warning: a `cells` entry that is not an object, an entry with
-  no `instrument`, an `instrument` that is not a string or is empty, and an `align` other than
-  `left` or `right` (`center` included). An unknown-but-well-formed instrument name still only
+  no `instrument`, an `instrument` that is not a string or is empty, and an `align` outside the
+  three (`"middle"`, `"Center"`, `4`). An unknown-but-well-formed instrument name still only
   warns and renders `blank` in that cell, as it does today. An unrecognised key on a cell object —
   the declined `width`, or a misspelling such as `aling` — is rejected too, and the warning names
   that key, because a statusline that silently renders something other than what was declared is
@@ -70,13 +74,12 @@ there rather than split into a second capability.
 ### Modified Capabilities
 
 - `statusline`: four requirements change and one is added. `A row's cells are its count and its
-  placement` states
-  cell objects, the ten-cell default and ceiling, and the new invalid-entry rejections.
-  `Configuration designates each cell's instrument` states that each entry is an object naming an
-  instrument. `Instrument text is bound by the row's geometry` states that padding lands on the
-  side opposite the cell's alignment. `Cell content comes from an instrument` moves the default
-  row's cell count from eight to ten so the spec does not state two defaults. `A cell's alignment
-  is the padding side inside it` is added.
+  placement` states cell objects, the ten-cell default and ceiling, and the new invalid-entry
+  rejections. `Configuration designates each cell's instrument` states that each entry is an object
+  naming an instrument. `Instrument text is bound by the row's geometry` states that padding lands
+  on the side opposite the cell's alignment, or across both sides under `center`. `Cell content
+  comes from an instrument` moves the default row's cell count from eight to ten so the spec does
+  not state two defaults. `A cell's alignment is the padding side inside it` is added.
 
 ## Impact
 
@@ -84,9 +87,9 @@ there rather than split into a second capability.
   rather than a list of names, `align` is accepted on a cell and defaults to `left`, the default
   and ceiling cell counts become ten, and the rejection message for a non-object entry names the
   object spelling with an example.
-- `extensions/jefferson/`: the renderer pads on the side the cell's alignment names instead of
-  always on the right; clipping stays the host's end-anchored clip, and the row's remainder stays
-  at the right edge.
+- `extensions/jefferson/`: the renderer pads on the side the cell's alignment names — its right
+  under `left`, its left under `right`, both sides under `center` — instead of always on the right;
+  clipping stays the host's end-anchored clip, and the row's remainder stays at the right edge.
 - `tests/`: the configuration tests that pin the string-list shape, the 8-cell expectations, the
   non-object rejection, and the cell's single key; the renderer tests' fixtures, plus right-aligned
   padding, a wide glyph at the clip boundary, and ANSI-styled and combining-mark text under both

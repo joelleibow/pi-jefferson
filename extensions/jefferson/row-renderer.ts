@@ -62,10 +62,12 @@ export function renderRow(
   for (const cell of row.cells) {
     const clipped = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
     const pad = cellWidth - helpers.visibleWidth(clipped);
-    if (cell.align === "right") line += spaces(pad);
+    const before = cell.align === "right" ? pad : cell.align === "center" ? Math.floor(pad / 2) : 0;
+    const after = cell.align === "left" ? pad : cell.align === "center" ? pad - Math.floor(pad / 2) : 0;
+    line += spaces(before);
     line += clipped;
     styleOpen = leavesStyleOpen(clipped);
-    if (cell.align !== "right") line += spaces(pad);
+    line += spaces(after);
   }
   line += spaces(width - helpers.visibleWidth(line));
   return line;

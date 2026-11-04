@@ -12,8 +12,8 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { blank, instrumentNamed, type Instrument } from "./instrument.ts";
 
-/** The side a cell's text hugs inside its cell: left by default, right when declared (D1). */
-export type CellAlign = "left" | "right";
+/** The side a cell's text hugs inside its cell: left by default, right or center when declared (D1). */
+export type CellAlign = "left" | "right" | "center";
 
 /** A single cell of a row: the instrument whose text it displays, padded against its align (D1). */
 export interface Cell {
@@ -91,10 +91,10 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
     if (typeof instrumentValue !== "string" || instrumentValue === "") {
       throw new RejectedConfiguration(`row ${index} has an instrument that is not a non-empty string`);
     }
-    if (alignValue !== undefined && alignValue !== "left" && alignValue !== "right") {
-      throw new RejectedConfiguration(`row ${index} has an align that is not "left" or "right": ${JSON.stringify(alignValue)}`);
+    if (alignValue !== undefined && alignValue !== "left" && alignValue !== "right" && alignValue !== "center") {
+      throw new RejectedConfiguration(`row ${index} has an align that is not "left", "right" or "center": ${JSON.stringify(alignValue)}`);
     }
-    const align: CellAlign = alignValue === "right" ? "right" : "left";
+    const align: CellAlign = alignValue === "right" ? "right" : alignValue === "center" ? "center" : "left";
     const instrument = instrumentNamed(instrumentValue);
     // One typo does not take down the statusline: the cell renders blank and the warning names it.
     // Collect unknown names before truncating, so a typo past the ceiling still warns though its
