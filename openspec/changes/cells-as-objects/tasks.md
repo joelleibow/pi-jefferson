@@ -39,3 +39,79 @@ one.
 - [x] 5.3 — `openspec validate cells-as-objects --strict` exits 0 and prints `Change 'cells-as-objects' is valid`; record the raw output. Verified by: raw output — Change 'cells-as-objects' is valid, exit status 0.
 - [x] 5.4 — `git diff --stat` lists only `extensions/jefferson/configuration.ts`, `extensions/jefferson/row-renderer.ts`, `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts` and `README.md`; `extensions/jefferson/instrument.ts`, `extensions/jefferson/session-data-store.ts`, `extensions/jefferson.ts`, `package.json`, `tsconfig.json`, `pnpm-lock.yaml` and `.github/workflows/` show no diff. A diff in any of those is a design error to report, not a task to tick. Verified by: git diff --stat output lists only the six named files; no other path appeared.
 - [ ] 5.5 Terminal observation, D11's documents and widths exactly — at 80 columns, `[{instrument:"thinking"},{instrument:"thinking",align:"right"}]` (`cellWidth` 40, remainder 0, the right-aligned text on columns 67–80); at 132 columns, seven cells, six `{instrument:"thinking"}` and the last `{instrument:"thinking",align:"right"}` (`cellWidth` 18, remainder 6, the last cell's text ending on column 126, 6 columns short of the terminal edge); at 100 columns, a row carrying `[{instrument:"thinking"},{instrument:"thinking",align:"center"},{instrument:"thinking"}]`, whose centred middle cell's text occupies columns 43–56, with a 9-column pad to its left and 10 to its right — the counted split to ask for rather than an eyeballed offset; at 80 columns, a row carrying `{instrument:"model",align:"middle"}`, which notifies `pi-jefferson: <path> was rejected (row 0 has an align that is not "left", "right" or "center": "middle"); rendering the default row`. Record for each the terminal width, the observed line verbatim, and whether the right-aligned text ends against its cell's edge — with the default ten-cell row at 132 ending 2 columns short of the terminal edge, as the delta states. This task is completed only by an owner-observed run in a real terminal with the observed lines recorded in the change's implementation record; it cannot be ticked from a headless transcript, a piped render, or `node --test` output.
+
+## 6. Reconcile onto extension-structure
+
+- [ ] 6.1 — Merge `extension-structure` into this branch, so this change rests on the composition that
+  change decided (its D1–D5) and both changes archive together; the merge brings
+  `openspec/changes/extension-structure/` and its `extension-source-layout` delta with it, and neither
+  is edited here. Resolve `extensions/jefferson/row-renderer.ts` by keeping the structure branch's
+  shape — a row an `HStack` of cell views with `basis: floor(W / N)`, `grow: 0`, the footer a `VStack`
+  of rows, host imports ordinary, `WidthHelpers` gone — and giving the cell view this change's pad: the
+  three-way split on `cell.align` (D4) and the intra-cell reset (D6, D12). The reset is *added*, not
+  preserved: the structure branch's cell view pads unconditionally (`clipped + " ".repeat(pad)`), so
+  its own task 1.4 notwithstanding it holds no reset at all. `renderRow(row, width, readings)` and
+  `createFooter(rows, sampleReadings)` keep the signatures the structure branch established — no
+  `helpers` parameter — and the open-style reading is taken inside the cell from the text that cell just
+  appended, never threaded across cells (D12). Resolve `tests/row-renderer.test.ts` and
+  `tests/jefferson.test.ts` by taking the structure branch's two files wholesale, framing helpers
+  included, and then re-applying this change's align fixtures on top of them in 6.2 — not by merging
+  the two sets of expectations hunk by hunk, which would resolve either to this branch's version and
+  turn 6.2 into a rewrite or to the structure branch's and silently drop the align fixtures 6.2
+  re-expresses. Verified by: the merged lines carry the host's framing, the structure branch's
+  expectations pass unchanged, this change's align fixtures are absent from both files — that absence
+  is 6.2's red — and `pnpm typecheck` is clean on the resolved sources.
+- [ ] 6.2 — Reconcile every expectation with the host's framing, in one reviewed pass that re-applies
+  this change's align fixtures on the structure branch's two test files (6.1): its `FRAME` and
+  `composed(...)`/`visible()` helpers come across unchanged, and what follows is an invariant about
+  where the pad sits, not a classification of which lines keep an intact frame. (a) Whether
+  `visible(line)` reproduces a pre-merge string byte for byte depends on what each cell's rendered line
+  ends with, so split by that rather than claiming it for every align fixture. Where every cell ends in
+  pad spaces — pad ≥ 1 after the text, or any left pad — `visible(line)` equals the pre-merge string
+  byte for byte: assert that, as written today, so the old expectations stand unchanged and the
+  pad-side proof D10 promises is preserved. Where a cell is truncated to fill — pad 0, its line ending
+  in `\x1b[0m` — `visible()` consumes that trailing reset along with the closing frame, the
+  concatenation being `FRAME` exactly, so `visible(line)` equals the pre-merge string minus one reset
+  for that cell; state that exact relation, and name the fixtures it governs so nobody discovers them
+  by failing: `text wider than its cell renders identically under any alignment` (two cells at width
+  21, both clipped to 10, so two resets go) and the two pre-existing truncation fixtures,
+  `content wider than its cell is truncated to one line` and `an instrument resolving text wider than
+  its cell is clipped and stays one line`, whose cells are also pad 0 — those two carry no byte-exact
+  pre-merge string, and their width and substring assertions stand read from `visible(line)`. A
+  fixture whose cells end in pad spaces is unaffected, which is why a general rule about `visible()`
+  missed this. (b) Framing is asserted as `composed(cells)` on a line whose remainder is 0 — the
+  cross-cell row, and the two-cell `ab` rows where the width divides evenly — and as
+  `composed(cells) + " ".repeat(width - cellWidth * N)` anywhere the remainder is non-zero, because
+  `composed(...)` ends with the closing frame but the host writes the row's trailing pad after it:
+  measured, `composed("ab    ", "ab    ", "ab    ")` is not the line and `composed(...) + "  "` is.
+  (c) The truncated, emoji, wide-glyph and combining-mark fixtures assert through `visible()` because a
+  lookup is simpler than reproducing the collapse — **not** because their frames collapse, the cell
+  truncated to fill of (a) excepted: a cell with pad 1 (wide glyph, emoji) or pad 3 (combining mark)
+  ends in a pad space, so its frame stays intact, and only a cell truncated to fill (pad 0, ending in
+  `\x1b[0m`) has that trailing reset absorbed into the closing frame's. The ANSI test asserts the pad
+  carries no styling by counting the line's style-setting SGR sequences — one open, none between the
+  cell's close and its pad — not by matching a substring. (d) The end-to-end index is taken on
+  `visible(line)`: task 3.2's assertion becomes `visible(line).indexOf("thinking: high") === 66` with
+  `visibleWidth(line) === 80` unchanged, because two frames of ten characters precede the text in the
+  raw line — measured, 66 in `visible(line)` against 86 in the raw line — and no expectation anywhere,
+  here or in 3.2, is adjusted to a framing-shifted character index: 86 would pin the frame's width as
+  though it were alignment. Verified by: the align fixtures absent after 6.1 are present and pass,
+  with `visibleWidth(line) === width` on each, the truncated-to-fill fixtures satisfying (a)'s
+  minus-one-reset relation, and the end-to-end index asserted on `visible(line)`.
+- [ ] 6.3 — Rename the cross-cell test to what is now true — the host closes an open style between
+  cells — and assert the frame sits between them:
+  `[{text:"\x1b[4mabcdefghij"},{text:"cd",align:"right"}]` at width 20 (`cellWidth` 10, remainder 0)
+  is byte-exactly `composed("\x1b[4mabcdefghij", "        cd")`, so the second cell's leading pad
+  follows a reset the host wrote, not one this renderer wrote. No red: the assertion pins behaviour that
+  moved to the host, and the bytes come from 6.2's measurement rather than from a new implementation.
+  Verified by: `node --test tests/row-renderer.test.ts` green, with no assertion left claiming this
+  renderer emits a reset across a cell boundary.
+- [ ] 6.4 Green — `pnpm typecheck`, `pnpm test`, `openspec validate cells-as-objects --strict` and
+  `openspec validate extension-structure --strict` all pass, with no `extension-source-layout` delta
+  edited here (the structure change owns it) and task 5.5 still open. Verified by: the four exit
+  statuses, with `pnpm test`'s summary lines and both validate outputs recorded raw.
+- [ ] 6.5 — Bring `extension-structure`'s documents across in the same merge — `ARCHITECTURE.md`,
+  `docs/adr/0001-imports-run-one-way.md`, `AGENTS.md` — and add one line to `ARCHITECTURE.md` naming the
+  three-way pad and the `leavesStyleOpen` rule, since both now live in the model it describes. Verified
+  by: the three documents are present after the merge, and the added line sits with the pad-and-reset
+  paragraph it extends (`rg -n "three-way|leavesStyleOpen" ARCHITECTURE.md`).

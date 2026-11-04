@@ -505,6 +505,47 @@ host-supplied, and `blank` is fixed ASCII Lorem text, so a wide-glyph instrument
 put into a document. Wide-glyph correctness therefore rests on the unit fixtures of D10, where the
 string — `"ab漢字cd"`, `"ab😀cdef"` — can be constructed.
 
+### D12. The host owns the cross-cell reset; ours is the intra-cell pad
+
+`extension-structure` composes a row from the host's `HStack` and the footer from a `VStack`, and the
+host puts a style reset and a hyperlink close before every child it composes and one more at the end of
+the line — which retires D6's premise that the host's reset lands only at the end of a rendered line.
+That change decides the composition (its D1–D5); this decision records only what it does to D6.
+
+**D6's decision stands, and narrows to one cell.** The case D6 decided had two sides, and the left one
+is the host's: a right-aligned or centred cell's leading pad follows the *previous* cell's text, and the
+host resets styling between children, so no reset of ours is needed there. What remains ours is the pad
+that follows the cell's own text — a `left` pad and a centred cell's trailing half — with D6's rule
+unchanged: a run of spaces is preceded by `"\x1b[0m"` when the text before it left an SGR open. So
+D4's `styleOpen` stops being state threaded across a row: it is a reading of the text this cell just
+appended, taken inside the cell view. The row's remainder is the host's too, and the host writes it
+*after* the line's closing frame: measured, `composed(cells)` is not the line and
+`composed(cells) + " ".repeat(width - cellWidth * N)` is, so the merged `renderRow`'s remainder branch
+never fires — nothing is appended at all, not appended without a reset. Because the pad follows the
+closing frame, the remainder cannot inherit a style either.
+
+The signatures are what D12 moves: after the merge `renderRow(row, width, readings)` and
+`createFooter(rows, sampleReadings)` take no helpers, because `extension-structure` deletes
+`WidthHelpers` outright (its D5), and the entry stops injecting them. So D4's four-parameter signature
+and D8's "no diff" row for `extensions/jefferson.ts` both give way to that branch's three-line entry
+change; nothing else in D4 or D8 moves — the cell width formula, `GAP = 0`, the three-way split of the
+pad, and the row's remainder at the right edge are the same arithmetic, now inside a cell view that
+knows nothing of instruments.
+
+**D8 stops being true once the merge lands.** Its table gains rows for the three root documents
+`extension-structure` brings — `AGENTS.md`, `ARCHITECTURE.md`,
+`docs/adr/0001-imports-run-one-way.md` — and for the one line 6.5 adds to `ARCHITECTURE.md`, and its
+summary sentence — the one its title repeats — becomes "two source files, the tests, one README
+sentence, and the structure change's documents". Left as written, the diff it describes contradicts
+the merged tree on three paths and one added line.
+
+**D10's table is retired as literal expectations and re-stated through `visible()`.** Its byte strings
+stay as the proof of pad side, but read from `visible(line)` rather than from the raw line, with
+framing asserted separately as 6.2 requires. As literal expectations all eleven of its rows present a
+pre-merge string as what `renderRow` returns, and no framed line returns one: a reviewer checking D10
+against the merged tree meets a contradiction per row and no way to tell a stale expectation from a
+pad on the wrong side.
+
 ## Risks / Trade-offs
 
 - **[Ten cells at 80 columns gives each cell 8 columns]** → recorded with the ruling; the model name
