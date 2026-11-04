@@ -64,10 +64,10 @@ export function renderRow(
 
   // Each instrument resolves once per row render: the host asks a child to render more than once
   // (once to measure, again to lay out), and an instrument must not pay for that twice.
-  const resolved = row.cells.map((cell) => cell.instrument.resolve(readings));
+  const resolved = row.cells.map((cell) => ({ text: cell.instrument.resolve(readings), align: cell.align }));
   const composed = new HStack(
-    resolved.map((text, index) => ({
-      component: cellView(text, row.cells[index]?.align ?? "left"),
+    resolved.map((pair) => ({
+      component: cellView(pair.text, pair.align),
       basis: cellWidth,
       grow: 0,
       shrink: 0,
@@ -76,6 +76,7 @@ export function renderRow(
   ).render(width)[0] ?? "";
 
   const remainder = width - visibleWidth(composed);
+  // The host pads the composed line to width, so this is a guard rather than the normal path.
   return remainder > 0 ? composed + " ".repeat(remainder) : composed;
 }
 
