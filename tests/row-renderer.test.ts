@@ -1,21 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/configuration.ts";
 import { type Instrument, model } from "../extensions/jefferson/instrument.ts";
 import {
   createFooter,
   renderRow,
-  type WidthHelpers,
 } from "../extensions/jefferson/row-renderer.ts";
 import {
   createSessionDataStore,
   type Readings,
 } from "../extensions/jefferson/session-data-store.ts";
 
-const helpers: WidthHelpers = { truncateToWidth, visibleWidth };
 
 /** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
 const FRAME = "\x1b[0m\x1b]8;;\x07";
@@ -42,13 +40,13 @@ function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
 
 test("a width that divides evenly gives every cell the same columns", () => {
   // Cell text fits the cell exactly, so no truncation intervenes in the geometry check.
-  const line = renderRow(rowOf(8, "Lorem ipsu"), 80, helpers, readings);
+  const line = renderRow(rowOf(8, "Lorem ipsu"), 80, readings);
   assert.equal(visibleWidth(line), 80);
   assert.equal(line, composed(...Array<string>(8).fill("Lorem ipsu")));
 });
 
 test("a width that does not divide evenly leaves the remainder blank at the right edge", () => {
-  const line = renderRow(rowOf(3), 100, helpers, readings);
+  const line = renderRow(rowOf(3), 100, readings);
   assert.equal(visibleWidth(line), 100);
   // 33 columns per cell, the 100th column blank at the right edge.
   assert.equal(line, composed(...Array<string>(3).fill("Lorem ipsum dolor sit amet".padEnd(33))) + " ");
@@ -57,7 +55,7 @@ test("a width that does not divide evenly leaves the remainder blank at the righ
 
 test("content wider than its cell is truncated to one line", () => {
   // 3 cells at width 12: 4 columns each, against far wider content.
-  const line = renderRow(rowOf(3), 12, helpers, readings);
+  const line = renderRow(rowOf(3), 12, readings);
   assert.equal(typeof line, "string");
   assert.equal(visibleWidth(line), 12);
   for (const raw of line.split("\n")) assert.ok(visibleWidth(raw) <= 12);
@@ -72,7 +70,7 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
       { instrument: { resolve: () => "thinking: high" } },
     ],
   };
-  const line = renderRow(row, 20, helpers, readings);
+  const line = renderRow(row, 20, readings);
   assert.equal(visibleWidth(line), 20);
   assert.ok(visible(line).startsWith("provide"), "the first cell clips at its 10 columns");
   assert.ok(!line.includes("a-very-long-model-name"), "the text is clipped, not overflowed");
@@ -80,7 +78,7 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
 });
 
 test("short cell text is padded so the line spans the full width", () => {
-  const line = renderRow(rowOf(3, "ab"), 12, helpers, readings);
+  const line = renderRow(rowOf(3, "ab"), 12, readings);
   assert.equal(line, composed("ab  ", "ab  ", "ab  "));
   assert.equal(visibleWidth(line), 12);
 });
@@ -96,7 +94,7 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
       { instrument: { resolve: () => "😀" } },
     ],
   };
-  const line = renderRow(row, 9, helpers, readings);
+  const line = renderRow(row, 9, readings);
   assert.equal(visibleWidth(line), 9);
   assert.equal(line, composed("\x1b[31mab\x1b[0m" + "  ", "😀" + "  ") + " ");
   assert.ok(!line.includes("\n"));
@@ -106,7 +104,6 @@ test("the footer renders one line per row, in order, each spanning the width", (
   const footer = createFooter(
     [rowOf(2, "aa"), rowOf(4, "b"), rowOf(8, "c")],
     () => readings,
-    helpers,
   );
   const lines = footer.render(80);
   assert.equal(lines.length, 3);
@@ -120,15 +117,15 @@ test("the footer renders one line per row, in order, each spanning the width", (
 });
 
 test("more cells than columns still renders exactly one line of the width", () => {
-  const line = renderRow(rowOf(8), 4, helpers, readings);
+  const line = renderRow(rowOf(8), 4, readings);
   assert.equal(typeof line, "string");
   assert.equal(visibleWidth(line), 4);
 });
 
 test("cell widths are recomputed when the width changes", () => {
   const row = rowOf(3, "Lorem ipsum dolor sit amet");
-  renderRow(row, 100, helpers, readings); // 33 columns per cell
-  const resized = renderRow(row, 90, helpers, readings); // 30 columns per cell, nothing retained
+  renderRow(row, 100, readings); // 33 columns per cell
+  const resized = renderRow(row, 90, readings); // 30 columns per cell, nothing retained
   assert.equal(visibleWidth(resized), 90);
   assert.equal(resized, composed(...Array<string>(3).fill("Lorem ipsum dolor sit amet".padEnd(30))));
 });
@@ -141,7 +138,6 @@ test("one render samples the store exactly once, whatever the row and cell count
       samples += 1;
       return readings;
     },
-    helpers,
   );
   footer.render(80);
   assert.equal(samples, 1, "three rows of eight cells still take one sample");
@@ -164,7 +160,6 @@ test("every cell of one render is handed the same readings object", () => {
     ],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
-    helpers,
   );
   footer.render(30);
   assert.equal(handed.length, 3);
@@ -176,7 +171,6 @@ test("two cells holding the model instrument resolve identical text", () => {
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: model }, { instrument: model }] }],
     () => live,
-    helpers,
   );
   const [line] = footer.render(48);
   assert.equal(line, composed("anthropic: claude-opus-4", "anthropic: claude-opus-4"));
@@ -197,7 +191,6 @@ test("a push between two renders shows up in the next render and not before", ()
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: capture }, { instrument: capture }] }],
     () => store.sample(),
-    helpers,
   );
 
   const first = footer.render(26)[0];

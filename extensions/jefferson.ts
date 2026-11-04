@@ -28,7 +28,6 @@ import {
   type ExtensionAPI,
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { readConfiguration } from "./jefferson/configuration.ts";
 import { createFooter } from "./jefferson/row-renderer.ts";
@@ -109,7 +108,7 @@ export default function jefferson(pi: ExtensionAPI): void {
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;
-    const footer = createFooter(rows, () => store.sample(), { truncateToWidth, visibleWidth });
+    const footer = createFooter(rows, () => store.sample());
 
     ctx.ui.setFooter((tui) => {
       requestRepaint = () => tui.requestRender();

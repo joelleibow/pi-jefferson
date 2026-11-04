@@ -34,8 +34,10 @@ indistinguishable from a design error.
 
 ## Consequences
 
-- `HStack` and `Component` are ordinary imports in `row-renderer.ts`. `WidthHelpers` survives only
-  because the tests pass the real helpers in, not because the import boundary demands it.
+- `HStack`, `Component`, `truncateToWidth` and `visibleWidth` are ordinary imports in
+  `row-renderer.ts`. The `WidthHelpers` parameter they used to travel in is gone: it existed to serve
+  the retired rule, and keeping a seam alive for the tests would have been the tests dictating the
+  design.
 - The guarantee that matters moved entirely into the `peerDependencies` clause, which CI can check from
   the manifest without reading source.
 - A future reader who wants the old rule back should bring a measurement with it.

@@ -59,6 +59,11 @@ is the one with a failure mode: host packages stay `peerDependencies` with a `*`
 `dependencies`; imports run one way, entry → working parts, never back, with no cycles. Recorded in
 `docs/adr/0001-imports-run-one-way.md`.
 
+The `WidthHelpers` parameter is deleted outright, not kept as a seam. It existed to serve the retired
+rule; once host imports are ordinary, the only reason left to pass width helpers in would be the tests,
+and a seam that exists for the tests is the tests dictating the design. `renderRow` and `createFooter`
+lose the parameter, the entry stops passing it, and the tests call the real signatures.
+
 ## Risks / Trade-offs
 
 - **[Host framing leaks into tests]** Every byte-exact expectation now encodes host output. → Stated

@@ -9,16 +9,10 @@
  * tall, so a row always is.
  */
 
-import { HStack, type Component } from "@earendil-works/pi-tui";
+import { HStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 
 import type { Row } from "./configuration.ts";
 import type { Readings } from "./session-data-store.ts";
-
-/** The host's width helpers, injected by the entry (D8). */
-export interface WidthHelpers {
-  truncateToWidth(text: string, maxWidth: number): string;
-  visibleWidth(text: string): number;
-}
 
 /** The component the entry hands to `ctx.ui.setFooter`. */
 export interface Footer {
@@ -37,7 +31,6 @@ const GAP = 0;
 export function renderRow(
   row: Row,
   width: number,
-  helpers: WidthHelpers,
   readings: Readings,
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
@@ -45,8 +38,8 @@ export function renderRow(
   /** One cell: clipped to the width the row gives it, padded so it occupies that width. */
   const cellComponent = (text: string): Component => ({
     render: (cellRenderWidth: number): string[] => {
-      const clipped = helpers.truncateToWidth(text, cellRenderWidth);
-      const pad = Math.max(0, cellRenderWidth - helpers.visibleWidth(clipped));
+      const clipped = truncateToWidth(text, cellRenderWidth);
+      const pad = Math.max(0, cellRenderWidth - visibleWidth(clipped));
       return [clipped + " ".repeat(pad)];
     },
     invalidate(): void {},
@@ -60,7 +53,7 @@ export function renderRow(
     { gap: GAP },
   ).render(width)[0] ?? "";
 
-  const remainder = width - helpers.visibleWidth(composed);
+  const remainder = width - visibleWidth(composed);
   return remainder > 0 ? composed + " ".repeat(remainder) : composed;
 }
 
@@ -68,14 +61,13 @@ export function renderRow(
 export function createFooter(
   rows: Row[],
   sampleReadings: () => Readings,
-  helpers: WidthHelpers,
 ): Footer {
   return {
     render(width: number): string[] {
       // One sample per render, handed to every row and every cell, so two cells reading one datum
       // cannot disagree: agreement is structural, not procedural (D4).
       const readings = sampleReadings();
-      return rows.map((row) => renderRow(row, width, helpers, readings));
+      return rows.map((row) => renderRow(row, width, readings));
     },
     // The footer caches nothing, so there is nothing to invalidate.
     invalidate(): void {},
