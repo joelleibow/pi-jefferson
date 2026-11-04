@@ -12,8 +12,14 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { blank, instrumentNamed, type Instrument } from "./instrument.ts";
 
-/** The side a cell's text hugs inside its cell: left by default, right or center when declared (D1). */
-export type CellAlign = "left" | "right" | "center";
+/** The values a cell's `align` may take. The type and every message derive from this tuple. */
+const ALIGNMENTS = ["left", "right", "center"] as const;
+export type CellAlign = (typeof ALIGNMENTS)[number];
+
+/** Whether a configuration value is one of `ALIGNMENTS`. */
+function isAlign(value: unknown): value is CellAlign {
+  return typeof value === "string" && (ALIGNMENTS as readonly string[]).includes(value);
+}
 
 /** A single cell of a row: the instrument whose text it displays, padded against its align (D1). */
 export interface Cell {
@@ -60,7 +66,7 @@ function defaultRow(): Row {
 }
 
 function blankCells(count: number): Cell[] {
-  return Array.from({ length: count }, () => ({ instrument: blank, align: "left" }));
+  return Array.from({ length: count }, () => ({ instrument: blank, align: ALIGNMENTS[0] }));
 }
 
 /**
@@ -91,10 +97,12 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
     if (typeof instrumentValue !== "string" || instrumentValue === "") {
       throw new RejectedConfiguration(`row ${index} has an instrument that is not a non-empty string`);
     }
-    if (alignValue !== undefined && alignValue !== "left" && alignValue !== "right" && alignValue !== "center") {
-      throw new RejectedConfiguration(`row ${index} has an align that is not "left", "right" or "center": ${JSON.stringify(alignValue)}`);
+    if (alignValue !== undefined && !isAlign(alignValue)) {
+      const quoted = ALIGNMENTS.map((value) => `"${value}"`);
+      const list = quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
+      throw new RejectedConfiguration(`row ${index} has an align that is not ${list}: ${JSON.stringify(alignValue)}`);
     }
-    const align: CellAlign = alignValue === "right" ? "right" : alignValue === "center" ? "center" : "left";
+    const align: CellAlign = alignValue === undefined ? "left" : alignValue;
     const instrument = instrumentNamed(instrumentValue);
     // One typo does not take down the statusline: the cell renders blank and the warning names it.
     // Collect unknown names before truncating, so a typo past the ceiling still warns though its
