@@ -1,0 +1,16 @@
+schema: marbleization
+created: 2026-11-03
+goal: "A cell object is the config surface: instrument plus align, ten cells by
+  default."
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: 7244e57f-9a2c-4d70-8ed9-739ac2a8810f
+    chidi: 29e0cd95-be51-46ad-8e0c-800129a6ed63
+    eleanor: d0452799-f6bc-4e75-be8b-094cd357d181
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: pending
+    validate: pending

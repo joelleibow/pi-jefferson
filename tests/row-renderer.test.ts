@@ -23,7 +23,7 @@ const readings: Readings = { provider: undefined, model: undefined, thinkingLeve
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
     id: "row-0",
-    cells: Array.from({ length: count }, () => ({ instrument: { resolve: () => text } })),
+    cells: Array.from({ length: count }, () => ({ instrument: { resolve: () => text }, align: "left" })),
   };
 }
 
@@ -55,8 +55,8 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
   const row: Row = {
     id: "row-0",
     cells: [
-      { instrument: { resolve: () => "provider: a-very-long-model-name" } },
-      { instrument: { resolve: () => "thinking: high" } },
+      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { resolve: () => "thinking: high" }, align: "left" },
     ],
   };
   const line = renderRow(row, 20, helpers, readings);
@@ -72,6 +72,123 @@ test("short cell text is padded so the line spans the full width", () => {
   assert.equal(visibleWidth(line), 12);
 });
 
+test("a left-aligned cell pads to the right of its text", () => {
+  const line = renderRow(rowOf(3, "ab"), 20, helpers, readings);
+  assert.equal(line, "ab    ab    ab      ");
+  assert.equal(visibleWidth(line), 20);
+});
+
+test("a right-aligned cell pads to the left of its text", () => {
+  const line = renderRow(
+    { id: "row-0", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(line, "    ab    ab    ab  ");
+  assert.equal(visibleWidth(line), 20);
+});
+
+test("text wider than its cell renders identically under either alignment", () => {
+  const row: Row = {
+    id: "row-0",
+    cells: [
+      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
+    ],
+  };
+  const left = renderRow(row, 21, helpers, readings);
+  const right = renderRow(
+    { ...row, cells: row.cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    21,
+    helpers,
+    readings,
+  );
+  assert.equal(right, left);
+  assert.equal(visibleWidth(left), 21);
+  assert.equal(left, "provide\x1b[0m...\x1b[0mprovide\x1b[0m...\x1b[0m ");
+});
+
+test("a wide glyph dropped by the clip leaves a pad that keeps the cell's width", () => {
+  const line = renderRow(rowOf(3, "ab漢字cd"), 20, helpers, readings);
+  assert.equal(line, "ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m   ");
+  assert.equal(visibleWidth(line), 20);
+  const right = renderRow(
+    { id: "row-0", cells: rowOf(3, "ab漢字cd").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(right, " ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m  ");
+  assert.equal(visibleWidth(right), 20);
+});
+
+test("an emoji clipped at the boundary leaves a one-column pad", () => {
+  const line = renderRow(rowOf(3, "ab😀cdef"), 20, helpers, readings);
+  assert.equal(line, "ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m   ");
+  assert.equal(visibleWidth(line), 20);
+  const right = renderRow(
+    { id: "row-0", cells: rowOf(3, "ab😀cdef").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(right, " ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m ab\x1b[0m...\x1b[0m  ");
+  assert.equal(visibleWidth(right), 20);
+});
+
+test("a combining mark is measured in columns, not code units", () => {
+  const line = renderRow(rowOf(3, "abe\u0301"), 20, helpers, readings);
+  assert.equal(line, "abe\u0301   abe\u0301   abe\u0301     ");
+  assert.equal(visibleWidth(line), 20);
+  const right = renderRow(
+    { id: "row-0", cells: rowOf(3, "abe\u0301").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    20,
+    helpers,
+    readings,
+  );
+  assert.equal(right, "   abe\u0301   abe\u0301   abe\u0301  ");
+});
+
+test("an ANSI-styled cell's pad carries no styling", () => {
+  const closed: Row = {
+    id: "row-0",
+    cells: [
+      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+    ],
+  };
+  const closedLine = renderRow(closed, 20, helpers, readings);
+  assert.equal(closedLine, "\x1b[31mab\x1b[0m    \x1b[31mab\x1b[0m    \x1b[31mab\x1b[0m      ");
+  assert.equal(visibleWidth(closedLine), 20);
+
+  const open: Row = {
+    id: "row-0",
+    cells: [
+      { instrument: { resolve: () => "\x1b[4mab" }, align: "left" },
+      { instrument: { resolve: () => "\x1b[4mab" }, align: "left" },
+      { instrument: { resolve: () => "\x1b[4mab" }, align: "left" },
+    ],
+  };
+  const openLine = renderRow(open, 20, helpers, readings);
+  assert.equal(openLine, "\x1b[4mab\x1b[0m    \x1b[4mab\x1b[0m    \x1b[4mab\x1b[0m      ");
+  assert.equal(visibleWidth(openLine), 20);
+});
+
+test("an open style from one cell resets before the next cell's pad", () => {
+  const row: Row = {
+    id: "row-0",
+    cells: [
+      { instrument: { resolve: () => "\x1b[4mabcdefghij" }, align: "left" },
+      { instrument: { resolve: () => "cd" }, align: "right" },
+    ],
+  };
+  const line = renderRow(row, 20, helpers, readings);
+  assert.equal(line, "\x1b[4mabcdefghij\x1b[0m        cd");
+  assert.equal(visibleWidth(line), 20);
+});
+
 test("wide glyphs and ANSI escapes are measured in visible columns, not string length", () => {
   const row: Row = {
     id: "row-0",
@@ -79,8 +196,8 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
     // padding it from String.length (12, not 2) under-pads it mid-line and
     // the line-level remainder cannot restore the byte-identical string.
     cells: [
-      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" } },
-      { instrument: { resolve: () => "😀" } },
+      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+      { instrument: { resolve: () => "😀" }, align: "left" },
     ],
   };
   const line = renderRow(row, 9, helpers, readings);
@@ -146,8 +263,8 @@ test("every cell of one render is handed the same readings object", () => {
   };
   const footer = createFooter(
     [
-      { id: "row-0", cells: [{ instrument: capture }, { instrument: capture }] },
-      { id: "row-1", cells: [{ instrument: capture }] },
+      { id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] },
+      { id: "row-1", cells: [{ instrument: capture, align: "left" }] },
     ],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
@@ -161,7 +278,7 @@ test("every cell of one render is handed the same readings object", () => {
 test("two cells holding the model instrument resolve identical text", () => {
   const live: Readings = { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
-    [{ id: "row-0", cells: [{ instrument: model }, { instrument: model }] }],
+    [{ id: "row-0", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
     () => live,
     helpers,
   );
@@ -182,7 +299,7 @@ test("a push between two renders shows up in the next render and not before", ()
     requestRender: () => {},
   });
   const footer = createFooter(
-    [{ id: "row-0", cells: [{ instrument: capture }, { instrument: capture }] }],
+    [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
     () => store.sample(),
     helpers,
   );

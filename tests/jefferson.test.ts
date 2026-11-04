@@ -241,16 +241,30 @@ test("a trusted project's document wins end to end", async (t) => {
 
 test("a rejected configuration warns and still installs the default row", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["blank"], rows: [{}] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "blank" }], rows: [{}] });
 
   const session = await harness().start();
   assert.equal(session.notified.length, 1);
   assert.equal(session.notified[0]?.type, "warning");
   const lines = session.lines(80);
   assert.equal(lines.length, 1, "the default row renders");
-  // One row of 8 cells at 80 columns: 10 columns each of the truncated placeholder.
-  assert.equal(lines[0], truncateToWidth(DEFAULT_CELL_TEXT, 10).repeat(8));
+  // One row of 10 cells at 80 columns: 8 columns each of the truncated placeholder.
+  assert.equal(lines[0], truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10));
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
+});
+
+test("a right-aligned cell ends at its cell's right edge end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking", align: "right" }] });
+
+  const session = await harness().start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    thinkingLevel: "high",
+  });
+
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(visibleWidth(line), 80);
+  assert.equal(line.indexOf("thinking: high"), 66);
 });
 
 test("the exported surface offers no way to supply or replace cell content", async () => {
@@ -297,7 +311,7 @@ test("an untrusted project's document is ignored end to end", async (t) => {
 for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
   test(`a ${reason} session renders the model and thinking level it was seeded with`, async (t) => {
     const agentDir = useTempAgentDir(t);
-    writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+    writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
 
     // The host reports no selection when it restores, so nothing here is dispatched.
     const session = await harness().start({
@@ -331,7 +345,7 @@ test("outside TUI mode a session takes no subscription", async (t) => {
 
 test("a model selection push changes the line and requests one repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -346,7 +360,7 @@ test("a model selection push changes the line and requests one repaint", async (
 
 test("a thinking-level push changes the line and requests one repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -361,7 +375,7 @@ test("a thinking-level push changes the line and requests one repaint", async (t
 
 test("a push carrying the values the store already holds requests no repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -377,7 +391,7 @@ test("a push carrying the values the store already holds requests no repaint", a
 
 test("a second session_start releases the first install before installing its own", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
   const h = harness();
 
   const first = await h.start({
@@ -414,7 +428,7 @@ test("a second session_start releases the first install before installing its ow
 
 test("disposing a footer then replacing the session releases the first install once", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: ["model", "thinking"] });
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
   const h = harness();
 
   const first = await h.start({

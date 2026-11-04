@@ -28,10 +28,20 @@ export interface Footer {
 /** Inter-cell gap, fixed at 0 for this change (D7's `g = 0` case). */
 const GAP = 0;
 
+/** The host's style reset, as the renderer emits it before a pad whose text left an SGR open (D6). */
+const RESET = "\x1b[0m";
+
+/** Whether cell text leaves an SGR open, so a run of spaces after it would inherit the style. */
+function leavesStyleOpen(text: string): boolean {
+  return text.includes("\x1b") && !text.endsWith(RESET);
+}
+
 /**
  * Render one row as one line of `width` columns: each of the row's N cells
  * occupies `floor((W - (N - 1) * GAP) / N)` columns, the remainder stays blank
- * at the right edge, and the composed line is padded to the full width.
+ * at the right edge, and the composed line is padded to the full width. The pad
+ * sits on the side the cell's `align` names; the row's remainder stays at the
+ * right edge regardless (D4, D5).
  */
 export function renderRow(
   row: Row,
@@ -41,12 +51,24 @@ export function renderRow(
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
   let line = "";
+  let styleOpen = false; // whether the last text appended left an SGR open
+  /** The spaces a pad or the row's remainder adds: reset first, so a space never inherits a style. */
+  const spaces = (count: number): string => {
+    if (count <= 0) return "";
+    const reset = styleOpen ? RESET : "";
+    styleOpen = false;
+    return reset + " ".repeat(count);
+  };
   for (const cell of row.cells) {
-    const truncated = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
-    line += truncated + " ".repeat(Math.max(0, cellWidth - helpers.visibleWidth(truncated)));
+    const clipped = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
+    const pad = cellWidth - helpers.visibleWidth(clipped);
+    if (cell.align === "right") line += spaces(pad);
+    line += clipped;
+    styleOpen = leavesStyleOpen(clipped);
+    if (cell.align !== "right") line += spaces(pad);
   }
-  const remainder = width - helpers.visibleWidth(line);
-  return remainder > 0 ? line + " ".repeat(remainder) : line;
+  line += spaces(width - helpers.visibleWidth(line));
+  return line;
 }
 
 /** Build the footer component: one line per row, in declaration order. */
