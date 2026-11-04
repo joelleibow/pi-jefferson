@@ -141,6 +141,14 @@ function harness(): Harness {
   };
 }
 
+/** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
+const FRAME = "\x1b[0m\x1b]8;;\x07";
+
+/** A line with the host's framing removed, for assertions about what a reader sees. */
+function visible(line: string): string {
+  return line.replaceAll(FRAME, "");
+}
+
 test("registers exactly one command", () => {
   assert.deepEqual([...harness().commands.keys()], ["jefferson"]);
 });
@@ -249,7 +257,10 @@ test("a rejected configuration warns and still installs the default row", async 
   const lines = session.lines(80);
   assert.equal(lines.length, 1, "the default row renders");
   // One row of 10 cells at 80 columns: 8 columns each of the truncated placeholder.
-  assert.equal(lines[0], truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10));
+  // Ten 8-column cells of the placeholder; the host's framing between cells is covered by
+  // tests/row-renderer.test.ts, so this asserts what a reader sees.
+  const cellText = truncateToWidth(DEFAULT_CELL_TEXT, 8).replace(/\x1b\[[0-9;]*m/g, "");
+  assert.equal(visible(lines[0] ?? "").replace(/\x1b\[[0-9;]*m/g, ""), cellText.repeat(10));
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
 });
 
@@ -264,7 +275,9 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
 
   const line = session.lines(80)[0] ?? "";
   assert.equal(visibleWidth(line), 80);
-  assert.equal(line.indexOf("thinking: high"), 66);
+  // Two frames of ten characters precede the text in the raw line, so the index is taken on what
+  // a reader sees: 66 in visible(line), never the framing-shifted 86 of the raw line.
+  assert.equal(visible(line).indexOf("thinking: high"), 66);
 });
 
 test("the exported surface offers no way to supply or replace cell content", async () => {
@@ -321,8 +334,8 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
     });
 
     const [line] = session.lines(80);
-    assert.ok(line?.startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
-    assert.ok(line?.includes("thinking: high"), "the thinking cell renders the seed");
+    assert.ok(visible(line ?? "").startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
+    assert.ok(visible(line ?? "").includes("thinking: high"), "the thinking cell renders the seed");
     assert.deepEqual(session.notified, []);
   });
 }
@@ -354,7 +367,7 @@ test("a model selection push changes the line and requests one repaint", async (
 
   h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5" } });
 
-  assert.ok(session.lines(80)[0]?.startsWith("openai: gpt-5"));
+  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("openai: gpt-5"));
   assert.equal(session.repaints(), 1);
 });
 
@@ -369,7 +382,7 @@ test("a thinking-level push changes the line and requests one repaint", async (t
 
   h.dispatch({ type: "thinking_level_select", level: "low" });
 
-  assert.ok(session.lines(80)[0]?.includes("thinking: low"));
+  assert.ok(visible(session.lines(80)[0] ?? "").includes("thinking: low"));
   assert.equal(session.repaints(), 1);
 });
 
@@ -386,7 +399,7 @@ test("a push carrying the values the store already holds requests no repaint", a
   h.dispatch({ type: "thinking_level_select", level: "high" });
 
   assert.equal(session.repaints(), 0);
-  assert.ok(session.lines(80)[0]?.startsWith("anthropic: claude-opus-4"));
+  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("anthropic: claude-opus-4"));
 });
 
 test("a second session_start releases the first install before installing its own", async (t) => {
@@ -418,8 +431,8 @@ test("a second session_start releases the first install before installing its ow
   ]);
 
   const [line] = second.lines(80);
-  assert.ok(line?.startsWith("openai: gpt-5"), "the second footer renders the second context");
-  assert.ok(line?.includes("thinking: low"), "never the first install's values");
+  assert.ok(visible(line ?? "").startsWith("openai: gpt-5"), "the second footer renders the second context");
+  assert.ok(visible(line ?? "").includes("thinking: low"), "never the first install's values");
 
   h.dispatch({ type: "model_select", model: { provider: "google", id: "gemini-3" } });
   assert.equal(second.repaints(), 1, "the repaint lands on the second tui");
@@ -464,7 +477,7 @@ test("disposing a footer then replacing the session releases the first install o
   assert.equal(second.repaints(), 1);
 
   assert.equal(
-    first.footers[0]?.render(80)[0],
+    visible(first.footers[0]?.render(80)[0] ?? ""),
     " ".repeat(80),
     "the disposed footer resolves empty cells rather than the old values",
   );

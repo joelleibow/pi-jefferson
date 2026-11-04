@@ -42,7 +42,7 @@ one.
 
 ## 6. Reconcile onto extension-structure
 
-- [ ] 6.1 — Merge `extension-structure` into this branch, so this change rests on the composition that
+- [x] 6.1 — Merge `extension-structure` into this branch, so this change rests on the composition that
   change decided (its D1–D5) and both changes archive together; the merge brings
   `openspec/changes/extension-structure/` and its `extension-source-layout` delta with it, and neither
   is edited here. Resolve `extensions/jefferson/row-renderer.ts` by keeping the structure branch's
@@ -61,7 +61,7 @@ one.
   re-expresses. Verified by: the merged lines carry the host's framing, the structure branch's
   expectations pass unchanged, this change's align fixtures are absent from both files — that absence
   is 6.2's red — and `pnpm typecheck` is clean on the resolved sources.
-- [ ] 6.2 — Reconcile every expectation with the host's framing, in one reviewed pass that re-applies
+- [x] 6.2 — Reconcile every expectation with the host's framing, in one reviewed pass that re-applies
   this change's align fixtures on the structure branch's two test files (6.1): its `FRAME` and
   `composed(...)`/`visible()` helpers come across unchanged, and what follows is an invariant about
   where the pad sits, not a classification of which lines keep an intact frame. (a) Whether
@@ -98,7 +98,7 @@ one.
   though it were alignment. Verified by: the align fixtures absent after 6.1 are present and pass,
   with `visibleWidth(line) === width` on each, the truncated-to-fill fixtures satisfying (a)'s
   minus-one-reset relation, and the end-to-end index asserted on `visible(line)`.
-- [ ] 6.3 — Rename the cross-cell test to what is now true — the host closes an open style between
+- [x] 6.3 — Rename the cross-cell test to what is now true — the host closes an open style between
   cells — and assert the frame sits between them:
   `[{text:"\x1b[4mabcdefghij"},{text:"cd",align:"right"}]` at width 20 (`cellWidth` 10, remainder 0)
   is byte-exactly `composed("\x1b[4mabcdefghij", "        cd")`, so the second cell's leading pad
@@ -106,11 +106,11 @@ one.
   moved to the host, and the bytes come from 6.2's measurement rather than from a new implementation.
   Verified by: `node --test tests/row-renderer.test.ts` green, with no assertion left claiming this
   renderer emits a reset across a cell boundary.
-- [ ] 6.4 Green — `pnpm typecheck`, `pnpm test`, `openspec validate cells-as-objects --strict` and
+- [x] 6.4 Green — `pnpm typecheck`, `pnpm test`, `openspec validate cells-as-objects --strict` and
   `openspec validate extension-structure --strict` all pass, with no `extension-source-layout` delta
   edited here (the structure change owns it) and task 5.5 still open. Verified by: the four exit
   statuses, with `pnpm test`'s summary lines and both validate outputs recorded raw.
-- [ ] 6.5 — Bring `extension-structure`'s documents across in the same merge — `ARCHITECTURE.md`,
+- [x] 6.5 — Bring `extension-structure`'s documents across in the same merge — `ARCHITECTURE.md`,
   `docs/adr/0001-imports-run-one-way.md`, `AGENTS.md` — and add one line to `ARCHITECTURE.md` naming the
   three-way pad and the `leavesStyleOpen` rule, since both now live in the model it describes. Verified
   by: the three documents are present after the merge, and the added line sits with the pad-and-reset

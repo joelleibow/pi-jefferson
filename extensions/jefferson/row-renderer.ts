@@ -1,23 +1,18 @@
 /**
  * The row renderer: renders a normalized row into one footer line.
  *
- * Equal cells come from explicit `floor(W / N)` arithmetic recomputed inside
- * `render(width)` — the stack allocator drains greedily and must not divide the
- * row (D7). The width helpers cross the load boundary by injection from the
- * entry (D8): this source file holds no host runtime import, so wide glyphs and ANSI
- * escapes are measured with the host's `visibleWidth`, never `String.length`.
- * Each cell's text is resolved from its instrument and then truncated and padded, so a row is
- * always one line (D10, D12).
+ * Equal cells come from explicit `floor(W / N)` arithmetic recomputed inside `render(width)`,
+ * because the stack allocator distributes by weight and does not divide a row. That width becomes
+ * each child's `basis`; the host then composes the children and pads the line to the full width,
+ * so the row's remainder lands at the right edge. Composition, child iteration and line assembly
+ * are the host's `HStack`; a cell component owns only its own clip and pad. Cells are one line
+ * tall, so a row always is.
  */
 
-import type { Row } from "./configuration.ts";
-import type { Readings } from "./session-data-store.ts";
+import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 
-/** The host's width helpers, injected by the entry (D8). */
-export interface WidthHelpers {
-  truncateToWidth(text: string, maxWidth: number): string;
-  visibleWidth(text: string): number;
-}
+import type { CellAlign, Row } from "./configuration.ts";
+import type { Readings } from "./session-data-store.ts";
 
 /** The component the entry hands to `ctx.ui.setFooter`. */
 export interface Footer {
@@ -31,7 +26,7 @@ const GAP = 0;
 /** The host's style reset, as the renderer emits it before a pad whose text left an SGR open (D6). */
 const RESET = "\x1b[0m";
 
-/** Whether cell text leaves an SGR open, so a run of spaces after it would inherit the style. */
+/** Whether cell text leaves an SGR open, so a run of spaces after it would inherit the style (D6, D12). */
 function leavesStyleOpen(text: string): boolean {
   return text.includes("\x1b") && !text.endsWith(RESET);
 }
@@ -46,45 +41,60 @@ function leavesStyleOpen(text: string): boolean {
 export function renderRow(
   row: Row,
   width: number,
-  helpers: WidthHelpers,
   readings: Readings,
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
-  let line = "";
-  let styleOpen = false; // whether the last text appended left an SGR open
-  /** The spaces a pad or the row's remainder adds: reset first, so a space never inherits a style. */
-  const spaces = (count: number): string => {
-    if (count <= 0) return "";
-    const reset = styleOpen ? RESET : "";
-    styleOpen = false;
-    return reset + " ".repeat(count);
-  };
-  for (const cell of row.cells) {
-    const clipped = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
-    const pad = cellWidth - helpers.visibleWidth(clipped);
-    const before = cell.align === "right" ? pad : cell.align === "center" ? Math.floor(pad / 2) : 0;
-    const after = cell.align === "left" ? pad : cell.align === "center" ? pad - Math.floor(pad / 2) : 0;
-    line += spaces(before);
-    line += clipped;
-    styleOpen = leavesStyleOpen(clipped);
-    line += spaces(after);
-  }
-  line += spaces(width - helpers.visibleWidth(line));
-  return line;
+
+  /** One cell view: content in, one clipped and padded line out. It knows nothing of instruments. */
+  const cellView = (text: string, align: CellAlign): Component => ({
+    render: (cellRenderWidth: number): string[] => {
+      const clipped = truncateToWidth(text, cellRenderWidth);
+      const pad = Math.max(0, cellRenderWidth - visibleWidth(clipped));
+      const before = align === "right" ? pad : align === "center" ? Math.floor(pad / 2) : 0;
+      const after = align === "left" ? pad : align === "center" ? pad - Math.floor(pad / 2) : 0;
+      // The pad that follows this cell's own text resets first when the text left an SGR open;
+      // the pad that leads a right- or centred cell's text follows the host's reset between cells
+      // (D12): the open-style reading is taken from the text this cell just appended, inside the cell.
+      const trailing = after > 0 ? (leavesStyleOpen(clipped) ? RESET : "") + " ".repeat(after) : "";
+      const leading = before > 0 ? " ".repeat(before) : "";
+      return [leading + clipped + trailing];
+    },
+    invalidate(): void {},
+  });
+
+  // Each instrument resolves once per row render: the host asks a child to render more than once
+  // (once to measure, again to lay out), and an instrument must not pay for that twice.
+  const resolved = row.cells.map((cell) => cell.instrument.resolve(readings));
+  const composed = new HStack(
+    resolved.map((text, index) => ({
+      component: cellView(text, row.cells[index]?.align ?? "left"),
+      basis: cellWidth,
+      grow: 0,
+      shrink: 0,
+    })),
+    { gap: GAP },
+  ).render(width)[0] ?? "";
+
+  const remainder = width - visibleWidth(composed);
+  return remainder > 0 ? composed + " ".repeat(remainder) : composed;
 }
 
 /** Build the footer component: one line per row, in declaration order. */
 export function createFooter(
   rows: Row[],
   sampleReadings: () => Readings,
-  helpers: WidthHelpers,
 ): Footer {
   return {
     render(width: number): string[] {
       // One sample per render, handed to every row and every cell, so two cells reading one datum
       // cannot disagree: agreement is structural, not procedural (D4).
       const readings = sampleReadings();
-      return rows.map((row) => renderRow(row, width, helpers, readings));
+      const rowViews = rows.map((row): Component => ({
+        render: (rowWidth: number): string[] => [renderRow(row, rowWidth, readings)],
+        invalidate: () => {},
+      }));
+      // The footer is one component holding a tree: a VStack of rows, each row an HStack of cells.
+      return new VStack(rowViews, { gap: 0 }).render(width);
     },
     // The footer caches nothing, so there is nothing to invalidate.
     invalidate(): void {},
