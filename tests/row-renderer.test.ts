@@ -17,6 +17,19 @@ import {
 
 const helpers: WidthHelpers = { truncateToWidth, visibleWidth };
 
+/** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
+const FRAME = "\x1b[0m\x1b]8;;\x07";
+
+/** A row's line as the host composes it: one framing per cell, plus one closing the line. */
+function composed(...cells: string[]): string {
+  return FRAME + cells.join(FRAME) + FRAME;
+}
+
+/** A line with the host's framing removed, for assertions about what a reader sees. */
+function visible(line: string): string {
+  return line.replaceAll(FRAME, "");
+}
+
 /** The readings a geometry fixture's instrument ignores: these tests are about width, not data. */
 const readings: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined };
 
@@ -31,14 +44,14 @@ test("a width that divides evenly gives every cell the same columns", () => {
   // Cell text fits the cell exactly, so no truncation intervenes in the geometry check.
   const line = renderRow(rowOf(8, "Lorem ipsu"), 80, helpers, readings);
   assert.equal(visibleWidth(line), 80);
-  assert.equal(line, "Lorem ipsu".repeat(8));
+  assert.equal(line, composed(...Array<string>(8).fill("Lorem ipsu")));
 });
 
 test("a width that does not divide evenly leaves the remainder blank at the right edge", () => {
   const line = renderRow(rowOf(3), 100, helpers, readings);
   assert.equal(visibleWidth(line), 100);
   // 33 columns per cell, the 100th column blank at the right edge.
-  assert.equal(line, "Lorem ipsum dolor sit amet".padEnd(33).repeat(3) + " ");
+  assert.equal(line, composed(...Array<string>(3).fill("Lorem ipsum dolor sit amet".padEnd(33))) + " ");
   assert.equal(line.at(-1), " ");
 });
 
@@ -61,14 +74,14 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
   };
   const line = renderRow(row, 20, helpers, readings);
   assert.equal(visibleWidth(line), 20);
-  assert.ok(line.startsWith("provide"), "the first cell clips at its 10 columns");
+  assert.ok(visible(line).startsWith("provide"), "the first cell clips at its 10 columns");
   assert.ok(!line.includes("a-very-long-model-name"), "the text is clipped, not overflowed");
   assert.ok(!line.includes("\n"), "the row stays one line");
 });
 
 test("short cell text is padded so the line spans the full width", () => {
   const line = renderRow(rowOf(3, "ab"), 12, helpers, readings);
-  assert.equal(line, "ab  ab  ab  ");
+  assert.equal(line, composed("ab  ", "ab  ", "ab  "));
   assert.equal(visibleWidth(line), 12);
 });
 
@@ -85,7 +98,7 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
   };
   const line = renderRow(row, 9, helpers, readings);
   assert.equal(visibleWidth(line), 9);
-  assert.equal(line, "\x1b[31mab\x1b[0m" + "  " + "😀" + "   ");
+  assert.equal(line, composed("\x1b[31mab\x1b[0m" + "  ", "😀" + "  ") + " ");
   assert.ok(!line.includes("\n"));
 });
 
@@ -101,9 +114,9 @@ test("the footer renders one line per row, in order, each spanning the width", (
     lines.map((line) => visibleWidth(line)),
     [80, 80, 80],
   );
-  assert.ok(lines[0]?.startsWith("aa"));
-  assert.ok(lines[1]?.startsWith("b"));
-  assert.ok(lines[2]?.startsWith("c"));
+  assert.ok(visible(lines[0] ?? "").startsWith("aa"));
+  assert.ok(visible(lines[1] ?? "").startsWith("b"));
+  assert.ok(visible(lines[2] ?? "").startsWith("c"));
 });
 
 test("more cells than columns still renders exactly one line of the width", () => {
@@ -117,7 +130,7 @@ test("cell widths are recomputed when the width changes", () => {
   renderRow(row, 100, helpers, readings); // 33 columns per cell
   const resized = renderRow(row, 90, helpers, readings); // 30 columns per cell, nothing retained
   assert.equal(visibleWidth(resized), 90);
-  assert.equal(resized, "Lorem ipsum dolor sit amet".padEnd(30).repeat(3));
+  assert.equal(resized, composed(...Array<string>(3).fill("Lorem ipsum dolor sit amet".padEnd(30))));
 });
 
 test("one render samples the store exactly once, whatever the row and cell count", () => {
@@ -166,7 +179,7 @@ test("two cells holding the model instrument resolve identical text", () => {
     helpers,
   );
   const [line] = footer.render(48);
-  assert.equal(line, "anthropic: claude-opus-4".repeat(2));
+  assert.equal(line, composed("anthropic: claude-opus-4", "anthropic: claude-opus-4"));
 });
 
 test("a push between two renders shows up in the next render and not before", () => {
@@ -191,7 +204,7 @@ test("a push between two renders shows up in the next render and not before", ()
   store.modelSelected("anthropic", "gpt-5");
   const second = footer.render(26)[0];
 
-  assert.equal(first, "claude-opus-4".repeat(2));
-  assert.equal(second, "gpt-5".padEnd(13).repeat(2), "both cells see the pushed value");
+  assert.equal(first, composed(...Array<string>(2).fill("claude-opus-4")));
+  assert.equal(second, composed(...Array<string>(2).fill("gpt-5".padEnd(13))), "both cells see the pushed value");
   assert.equal(handed[0]?.model, "claude-opus-4", "the first render's object kept its values");
 });

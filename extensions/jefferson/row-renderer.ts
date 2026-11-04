@@ -1,14 +1,15 @@
 /**
  * The row renderer: renders a normalized row into one footer line.
  *
- * Equal cells come from explicit `floor(W / N)` arithmetic recomputed inside
- * `render(width)` — the stack allocator drains greedily and must not divide the
- * row (D7). The width helpers cross the load boundary by injection from the
- * entry (D8): this source file holds no host runtime import, so wide glyphs and ANSI
- * escapes are measured with the host's `visibleWidth`, never `String.length`.
- * Each cell's text is resolved from its instrument and then truncated and padded, so a row is
- * always one line (D10, D12).
+ * Equal cells come from explicit `floor(W / N)` arithmetic recomputed inside `render(width)`,
+ * because the stack allocator distributes by weight and does not divide a row. That width becomes
+ * each child's `basis`; the host then composes the children and pads the line to the full width,
+ * so the row's remainder lands at the right edge. Composition, child iteration and line assembly
+ * are the host's `HStack`; a cell component owns only its own clip and pad. Cells are one line
+ * tall, so a row always is.
  */
+
+import { HStack, type Component } from "@earendil-works/pi-tui";
 
 import type { Row } from "./configuration.ts";
 import type { Readings } from "./session-data-store.ts";
@@ -40,13 +41,27 @@ export function renderRow(
   readings: Readings,
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
-  let line = "";
-  for (const cell of row.cells) {
-    const truncated = helpers.truncateToWidth(cell.instrument.resolve(readings), cellWidth);
-    line += truncated + " ".repeat(Math.max(0, cellWidth - helpers.visibleWidth(truncated)));
-  }
-  const remainder = width - helpers.visibleWidth(line);
-  return remainder > 0 ? line + " ".repeat(remainder) : line;
+
+  /** One cell: clipped to the width the row gives it, padded so it occupies that width. */
+  const cellComponent = (text: string): Component => ({
+    render: (cellRenderWidth: number): string[] => {
+      const clipped = helpers.truncateToWidth(text, cellRenderWidth);
+      const pad = Math.max(0, cellRenderWidth - helpers.visibleWidth(clipped));
+      return [clipped + " ".repeat(pad)];
+    },
+    invalidate(): void {},
+  });
+
+  // Each instrument resolves once per row render: the host asks a child to render more than once
+  // (once to measure, again to lay out), and an instrument must not pay for that twice.
+  const resolved = row.cells.map((cell) => cell.instrument.resolve(readings));
+  const composed = new HStack(
+    resolved.map((text) => ({ component: cellComponent(text), basis: cellWidth, grow: 0, shrink: 0 })),
+    { gap: GAP },
+  ).render(width)[0] ?? "";
+
+  const remainder = width - helpers.visibleWidth(composed);
+  return remainder > 0 ? composed + " ".repeat(remainder) : composed;
 }
 
 /** Build the footer component: one line per row, in declaration order. */
