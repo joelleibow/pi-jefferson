@@ -31,11 +31,11 @@ state the approach must fit and the host facts it rests on.
 
 **Constraints that bind the shape.** No new source file, dependency, manifest field, `tsconfig`
 glob, or CI expectation (D8 lists what must show no diff). Erasable TypeScript only, no build step.
-Runtime host imports only in `extensions/jefferson.ts`; every other working part takes helpers by
-injection and uses `import type` for host types. Tests live under `tests/`. The vocabulary is
-row → cell → instrument (a label over a data field), with `align` naming a cell property; the
-owner's two rejected nouns do not appear below, and where `extension-source-layout`'s term of art
-is meant this design says "source file".
+Host packages are imported where needed, imports run one way from the entry down, and no module
+reaches back; the entry-only import rule is retired, superseded by `extension-structure`. Tests live
+under `tests/`. The vocabulary is row → cell → instrument (a label over a data field), with `align`
+naming a cell property; the owner's two rejected nouns do not appear below, and where
+`extension-source-layout`'s term of art is meant this design says "source file".
 
 **Host facts every claim below rests on** (via `research-chidi.md` and `research-eleanor.md`;
 section references are to those reports). Facts marked *verified directly* were checked against the
