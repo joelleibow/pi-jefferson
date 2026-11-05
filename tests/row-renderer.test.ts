@@ -34,7 +34,7 @@ const readings: Readings = { provider: undefined, model: undefined, thinkingLeve
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
     id: "row-0",
-    cells: Array.from({ length: count }, () => ({ instrument: { resolve: () => text }, align: "left" as const })),
+    cells: Array.from({ length: count }, () => ({ instrument: { render: () => text }, align: "left" as const })),
   };
 }
 
@@ -69,8 +69,8 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
   const row: Row = {
     id: "row-0",
     cells: [
-      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
-      { instrument: { resolve: () => "thinking: high" }, align: "left" },
+      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { render: () => "thinking: high" }, align: "left" },
     ],
   };
   const line = renderRow(row, 20, readings);
@@ -138,8 +138,8 @@ test("text wider than its cell renders identically under any alignment", () => {
   const row: Row = {
     id: "row-0",
     cells: [
-      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
-      { instrument: { resolve: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
     ],
   };
   const left = renderRow(row, 21, readings);
@@ -214,7 +214,7 @@ test("an ANSI-styled cell's pad carries no styling", () => {
   // one open per cell, and none between the cell's close and its pad.
   const styled = (text: string): Row => ({
     id: "row-0",
-    cells: Array.from({ length: 3 }, () => ({ instrument: { resolve: () => text }, align: "left" as const })),
+    cells: Array.from({ length: 3 }, () => ({ instrument: { render: () => text }, align: "left" as const })),
   });
   for (const text of ["\x1b[31mab\x1b[0m", "\x1b[4mab"]) {
     const line = renderRow(styled(text), 20, readings);
@@ -231,8 +231,8 @@ test("the host closes an open style between cells", () => {
   const row: Row = {
     id: "row-0",
     cells: [
-      { instrument: { resolve: () => "\x1b[4mabcdefghij" }, align: "left" },
-      { instrument: { resolve: () => "cd" }, align: "right" },
+      { instrument: { render: () => "\x1b[4mabcdefghij" }, align: "left" },
+      { instrument: { render: () => "cd" }, align: "right" },
     ],
   };
   const line = renderRow(row, 20, readings);
@@ -249,8 +249,8 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
     // padding it from String.length (12, not 2) under-pads it mid-line and
     // the line-level remainder cannot restore the byte-identical string.
     cells: [
-      { instrument: { resolve: () => "\x1b[31mab\x1b[0m" }, align: "left" },
-      { instrument: { resolve: () => "😀" }, align: "left" },
+      { instrument: { render: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+      { instrument: { render: () => "😀" }, align: "left" },
     ],
   };
   const line = renderRow(row, 9, readings);
@@ -304,25 +304,26 @@ test("one render samples the store exactly once, whatever the row and cell count
   assert.equal(samples, 2, "one sample per render, not one per render per row");
 });
 
-test("every cell of one render is handed the same readings object", () => {
-  const handed: Readings[] = [];
+test("an instrument renders once per (cell, width) — the row-width measure, then the cell-width layout — and every call shares one readings object", () => {
+  const handed: Array<{ readings: Readings; width: number }> = [];
   const capture: Instrument = {
-    resolve(r) {
-      handed.push(r);
+    render(r, width) {
+      handed.push({ readings: r, width });
       return "";
     },
   };
   const footer = createFooter(
-    [
-      { id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] },
-      { id: "row-1", cells: [{ instrument: capture, align: "left" }] },
-    ],
+    [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
   );
-  footer.render(30);
-  assert.equal(handed.length, 3);
-  for (const r of handed) assert.equal(r, handed[0], "one object for the whole render");
+  footer.render(30); // the row's cells are 10 columns wide
+  assert.deepEqual(
+    handed.map((call) => call.width),
+    [30, 30, 30, 10, 10, 10],
+    "two calls per cell: one at the row width, one at the cell width, never two at one width",
+  );
+  for (const call of handed) assert.equal(call.readings, handed[0]?.readings, "one object for the whole render");
 });
 
 test("two cells holding the model instrument resolve identical text", () => {
@@ -338,7 +339,7 @@ test("two cells holding the model instrument resolve identical text", () => {
 test("a push between two renders shows up in the next render and not before", () => {
   const handed: Readings[] = [];
   const capture: Instrument = {
-    resolve(r) {
+    render(r) {
       handed.push(r);
       return r.model ?? "";
     },

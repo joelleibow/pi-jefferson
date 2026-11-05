@@ -2,9 +2,9 @@
  * The instruments: the text a cell displays, resolved by reading the store.
  *
  * An instrument is a label over a data field, where either half may itself be data (D9). It is
- * handed one `Readings` and nothing else — no store, no context, no `tui` — so it cannot
- * subscribe, poll, mutate, or retain a handle, and `readonly` makes that a compile-time property
- * rather than a convention (D2). The only import is that type.
+ * handed one `Readings` and the width its cell has, and nothing else — no store, no context,
+ * no `tui` — so it cannot subscribe, poll, mutate, or retain a handle, and `readonly` makes
+ * that a compile-time property rather than a convention (D2). The only import is that type.
  */
 
 import type { Reading, Readings } from "./session-data-store.ts";
@@ -13,18 +13,22 @@ import type { Reading, Readings } from "./session-data-store.ts";
 export const DEFAULT_CELL_TEXT =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor";
 
-/** A cell's content: resolved synchronously from one render's readings. */
+/**
+ * A cell's content: one line rendered synchronously from one render's readings into the width
+ * the cell has. The shipped instruments are text and ignore the width; the cell clips
+ * defensively regardless.
+ */
 export interface Instrument {
-  resolve(readings: Readings): string;
+  render(readings: Readings, width: number): string;
 }
 
-/** The placeholder instrument: it displays a constant, so it reads no datum. */
-export const blank: Instrument = { resolve: () => DEFAULT_CELL_TEXT };
+/** The placeholder instrument: it displays a constant, so it reads no datum and no width. */
+export const blank: Instrument = { render: () => DEFAULT_CELL_TEXT };
 
-/** `label: data`, or "" when either half is unknown: there is no text it can honestly resolve. */
+/** `label: data`, or "" when either half is unknown: there is no text it can honestly render. */
 function labelled(label: (r: Readings) => Reading, data: (r: Readings) => Reading): Instrument {
   return {
-    resolve(readings) {
+    render(readings) {
       const l = label(readings);
       const d = data(readings);
       return l === undefined || d === undefined ? "" : `${l}: ${d}`;

@@ -37,8 +37,11 @@ weight, not by division — measured, not assumed.
 Each cell is a `Component` whose `render(cellWidth)` clips with the host's `truncateToWidth` and pads to
 the cell width with the host's `visibleWidth`. It returns one line, so a row is one line.
 
-Instruments resolve **once per row render**, not once per `render` call: the host asks a child to render
-more than once (measure, then lay out), and an instrument must not pay for that twice.
+Instruments resolve **at most once per (cell, width) per row render**, not once per `render` call:
+the host asks a child to render twice — once at the row width to measure, once at the cell width to
+lay out — and the text is memoized per width, so the two passes cost two resolutions, not four, and
+the composed line comes from the cell-width call: an instrument that sizes to its width sees its
+cell's width, not the row's.
 
 ### D3. The cross-cell ANSI state is deleted
 

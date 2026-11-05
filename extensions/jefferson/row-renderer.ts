@@ -11,7 +11,7 @@
 
 import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 
-import type { CellAlign, Row } from "./configuration.ts";
+import type { Cell, Row } from "./configuration.ts";
 import type { Readings } from "./session-data-store.ts";
 
 /** The component the entry hands to `ctx.ui.setFooter`. */
@@ -45,29 +45,40 @@ export function renderRow(
 ): string {
   const cellWidth = Math.floor((width - (row.cells.length - 1) * GAP) / row.cells.length);
 
-  /** One cell view: content in, one clipped and padded line out. It knows nothing of instruments. */
-  const cellView = (text: string, align: CellAlign): Component => ({
-    render: (cellRenderWidth: number): string[] => {
-      const clipped = truncateToWidth(text, cellRenderWidth);
-      const pad = Math.max(0, cellRenderWidth - visibleWidth(clipped));
-      const before = align === "right" ? pad : align === "center" ? Math.floor(pad / 2) : 0;
-      const after = align === "left" ? pad : align === "center" ? pad - Math.floor(pad / 2) : 0;
-      // The pad that follows this cell's own text resets first when the text left an SGR open;
-      // the pad that leads a right- or centred cell's text follows the host's reset between cells
-      // (D12): the open-style reading is taken from the text this cell just appended, inside the cell.
-      const trailing = after > 0 ? (leavesStyleOpen(clipped) ? RESET : "") + " ".repeat(after) : "";
-      const leading = before > 0 ? " ".repeat(before) : "";
-      return [leading + clipped + trailing];
-    },
-    invalidate(): void {},
-  });
+  /**
+   * One cell view: its instrument's line, clipped and padded. The instrument renders at most
+   * once per (cell, width) per row render: the host's measure pass hands the row width and its
+   * layout pass the cell width, and the text is memoized per width so neither pass re-renders.
+   * The composed line is built from the layout pass, so the width an instrument sizes to is its
+   * cell's, not the row's.
+   */
+  const cellView = (cell: Cell): Component => {
+    let cached: { width: number; text: string } | undefined;
+    return {
+      render: (cellRenderWidth: number): string[] => {
+        if (cached?.width !== cellRenderWidth) {
+          cached = { width: cellRenderWidth, text: cell.instrument.render(readings, cellRenderWidth) };
+        }
+        const text = cached.text;
+        const align = cell.align;
+        const clipped = truncateToWidth(text, cellRenderWidth);
+        const pad = Math.max(0, cellRenderWidth - visibleWidth(clipped));
+        const before = align === "right" ? pad : align === "center" ? Math.floor(pad / 2) : 0;
+        const after = align === "left" ? pad : align === "center" ? pad - Math.floor(pad / 2) : 0;
+        // The pad that follows this cell's own text resets first when the text left an SGR open;
+        // the pad that leads a right- or centred cell's text follows the host's reset between cells
+        // (D12): the open-style reading is taken from the text this cell just appended, inside the cell.
+        const trailing = after > 0 ? (leavesStyleOpen(clipped) ? RESET : "") + " ".repeat(after) : "";
+        const leading = before > 0 ? " ".repeat(before) : "";
+        return [leading + clipped + trailing];
+      },
+      invalidate(): void {},
+    };
+  };
 
-  // Each instrument resolves once per row render: the host asks a child to render more than once
-  // (once to measure, again to lay out), and an instrument must not pay for that twice.
-  const resolved = row.cells.map((cell) => ({ text: cell.instrument.resolve(readings), align: cell.align }));
   const composed = new HStack(
-    resolved.map((pair) => ({
-      component: cellView(pair.text, pair.align),
+    row.cells.map((cell) => ({
+      component: cellView(cell),
       basis: cellWidth,
       grow: 0,
       shrink: 0,

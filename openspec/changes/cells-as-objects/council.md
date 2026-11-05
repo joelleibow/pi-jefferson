@@ -7,6 +7,10 @@
 and adds per-cell `align`. Clipping stays at the text's end; the pad lands on the side opposite
 `align`. `width`, `spacer`, a bare number, `cellCount` and `center` are declined by the owner.
 
+**Amended 2026-11-03:** `center` did not stay declined. The owner reversed that ruling after this
+first pass, saying *"There should be left, right, and center"* (`owner-rulings.md`), and the change
+builds all three. The rest of this minute stands as written.
+
 Evidence inputs: `owner-rulings.md`, `research-chidi.md`, `research-eleanor.md`, `proposal.md`,
 `specs/statusline/spec.md`. Advisors were restricted to those documents and did not read the
 repository. Roster: `council-kimi` and `council-argon`, one pass each, no fallbacks. `council-argon`'s

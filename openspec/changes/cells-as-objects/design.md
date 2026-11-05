@@ -153,8 +153,10 @@ change from strings to objects:
 5. **`align`, when present, is `"left"`, `"right"` or `"center"`**;
 6. **resolve the instrument name** through `instrumentNamed` and collect an unknown into
    `notices.unknownInstruments` (the cell will render `blank`);
-7. **then the ceiling**: `if (cells.length === MAX_CELLS) break;`, then
-   `cells.push({ instrument: instrument ?? blank, align: align ?? "left" })`.
+7. **then the ceiling**: push only while there is room —
+   `if (cells.length < MAX_CELLS) cells.push({ instrument: instrument ?? blank, align: align ?? "left" })`.
+   The ceiling is a condition on the push, never a `break`: a `break` here would stop validating
+   entries past the ceiling, which the delta forbids and the two bullets below require.
 
 Consequences this order exists to guarantee, each of which a test in D10 pins:
 
@@ -162,8 +164,8 @@ Consequences this order exists to guarantee, each of which a test in D10 pins:
   ceiling never gets the chance to clamp a malformed entry away.
 - An unrecognised instrument at position 11 still **warns** naming it, though its cell does not
   render.
-- Nothing past the ceiling is half-constructed: the push is after the break, so a rejected field can
-  never leave a cell in the list.
+- Nothing past the ceiling is half-constructed: the push is the last statement and it is guarded, so
+  a rejected field can never leave a cell in the list.
 - **The key check precedes the `instrument` checks.** The key set is the object's outermost claim,
   and it is what catches both declined spellings the council ruled on: the declined `width` and the
   `aling` typo. Checking it first means a migrating user who wrote `{"name": "model"}` gets a
@@ -338,7 +340,10 @@ Why this predicate rather than unconditional resets, and why it is not a no-op:
   renders `"\x1b[4mabcdefghijabcdefghij"`, underlined throughout. That is pre-existing — today's
   renderer emits no reset at all — and it is outside this requirement's scope, which is about the
   pad and not about a cell's text inheriting a neighbour's style; closing it would mean resetting
-  before every cell's text, four bytes per cell in every row.
+  before every cell's text, four bytes per cell in every row. **That residual is closed by the
+  composition, not by this renderer:** the host writes a style reset before every child it composes
+  (D12), so no cell's text can inherit the previous cell's, and the four-bytes-per-cell fix is not to
+  be reached for.
 
 ### D7. Ten, for the measured reason
 
@@ -373,6 +378,11 @@ visible — `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)`.
 | `extensions/jefferson/instrument.ts` | **no diff** — `Instrument`, `blank`, `model`, `thinking` and `instrumentNamed` are untouched; no instrument pads |
 | `extensions/jefferson/session-data-store.ts` | **no diff** — alignment never reaches the store |
 | `package.json`, `tsconfig.json`, `pnpm-lock.yaml`, `.github/workflows/ci.yml` | **no diff** — no new file, dependency, export, or glob; `include` already covers `extensions/**/*.ts` and `tests/**/*.ts`, and CI's tarball rule only pins the roots, the entry and the manifest, none of which move |
+
+`cellsFromNames` keeps its name although it now takes cell objects rather than names: renaming it
+would touch its caller `normalizeRow` and three `tasks.md` references for no behavioural gain, and the
+doc comment above it states the new meaning. Recorded here so the mismatch reads as a decision, not
+an oversight.
 
 Nothing structural is added: no source file, no exported runtime name, no directory. The
 `files: ["extensions", …]` and `pi.extensions: ["./extensions/jefferson.ts"]` surfaces are
@@ -483,22 +493,24 @@ already asserts no `.test.ts` ships.
 
 A terminal's rendering cannot be asserted from `node --test`, so this is one task, completed by
 recording what was seen. Each observation names its document and width, so the geometry it should
-show is decided here rather than in whatever window the session happens to have:
+show is decided here rather than left implicit. The width is **136 columns** because that is the
+window the observation was taken in — recorded after the fact, and one width for every row, so a
+reader checks the arithmetic rather than the session:
 
 | Observation | Document | Width | Expected, measured |
 |---|---|---|---|
-| the pad is visible under `right` | `[{instrument:"thinking"},{instrument:"thinking",align:"right"}]` | 80 | `cellWidth` 40, remainder 0; the right-aligned text occupies columns 67–80 |
-| the shortfall is visible | seven cells: six `{instrument:"thinking"}`, the last `{instrument:"thinking",align:"right"}` | 132 | `cellWidth` 18, remainder 6; the last cell's text ends on column 126, so its 6-column gap to the terminal edge is plainly visible |
-| the centre split is visible, and its odd pad lands on the right | `[{instrument:"thinking"},{instrument:"thinking",align:"center"},{instrument:"thinking"}]` | 100 | `cellWidth` 33, remainder 1; the centred middle cell's text occupies columns 43–56, with a 9-column pad to its left and 10 to its right, so it sits half a column left of its cell's exact centre |
-| the align is rejected | any row carrying `{instrument:"model",align:"middle"}` | 80 | the notification `pi-jefferson: <path> was rejected (row 0 has an align that is not "left", "right" or "center": "middle"); rendering the default row` |
+| the pad is visible under `right` | `[{instrument:"thinking"},{instrument:"thinking",align:"right"}]` | 136 | `cellWidth` 68, remainder 0; the right-aligned text occupies columns 123–136 |
+| the shortfall is visible | seven cells: six `{instrument:"thinking"}`, the last `{instrument:"thinking",align:"right"}` | 136 | `cellWidth` 19, remainder 3; the last cell's text ends on column 133, so its 3-column gap to the terminal edge is plainly visible |
+| the centre split is visible, and its odd pad lands on the right | `[{instrument:"thinking"},{instrument:"thinking",align:"center"},{instrument:"thinking"}]` | 136 | `cellWidth` 45, remainder 1; the centred middle cell's text occupies columns 61–74, with a 15-column pad to its left and 16 to its right, so it sits half a column left of its cell's exact centre |
+| the align is rejected | any row carrying `{instrument:"model",align:"middle"}` | 136 | the notification `pi-jefferson: <path> was rejected (row 0 has an align that is not "left", "right" or "center": "middle"); rendering the default row` |
 
 Recorded for each observation: the terminal width, the observed line, whether the right-aligned
 cell's text ends against its cell's edge, with the last cell ending `W mod N` columns short of the
-terminal edge — 6 columns for the seven-cell row at 132, and 2 columns for the ten-cell default at
-the same width, as the delta states — and whether the centred cell's two pads are equal (an even
-pad) or heavier on the right by one column (an odd one). The record goes in the change's
-implementation record (not in a test), and this change is not complete until it holds the observed
-lines.
+terminal edge — 3 columns for the seven-cell row at 136, as the delta states — and whether the
+centred cell's two pads are equal (an even pad) or heavier on the right by one column (an odd one).
+The record goes in the change's implementation record (not in a test), and this change is not
+complete until it holds the observed lines. The delta's ten-cell-at-132 shortfall (2 columns) is
+arithmetic from D7 beside this record, not an observation: no run was recorded at 132.
 
 **The task observes no wide glyph, because no configuration path stages one:** the model id is
 host-supplied, and `blank` is fixed ASCII Lorem text, so a wide-glyph instrument value cannot be

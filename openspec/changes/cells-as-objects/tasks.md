@@ -2,9 +2,10 @@
 
 Each group is red first, then the implementation, then green, and every group leaves
 `pnpm typecheck` and `pnpm test` passing. Test files are named per task; D-references are to
-`design.md`. Declined by the owner and absent from every task: `width`, a `spacer` instrument,
-`center`, a bare number as `cells`, and a `cellCount` key — no task builds, reserves, or scaffolds
-one.
+`design.md`. Declined by the owner and absent from every task: `width`, a `spacer` instrument, a bare
+number as `cells`, and a `cellCount` key — no task builds, reserves, or scaffolds one. `center` was
+declined with them and then restored: the owner corrected his own scope on 2026-11-03
+(`owner-rulings.md`), so group 3 builds it and it is not among the declined.
 
 ## 1. The cell shape
 
@@ -17,7 +18,7 @@ one.
 
 - [x] 2.1 Red — in `tests/configuration.test.ts`, object entries and their fields: `cells is both the count and the placement, in order` takes `[{instrument:"model"},{instrument:"thinking"},{instrument:"blank"}]`; `a cells entry that is not an object rejects and names the object spelling` (a string, a number, an array, `null`), matching `/not an object/` and `/declare \{"instrument": "model"\}/`; `a cell object with an unrecognised key rejects and names the key` for `{"instrument":"model","width":4}` and `{"instrument":"model","aling":"right"}`, and the old `[{text:"x"}]` case moves here now that the warning names `text`; `a cell object with no instrument rejects` for `{"align":"right"}`; `an instrument that is not a non-empty string rejects` for `{instrument:4}` and `{instrument:""}`; `an align outside the three rejects and names the value` for `"middle"`, `"Center"` and `4` (`center` is accepted now); `a cells list of strings is rejected with no converted read` for `{rows:[{cells:["model","thinking"]}]}`, asserting the default row, the warning, and that nothing converts or warns about the string form as a near miss; `a cell that declares no align normalizes to left` for `{instrument:"model"}` under no `align`, and for `"right"` and `"center"` declared from two documents — that one test carries all three. Every remaining string entry fixture in the file becomes a cell object — `["blank","blank","blank"]` → three `{instrument:"blank"}`, and the two unknown-instrument fixtures and the top-level row carry their names in `instrument` — so the string form survives in exactly one test: the one that proves it is rejected. Verified by: `node --test tests/configuration.test.ts` fails on every new case (objects rejected as "not a string") before 2.3.
 - [x] 2.2 Red — in `tests/configuration.test.ts`, the counts and the ceiling's order: `the cell-count constants are named for cells` asserts both constants are 10; `cells naming 12 instruments keeps the first 10 and warns nothing`; `a cells entry past the ceiling that is not an object rejects the document`; `an align past the ceiling that is not a side rejects the document`; `a cells entry past the ceiling naming an unknown instrument warns and renders ten cells`; and the eight-cell expectations D10 lists move to ten — both shapes at once, an absent configuration, an empty object, an empty rows list, `a row omitting cells` (twice), the parametrized rejections, `an empty cells array`, the two duplicate-id cases, an unparseable document, and the trusted/agent document tests' `[8, 8]` → `[10, 10]`, while the `[3]` fixtures keep 3. Verified by: `node --test tests/configuration.test.ts` fails on the counts.
-- [x] 2.3 Implement — in `extensions/jefferson/configuration.ts`, `cellsFromNames` takes cell objects in D2's order: the entry is an object (not an array, not `null`, not a primitive), then every own key is `instrument` or `align`, then `instrument` is present, then a non-empty string, then `align` is `"left"`, `"right"` or `"center"`, then resolve through `instrumentNamed` and collect an unknown into `notices.unknownInstruments`, then `if (cells.length === MAX_CELLS) break;` and `cells.push({ instrument: instrument ?? blank, align: align ?? "left" })`. The unrecognised-key check must narrow explicitly — `const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align")` types as `string | undefined` under `strict` with `noUncheckedIndexedAccess`, so narrow with `if (unknownKey !== undefined) throw new RejectedConfiguration(...)` before throwing: no non-null assertion and no cast in `configuration.ts`. The five rejection messages are byte-identical to D3's table — `row ${index} has a cells entry that is not an object; declare {"instrument": "model"}`, `row ${index} has a cell with an unrecognised key ${JSON.stringify(key)}; a cell carries only instrument and align`, `row ${index} has a cell with no instrument`, `row ${index} has an instrument that is not a non-empty string`, `row ${index} has an align that is not "left", "right" or "center": ${JSON.stringify(value)}` — and `DEFAULT_CELLS` and `MAX_CELLS` are both 10. No compatibility branch, notice, or conversion for the string form. Verified by: 1.1, 2.1 and 2.2 green, `pnpm typecheck` clean.
+- [x] 2.3 Implement — in `extensions/jefferson/configuration.ts`, `cellsFromNames` takes cell objects in D2's order: the entry is an object (not an array, not `null`, not a primitive), then every own key is `instrument` or `align`, then `instrument` is present, then a non-empty string, then `align` is `"left"`, `"right"` or `"center"`, then resolve through `instrumentNamed` and collect an unknown into `notices.unknownInstruments`, then push only while there is room — `if (cells.length < MAX_CELLS) cells.push({ instrument: instrument ?? blank, align: align ?? "left" })`. The ceiling is a condition on the push, never a `break`: every entry of a longer array is still validated, and an unknown name past the ceiling still warns though its cell does not render. The unrecognised-key check must narrow explicitly — `const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align")` types as `string | undefined` under `strict` with `noUncheckedIndexedAccess`, so narrow with `if (unknownKey !== undefined) throw new RejectedConfiguration(...)` before throwing: no non-null assertion and no cast in `configuration.ts`. The five rejection messages are byte-identical to D3's table — `row ${index} has a cells entry that is not an object; declare {"instrument": "model"}`, `row ${index} has a cell with an unrecognised key ${JSON.stringify(key)}; a cell carries only instrument and align`, `row ${index} has a cell with no instrument`, `row ${index} has an instrument that is not a non-empty string`, `row ${index} has an align that is not "left", "right" or "center": ${JSON.stringify(value)}` — and `DEFAULT_CELLS` and `MAX_CELLS` are both 10. No compatibility branch, notice, or conversion for the string form. Verified by: 1.1, 2.1 and 2.2 green, `pnpm typecheck` clean.
 - [x] 2.4 — in `tests/jefferson.test.ts`, the six `{ cells: ["model", "thinking"] }` documents become `[{instrument:"model"},{instrument:"thinking"}]` (this task is red between 2.3 and now, because those documents are rejected); the rejected-document fixture becomes `{ cells: [{instrument:"blank"}], rows: [{}] }`, still rejected for carrying both shapes; and `a rejected configuration warns and still installs the default row` asserts `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)` with its comment updated to ten cells at 80 columns. Verified by: `node --test tests/jefferson.test.ts` green and `visibleWidth(line) === 80`.
 - [x] 2.5 Green — `pnpm typecheck` and `pnpm test` both pass, with the default row ten cells at both the parse and the end-to-end geometry assertions.
 
@@ -35,29 +36,44 @@ one.
 ## 5. Verification
 
 - [x] 5.1 — `pnpm typecheck` exits 0 with no output; record the exit status. Verified by: exit status 0, no output.
-- [x] 5.2 — `pnpm test` exits 0 for every file, including the three files this change edits; record its summary lines as the evidence. Verified by: exit status 0; summary lines — tests 112, pass 112, fail 0.
+- [x] 5.2 — `pnpm test` exits 0 for every file, including the three files this change edits; record its summary lines as the evidence. Verified by: exit status 0; summary lines — tests 114, pass 114, fail 0, the merged tip's count (112 was the count before the `extension-structure` merge, and 6.4 re-runs it).
 - [x] 5.3 — `openspec validate cells-as-objects --strict` exits 0 and prints `Change 'cells-as-objects' is valid`; record the raw output. Verified by: raw output — Change 'cells-as-objects' is valid, exit status 0.
 - [x] 5.4 — `git diff --stat` lists only `extensions/jefferson/configuration.ts`, `extensions/jefferson/row-renderer.ts`, `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts` and `README.md`; `extensions/jefferson/instrument.ts`, `extensions/jefferson/session-data-store.ts`, `extensions/jefferson.ts`, `package.json`, `tsconfig.json`, `pnpm-lock.yaml` and `.github/workflows/` show no diff. A diff in any of those is a design error to report, not a task to tick. Verified by: git diff --stat output lists only the six named files; no other path appeared.
 - [x] 5.5 Terminal observation — performed by the owner at 136 columns on 2026-11-04, driving
   `pi -e ~/Projects/pi-jefferson/extensions/jefferson.ts` and reloading between documents.
 
-  Observed, with the lines read from the screenshots:
+  The owner's window was 136 columns, so **D11's original 80, 100 and 132 widths were not exercised**;
+  D11 records 136 for all three alignment observations. The screenshots recorded the columns, not the
+  bytes, so the lines below are `renderRow`'s output for the same documents at 136 columns, with the
+  host's framing removed — reproduced on 2026-11-04, and agreeing with the columns observed. Spaces
+  are counted rather than drawn, so no editor can trim them:
 
   - **Right-align, two cells.** `[{model},{thinking,align:right}]` at 136 columns is two 68-column
-    cells, no remainder. `thinking: high` ends flush at column 136 with all its gap to the left;
-    `openrouter: ~deepseek/deepseek-flash-latest` sits at the left edge of cell 1.
+    cells, no remainder. The line is `openrouter: ~deepseek/deepseek-flash-latest` + 79 spaces +
+    `thinking: high`: `thinking: high` ends flush at column 136 with all its 54-column gap to the
+    left, and the model text sits at the left edge of cell 1, 25 columns clear of its edge.
   - **Centre, three cells.** `[{thinking},{thinking,align:center},{thinking}]` is 45 columns each with
-    one blank column at the far right. Left text at columns 1–14, **middle text at 61–74**, right text
-    starting at 91 — a 15/16 split, so the odd pad's extra column is on the right and the text sits
-    half a column left of its cell's centre.
-  - **Seven cells.** Seven × 19 columns with three blank columns at the right edge. The right-aligned
-    last cell ends on column **133**, three short of the window, which is `136 mod 7`.
+    one blank column at the far right. The line is `thinking: high` + 46 spaces + `thinking: high` +
+    16 spaces + `thinking: high` + 32 spaces: left text at columns 1–14, **middle text at 61–74**,
+    right text starting at 91 — a 15/16 split, so the odd pad's extra column is on the right and the
+    text sits half a column left of its cell's centre. The trailing 32 are the third cell's 31-column
+    pad and the row's one-column remainder.
+  - **Seven cells.** Seven × 19 columns with three blank columns at the right edge: `thinking: high` +
+    5 spaces, five times over, then `thinking: high` + 10 spaces + `thinking: high` + 3 spaces — the
+    10 being cell 6's 5-column pad followed by the right-aligned last cell's 5-column pad, and the
+    trailing 3 the row's remainder. The right-aligned last cell ends on column **133**, three short of
+    the window, which is `136 mod 7`.
   - **Rejection.** `[{model,align:"middle"}]` warns, byte for byte:
     `row 0 has an align that is not "left", "right" or "center": "middle"` — naming the refused value
     and all three accepted ones — and renders the default ten-cell placeholder row.
 
   The three alignment rows were observed on their own; the warning and the default row were observed
   together in the fourth. No line differed from what the tests and the design predict.
+
+  **Not observed: the delta's 132-column ten-cell shortfall.** Ten cells at 132 are 13 columns each
+  with 2 columns of remainder, so a right-aligned last cell's right edge lands on column 130 —
+  arithmetic from D7's table and the delta, not a terminal observation, because no run was recorded
+  at 132.
 
 ## 6. Reconcile onto extension-structure
 
@@ -128,7 +144,10 @@ one.
 - [x] 6.4 Green — `pnpm typecheck`, `pnpm test`, `openspec validate cells-as-objects --strict` and
   `openspec validate extension-structure --strict` all pass, with no `extension-source-layout` delta
   edited here (the structure change owns it) and task 5.5 still open. Verified by: the four exit
-  statuses, with `pnpm test`'s summary lines and both validate outputs recorded raw.
+  statuses, recorded raw on 2026-11-04 — `pnpm typecheck` exit 0 with no output; `pnpm test` exit 0,
+  summary `tests 114`, `pass 114`, `fail 0`; `openspec validate cells-as-objects --strict`
+  `Change 'cells-as-objects' is valid`, exit 0; `openspec validate extension-structure --strict`
+  `Change 'extension-structure' is valid`, exit 0.
 - [x] 6.5 — Bring `extension-structure`'s documents across in the same merge — `ARCHITECTURE.md`,
   `docs/adr/0001-imports-run-one-way.md`, `AGENTS.md` — and add one line to `ARCHITECTURE.md` naming the
   three-way pad and the `leavesStyleOpen` rule, since both now live in the model it describes. Verified
