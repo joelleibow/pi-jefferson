@@ -37,11 +37,14 @@ weight, not by division — measured, not assumed.
 Each cell is a `Component` whose `render(cellWidth)` clips with the host's `truncateToWidth` and pads to
 the cell width with the host's `visibleWidth`. It returns one line, so a row is one line.
 
-Instruments resolve **at most once per (cell, width) per row render**, not once per `render` call:
-the host asks a child to render twice — once at the row width to measure, once at the cell width to
-lay out — and the text is memoized per width, so the two passes cost two resolutions, not four, and
-the composed line comes from the cell-width call: an instrument that sizes to its width sees its
-cell's width, not the row's.
+The host asks a child to render twice: once at the row width to measure, once at the cell width to lay
+out, both with the same readings — measured, a 30-column row of three cells calls the instruments with
+`[30,30,30,10,10,10]`. So an instrument that sizes to its width sees **both** widths, and the composed
+line comes from the cell-width call: it carries `<10>`. The cell view's memo is **single-entry and
+keyed by width**, so it prevents a second render at one width; it does **not** halve the two-pass cost,
+because the two passes differ in width and never match. An instrument must therefore be pure in
+`(readings, width)` and must not cache its own first result, or its row-width output is what gets
+clipped into the cell. The three shipped instruments ignore the width.
 
 ### D3. The cross-cell ANSI state is deleted
 
@@ -74,8 +77,9 @@ lose the parameter, the entry stops passing it, and the tests call the real sign
 - **[Allocator semantics are now load-bearing]** `basis` plus `grow: 0` is what makes the geometry
   exact. → Recorded in D1 and in `ARCHITECTURE.md`; a future change that reaches for `grow` will see
   the measurement.
-- **[Host renders children more than once]** An instrument that did work per call would double it. →
-  D2 resolves instruments once per row render, and a test asserts the call count.
+- **[Host renders children more than once]** An instrument that did work per call does it twice. →
+  D2 records that cost and the purity it demands of an instrument, and a test pins the widths handed
+  to each call.
 - **[Loss of the entry-only guarantee]** A physical copy of the host package would still break module
   identity. → Unchanged and still checked: `peerDependencies` with `*`, absent from `dependencies`.
 

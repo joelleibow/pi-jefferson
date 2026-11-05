@@ -18,7 +18,7 @@ export type CellAlign = (typeof ALIGNMENTS)[number];
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
-  return typeof value === "string" && (ALIGNMENTS as readonly string[]).includes(value);
+  return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
 }
 
 /** A single cell of a row: the instrument whose text it displays, padded against its align (D1). */

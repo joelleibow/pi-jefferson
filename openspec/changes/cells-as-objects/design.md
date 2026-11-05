@@ -94,8 +94,9 @@ because neither report documents them.
   rejecting unknown row keys is a rule the council did not rule (the shipped precedent for a
   known-but-unread row key, `containers`, warns rather than rejects).
 - Any compatibility path for the string form — no deprecated read, no notice, no conversion.
-- Any change to `Instrument`, to `instrument.ts`, to instrument text (no instrument emits padding or
-  escapes), or to `resolve(readings)`'s signature.
+- Any change to instrument *behaviour*: no instrument emits padding or escapes, and none decides
+  geometry. The seam itself does change — `Instrument`'s one member becomes
+  `render(readings, width)` — per D13.
 - A README configuration example. The README documents no `pi-jefferson.json` shape at all today;
   the object spelling is documented by the rejection message and the proposal, and adding prose
   examples is a separate task this change does not take.
@@ -210,12 +211,18 @@ values quoted, so the warning shows the offending value as it was written.
 - A JSON document cannot express `align: undefined`, so "absent" and "present" are the only two
   states the parser can observe.
 
-### D4. `align` is read inside `renderRow`'s existing loop; no signature moves
+### D4. `align` is read inside `renderRow`'s existing loop
 
-`renderRow(row, width, helpers, readings)` keeps its four parameters, `createFooter(rows,
-sampleReadings, helpers)` keeps its three, `WidthHelpers` keeps its two members, `Row` is unchanged,
-and `Instrument.resolve(readings)` is untouched. `GAP` stays `0`. The cell width formula is
-unchanged. Nothing about padding reaches an instrument, and `instrument.ts` shows no diff (D8).
+`Row` is unchanged, `GAP` stays `0`, the cell width formula is unchanged, and nothing about padding
+reaches an instrument. **"No signature moves" is superseded: D12 moves `renderRow` and `createFooter`
+and deletes `WidthHelpers`; D13 replaces `Instrument.resolve(readings)` with
+`render(readings, width)`, which is what `instrument.ts` changes to (D8).**
+
+**The snippet below is superseded too, in one respect:** it calls
+`cell.instrument.resolve(readings)` through the deleted `helpers`, and its `styleOpen` is threaded
+across the row. The shipped loop is what to consult — D12's composition (a cell `Component` whose
+`render(width)` the host calls) plus D13's seam (`cell.instrument.render(readings, width)`) — and this
+copy is kept only for the pad arithmetic it introduced, which is what the bullets after it argue.
 
 ```ts
 const RESET = "\x1b[0m";
@@ -366,7 +373,7 @@ The cost, recorded with the decision: at 80 columns a ten-cell row gives each ce
 model name clips hard in a narrow window. `tests/jefferson.test.ts`'s geometry assertion makes that
 visible — `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)`.
 
-### D8. The diff is two source files, the tests, and one README sentence
+### D8. The diff is three source files, the tests, and one README sentence
 
 | Path | Diff |
 |---|---|
@@ -375,7 +382,7 @@ visible — `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)`.
 | `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts` | D10 |
 | `README.md` | the Status paragraph's "Formatting, alignment, and gaps are not built yet." loses "alignment" |
 | `extensions/jefferson.ts` | **no diff** — it injects the same two width helpers and passes the same `rows`; nothing in the parse or render change reaches it |
-| `extensions/jefferson/instrument.ts` | **no diff** — `Instrument`, `blank`, `model`, `thinking` and `instrumentNamed` are untouched; no instrument pads |
+| `extensions/jefferson/instrument.ts` | the interface's one member becomes `render(readings, width)`, the three shipped instruments' signatures follow it, and the header and doc comments that say what an instrument is handed change with them (D13) — no instrument reads the width or pads |
 | `extensions/jefferson/session-data-store.ts` | **no diff** — alignment never reaches the store |
 | `package.json`, `tsconfig.json`, `pnpm-lock.yaml`, `.github/workflows/ci.yml` | **no diff** — no new file, dependency, export, or glob; `include` already covers `extensions/**/*.ts` and `tests/**/*.ts`, and CI's tarball rule only pins the roots, the entry and the manifest, none of which move |
 
@@ -540,14 +547,15 @@ The signatures are what D12 moves: after the merge `renderRow(row, width, readin
 `createFooter(rows, sampleReadings)` take no helpers, because `extension-structure` deletes
 `WidthHelpers` outright (its D5), and the entry stops injecting them. So D4's four-parameter signature
 and D8's "no diff" row for `extensions/jefferson.ts` both give way to that branch's three-line entry
-change; nothing else in D4 or D8 moves — the cell width formula, `GAP = 0`, the three-way split of the
-pad, and the row's remainder at the right edge are the same arithmetic, now inside a cell view that
-knows nothing of instruments.
+change; nothing else in D4 moves — the cell width formula, `GAP = 0`, the three-way split of the pad,
+and the row's remainder at the right edge are the same arithmetic, now inside a cell view that holds
+no geometry rule of its own but does call the instrument for its content (D13). (D8's rows for
+`instrument.ts` and for the entry are D13's and this decision's, not D4's.)
 
 **D8 stops being true once the merge lands.** Its table gains rows for the three root documents
 `extension-structure` brings — `AGENTS.md`, `ARCHITECTURE.md`,
 `docs/adr/0001-imports-run-one-way.md` — and for the one line 6.5 adds to `ARCHITECTURE.md`, and its
-summary sentence — the one its title repeats — becomes "two source files, the tests, one README
+summary sentence — the one its title repeats — becomes "three source files, the tests, one README
 sentence, and the structure change's documents". Left as written, the diff it describes contradicts
 the merged tree on three paths and one added line.
 
@@ -557,6 +565,38 @@ framing asserted separately as 6.2 requires. As literal expectations all eleven 
 pre-merge string as what `renderRow` returns, and no framed line returns one: a reviewer checking D10
 against the merged tree meets a contradiction per row and no way to tell a stale expectation from a
 pad on the wrong side.
+
+### D13. The instrument seam: the cell hands its width, and the instrument must be pure
+
+The contract is `render(readings: Readings, width: number): string`. The cell hands its instrument the
+width it is being laid out at because a later instrument draws a bar or a sparkline and has to size
+itself; today's are labels over a datum, and the width is what a derived one needs.
+
+The cell then renders each child **twice**, and that is load-bearing rather than incidental:
+
+- **The host's measure pass hands the row width.** `HStack`'s `render(width)` calls every child at the
+  row width to learn its intrinsic width, allocates, then calls each child again at its allocated
+  width (*verified directly*, `@earendil-works/pi-tui` 1.4.0,
+  `dist/components/h-stack.js`, `render`). Both calls carry the same `readings`.
+- **Measured:** a 30-column row of three cells calls the instruments with `[30,30,30,10,10,10]` — one
+  measure call per cell at the row width, then one layout call per cell at `cellWidth` 10.
+- **The composed line comes from the cell-width call.** It carries `<10>`, the width the layout pass
+  handed over; the measure pass's output reaches the allocator and nothing else.
+
+**The cell view's memo is single-entry and keyed by width** (`row-renderer.ts`:
+`cached?: { width: number; text: string }`). It prevents a second render at one width — a child asked
+twice at 10 renders once — and it does **not** reduce the two-pass cost, because the two passes differ
+in width and the key never matches. Two passes are two renders per cell per row render.
+
+So an instrument must be **pure in `(readings, width)`**: same inputs, same string, and no memo of its
+own. An instrument that keeps its first result because "the readings did not change" keeps the
+row-width output, and what gets clipped and padded into the cell is that 30-column line rather than the
+10-column one it would have drawn. That is why the requirement is written down rather than assumed:
+the second call is not a repeat, and the first answer is not the answer.
+
+The three shipped instruments ignore the width — `blank` returns `DEFAULT_CELL_TEXT`, and `model` and
+`thinking` return `label: data` — and the cell clips defensively in every case, so a text instrument
+needs no width and no instrument today measures anything.
 
 ## Risks / Trade-offs
 

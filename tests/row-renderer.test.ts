@@ -313,15 +313,18 @@ test("an instrument renders once per (cell, width) — the row-width measure, th
     },
   };
   const footer = createFooter(
-    [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
+    [
+      { id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }, { instrument: capture, align: "left" }] },
+      { id: "row-1", cells: [{ instrument: capture, align: "left" }] },
+    ],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
   );
-  footer.render(30); // the row's cells are 10 columns wide
+  footer.render(30); // row 0's cells are 10 columns wide; row 1's single cell is 30
   assert.deepEqual(
     handed.map((call) => call.width),
-    [30, 30, 30, 10, 10, 10],
-    "two calls per cell: one at the row width, one at the cell width, never two at one width",
+    [30, 30, 30, 10, 10, 10, 30],
+    "one call per distinct (cell, width): row 1's measure and layout both use the row width",
   );
   for (const call of handed) assert.equal(call.readings, handed[0]?.readings, "one object for the whole render");
 });
