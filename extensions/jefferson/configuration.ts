@@ -12,9 +12,19 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { blank, instrumentNamed, type Instrument } from "./instrument.ts";
 
-/** A single cell of a row: the instrument whose text it displays. */
+/** The values a cell's `align` may take. The type and every message derive from this tuple. */
+const ALIGNMENTS = ["left", "right", "center"] as const;
+export type CellAlign = (typeof ALIGNMENTS)[number];
+
+/** Whether a configuration value is one of `ALIGNMENTS`. */
+function isAlign(value: unknown): value is CellAlign {
+  return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
+}
+
+/** A single cell of a row: the instrument whose text it displays, padded against its align (D1). */
 export interface Cell {
   instrument: Instrument;
+  align: CellAlign;
 }
 
 /** A normalized statusline row: one footer line of evenly divided cells. */
@@ -39,8 +49,8 @@ export interface Configuration {
   warning: string | undefined;
 }
 
-export const DEFAULT_CELLS = 8;
-export const MAX_CELLS = 8;
+export const DEFAULT_CELLS = 10;
+export const MAX_CELLS = 10;
 
 /** A document the extension refused: the default row renders, none of it (D3). */
 class RejectedConfiguration extends Error {}
@@ -56,11 +66,11 @@ function defaultRow(): Row {
 }
 
 function blankCells(count: number): Cell[] {
-  return Array.from({ length: count }, () => ({ instrument: blank }));
+  return Array.from({ length: count }, () => ({ instrument: blank, align: ALIGNMENTS[0] }));
 }
 
 /**
- * The row's cells, from its `cells` names in order, clamped to the ceiling. Each entry is
+ * The row's cells, from its `cells` entries in order, clamped to the ceiling. Each entry is
  * narrowed before it is resolved, so a name reaches `instrumentNamed` as the `string` it takes.
  * An empty list is rejected: a row of no cells has no `floor(W / N)` geometry (D11).
  */
@@ -69,20 +79,41 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
     throw new RejectedConfiguration(`row ${index} has an empty cells list`);
   }
   const cells: Cell[] = [];
-  for (const name of names) {
-    // Narrow before truncating, so a malformed entry rejects the document for any position —
-    // including past the ceiling — before the ceiling can clamp it away (D11).
-    if (typeof name !== "string") {
-      throw new RejectedConfiguration(`row ${index} has a cells entry that is not a string`);
+  for (const entry of names) {
+    // The entry is an object: not an array, not null, not a primitive (D2).
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new RejectedConfiguration(`row ${index} has a cells entry that is not an object; declare {"instrument": "model"}`);
     }
-    const instrument = instrumentNamed(name);
+    const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align");
+    if (unknownKey !== undefined) {
+      throw new RejectedConfiguration(`row ${index} has a cell with an unrecognised key ${JSON.stringify(unknownKey)}; a cell carries only instrument and align`);
+    }
+    const fields = Object.entries(entry);
+    const instrumentValue = fields.find(([key]) => key === "instrument")?.[1];
+    const alignValue = fields.find(([key]) => key === "align")?.[1];
+    if (instrumentValue === undefined) {
+      throw new RejectedConfiguration(`row ${index} has a cell with no instrument`);
+    }
+    if (typeof instrumentValue !== "string" || instrumentValue === "") {
+      throw new RejectedConfiguration(`row ${index} has an instrument that is not a non-empty string`);
+    }
+    if (alignValue !== undefined && !isAlign(alignValue)) {
+      const quoted = ALIGNMENTS.map((value) => `"${value}"`);
+      const list = quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
+      throw new RejectedConfiguration(`row ${index} has an align that is not ${list}: ${JSON.stringify(alignValue)}`);
+    }
+    const align: CellAlign = alignValue === undefined ? "left" : alignValue;
+    const instrument = instrumentNamed(instrumentValue);
     // One typo does not take down the statusline: the cell renders blank and the warning names it.
     // Collect unknown names before truncating, so a typo past the ceiling still warns though its
     // cell is not rendered.
-    if (instrument === undefined) notices.unknownInstruments.add(name);
+    if (instrument === undefined) notices.unknownInstruments.add(instrumentValue);
     // The ceiling truncates last: the first MAX_CELLS entries render, the rest are not rendered.
-    if (cells.length === MAX_CELLS) break;
-    cells.push({ instrument: instrument ?? blank });
+    // The push is guarded rather than breaking, so every entry past the ceiling is still
+    // validated and checked for unknowns before the ceiling decides (D2).
+    if (cells.length < MAX_CELLS) {
+      cells.push({ instrument: instrument ?? blank, align });
+    }
   }
   return cells;
 }

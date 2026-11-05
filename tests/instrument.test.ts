@@ -32,37 +32,37 @@ function unreadable(): Readings {
 }
 
 test("blank resolves the placeholder for any readings", () => {
-  assert.equal(blank.resolve(seed), DEFAULT_CELL_TEXT);
-  assert.equal(blank.resolve(unknown), DEFAULT_CELL_TEXT);
+  assert.equal(blank.render(seed, 80), DEFAULT_CELL_TEXT);
+  assert.equal(blank.render(unknown, 80), DEFAULT_CELL_TEXT);
 });
 
 test("blank reads no datum", () => {
-  assert.equal(blank.resolve(unreadable()), DEFAULT_CELL_TEXT);
+  assert.equal(blank.render(unreadable(), 80), DEFAULT_CELL_TEXT);
 });
 
 test("model resolves the provider as label over the model as data", () => {
-  assert.equal(model.resolve(seed), "anthropic: claude-opus-4");
+  assert.equal(model.render(seed, 80), "anthropic: claude-opus-4");
 });
 
 test("thinking resolves a literal label over the level as data", () => {
-  assert.equal(thinking.resolve(seed), "thinking: high");
-  assert.equal(thinking.resolve({ ...seed, thinkingLevel: "off" }), "thinking: off");
+  assert.equal(thinking.render(seed, 80), "thinking: high");
+  assert.equal(thinking.render({ ...seed, thinkingLevel: "off" }, 80), "thinking: off");
 });
 
 test("model yields an empty string when either half is unknown", () => {
   assert.equal(
-    model.resolve({ provider: undefined, model: "claude-opus-4", thinkingLevel: "high" }),
+    model.render({ provider: undefined, model: "claude-opus-4", thinkingLevel: "high" }, 80),
     "",
   );
   assert.equal(
-    model.resolve({ provider: "anthropic", model: undefined, thinkingLevel: "high" }),
+    model.render({ provider: "anthropic", model: undefined, thinkingLevel: "high" }, 80),
     "",
   );
 });
 
 test("thinking yields an empty string when the level is unknown", () => {
   assert.equal(
-    thinking.resolve({ provider: "anthropic", model: "claude-opus-4", thinkingLevel: undefined }),
+    thinking.render({ provider: "anthropic", model: "claude-opus-4", thinkingLevel: undefined }, 80),
     "",
   );
 });
@@ -75,7 +75,7 @@ test("model reads no datum its text does not use", () => {
       throw new Error("model read the thinking level");
     },
   };
-  assert.equal(model.resolve(readings), "anthropic: claude-opus-4");
+  assert.equal(model.render(readings, 80), "anthropic: claude-opus-4");
 });
 
 test("thinking reads no datum its text does not use", () => {
@@ -88,7 +88,7 @@ test("thinking reads no datum its text does not use", () => {
     },
     thinkingLevel: "high",
   };
-  assert.equal(thinking.resolve(readings), "thinking: high");
+  assert.equal(thinking.render(readings, 80), "thinking: high");
 });
 
 test("each shipped name resolves the instrument that name denotes", () => {

@@ -60,23 +60,6 @@ different location.
 - **WHEN** a test is added for a source module
 - **THEN** it lives under `tests/` and imports the source by relative path
 
-### Requirement: Host packages are imported only at the load boundary
-
-Host packages (`@earendil-works/*`) MUST be declared in `peerDependencies` with a `*` range and
-MUST NOT appear in `dependencies`. Runtime imports of host packages MUST occur only in the
-module the host loads as an entry; type-only imports are permitted in any module.
-
-#### Scenario: A helper reaches for the host at runtime
-
-- **WHEN** a module other than the host-loaded entry contains a runtime import of a host package
-- **THEN** the tree does not conform, and the change adding it is rejected
-
-#### Scenario: Declaring a host package
-
-- **WHEN** `package.json` is inspected
-- **THEN** each host package is a `peerDependencies` entry with a `*` range and is absent from
-  `dependencies`
-
 ### Requirement: Every shipped source file is typechecked and erasable
 
 Each shipped source file MUST match `tsconfig.json`'s `include`, so `npm run typecheck` checks
@@ -152,3 +135,31 @@ that follows an established pattern MUST NOT require such a change.
 
 - **WHEN** a module is added inside an established pattern
 - **THEN** no new structure, manifest field, or CI expectation is required
+
+### Requirement: Host packages are the host's to supply, and imports run one way
+
+Host packages (`@earendil-works/*`) MUST be declared in `peerDependencies` with a `*` range and MUST
+NOT appear in `dependencies`, so exactly one copy reaches the process. Any shipped source file MAY
+import a host package at runtime. Within this package, imports MUST run one way: the entry may import
+the working parts, a working part MUST NOT import the entry, and no import cycle MUST exist.
+
+#### Scenario: Declaring a host package
+
+- **WHEN** `package.json` is inspected
+- **THEN** each host package is a `peerDependencies` entry with a `*` range and is absent from
+  `dependencies`
+
+#### Scenario: A working part imports the host
+
+- **WHEN** a source file other than the entry imports a host package at runtime
+- **THEN** the tree conforms, and the import resolves to the host's copy
+
+#### Scenario: A working part imports the entry
+
+- **WHEN** a source file other than the entry imports the entry
+- **THEN** the tree does not conform, because the dependency would run the wrong way
+
+#### Scenario: An import cycle
+
+- **WHEN** following imports from any shipped file returns to a file already visited
+- **THEN** the tree does not conform

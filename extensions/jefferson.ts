@@ -7,16 +7,15 @@
  * `extensions/jefferson/` directory beside it is the extension's working parts,
  * imported by relative path; the host never loads them.
  *
- * This file is the entry and the only source file that may contain a runtime import of a
- * host package (`@earendil-works/*`); source files under `extensions/jefferson/` import
- * each other by relative path and use `import type` for host types. Because the
- * working-parts directory shares its stem with this file, an import from here must
- * name a file inside it (`./jefferson/configuration.ts`), not the bare `./jefferson`.
+ * This file is the entry; any shipped file may import a host package (`@earendil-works/*`).
+ * Imports run one way only — from the entry to the working parts, never back, and no cycles.
+ * Because the working-parts directory shares its stem with this file, an import from here
+ * must name a file inside it (`./jefferson/configuration.ts`), not the bare `./jefferson`.
  *
  * The entry registers the `/jefferson` version command and installs the statusline
  * footer: on every `session_start` in TUI mode it reads `pi-jefferson.json` (agent
  * directory, plus the trusted project copy), seeds the session data store from the
- * context, injects the host's width helpers and the footer's repaint request, and
+ * context, captures the footer's repaint request, and
  * replaces the built-in footer with one line per declared row. Reload clears the
  * custom footer, so the install re-runs on every `session_start`.
  */
@@ -28,7 +27,6 @@ import {
   type ExtensionAPI,
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { readConfiguration } from "./jefferson/configuration.ts";
 import { createFooter } from "./jefferson/row-renderer.ts";
@@ -109,7 +107,7 @@ export default function jefferson(pi: ExtensionAPI): void {
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;
-    const footer = createFooter(rows, () => store.sample(), { truncateToWidth, visibleWidth });
+    const footer = createFooter(rows, () => store.sample());
 
     ctx.ui.setFooter((tui) => {
       requestRepaint = () => tui.requestRender();
