@@ -1,0 +1,14 @@
+schema: marbleization
+created: 2026-11-05
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: ""
+    chidi: ""
+    eleanor: ""
+  gates:
+    council_owner: pending
+    design: pending
+    tasks: pending
+    implement: pending
+    validate: pending
