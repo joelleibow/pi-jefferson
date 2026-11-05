@@ -38,7 +38,26 @@ one.
 - [x] 5.2 — `pnpm test` exits 0 for every file, including the three files this change edits; record its summary lines as the evidence. Verified by: exit status 0; summary lines — tests 112, pass 112, fail 0.
 - [x] 5.3 — `openspec validate cells-as-objects --strict` exits 0 and prints `Change 'cells-as-objects' is valid`; record the raw output. Verified by: raw output — Change 'cells-as-objects' is valid, exit status 0.
 - [x] 5.4 — `git diff --stat` lists only `extensions/jefferson/configuration.ts`, `extensions/jefferson/row-renderer.ts`, `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts` and `README.md`; `extensions/jefferson/instrument.ts`, `extensions/jefferson/session-data-store.ts`, `extensions/jefferson.ts`, `package.json`, `tsconfig.json`, `pnpm-lock.yaml` and `.github/workflows/` show no diff. A diff in any of those is a design error to report, not a task to tick. Verified by: git diff --stat output lists only the six named files; no other path appeared.
-- [ ] 5.5 Terminal observation, D11's documents and widths exactly — at 80 columns, `[{instrument:"thinking"},{instrument:"thinking",align:"right"}]` (`cellWidth` 40, remainder 0, the right-aligned text on columns 67–80); at 132 columns, seven cells, six `{instrument:"thinking"}` and the last `{instrument:"thinking",align:"right"}` (`cellWidth` 18, remainder 6, the last cell's text ending on column 126, 6 columns short of the terminal edge); at 100 columns, a row carrying `[{instrument:"thinking"},{instrument:"thinking",align:"center"},{instrument:"thinking"}]`, whose centred middle cell's text occupies columns 43–56, with a 9-column pad to its left and 10 to its right — the counted split to ask for rather than an eyeballed offset; at 80 columns, a row carrying `{instrument:"model",align:"middle"}`, which notifies `pi-jefferson: <path> was rejected (row 0 has an align that is not "left", "right" or "center": "middle"); rendering the default row`. Record for each the terminal width, the observed line verbatim, and whether the right-aligned text ends against its cell's edge — with the default ten-cell row at 132 ending 2 columns short of the terminal edge, as the delta states. This task is completed only by an owner-observed run in a real terminal with the observed lines recorded in the change's implementation record; it cannot be ticked from a headless transcript, a piped render, or `node --test` output.
+- [x] 5.5 Terminal observation — performed by the owner at 136 columns on 2026-11-04, driving
+  `pi -e ~/Projects/pi-jefferson/extensions/jefferson.ts` and reloading between documents.
+
+  Observed, with the lines read from the screenshots:
+
+  - **Right-align, two cells.** `[{model},{thinking,align:right}]` at 136 columns is two 68-column
+    cells, no remainder. `thinking: high` ends flush at column 136 with all its gap to the left;
+    `openrouter: ~deepseek/deepseek-flash-latest` sits at the left edge of cell 1.
+  - **Centre, three cells.** `[{thinking},{thinking,align:center},{thinking}]` is 45 columns each with
+    one blank column at the far right. Left text at columns 1–14, **middle text at 61–74**, right text
+    starting at 91 — a 15/16 split, so the odd pad's extra column is on the right and the text sits
+    half a column left of its cell's centre.
+  - **Seven cells.** Seven × 19 columns with three blank columns at the right edge. The right-aligned
+    last cell ends on column **133**, three short of the window, which is `136 mod 7`.
+  - **Rejection.** `[{model,align:"middle"}]` warns, byte for byte:
+    `row 0 has an align that is not "left", "right" or "center": "middle"` — naming the refused value
+    and all three accepted ones — and renders the default ten-cell placeholder row.
+
+  The three alignment rows were observed on their own; the warning and the default row were observed
+  together in the fourth. No line differed from what the tests and the design predict.
 
 ## 6. Reconcile onto extension-structure
 
