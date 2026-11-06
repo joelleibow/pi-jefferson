@@ -633,7 +633,7 @@ D10, and the entry side of D9. Traces to `Freshness never exceeds the host's del
 boundary), `A pushed change that alters displayed data results in a repaint`, and `Store data does not
 survive a session replacement`.
 
-- [ ] 5.1 Red — in `tests/jefferson.test.ts`, rename `in TUI mode a session takes exactly the two
+- [x] 5.1 Red — in `tests/jefferson.test.ts`, rename `in TUI mode a session takes exactly the two
   selection subscriptions` to `in TUI mode a session takes exactly the three subscriptions it names`
   and assert `["model_select", "thinking_level_select", "turn_end"]` in that order; and grow the two
   release tests' expected logs with `unsubscribe:turn_end` between `setFooter#1` and `setFooter#2`,
@@ -641,14 +641,14 @@ survive a session replacement`.
   Boundary cases: outside TUI mode a session still takes **no** subscription; a `turn_end` dispatched
   after disposal requests no repaint and touches no reader. Verified by: red before 5.4 — the pin
   lists two and the logs lack the third unsubscribe.
-- [ ] 5.2 Red — a dispatched `turn_end` whose totals changed (the harness's fixture entries gain a
+- [x] 5.2 Red — a dispatched `turn_end` whose totals changed (the harness's fixture entries gain a
   usage-bearing entry, moving the leaf) requests exactly one repaint and the next rendered line shows
   the new totals; a `turn_end` with unchanged totals requests none. Discriminator: repainting on every
   boundary without comparing passes the first half and fails the second, which is the guarantee the
   delta names (D9's comparison *is* the rescan). Boundary cases: a `turn_end` arriving before any
   render (no repaint, cache filled); two `turn_end`s in a row with one change between them (one
   repaint). Verified by: red before 5.4.
-- [ ] 5.3 Red — replacement end to end: a second `session_start` with a different `cwd`, model and
+- [x] 5.3 Red — replacement end to end: a second `session_start` with a different `cwd`, model and
   fixture entries re-seeds and re-scans, so the second install's footer shows the second session's
   basename, model and totals and none of the first's; the first install's disposed footer still renders
   `" ".repeat(80)` (all-unknown readings, ten cells at 80); and the first session's readers are never
@@ -657,7 +657,12 @@ survive a session replacement`.
   `undefined` installs and renders `context` as nothing. Verified by: red before 5.4 for the totals and
   basename halves — no `path`/`tokens` cell can be configured end to end until 4.9, and no `turn_end`
   reaches the store until 5.4.
-- [ ] 5.4 Implement — `extensions/jefferson.ts` takes the third subscription,
+  Implementation observation (conductor confirmed): after correcting the new fixture to configure
+  thinking as `$level` for its bare high/low expectations, all five replacement/no-context cases
+  were already green before 5.4 because groups 1–4 built the datums and their binding. No red is
+  fabricated. Temporarily omitting store.dispose from release made the disposed-footer blanks
+  assertion fail with the old session's text; restoring teardown made it green, unchanged.
+- [x] 5.4 Implement — `extensions/jefferson.ts` takes the third subscription,
   `pi.on("turn_end", () => store.turnEnded())`, the payload unwrapped to nothing at the entry so the
   store still names no host event, released in the single `release` beside the other two. **No other
   subscription is taken**: D10's deliberately-not-subscribed list stays unsubscribed — no
@@ -665,7 +670,7 @@ survive a session replacement`.
   the appends no event announces correct on the next render any repaint produces (design fact 7).
   Verified by: 5.1–5.3 green, and `rg -n "pi.on\(" extensions/jefferson.ts` shows exactly four
   registrations — `session_start` plus the three.
-- [ ] 5.5 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
+- [x] 5.5 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
   recorded.
 
 ## 6. The docs this change rewrites, and the ADR it owes

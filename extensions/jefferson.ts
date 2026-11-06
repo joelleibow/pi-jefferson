@@ -93,8 +93,9 @@ export default function jefferson(pi: ExtensionAPI): void {
     const releaseThinking = pi.on("thinking_level_select", (event) =>
       store.thinkingLevelSelected(event.level),
     );
+    const releaseTurn = pi.on("turn_end", () => store.turnEnded());
 
-    // The single teardown: both host subscriptions and the store, released together (D8). Two
+    // The single teardown: all three subscriptions and the store, released together. Two
     // callers reach it — the host's `dispose()` and the next session's `releasePrevious()`.
     let released = false;
     const release = (): void => {
@@ -102,6 +103,7 @@ export default function jefferson(pi: ExtensionAPI): void {
       released = true;
       releaseModel();
       releaseThinking();
+      releaseTurn();
       store.dispose();
     };
     releasePrevious = release;

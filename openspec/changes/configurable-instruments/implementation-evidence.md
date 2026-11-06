@@ -201,3 +201,32 @@ typecheck_exit=0
 ℹ duration_ms 461.925417
 test_exit=0
 ```
+
+## Group 5 — third subscription and replacement
+
+- 5.1 red: subscription pin/release logs lacked turn_end, and the disposed-boundary dispatch had no handler (four assertion failures).
+- 5.2 red: both dispatch scenarios failed at the harness's `no handler registered for turn_end` assertion before wiring. After wiring they prove one changed-totals repaint, no unchanged-totals repaint even after another append/leaf move, and scan reuse by the next render. Before the first footer render the install-time sample has already filled the cache (D8); an unchanged boundary does not repaint or scan again. The genuinely no-cache store boundary is covered in 1.5.
+- 5.3 honest baseline: corrected setup yields five baseline-green cases before 5.4 — new/resume/fork/reload replacements and absent context usage. These behaviors were already built in groups 1–4. The conductor approved recording that truth, then omitting `store.dispose()` from release temporarily: the replaced footer rendered old text instead of 80 spaces, so the unchanged replacement assertion failed. The edit was restored.
+- Approved fixture setup repair: this new ten-cell test expected bare high/low but had not configured thinking, whose default thinking: $level correctly clips to think... at eight columns. Only that fixture's document gained thinking.format = $level; every expected byte and all production code stayed unchanged for the repair.
+- Exactly four registrations: session_start, model_select, thinking_level_select, turn_end. All three per-session subscriptions release once through the one teardown; post-dispose dispatch calls no reader.
+- The unexpected .openspec.yaml Chidi run-id update was confirmed conductor-owned metadata. It stays unstaged and untouched, excluded from my commits; conductor will commit it after this run.
+
+Raw group boundary:
+
+```text
+$ tsc --noEmit
+typecheck_exit=0
+ℹ tests 196
+ℹ suites 0
+ℹ pass 196
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 339.149958
+test_exit=0
+63:  pi.on("session_start", (_event, ctx) => {
+90:    const releaseModel = pi.on("model_select", (event) =>
+93:    const releaseThinking = pi.on("thinking_level_select", (event) =>
+96:    const releaseTurn = pi.on("turn_end", () => store.turnEnded());
+```
