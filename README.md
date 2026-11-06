@@ -11,11 +11,12 @@ Starship.
 
 ## Status
 
-The statusline is a footer of one line per configured row, each row divided into evenly
-spaced cells. A cell holds an instrument, and an instrument shows one piece of the session's
-own data — the active model, the thinking level — by reading a store kept current behind the
-scenes. With no configuration you get the default single row of placeholder cells.
-Formatting and gaps are not built yet.
+The statusline is a footer of one line per configured row, with evenly divided cells spanning
+its full width. Six instruments — `model`, `thinking`, `path` (directory basename), `context`,
+`tokens` and `cost` — read the session's own data from a store kept current behind the scenes.
+Each can be configured once by name in `pi-jefferson.json` with a plain-text `format`, `$variables`
+and pi's `style`; context also offers `$bar`, taking the width the rest of its format leaves.
+With no configuration you get the default single row of placeholder cells.
 
 ## Install
 

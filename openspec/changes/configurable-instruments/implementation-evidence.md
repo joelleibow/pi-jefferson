@@ -230,3 +230,27 @@ test_exit=0
 93:    const releaseThinking = pi.on("thinking_level_select", (event) =>
 96:    const releaseTurn = pi.on("turn_end", () => store.turnEnded());
 ```
+
+## Group 6 — standing docs and ADR
+
+Updated only ARCHITECTURE.md's parts/store/configuration/instrument/renderer/Fidelity passages, AGENTS.md's instrument list, README.md's status paragraph, and the task-named ADR 0002. The ADR records that the blank right edge was a stated property, why the owner retired it, the grow-only skew and basis-only under-fill, and the full-width replacement. Its local date was checked with date +%F: 2026-11-05.
+
+Checks: the three retired architecture phrases, the old two-argument AGENTS seam, and README's not-built-yet phrase are absent. The architecture diagram has five working parts. Both files' trap sections were compared to HEAD with assert.equal and are byte-identical. The living extension-source-layout was inspected and not amended; `git status --porcelain -- openspec/specs/` is empty. No code changed in this group.
+
+Raw group boundary:
+
+```text
+ARCHITECTURE.md: traps byte-identical
+AGENTS.md: traps byte-identical
+$ tsc --noEmit
+typecheck_exit=0
+ℹ tests 196
+ℹ suites 0
+ℹ pass 196
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 464.759417
+test_exit=0
+```

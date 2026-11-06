@@ -678,7 +678,7 @@ survive a session replacement`.
 D13, plus the two passages D13 does not name and this change makes false (Michael's implementation
 gate: documentation the change made false is corrected). No code moves in this group.
 
-- [ ] 6.1 — `ARCHITECTURE.md`, to D13's shapes: the parts diagram gains `format.ts` (the
+- [x] 6.1 — `ARCHITECTURE.md`, to D13's shapes: the parts diagram gains `format.ts` (the
   format-and-style language) and rewords the `instrument.ts` line (declarations) and the store line
   (the datums it now holds); the **Row renderer** paragraph loses "the division is ours because the
   allocator distributes by weight rather than dividing" and states the new split — the basis is ours
@@ -695,7 +695,7 @@ gate: documentation the change made false is corrected). No code moves in this g
   style validation. Verified by: `rg -n "distributes by weight|stay blank at the right edge|Text
   today" ARCHITECTURE.md` is empty, the diagram lists five working parts, and `git diff
   ARCHITECTURE.md` touches no other section.
-- [ ] 6.2 — `AGENTS.md`'s "Adding an instrument", to D13's shape: add **one declaration** to
+- [x] 6.2 — `AGENTS.md`'s "Adding an instrument", to D13's shape: add **one declaration** to
   `extensions/jefferson/instrument.ts` (name, variables, defaults, options) and register it in the
   declarations table so `instrumentNamed` resolves it; add the datum it displays to the store if the
   store does not hold it; add a test that the cell renders it and one that alignment still applies.
@@ -704,21 +704,21 @@ gate: documentation the change made false is corrected). No code moves in this g
   and the harness note stay; "Where decisions live" stays. Verified by: `rg -n "\(readings, width\)"
   AGENTS.md` is empty, `rg -n "declaration" AGENTS.md` shows the new step 1, and `git diff AGENTS.md`
   touches only that list.
-- [ ] 6.3 — `README.md`'s status paragraph, to D13's shape: it stops saying formatting is not built yet
+- [x] 6.3 — `README.md`'s status paragraph, to D13's shape: it stops saying formatting is not built yet
   (`format`, `style` and `$bar` are built) and names the six instruments instead of two, keeping the
   default single row of placeholder cells true. The later "Why another statusline" paragraph's mention
   of gaps and truncation priority stays — as in the archived `cells-as-objects` tasks, that paragraph
   is an aspiration for the product, not a claim that a feature is missing, and gaps are declined scope
   here. Verified by: `rg -n "not built yet" README.md` is empty, the six names appear, and
   `git diff README.md` touches only the status paragraph.
-- [ ] 6.4 — `docs/adr/0002-<slug>.md`, the ADR D13 owes under `AGENTS.md`'s standing rule: it records
+- [x] 6.4 — `docs/adr/0002-<slug>.md`, the ADR D13 owes under `AGENTS.md`'s standing rule: it records
   the retired Fidelity property (the `W mod N` blank right edge was a **stated property**, not a
   defect), why it dies (the owner's 2026-11-05 layout ruling in `owner-rulings.md`, and the allocator
   evidence — `basis` alone under-fills, `grow: 1` alone skews to 13,11,10,9,8,7,6,6,5,5 — chidi §4.2),
   and what replaces it (the row spans the width; the remainder goes to the earliest cells). Dated, with
   a Status line, in ADR 0001's shape. Verified by: the file exists under `docs/adr/`, and
   `ARCHITECTURE.md`'s Fidelity section cites it (6.1).
-- [ ] 6.5 Green — docs only: `pnpm typecheck` and `pnpm test` still pass, and `openspec/specs/` shows
+- [x] 6.5 Green — docs only: `pnpm typecheck` and `pnpm test` still pass, and `openspec/specs/` shows
   no diff — `extension-source-layout` is inspected and **not** amended (D13, proposal Capabilities).
   Verified by: the two exit statuses and `git status --porcelain openspec/specs/` empty.
 
