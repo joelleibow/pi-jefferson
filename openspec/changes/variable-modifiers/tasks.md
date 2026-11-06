@@ -204,7 +204,7 @@ file passes under both.
 
 ## 8. The document path and the blast radius
 
-- [ ] 8.1 The `|bd` rejection reaches the user unchanged. **Test first, in
+- [x] 8.1 The `|bd` rejection reaches the user unchanged. **Test first, in
       `tests/configuration.test.ts`,** through the existing `rejected(...)` helper the way line 569
       asserts `$nope`: a document whose `model` format is `$model|bd` produces, byte for byte,
 
