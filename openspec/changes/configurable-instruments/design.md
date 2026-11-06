@@ -370,7 +370,10 @@ because the delta binds `$bar` as a variable any instrument may declare.
 
 `validateStyle(raw, theme)` in `format.ts`, run at document read (D3):
 
-- Keys checked against the eight `ThemeStyle` names; the six attributes must be `typeof boolean`.
+- Keys checked against the eight `ThemeStyle` names, and Jefferson's runtime list of those keys is
+  tied to the type at compile time — it must satisfy, for example, a `Record<keyof ThemeStyle,
+  true>` — so a host-side addition to `TextAttributes` fails `pnpm typecheck` instead of silently
+  rejecting valid styles. The six attributes must be `typeof boolean`.
 - `fg` (string): membership in the theme's **foreground-slot map** is probed through
   `theme.getFgAnsi(value)` in a try/catch — the public typed door on `fgAnsi`, which throws
   `Unknown theme color` exactly when the token is unknown *or* belongs to the other slot (fact 8).
@@ -571,7 +574,12 @@ appends move the leaf and fire no `turn_end` (fact 7), and the key catches all o
   `getEntryCount` the readonly view withholds (fact 5; chidi Gaps 1) — and every append moves the
   leaf, so the key is exactly as fresh as the host's own. The council settled the `turn_end`
   dispute on the emit-site evidence (fact 7): keying invalidation on the boundary would miss three
-  of the four summed categories.
+  of the four summed categories. The one read that stays unkeyed is `getContextUsage()`: it runs
+  `sessionManager.buildSessionProjection()` — which calls `getEntries()` — and `getBranch()`, so
+  one call per render sample is O(entries) too, measured by Michael at about 0.34 ms per call on a
+  synthetic 4,000-entry in-memory session. It is still not keyed on the model, because the limits
+  model includes `routedModel`, which changes the window with no `model_select` event, so a
+  model-keyed cache would be unsafe; the spec-mandated per-sample read stands.
 - **Alternatives beaten.** The entry summing totals and pushing them in (arithmetic in the entry,
   freshness at pi's render cadence — proposal shape 2's rejection). `turn_end` as the invalidation
   key (kimi's framing, rejected on evidence). Holding `ctx.sessionManager` in the store (a host
@@ -734,10 +742,16 @@ removed:
 
 ## Risks / Trade-offs
 
-- **[Every leaf move copies the whole entry array]** → the scan runs at most once per
-  `(sessionId, leafId)` move, keyed exactly like the host's own footer scan (fact 5, 6); idle
-  frames pay two getters. A very long session makes each append's rescan O(entries) — the same
-  order the host pays for its own numbers, and the price of matching them (ruling).
+- **[Every leaf move copies the whole entry array, and every sample calls `getContextUsage()`]** →
+  the scan runs at most once per `(sessionId, leafId)` move, keyed exactly like the host's own
+  footer scan (fact 5, 6). A very long session makes each append's rescan O(entries) — the same
+  order the host pays for its own numbers, and the price of matching them (ruling). The per-sample
+  read is not free either: one `getContextUsage()` call per render sample is O(entries), because it
+  runs `sessionManager.buildSessionProjection()` — which calls `getEntries()` — and `getBranch()`;
+  Michael measured about 0.34 ms per call on a synthetic 4,000-entry in-memory session. It is still
+  not keyed on the model, because the limits model includes `routedModel`, which changes the window
+  with no `model_select` event, so a model-keyed cache would be unsafe. The spec-mandated
+  per-sample read stands (D9).
 - **[Appends no event announces — cache-warm usage, compaction, branch summaries — do not
   self-repaint]** → named, accepted (D10): the next render any repaint triggers reads them
   correctly, the freshness requirement claims nothing more, and a store-driven compaction repaint
@@ -788,12 +802,18 @@ removed:
 
 ## Open Questions
 
-None that changes the specs, the approach, or the task breakdown. Two knowns are recorded rather
+One question is Joel's, and its default answer — what the tasks build unless he says otherwise —
+changes nothing in the specs, the approach, or the task breakdown. One known is recorded rather
 than open:
 
+- **Should Jefferson's numbers read exactly like pi's footer?** (Joel) `compactCount`'s
+  one-decimal band runs up to 100 000 (D11), which differs from pi's `formatTokens`, which switches
+  to rounded thousands at 10 000 — so Jefferson's `tokens` instrument would show `20.4k` where pi's
+  own footer shows `20k`. The default answer, and what the delta spec pins today, is the ratified
+  band: the pinned `86.4k` is the requirement, so host-identical rounding is a spec change rather
+  than a design choice, and D14's fixtures pin the band edges. Recorded here so a future reader who
+  diffs Jefferson's output against the host footer's at, say, 43 210 tokens finds the reason
+  without a council.
 - How faithfully the end-to-end harness fakes `Theme` — a structural fake exposing only
   `getFgAnsi`/`getBgAnsi`/`style`, or a constructed real `Theme` — is a tasks-level choice; either
   keeps the validation seam faked at the boundary, and nothing in D6 depends on which.
-- The `compactCount` band deviation from chidi §1.6's `formatTokens` reading (D11) is settled
-  toward the ratified delta; it is recorded here so a future reader who diffs Jefferson's output
-  against the host footer's at, say, 43 210 tokens finds the reason without a council.
