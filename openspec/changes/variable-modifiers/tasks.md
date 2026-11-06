@@ -180,7 +180,7 @@ Notes for the writing session:
 Each of these exists to tell the right order from one specific wrong one; every other test in the
 file passes under both.
 
-- [ ] 7.1 Mutation runs before `$bar`'s width is measured (D8 step 3 before step 4).
+- [x] 7.1 Mutation runs before `$bar`'s width is measured (D8 step 3 before step 4).
       **Test first, and expect it green on writing** — 4.1 and 6.2 already put the mutation in
       D8's position, so this test is not red at birth: `context` with the format `straße|upper $bar`
       in a cell of known width W renders a bar of exactly `W − visibleWidth("STRASSE ")` columns,
@@ -192,7 +192,7 @@ file passes under both.
       move the bar, so the assertion runs once more with `upper` over a value that is already
       upper.
 
-- [ ] 7.2 Mutation runs before styling (D8 step 3 before step 5). **Test first, and expect it
+- [x] 7.2 Mutation runs before styling (D8 step 3 before step 5). **Test first, and expect it
       green on writing.** 2.1 and 6.2 already put styling last, so this test is not red at birth:
       an instrument styled `{"bold": true}` with the format `$model|upper` renders output
       containing `\x1b[1m` and never `\x1b[1M` (D10). **Verify:** the assertion passes, and its

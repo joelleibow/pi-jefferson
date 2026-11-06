@@ -349,3 +349,22 @@ test("a modifier cannot resurrect an unknown value", () => {
   assert.equal(rendered("thinking", "$level|capitalize", { readings }), "");
   assert.equal(rendered("thinking", "$level", { readings }), "");
 });
+
+test("a mutation runs before the bar measures the columns left over", () => {
+  const width = 20;
+  for (const format of ["straße|upper $bar", "STRASSE|upper $bar"]) {
+    const text = rendered("context", format, { width });
+    const plain = stripTerminalSequences(text);
+    assert.ok(plain.startsWith("STRASSE "), format);
+    assert.equal(visibleWidth(plain.slice("STRASSE ".length)), width - visibleWidth("STRASSE "), format);
+    assert.equal(visibleWidth(text), width, format);
+  }
+});
+
+test("a mutation runs before styling so it cannot rewrite an escape sequence", () => {
+  const text = rendered("model", "$model|upper", { style: { bold: true } });
+  assert.ok(text.includes("\x1b[1m"));
+  assert.equal(text.includes("\x1b[1M"), false);
+  assert.equal(rendered("model", "$model|lower", { style: { bold: true } }),
+    rendered("model", "$model", { style: { bold: true } }));
+});
