@@ -324,6 +324,24 @@ test("a modifier on the bar rejects naming the bar and the modifier", () => {
     { message: '"context"\'s format puts a modifier on "$bar": "|bold"' });
 });
 
+test("a modifier on text after the bar styles the text, not the bar", () => {
+  const theme = fakeTheme();
+  const text = rendered("context", "$bar ok|bold", { width: 20, theme });
+  assert.equal(stripTerminalSequences(text), "█".repeat(7) + "░".repeat(10) + " ok");
+  assert.ok(text.endsWith(" " + theme.style("ok", { bold: true })));
+});
+
+test("a modifier on the text closing a bar styles that text", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("context", "[$bar]|dim", { width: 20, theme }),
+    "[" + "█".repeat(7) + theme.style("░".repeat(11), { dim: true }) + theme.style("]", { dim: true }));
+});
+
+test("a modifier after the bar and a space has nothing before it", () => {
+  assert.throws(() => parseFormat(named("context"), "$bar |dim"),
+    { message: '"context"\'s format has a modifier with nothing before it: "|dim"' });
+});
+
 test("a modifier with nothing before it rejects naming the instrument and the modifier", () => {
   for (const format of ["🧠 |dim $model", "|dim"]) {
     assert.throws(() => parseFormat(named("model"), format),

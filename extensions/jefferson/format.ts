@@ -88,10 +88,10 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         if (modifier === undefined) {
           throw formatError(declaration, `names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
         }
-        if (subject?.kind === "bar") {
-          throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
-        }
         if (afterName && subject !== undefined) {
+          if (subject.kind === "bar") {
+            throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
+          }
           segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
         } else {
           const text = collapse(literal);
