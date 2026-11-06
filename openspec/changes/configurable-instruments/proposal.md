@@ -21,7 +21,13 @@ today. Every document's *geometry* changes, because a row now fills the window.
   cell entry gets `basis: floor(W / N)` together with `grow: 1`, so the host's allocator hands the
   leftover columns out — one at a time to the row's earliest cells — and the row spans the full
   width. `basis` without `grow` is not an option: pi-tui's grow pass computes each share from what
-  the cells before it left, so ten cells over 80 columns come out 13,11,10,9,8,7,6,6,5,5.
+  the cells before it left, so ten cells over 80 columns come out 13,11,10,9,8,7,6,6,5,5. Once built
+  is not once sized: `Stack.addChild` copies its option values into fresh internal entries held
+  behind `protected readonly entries`, with no setter, so a new per-render `basis` reaches a built
+  row only through the public typed route — `clear()` plus `addChild(component, { basis, grow,
+  shrink })` when the width changes, which keeps every cell component and retires only the entry
+  options. No cast past `protected`, and no deep import of the unexported `LAYOUT_NODE` the stack
+  hangs its layout node on.
 - **The trailing-remainder guard dies.** With the allocator spending every column, the pad-to-width
   guard at the end of `renderRow` is unreachable and goes, and `ARCHITECTURE.md`'s "Fidelity"
   caveat — which states the remainder stays blank at the right edge — goes with it. Its "Row
@@ -49,8 +55,10 @@ today. Every document's *geometry* changes, because a row now fills the window.
   each of its variables already formatted, on the pattern of Starship's `memory_usage` offering
   `$ram` and `$ram_pct`, so the format language never formats a number. `style` is pi's
   `ThemeStyle`: theme color tokens plus `bold`, `dim`, `italic`, `underline`, `inverse`,
-  `strikethrough`, applied with `theme.style()`. The owner's own model format, `🧠: $model from
-  $provider`, is what a configured format looks like.
+  `strikethrough`, applied with `theme.style()`. A cell's `style` is applied per non-`$bar` segment
+  rather than once around the resolved format, because `$bar` emits resets of its own: styling the
+  prose on either side of it as its own segment keeps those resets from stripping it. The owner's
+  own model format, `🧠: $model from $provider`, is what a configured format looks like.
 - **No Markdown.** pi-tui's `Markdown` wraps instead of clipping, parses block syntax, and would
   read Markdown inside data values. A format's text is literal: `[`, `]`, `(` and `)` are the
   characters they are, and `$` is the only special character, escaped `\$`.
@@ -77,7 +85,7 @@ and `The cost instrument` in different specs for no reader's benefit.
 
 ### Modified Capabilities
 
-- `statusline`: eight requirements are amended and ten are added.
+- `statusline`: eight requirements are amended and eleven are added.
   Amended — `Cells are evenly distributed across the width` (basis plus `grow: 1`, remainder
   allocated, row spans the width); `Instrument text is bound by the row's geometry` (a cell occupies
   its allocated width, and a right-aligned last cell now ends at the window's edge); `A row is one
@@ -91,17 +99,19 @@ and `The cost instrument` in different specs for no reader's benefit.
   Added — `The footer's tree is built once and reads the current render's sample`; `An instrument is
   declared once, and every reader reads that declaration`; `An instrument's configuration lives in
   the extension's own document`; `An instrument's format is plain text and variables`; `An
-  instrument's style is pi's ThemeStyle`; `$bar takes the width the rest of the format leaves`; and
-  the four instruments `The path instrument`, `The context instrument`, `The tokens instrument`,
-  `The cost instrument`.
+  instrument's style is pi's ThemeStyle`; `An instrument's style is validated when its document is
+  read`; `$bar takes the width the rest of the format leaves`; and the four instruments `The path
+  instrument`, `The context instrument`, `The tokens instrument`, `The cost instrument`.
 - `session-data-store`: five requirements are amended, all of them consequences of the store
   growing datums. `The store holds the data its instruments display` (the working directory, the
   host's context usage, and the session's token and cost totals enter; the working directory leaves
   the not-held list); `Freshness never exceeds the host's delivery` (each new datum's source and
-  currency); `Expensive derivations are bounded and invalidated by name` (a derivation may read the
-  host at sample time, and the entry scan is named and bounded); `A pushed change that alters
-  displayed data results in a repaint` (a turn boundary that changes a displayed total repaints);
-  `Store data does not survive a session replacement` (re-seeding covers the new datums).
+  currency — the context usage read per render sample, the entry scan keyed on the session and leaf
+  ids); `Expensive derivations are bounded and invalidated by name` (a derivation may read the host
+  at sample time, and the entry scan is keyed and bounded, with `turn_end` a repaint trigger rather
+  than a key); `A pushed change that alters displayed data results in a repaint` (a turn boundary
+  that changes a displayed total repaints); `Store data does not survive a session replacement`
+  (re-seeding covers the new datums).
 - `extension-source-layout` is inspected and **not** amended: a declaration source file under
   `extensions/jefferson/` is an ordinary source file inside an established pattern, which its
   `Growth is a named change` requirement explicitly exempts; ADR 0001 already lets any shipped file
@@ -111,15 +121,17 @@ and `The cost instrument` in different specs for no reader's benefit.
 ## Impact
 
 - `extensions/jefferson/row-renderer.ts`: the tree is built once in `createFooter` rather than per
-  render; each cell entry carries `basis: floor(W / N)` and `grow: 1`; the trailing-remainder guard
-  goes; `invalidate()` stops being a no-op, because styled text may be cached by width and the host
-  invalidates the footer when the theme changes.
+  render; each cell entry carries `basis: floor(W / N)` and `grow: 1`, re-seated with `clear()` plus
+  `addChild` when the width changes; the trailing-remainder guard goes; `invalidate()` stops being a
+  no-op, because styled text may be cached by width and the host invalidates the footer when the
+  theme changes.
 - `extensions/jefferson/instrument.ts`: the shipped table of three becomes declarations of seven
   (`blank` plus the six), each carrying its name, variables, defaults and options. Where the
   declarations live — grown inside `instrument.ts`, or in a new source file named for what it owns —
   is design's; either is an ordinary source file under the declared load root.
 - `extensions/jefferson/configuration.ts`: reads and validates the `instruments` section against
-  the declarations, and resolves each cell's instrument together with its configuration.
+  the declarations, validates each `style` against the live theme the entry hands it
+  (`ctx.ui.theme`), and resolves each cell's instrument together with its configuration.
 - `extensions/jefferson/session-data-store.ts` and `extensions/jefferson.ts`: the store grows the
   new datums and the derivations behind them; the entry supplies what a sample-time read needs
   (`ctx.getContextUsage()`, `ctx.sessionManager`), passes the footer factory's `theme` argument
@@ -206,22 +218,31 @@ treat every one as open.
    objects at their two ruled keys. Rejected: per-cell inline configuration, which the ruling
    excludes, and a namespace inside pi's `settings.json`, which does not exist.
 2. **Whether usage-derived datums live in the store or are read at sample time.** Chosen: the store
-   derives them, at most once per render, from a synchronous host read the entry supplies, and
-   recomputes only on a named invalidation — a session replacement, or the host's `turn_end`
-   boundary, which carries the entry ids it appended. Reasoning: `ctx.getContextUsage()` has no push
-   at all, so it must be read at sample time regardless; `getEntries()` copies the whole session
-   array, so it must not run per cell or per frame; the store's existing `Expensive derivations are
-   bounded and invalidated by name` requirement already describes exactly this; and the entry keeps
-   computing nothing, which is its stated job. Rejected: the entry summing totals and pushing them
-   in, which would put arithmetic in the entry and leave freshness to pi's own render cadence.
+   derives them, at most once per render, from a synchronous host read the entry supplies. The
+   `getEntries()` scan is keyed on `(getSessionId(), getLeafId())` — the host's own footer key minus
+   the entry count `ReadonlySessionManager` does not expose — and the leaf advances on every append,
+   so any change to the session's entries re-runs it. `ctx.getContextUsage()` is read once per render
+   sample rather than frozen between invalidations, because the host pushes no change to it and it
+   moves on a model selection as well as on an append. `turn_end` remains available only as a
+   repaint trigger and is not a sufficient invalidation on its own: it never fires for `compaction`,
+   `branch_summary` or `type: "usage"` appends, while all three advance the leaf. A session
+   replacement invalidates everything. Reasoning: `getEntries()` copies the whole session array, so
+   it must not run per cell or per frame; the store's existing `Expensive derivations are bounded and
+   invalidated by name` requirement already describes the frame; and the entry keeps computing
+   nothing, which is its stated job. Rejected: the entry summing totals and pushing them in, which
+   would put arithmetic in the entry and leave freshness to pi's own render cadence; and `turn_end`
+   as the key, which the emit-site evidence shows misses three of the four categories the totals
+   count.
 3. **Variable names and default formats.** Chosen, using pi's own field spellings inside the `$`:
    `blank` — no variables, default the placeholder text; `model` — `$provider`, `$model`, default
    `$provider: $model`; `thinking` — `$level`, default `thinking: $level`; `path` — `$path`,
    default `$path`; `context` — `$tokens`, `$window`, `$percent`, `$bar`, default `$percent/$window`
-   with `$bar` opt-in; `tokens` — `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens`,
-   default `$totalTokens`; `cost` — `$cost`, default `$cost`. Reasoning: the two shipped instruments
-   keep the text they render today, so no document changes appearance except by geometry; the new
-   ones mirror the numbers pi's own footer shows (`43.2%/200k`, `20.4k`, `$0.123`). The owner's
+   with `$bar` opt-in; `tokens` — `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens`
+   (the sum of those four, because pi's own `addUsageToTotals` accumulates exactly them and never
+   reads `usage.totalTokens`), default `$totalTokens`; `cost` — `$cost`, default `$cost`.
+   Reasoning: the two shipped instruments keep the text they render today, so no document changes
+   appearance except by geometry; the new ones mirror the numbers pi's own footer shows
+   (`43.2%/200k`, `20.4k`, `$0.123`). The owner's
    `🧠: $model from $provider` is read as a configured format, not a proposed default — if he wants
    it as the default, it is one line in one declaration.
 4. **Error policy inside the `instruments` section.** Chosen: an option key an instrument does not
@@ -229,24 +250,38 @@ treat every one as open.
    allow each reject the whole document with a warning naming the offender — the cell-key precedent,
    which reasons that a statusline silently rendering something other than what was declared is
    worse than a loud failure. A name in `instruments` that the extension does not implement warns
-   and the document is accepted — the unknown-instrument-name precedent. Whether an unresolvable
-   theme *token* name is caught at parse time or at render time is design's, because pi exports the
-   token type but not the token list.
+   and the document is accepted — the unknown-instrument-name precedent. An unresolvable theme
+   *token* name is caught at parse time, not at render time. The document is read in the
+   `session_start` handler, where `ctx.ui.theme` hands the extension the live theme, so a string `fg`
+   is checked against that theme's foreground slots and a string `bg` against its background slots,
+   and a color string or number naming no token goes through pi-tui's `parseColor()` there and is
+   kept as a `Color` object. It cannot wait for render: `theme.style()` throws `Error: Unknown theme
+   color` on a raw color string and on a wrong-slot token. pi exports the token *type* but not the
+   token list, so the check reads the live theme rather than a list copied into Jefferson, which
+   would drift with the host's.
 5. **Unknown values, per instrument.** Chosen: `model` and `thinking` render nothing when a datum is
    unknown, as they do today, rather than a format with a hole in it; `context` hands out `?` for a
-   null estimate, which is what pi's own footer prints after a compaction, and renders nothing when
-   the host reports no usage at all; `tokens` and `cost` start at zero, so a fresh session renders
-   `0` and `$0.000`.
+   null estimate, so the cell renders `?/<window>` — what pi's own footer prints after a compaction —
+   and `$bar` draws its whole track unfilled in `dim`, there being no fraction to fill; it renders
+   nothing when the host reports no usage at all; `tokens` and `cost` start at zero, so a fresh
+   session renders `0` and `$0.000`.
 6. **`$bar`'s colors and thresholds, and who declares it.** Chosen: `context` is the only instrument
    declaring `$bar` in this change; the filled portion (`█`) takes the theme's `warning` above 70 %
    and `error` above 90 % — pi's own footer thresholds — and the cell's configured `style` below
-   them, with the empty portion (`░`) `dim`. Reasoning: the ruling fixes the pattern (block
+   them, with the empty portion (`░`) `dim`. On the host's `{ tokens: null, percent: null,
+   contextWindow }` there is no fraction to fill, so the whole track is the empty portion and
+   renders `dim` while the cell shows `?/<window>`. Reasoning: the ruling fixes the pattern (block
    characters, theme color by threshold, no package) but not the values, and the host's are the ones
    a pi user already reads.
 7. **How a cell reduces content to one line.** The ruling fixes that it must and does not fix how.
    Chosen: the cell collapses `\r`, `\n` and `\t` to a space and then clips, which is what pi's own
-   footer does to status text internally; pi-tui exports no helper for it (`stripTerminalSequences`
-   strips ANSI and OSC, not control characters), so it is one expression of Jefferson's own.
+   footer does to status text internally, so it is one expression of Jefferson's own. That pi-tui
+   exports no helper for it is version-relative, and true only of the pi-tui 1.4.0 this repository
+   resolves (`stripTerminalSequences` strips ANSI and OSC, not control characters): 1.5.0 exports
+   `replaceControlCharacters`, but it is escape-naive — its character class covers the ESC byte of an
+   ANSI sequence — and it collapses each run of control characters to one space, so it cannot be
+   applied to styled text. Jefferson's own collapse therefore stands at either version, and any
+   collapse runs before styling, never after.
 8. **Whether `blank` takes the two options.** Chosen: yes, like every other instrument, so there is
    one code path and one declaration shape; its default format is the placeholder text it renders
    today, and a configured format lets a user replace the placeholder without writing an instrument.

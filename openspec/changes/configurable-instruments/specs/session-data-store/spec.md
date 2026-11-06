@@ -35,11 +35,11 @@ needs MUST be added to the store, not to the instrument.
 ### Requirement: Freshness never exceeds the host's delivery
 
 For every datum it holds, the store MUST state how current that value is, and MUST NOT claim
-freshness greater than the host's own delivery for that datum. The model, the thinking level and the
-working directory MUST be read when the session starts, because the host reports no selection when
-it restores a session, and the model and thinking level MUST be updated from the host's
-`model_select` and `thinking_level_select` pushes. The usage-derived datums MUST be read from the
-host at sample time.
+freshness greater than the host's own delivery. The model, the thinking level and the working
+directory MUST be read at session start, and the model and thinking level updated from the host's
+`model_select` and `thinking_level_select` pushes. The context usage MUST be read once per render
+sample; the entry scan MUST be keyed on the session and leaf ids the host reports, which every
+append moves.
 
 #### Scenario: A session is restored
 
@@ -64,19 +64,27 @@ host at sample time.
 - **THEN** the value is the one the host exposes at the start of that render, the store claims
   nothing fresher, and a null the host reports stays unknown rather than becoming zero
 
+#### Scenario: A context usage that changes with no append
+
+- **WHEN** the host's context usage changes with nothing appended to the session — a model selection
+  changing the window it reports
+- **THEN** the next render's sample reads the changed value, because the usage is read per sample
+  and not frozen between invalidations
+
 #### Scenario: A turn boundary
 
 - **WHEN** the host reports a turn boundary, appending the entries that boundary recorded
-- **THEN** the usage-derived datums are recomputed for the next render, and no render before it
-  claims them
+- **THEN** the leaf id the host reports has moved, so the next render's scan is recomputed; the
+  boundary is a repaint trigger and not what makes the scan current
 
 ### Requirement: Expensive derivations are bounded and invalidated by name
 
-A value the store derives — from the datums it holds, or from a synchronous read of the host at
-sample time — MUST be derived at most once per render, MUST be reused by every read within that
-render, and MUST be recomputed only when one of the store's named invalidations occurs. Each
-invalidation MUST be named for the change that causes it, and the usage-derived datums'
-invalidations MUST include a session replacement and the host's turn boundary.
+A value the store derives — from its datums or a synchronous host read at sample time — MUST be
+derived at most once per render, reused by every read in that render, and recomputed only on one of
+the store's named invalidations, each named for its cause. The entry scan MUST be keyed on the
+session and leaf ids the host reports, which every append moves, and dropped on a session
+replacement; a turn boundary MUST NOT be its key, since usage, compaction and branch-summary appends
+fire none.
 
 #### Scenario: Two reads of a derived datum in one render
 
@@ -93,9 +101,17 @@ invalidations MUST include a session replacement and the host's turn boundary.
 - **WHEN** a render happens and no named invalidation has occurred since the previous render
 - **THEN** no derived value is recomputed
 
+#### Scenario: An append no turn boundary announces
+
+- **WHEN** the host appends a `usage`, compaction or branch-summary entry, which moves the leaf id
+  it reports and fires no turn boundary
+- **THEN** the next render's scan sees it, because the scan is keyed on the leaf and not on the
+  boundary
+
 #### Scenario: Two renders over one session's entries
 
-- **WHEN** two renders read the token totals with no named invalidation between them
+- **WHEN** two renders read the token totals with neither the session id nor the leaf id moved
+  between them
 - **THEN** the host's entries are scanned once, and both renders read the same totals
 
 ### Requirement: A pushed change that alters displayed data results in a repaint

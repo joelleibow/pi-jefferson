@@ -231,8 +231,10 @@ the row's.
 
 The footer MUST build its tree once, when it is installed: a `VStack` holding one `HStack` per
 declared row, each holding that row's cells. Every render MUST lay out that tree, and every cell
-MUST read the sample taken at the start of the render it is in. Text a cell cached MUST NOT survive
-into a later render, and what the footer caches MUST be dropped when the host invalidates it.
+MUST read the sample taken at the start of the render it is in. A width change MUST re-seat the
+entry options through the stack's public typed route, keeping every component. Text a cell cached
+MUST NOT survive into a later render, and what the footer caches MUST be dropped when the host
+invalidates it.
 
 #### Scenario: Two renders
 
@@ -249,6 +251,13 @@ into a later render, and what the footer caches MUST be dropped when the host in
 
 - **WHEN** the host calls the footer's `invalidate()`, as it does when the theme changes
 - **THEN** what the footer cached is dropped and the next render rebuilds it
+
+#### Scenario: A resize re-seats the entry options
+
+- **WHEN** the footer renders at a width other than the one before it
+- **THEN** each row re-seats its cells' entry options for the new basis by clearing the row's stack
+  and adding the same cell components back, reaching no entry list the host keeps protected and
+  importing no layout symbol the host does not export
 
 ### Requirement: The path instrument
 
@@ -273,8 +282,8 @@ command to get it.
 The extension MUST implement a `context` instrument declaring `$tokens`, `$window`, `$percent` and
 `$bar`, read from the context usage the host reports, with `$percent/$window` as its default format.
 Each variable MUST arrive already formatted — a compact token count, a percentage — and a null
-estimate MUST hand out `?`, as the host's own footer does. When the host reports no usage at all it
-MUST render nothing.
+estimate MUST hand out `?`, as the host's own footer does, and leave `$bar` unfilled and `dim`. When
+the host reports no usage at all it MUST render nothing.
 
 #### Scenario: A session with a known estimate
 
@@ -287,7 +296,7 @@ MUST render nothing.
 - **WHEN** the host reports a context usage whose token estimate is null, as it does after a
   compaction and before the next response
 - **THEN** `$percent` and `$tokens` hand out `?` and the cell renders `?/200k`, never `0%` and never
-  a zero it was not given
+  a zero it was not given, and a `$bar` in the format draws its whole track unfilled in `dim`
 
 #### Scenario: No usage the host can report
 
@@ -297,14 +306,21 @@ MUST render nothing.
 ### Requirement: The tokens instrument
 
 The extension MUST implement a `tokens` instrument declaring `$input`, `$output`, `$cacheRead`,
-`$cacheWrite` and `$totalTokens`, summed from the session's usage-bearing entries the way the host's
-own footer sums them, with `$totalTokens` as its default format. The sum MUST cover the whole
-session rather than one branch, and each variable MUST arrive already formatted as a compact count.
+`$cacheWrite` and `$totalTokens`, summed from the session's usage-bearing entries as the host's
+footer sums them, with `$totalTokens` as its default format. `$totalTokens` MUST be
+`input + output + cacheRead + cacheWrite`, because the host's accumulation never reads
+`usage.totalTokens`. The sum MUST cover the whole session, not one branch, and each variable MUST
+arrive formatted as a compact count.
 
 #### Scenario: A session's totals
 
 - **WHEN** a cell holds `tokens` in a session whose entries carry usage
 - **THEN** it renders the total tokens of those entries, formatted compactly
+
+#### Scenario: What `$totalTokens` adds
+
+- **WHEN** a session's usage-bearing entries carry input, output, cache-read and cache-write counts
+- **THEN** `$totalTokens` is the sum of those four, and no `totalTokens` a provider reported is read
 
 #### Scenario: The categories the host counts
 
@@ -475,12 +491,40 @@ be rebuilt when the host invalidates the footer.
 - **WHEN** a styled cell's text is narrower than its cell
 - **THEN** the pad carries none of that style, exactly as it does for text carrying ANSI today
 
+### Requirement: An instrument's style is validated when its document is read
+
+A `style` MUST be validated when its document is read, against the live theme the host hands the
+extension at `session_start`: a string `fg` MUST name a foreground-slot token of that theme, a
+string `bg` a background-slot token, and a color string or number naming no token MUST go through
+pi-tui's `parseColor()` there and be kept as a `Color`, because `theme.style()` throws at render
+time on a raw color string and on a wrong-slot token. The host's token list MUST NOT be copied.
+
+#### Scenario: A color that is no token
+
+- **WHEN** an instrument is configured with the style `{"fg": "#bf5700"}`
+- **THEN** the reader parses it into a `Color` when it reads the document, and the cell renders that
+  color through `theme.style()` instead of throwing at render time
+
+#### Scenario: A token in the wrong slot
+
+- **WHEN** an instrument's style names a background-slot token as its `fg`, or a foreground-slot
+  token as its `bg`
+- **THEN** the document is rejected when it is read and the warning names the token, because the
+  theme accepts a token only in its own slot
+
+#### Scenario: The theme the check reads
+
+- **WHEN** the shipped source is inspected
+- **THEN** the token check reads the live theme the host hands the extension, and no copy of the
+  host's token list is in it
+
 ### Requirement: $bar takes the width the rest of the format leaves
 
 An instrument MAY declare `$bar`. It MUST take the columns the rest of the format leaves in the
 cell, MUST shrink to nothing when nothing is left, and a format MUST hold at most one width-taking
 variable — a second MUST reject the document, naming it. The bar MUST be drawn from block
-characters in theme colors, with no dependency the package does not already declare.
+characters in theme colors, with no dependency the package does not already declare, and with no
+estimate to show it MUST draw its whole track unfilled in `dim`.
 
 #### Scenario: A bar in a cell with room
 
@@ -509,6 +553,11 @@ characters in theme colors, with no dependency the package does not already decl
   context pressure by
 - **THEN** the filled portion takes the theme's `warning` and then `error` color, and the empty
   portion is drawn `dim`
+
+#### Scenario: A bar with no estimate to show
+
+- **WHEN** the instrument holding `$bar` has a null estimate, so there is no fraction to fill
+- **THEN** the bar draws its whole track unfilled in `dim`, and the cell still shows `?/<window>`
 
 #### Scenario: No new dependency
 
