@@ -136,14 +136,14 @@ Notes for the writing session:
 
 ## 5. The guards that reject a document
 
-- [ ] 5.1 A modifier on `$bar` rejects the document (D9). **Test first:** `parseFormat` throws
+- [x] 5.1 A modifier on `$bar` rejects the document (D9). **Test first:** `parseFormat` throws
       `"context"'s format puts a modifier on "$bar": "|bold"` for a format carrying `$bar|bold`.
       **Verify:** the assertion passes and the thrown message names the instrument and the modifier.
       **Boundary:** a pipe after `$bar` that no name follows is literal text (3.1), not this
       rejection. All three rejections leave `parseFormat` by one path, so the user-visible half is
       proved once, at 8.1, rather than three times.
 
-- [ ] 5.2 A modifier with nothing before it rejects the document (D5's third guard, D6).
+- [x] 5.2 A modifier with nothing before it rejects the document (D5's third guard, D6).
       **Test first:** `🧠 |dim $model` throws `"model"'s format has a modifier with nothing before
       it: "|dim"`, and `|dim` at position 0 does the same (spec, "A modifier with nothing before
       it"). **Verify:** both pass, and each names the instrument and the modifier. **Boundary:** a

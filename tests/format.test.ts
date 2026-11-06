@@ -318,3 +318,15 @@ test("a chain on literal text extends the same run", () => {
   assert.equal(text, "claude-opus-4 " + theme.style("via", { dim: true, bold: true }) + " anthropic");
   assert.equal(occurrences(stripTerminalSequences(text), "via"), 1);
 });
+
+test("a modifier on the bar rejects naming the bar and the modifier", () => {
+  assert.throws(() => parseFormat(named("context"), "$bar|bold"),
+    { message: '"context"\'s format puts a modifier on "$bar": "|bold"' });
+});
+
+test("a modifier with nothing before it rejects naming the instrument and the modifier", () => {
+  for (const format of ["🧠 |dim $model", "|dim"]) {
+    assert.throws(() => parseFormat(named("model"), format),
+      { message: '"model"\'s format has a modifier with nothing before it: "|dim"' });
+  }
+});

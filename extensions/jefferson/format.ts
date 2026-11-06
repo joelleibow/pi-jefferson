@@ -39,6 +39,10 @@ function collapse(text: string): string {
   return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
 }
 
+function formatError(declaration: InstrumentDeclaration, detail: string): Error {
+  return new Error(`${JSON.stringify(declaration.name)}'s format ${detail}`);
+}
+
 export function parseFormat(declaration: InstrumentDeclaration, format: string): FormatSegment[] {
   const segments: FormatSegment[] = [];
   let literal = "";
@@ -57,15 +61,15 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
     } else if (character === "$") {
       const name = format.slice(index + 1).match(/^[A-Za-z0-9_]+/)?.[0];
       if (name === undefined) {
-        throw new Error(`${JSON.stringify(declaration.name)}'s format has a bare $; escape a literal dollar as \\$`);
+        throw formatError(declaration, "has a bare $; escape a literal dollar as \\$");
       }
       const declared = name === "bar" ? declaration.bar !== undefined : Object.hasOwn(declaration.variables, name);
       if (!declared) {
-        throw new Error(`${JSON.stringify(declaration.name)}'s format names a variable it does not declare: ${JSON.stringify("$" + name)}`);
+        throw formatError(declaration, `names a variable it does not declare: ${JSON.stringify("$" + name)}`);
       }
       flush();
       if (name === "bar") {
-        if (hasBar) throw new Error(`${JSON.stringify(declaration.name)}'s format names a second width-taking variable: "$bar"`);
+        if (hasBar) throw formatError(declaration, 'names a second width-taking variable: "$bar"');
         hasBar = true;
         segments.push({ kind: "bar" });
       } else {
@@ -82,21 +86,23 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
       } else {
         const modifier = MODIFIERS.get(name);
         if (modifier === undefined) {
-          throw new Error(`${JSON.stringify(declaration.name)}'s format names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
+          throw formatError(declaration, `names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
         }
-        const text = collapse(literal);
-        const run = afterName ? undefined : text.match(/\S+$/)?.[0];
-        if (subject !== undefined && subject.kind !== "bar" && afterName) {
+        if (subject?.kind === "bar") {
+          throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
+        }
+        if (afterName && subject !== undefined) {
           segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
-        } else if (subject?.kind !== "bar" && run !== undefined) {
+        } else {
+          const text = collapse(literal);
+          const run = text.match(/\S+$/)?.[0];
+          if (run === undefined) {
+            throw formatError(declaration, `has a modifier with nothing before it: ${JSON.stringify("|" + name)}`);
+          }
           const prefix = text.slice(0, text.length - run.length);
           if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
           segments.push({ kind: "literal", text: run, modifiers: [modifier] });
           literal = "";
-        } else {
-          literal += character;
-          afterName = false;
-          continue;
         }
         index += name.length;
         afterName = true;
