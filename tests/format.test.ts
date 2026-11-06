@@ -368,3 +368,7 @@ test("a mutation runs before styling so it cannot rewrite an escape sequence", (
   assert.equal(rendered("model", "$model|lower", { style: { bold: true } }),
     rendered("model", "$model", { style: { bold: true } }));
 });
+
+test("a chain applies its string mutations in the order the format writes them", () => {
+  assert.equal(rendered("thinking", "$level|lower|capitalize", { readings: { ...seed, thinkingLevel: "HIGH" } }), "High");
+});

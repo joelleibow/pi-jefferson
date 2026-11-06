@@ -215,7 +215,7 @@ file passes under both.
       assertion passes. **Boundary:** no second instrument name in the message — a `parseFormat`
       error never gets the `instrument "<name>" ` prefix that `validateStyle` errors get (D10).
 
-- [ ] 8.2 The change touches only what the design names. **Verify:** `git diff --name-only` against
+- [x] 8.2 The change touches only what the design names. **Verify:** `git diff --name-only` against
       the base, leaving out the change directory `openspec/changes/variable-modifiers/` — which this
       change's own artifacts and their ticks belong to — lists `package.json`, `pnpm-lock.yaml`,
       `extensions/jefferson/format.ts`, `tests/format.test.ts` and `tests/configuration.test.ts`,
@@ -225,7 +225,7 @@ file passes under both.
       `resolveFormat` never looks a name up in the table (D3, D6). **Boundary:** none; this task is
       the diff, not a test.
 
-- [ ] 8.3 Whole-suite gate. **Verify:** `pnpm typecheck` exits 0; `pnpm test` exits 0 with the whole
+- [x] 8.3 Whole-suite gate. **Verify:** `pnpm typecheck` exits 0; `pnpm test` exits 0 with the whole
       suite green, not only the new tests; `openspec validate variable-modifiers --strict` is green;
       and `pnpm pack --dry-run --json` lists only `package.json`, `README.md`, `LICENSE` and
       `extensions/*`, with `pi.extensions` still `["./extensions/jefferson.ts"]` — the dependency
