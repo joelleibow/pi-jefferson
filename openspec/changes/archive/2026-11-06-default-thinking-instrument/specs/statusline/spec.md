@@ -106,16 +106,21 @@ either.
 - **THEN** only the `$level` segment takes the level's color, and the literal text keeps the
   instrument's own style
 
+#### Scenario: A level outside the seven
+
+- **WHEN** the host reports a thinking level that is none of the seven
+- **THEN** the cell renders the level, and the `$level` segment keeps the instrument's own style with
+  no `thinking*` token
+
 ## MODIFIED Requirements
 
 ### Requirement: The thinking instrument
 
-The extension MUST implement a `thinking` instrument declaring the variable `$level`, whose default
-label is `Thinking: ` and whose default format is `$level|capitalize`, so that it renders `Thinking: `
-followed by the capitalized level. Configuration MUST be able to place it in a row's cell and to
-configure its label, format and style, and the footer MUST render it. Its text MUST already be correct
-when a session is restored, MUST change when the host reports a thinking-level selection, and MUST be
-nothing when the level is unknown — not a fallback the host did not report.
+The extension MUST implement a `thinking` instrument declaring the variable `$level`, with the default
+label `Thinking: ` and the default format `$level|capitalize`. Configuration MUST be able to place it in
+a row's cell and to configure its label, format and style, and the footer MUST render it. Its text MUST
+be correct when a session is restored, MUST change when the host reports a thinking-level selection,
+and MUST be nothing when the level is unknown — not a fallback the host did not report.
 
 #### Scenario: The default thinking cell
 
