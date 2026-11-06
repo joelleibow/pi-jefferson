@@ -119,8 +119,8 @@ fire none.
 When a change the store receives alters a datum a cell displays, the store MUST request a repaint
 itself; a repaint MUST NOT depend on the consumer noticing the change. When the change alters no
 displayed datum, no repaint is requested. A change the store learns of only by reading the host — a
-turn boundary that alters a usage-derived datum — MUST likewise request a repaint, and MUST NOT
-rely on the host repainting for its own reasons.
+turn boundary that alters one of the token and cost totals — MUST likewise request a repaint, and
+MUST NOT rely on the host repainting for its own reasons.
 
 #### Scenario: A displayed datum is pushed
 
@@ -129,7 +129,7 @@ rely on the host repainting for its own reasons.
 
 #### Scenario: A turn boundary alters a displayed total
 
-- **WHEN** the host reports a turn boundary and the usage-derived datums differ from what the store
+- **WHEN** the host reports a turn boundary and the token and cost totals differ from what the store
   last read
 - **THEN** a repaint is requested without the instrument or the cell asking for one
 
