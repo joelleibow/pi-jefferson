@@ -33,3 +33,7 @@ Joel's rulings for this change, quoted and dated. Binding, and newer than any ot
 ## 2026-11-06 — No authorization for fast-forward
 
 > "What does needs authorization mean? There's no auth needed for that."
+
+## 2026-11-06 — Preserve the preferred config during validation
+
+> "Once she's done then I can reload and send you a screen cap of the results. Please know that the current @~/.pi/agent/pi-jefferson.json is my preferred setup so let's be certain to restore it after we validate the functionality."

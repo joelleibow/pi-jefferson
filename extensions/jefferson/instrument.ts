@@ -58,7 +58,7 @@ const THINKING_FG: Readonly<Record<string, ThemeColor>> = {
 const thinking: InstrumentDeclaration = {
   name: "thinking",
   variables: { level: r => r.thinkingLevel },
-  variableFg: { level: level => THINKING_FG[level] },
+  variableFg: { level: level => Object.hasOwn(THINKING_FG, level) ? THINKING_FG[level] : undefined },
   defaultFormat: "$level|capitalize",
   defaultLabel: "Thinking: ",
   options: FOUNDATIONAL_OPTIONS,

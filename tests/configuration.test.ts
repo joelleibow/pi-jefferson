@@ -606,12 +606,16 @@ test("only the level segment is recolored", () => {
 
 test("a level outside the seven keeps the instrument's own style", () => {
   const theme = fakeTheme();
-  const readings: Readings = { ...seed, thinkingLevel: "ultra" };
   const plain = readDocument({ cells: [{ instrument: "thinking" }] }, theme);
-  assert.equal(plain.rows[0]?.cells[0]?.instrument.render(readings, 80, theme), "Thinking: Ultra", "a known level renders with no token to give it");
   const styled = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, cells: [{ instrument: "thinking" }] }, theme);
-  assert.equal(styled.rows[0]?.cells[0]?.instrument.render(readings, 80, theme),
-    theme.style("Thinking: ", { fg: "accent" }) + theme.style("Ultra", { fg: "accent" }), "the configured foreground keeps the level");
+  // An inherited object name is no more a token than a future host level is, so it renders unstyled.
+  const levels = [["ultra", "Ultra"], ["toString", "ToString"], ["constructor", "Constructor"], ["__proto__", "__proto__"]] as const;
+  for (const [level, capitalized] of levels) {
+    const readings: Readings = { ...seed, thinkingLevel: level };
+    assert.equal(plain.rows[0]?.cells[0]?.instrument.render(readings, 80, theme), "Thinking: " + capitalized, `${level} renders with no token to give it`);
+    assert.equal(styled.rows[0]?.cells[0]?.instrument.render(readings, 80, theme),
+      theme.style("Thinking: ", { fg: "accent" }) + theme.style(capitalized, { fg: "accent" }), `${level} keeps the configured foreground`);
+  }
 });
 
 test("the level's token resolves against the theme passed to each render", () => {
