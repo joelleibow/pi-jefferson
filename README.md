@@ -61,11 +61,29 @@ cell that uses it:
 | --- | --- | --- |
 | `blank` | None | `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor` |
 | `model` | `$provider`, `$model` | `$provider: $model` |
-| `thinking` | `$level` | `thinking: $level` |
+| `thinking` | `$level` | `$level\|capitalize` |
 | `path` | `$path` | `$path` |
 | `context` | `$tokens`, `$window`, `$percent`, `$bar` | `$percent/$window` |
 | `tokens` | `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens` | `$totalTokens` |
 | `cost` | `$cost` | `$cost` |
+
+Every instrument also accepts `label`, a string placed in front of its format, whether the format
+is configured or the default. It is literal text: `$` means nothing in it, and `$label` is not a
+variable (a format that names it rejects the document). Each control character in it becomes one
+space, and it takes the instrument's `style`. A `label` that is not a string rejects the document.
+
+```json
+"thinking": { "label": "🤔" }
+```
+
+Only `thinking` has a default label, `Thinking: `, so its default cell reads `Thinking: High`. A
+configured `label` replaces the default, and `label: ""` removes it. When an instrument's data is
+unknown the cell renders nothing, label included. With known data and `"format": ""`, the cell is the
+label alone.
+
+Upgrading: the default label also applies to a `thinking` format you had already configured. If that
+format has no `label`, the cell now starts with `Thinking: `. Set `label: ""` to get the previous
+text back.
 
 A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
 each applying in the order the format writes them. On plain text a modifier covers the run of
@@ -103,6 +121,12 @@ tokens, or either slot can use a color pi's parser accepts. The six boolean attr
 inside a format. A modifier only adds: `$model|bold` renders bold even where the instrument's
 `style` sets `bold: false`, and nothing in a format switches an attribute off. `fg` and `bg` are
 not modifiers; colors belong to `style`.
+
+`thinking`'s `$level` is the one segment `style` does not fully control. It takes the foreground
+pi gives the thinking rules on the input box for the current level: the theme's `thinkingOff`
+through `thinkingMax` token, read from the theme current at render time. That replaces a configured
+`fg` on `$level` only. A configured `bg` and the boolean attributes stay, and the label and any other
+text keep the instrument's `fg`.
 
 If the extension cannot read a document's style or format, it rejects the whole document, renders
 the default row, and warns with a message naming the offender. The offenders include a modifier it

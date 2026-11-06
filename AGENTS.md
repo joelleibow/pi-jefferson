@@ -18,7 +18,8 @@ extension.
 ## Adding an instrument
 
 1. Add one declaration to `extensions/jefferson/instrument.ts` — name, variables, defaults and
-   options — and include it in the shipped declarations table so `instrumentNamed` resolves it.
+   options, plus a `defaultLabel` or a `variableFg` if it needs them — and include it in the shipped
+   declarations table so `instrumentNamed` resolves it.
 2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
    `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
 3. Add the data it displays to the store if the store does not hold it. Do not reach for host state
