@@ -22,9 +22,10 @@ involved.
 
 ## Decision
 
-`lodash-es` at `^4.18.1` in `dependencies`, imported by name for `upperFirst`, `toUpper` and
-`toLower`. `@types/lodash-es` at `^4.17.12` in `devDependencies`; its own dependency supplies the
-other type package, so that one is not declared a second time.
+`lodash-es` at `^4.18.1` in `dependencies`, imported per function from `lodash-es/upperFirst.js`,
+`lodash-es/toUpper.js` and `lodash-es/toLower.js`, which loads three modules rather than the
+library's index. `@types/lodash-es` at `^4.17.12` in `devDependencies`; its own dependency supplies
+the other type package, so that one is not declared a second time.
 
 The host packages stay `peerDependencies` with a `*` range. The dependency is installed by pi when
 it installs this package and does not enter the published tarball, whose file set is unchanged.

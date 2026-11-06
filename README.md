@@ -83,8 +83,10 @@ Here `via` renders dim and the provider's value is capitalized.
 | `upper` | Upper-cases the whole value: `high` becomes `HIGH` |
 | `lower` | Lower-cases the whole value: `HIGH` becomes `high` |
 
-A `|` begins a modifier only when a name follows it directly. Followed by a space, the end of the
-format or punctuation, it is the character itself, so `$model | $provider` renders
+A `|` begins a modifier only when a name follows it directly. A name is a run of letters, digits
+and underscores, so `10|20` and `$model|_x` start a modifier and an unknown one rejects the
+document. Followed by anything else (a space, the end of the format, `$`, `|` or other
+punctuation) the pipe is the character itself, so `$model | $provider` renders
 `claude-opus-4 | anthropic`. Where a literal pipe has to sit beside a name, write `\|`.
 
 That escape changed meaning in this release. A format written `\|` used to render `\|`, because a

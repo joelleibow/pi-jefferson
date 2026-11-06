@@ -62,11 +62,16 @@ something the spec did not ask for: the format's special characters and escapes 
 add-only styling by D7, the three string modifiers by D1, D3, D4 and D8, and read-time rejection by
 D5. D2, D9 and D10 are the conditions that keep those true.
 
-### D1. The package is `lodash-es`, imported by name
+### D1. The package is `lodash-es`, imported per function
 
 ```ts
-import { toLower, toUpper, upperFirst } from "lodash-es";
+import toLower from "lodash-es/toLower.js";
+import toUpper from "lodash-es/toUpper.js";
+import upperFirst from "lodash-es/upperFirst.js";
 ```
+
+Per-function paths load three modules instead of the ~600-module index: measured under pi's jiti
+loader at ~4 ms warm against ~47 ms for the named import.
 
 Chidi measured the two builds against both loaders that matter. `lodash-es` named imports work under
 pi's jiti loader (`JITI OK`) **and** under `node file.ts`, which is how `node --test` runs the suite
