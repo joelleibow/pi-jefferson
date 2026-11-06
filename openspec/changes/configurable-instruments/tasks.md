@@ -482,7 +482,7 @@ leaves`. Every guard gets a test that fails when the guard is removed and assert
 message string, inside the unchanged envelope
 `pi-jefferson: <path> was rejected (<message>); rendering the default row`.
 
-- [ ] 4.1 Red — in `tests/configuration.test.ts`, the section's position: `{"instruments": …}` **alone**
+- [x] 4.1 Red — in `tests/configuration.test.ts`, the section's position: `{"instruments": …}` **alone**
   normalizes to the default row with those instruments configured (envelope detection reads only
   `rows`/`cells`/`id`, so the section sits beside either shape); `{"instruments": …, "cells": […]}` and
   `{"instruments": …, "rows": […]}` both read; a trusted project document whose `instruments` differs
@@ -492,7 +492,7 @@ message string, inside the unchanged envelope
   they are red under `pnpm typecheck`. Boundary cases: an `instruments` object that is empty (`{}`) is
   accepted and configures nothing; `instruments` beside a document that is *also* wrong in its rows is
   4.6's case, not this one. Verified by: red before 4.9.
-- [ ] 4.2 Red — configured once by name: a document configuring `model`'s format as
+- [x] 4.2 Red — configured once by name: a document configuring `model`'s format as
   `🧠: $model from $provider` renders `🧠: claude-opus-4 from anthropic` in **every** cell holding
   `model`, in every declared row, and two cells in two rows hold the **same bound object**
   (`assert.equal(rows[0].cells[0].instrument, rows[1].cells[0].instrument)` — D2's memoized binding,
@@ -502,7 +502,7 @@ message string, inside the unchanged envelope
   format. Boundary cases: a name configured in the section but held by no cell (accepted, no binding
   built, see 4.3); a cell holding a name the section does not mention (defaults); two cells holding
   one name in the *same* row. Verified by: red before 4.9.
-- [ ] 4.3 Red — the accepted-document notice: a name in `instruments` the extension does not implement
+- [x] 4.3 Red — the accepted-document notice: a name in `instruments` the extension does not implement
   joins the existing `unknownInstruments` sentence — one set, one sentence, byte-exactly
   `pi-jefferson: <path> names instruments the extension does not implement: nope; those cells render
   blank` — gathered now from the section as well as from cells, so a name unknown in both places
@@ -511,7 +511,7 @@ message string, inside the unchanged envelope
   its siblings still render theirs. Boundary cases: the `containers` notice and the unknown-instrument
   notice in one document still join with `; ` in the existing order; two unknown section names list
   both, once each. Verified by: red before 4.9 — the section is not read yet, so no warning names it.
-- [ ] 4.4 Red — the format-side guards, one test each, each asserting the exact message and each
+- [x] 4.4 Red — the format-side guards, one test each, each asserting the exact message and each
   **failing when its guard is removed** (the removal is 7.5's re-run): a non-object section →
   `the instruments value is not an object`; a non-object entry →
   `the instruments configuration for "model" is not an object`; a key the declaration's `options` does
@@ -527,7 +527,7 @@ message string, inside the unchanged envelope
   present-and-not-a-string and is rejected; an option key with a non-ASCII spelling (`frmát`) is named
   byte-exactly through `JSON.stringify`; a guard fires for a name in the section even when no cell
   holds it. Verified by: red before 4.9.
-- [ ] 4.5 Red — the style side, at both seams. At `validateStyle`'s own boundary against the fake
+- [x] 4.5 Red — the style side, at both seams. At `validateStyle`'s own boundary against the fake
   theme: a foreground-slot token is kept as the **string** (render-time resolution); `"#bf5700"` is
   kept as a parsed `Color`; an indexed number is kept as a `Color`; a background-slot token used as
   `fg` — and a foreground-slot token used as `bg` — is rejected naming the token, which is the case
@@ -558,14 +558,14 @@ message string, inside the unchanged envelope
   default in the host's own vocabulary — is a string naming no token, so it goes to `parseColor` and is
   rejected, which is the honest reading of D6 and is pinned here rather than left to a reader.
   Verified by: red before 4.9.
-- [ ] 4.6 Red — the read order is the error precedence: **envelope → `instruments` section →
+- [x] 4.6 Red — the read order is the error precedence: **envelope → `instruments` section →
   rows/cells**. One document wrong in both sections —
   `{"instruments": {"model": {"format": 42}}, "cells": [{"instrument": "model", "align": "middle"}]}` —
   is rejected naming the `instruments` offender, not the align. Boundary cases: a document whose
   envelope alone is wrong (`rows` and `cells` together) still rejects with the existing envelope
   message; a section guard and a cell guard both firing in a `rows` document names the section.
   Verified by: red before 4.9 — today the section is unread, so the align message wins.
-- [ ] 4.7 Red — styled cells in the footer, now that a document can declare a style: a configured
+- [x] 4.7 Red — styled cells in the footer, now that a document can declare a style: a configured
   `{"fg": "accent"}` puts the theme's escapes around the **prose segments only**, so a format holding
   `$bar` between two literals keeps both literals styled and the bar's own resets inside the track;
   the empty-style path stays **byte-identical** to today's unstyled output (the default-document
@@ -582,7 +582,7 @@ message string, inside the unchanged envelope
   reset of ours); a styled `dim` bar track under a configured `bg` (the `bg` survives, D5); a
   `strikethrough`-only style (no colour escapes at all, so the pad reset still fires). Verified by:
   red before 4.9 — no document can declare a style yet.
-- [ ] 4.8 Red — the theme switch, end to end through the footer: render with fake theme A, call
+- [x] 4.8 Red — the theme switch, end to end through the footer: render with fake theme A, call
   `footer.invalidate()` (as the host cascades on a theme change, design fact 1, chidi §3.2), render
   with theme B, and assert the cell's bytes carry B's escapes and **nothing cached from A survives**;
   and, end to end through the harness, one document configuring a format, a style and a `$bar` renders
@@ -590,7 +590,7 @@ message string, inside the unchanged envelope
   default row. Boundary cases: `invalidate()` with no theme change still re-resolves (the memo is
   dropped, not compared); a second `invalidate()` is harmless; a styled cell at a width change
   re-styles rather than reusing the old width's text. Verified by: red before 4.9.
-- [ ] 4.9 Implement — `extensions/jefferson/format.ts` gains `validateStyle(raw, theme)` exactly as D6
+- [x] 4.9 Implement — `extensions/jefferson/format.ts` gains `validateStyle(raw, theme)` exactly as D6
   states it: the eight `ThemeStyle` keys checked through an **own-property** lookup —
   `Object.hasOwn` against the runtime `Record<keyof ThemeStyle, true>` key record (4.10(b)), never
   `in` and never a bare index, both of which find `constructor`, `toString` and `__proto__` on
@@ -611,7 +611,7 @@ message string, inside the unchanged envelope
   indistinguishable from outside; if Michael wants `RejectedConfiguration` itself thrown from
   `format.ts`, that inverts a D1 edge and is his call at PL7. Verified by: 4.1–4.8 green,
   `pnpm typecheck` clean.
-- [ ] 4.10 Pin — the two source-shape guarantees Michael's PL4 list names, asserted by inspection and
+- [x] 4.10 Pin — the two source-shape guarantees Michael's PL4 list names, asserted by inspection and
   by the compiler rather than by a new test double: (a) the `getFgAnsi`/`getBgAnsi` probe cast is
   **one expression wide with no suppression comment** —
   `rg -n "getFgAnsi|getBgAnsi" extensions/jefferson/format.ts` shows one call site each with the cast
@@ -624,7 +624,7 @@ message string, inside the unchanged envelope
   named anywhere under `extensions/` are `warning` and `error`, D5's two bar thresholds, used at render
   time and not as a membership list. Verified by: the three `rg` outputs recorded, `pnpm typecheck`
   exit 0.
-- [ ] 4.11 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
+- [x] 4.11 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
   recorded.
 
 ## 5. The entry: exactly three subscriptions

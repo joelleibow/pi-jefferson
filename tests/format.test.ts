@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
+import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/format.ts";
 import { instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/instrument.ts";
 import { createFooter } from "../extensions/jefferson/row-renderer.ts";
 import type { Readings } from "../extensions/jefferson/session-data-store.ts";
@@ -183,4 +183,21 @@ test("a variables record with no prototype uses the same own-property rule", () 
   };
   assert.equal(resolveFormat(declaration, parseFormat(declaration, "$value"), {}, seed, 80, fakeTheme()), "known");
   assert.throws(() => parseFormat(declaration, "$constructor"), { message: '"fixture"\'s format names a variable it does not declare: "$constructor"' });
+});
+
+test("style validation keeps slot tokens as strings and parses concrete colors once", () => {
+  const theme = fakeTheme();
+  assert.deepEqual(validateStyle(undefined, theme), {});
+  assert.deepEqual(validateStyle({}, theme), {});
+  assert.deepEqual(validateStyle({ fg: "accent", bg: "selectedBg" }, theme), { fg: "accent", bg: "selectedBg" });
+  for (const value of ["#bf5700", 42, "oklch(70% 0.1 150)", "okhsl(150 80% 60%)"]) {
+    assert.deepEqual(validateStyle({ fg: value, bg: value }, theme), { fg: parseColor(value), bg: parseColor(value) });
+  }
+});
+
+test("style validation rejects wrong slots and invalid values at its own boundary", () => {
+  const theme = fakeTheme();
+  for (const [key, value] of [["fg", "selectedBg"], ["bg", "accent"], ["fg", "nope"], ["fg", {}], ["fg", true], ["fg", null], ["fg", 256], ["bg", 1.5]] as const) {
+    assert.throws(() => validateStyle({ [key]: value }, theme), (error: unknown) => error instanceof Error && error.message.includes(JSON.stringify(value)));
+  }
 });

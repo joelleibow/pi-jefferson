@@ -110,6 +110,7 @@ export default function jefferson(pi: ExtensionAPI): void {
       agentPath: join(getAgentDir(), "pi-jefferson.json"),
       projectPath: join(ctx.cwd, CONFIG_DIR_NAME, "pi-jefferson.json"),
       projectTrusted: ctx.isProjectTrusted(),
+      theme: ctx.ui.theme,
     });
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 

@@ -148,3 +148,56 @@ test_exit=0
 ```
 
 The format geometry search finds only the one control-collapse replacement space; no truncateToWidth or padding exists in format.ts. The entry/configuration export pins are unchanged; the renderer pin is createFooter only. The contribution-key sweep now includes format.ts.
+
+## Group 4 — document configuration and styles
+
+Red runs 4.1–4.8 all failed at assertions before implementation: configured default/envelope/trust formats (3 failures), configured-by-name agreement (1), section notices (2), format guards and empty format (7), document style guards/accepted booleans (7), error precedence (align won instead of the instruments format error), footer style/clip/pad bytes (5), and theme-switch/harness scenarios (3). The new direct validateStyle tests also had the honest TS2339 missing-export compile red; ConfigurationSource.theme was absent (TS2353). No import-loader failure is counted.
+
+Conductor decisions and bounded specialist answer:
+
+- validateStyle stays `(raw, theme)` and throws style-specific Error fragments with no prefix/outer whitespace. Only its configuration call site prefixes `instrument ${JSON.stringify(declaration.name)} ` and wraps RejectedConfiguration; parseFormat's complete message is wrapped without another prefix. Full composed D3 messages, including wrong slots and invalid numeric indices, are asserted through documents.
+- Chidi supplied verified pi-tui 1.4.0 fixtures: `oklch(70% 0.1 150)` and `okhsl(150 80% 60%)` (parseColor/colors.js 58–77, patterns 35–36). Separators are whitespace, not commas. Both accepted fixtures are covered by actual validator-result assertions.
+- One new harness expectation was wrong: padEnd(39) built 79 columns. With approval, only that new expectation moved to padEnd(40). Measured arithmetic: model prose 32 + trailing pad 8 = 40; context prose 6 + track 34 = 40; line 80. Both cells default left-align. No production adjustment or existing pin changed to accommodate the typo.
+- Small separate green refactor: once validateStyle existed, its two tests switched from the temporary namespace access to the ordinary named import, without changing an expectation; full suite green before and after.
+
+Twelve early guard demonstrations, each caught at an assertion and individually restored (the first runner attempt stopped before editing because a mutation selector was non-unique; its selector was narrowed, not production code):
+
+| Edit | Catching test | Result |
+|---|---|---|
+| 4-1: section shape guard disabled (extensions/jefferson/configuration.ts) | the instruments section shape guard rejects non-objects with the exact message | exit 1, assertion red; restored |
+| 4-2: entry shape guard disabled (extensions/jefferson/configuration.ts) | the instrument entry shape guard rejects non-objects even without a holding cell | exit 1, assertion red; restored |
+| 4-3: option-key guard disabled (extensions/jefferson/configuration.ts) | the declaration option-key guard names misspellings and the declined width option | exit 1, assertion red; restored |
+| 4-4: format type guard disabled (extensions/jefferson/configuration.ts) | the format type guard rejects present non-strings including null | exit 1, assertion red; restored |
+| 4-5: unknown-variable rejection disabled (extensions/jefferson/format.ts) | the document surfaces the unknown-variable guard's full message | exit 1, assertion red; restored |
+| 4-6: second-width-taker rejection disabled (extensions/jefferson/format.ts) | the document surfaces the second-width-taker guard's full message | exit 1, assertion red; restored |
+| 4-7: style shape guard disabled (extensions/jefferson/format.ts) | the style shape guard rejects a non-object with the full composed message | exit 1, assertion red; restored |
+| 4-8: style key guard disabled (extensions/jefferson/format.ts) | the style-key guard rejects unknown keys with the full composed message | exit 1, assertion red; restored |
+| 4-9: attribute type guard disabled (extensions/jefferson/format.ts) | the style attribute guard rejects non-booleans for all six attributes | exit 1, assertion red; restored |
+| 4-10: foreground parser rejection swallowed (extensions/jefferson/format.ts) | the foreground value guard reports rejected types, wrong slots, colors and indices | exit 1, assertion red; restored |
+| 4-11: background parser rejection swallowed (extensions/jefferson/format.ts) | the background value guard reports rejected colors, wrong slots and fractional indices | exit 1, assertion red; restored |
+| 4-12: style key own-property check replaced by inherited lookup (extensions/jefferson/format.ts) | the style-key guard rejects inherited-name own keys including JSON proto keys | exit 1, assertion red; restored |
+
+4.10 raw inspections:
+
+```text
+77:          if (key === "fg") theme.getFgAnsi(value as Parameters<Theme["getFgAnsi"]>[0]);
+78:          else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
+```
+
+The suppression search `rg -n '@ts-(ignore|expect-error|nocheck)' extensions/ tests/` is empty. The source runtime key record satisfies `Record<keyof ThemeStyle, true>`; no host token list or theme.colors membership check is copied. The only render-time theme-token literals are warning/error in the bar; the entry's existing warning notification level is not a token-membership list. Deleting underline is reserved for the final 7.5 compiler mutation.
+
+Raw group boundary:
+
+```text
+$ tsc --noEmit
+typecheck_exit=0
+ℹ tests 188
+ℹ suites 0
+ℹ pass 188
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 461.925417
+test_exit=0
+```

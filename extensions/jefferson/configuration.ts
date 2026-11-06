@@ -9,9 +9,10 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
-import { parseFormat, resolveFormat } from "./format.ts";
+import { parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./format.ts";
 
 /** The values a cell's `align` may take. The type and every message derive from this tuple. */
 const ALIGNMENTS = ["left", "right", "center"] as const;
@@ -39,6 +40,7 @@ export interface ConfigurationSource {
   agentPath: string;
   projectPath: string;
   projectTrusted: boolean;
+  theme: Theme;
 }
 
 export interface Configuration {
@@ -64,19 +66,70 @@ interface Notices {
 
 type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 
-function defaultBindings(): BindInstrument {
+interface ConfiguredInstrument {
+  segments: FormatSegment[];
+  style: ThemeStyle;
+}
+
+function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
   const bound = new Map<string, Instrument>();
   return declaration => {
     let instrument = bound.get(declaration.name);
     if (instrument === undefined) {
-      const segments = parseFormat(declaration, declaration.defaultFormat);
+      const entry = configured.get(declaration.name);
+      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
+      const style = entry?.style ?? {};
       instrument = {
-        render: (readings, width, renderTheme) => resolveFormat(declaration, segments, {}, readings, width, renderTheme),
+        render: (readings, width, renderTheme) => resolveFormat(declaration, segments, style, readings, width, renderTheme),
       };
       bound.set(declaration.name, instrument);
     }
     return instrument;
   };
+}
+
+function readInstruments(raw: unknown, theme: Theme, notices: Notices): ReadonlyMap<string, ConfiguredInstrument> {
+  const configured = new Map<string, ConfiguredInstrument>();
+  if (raw === undefined) return configured;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new RejectedConfiguration("the instruments value is not an object");
+  }
+  for (const [name, value] of Object.entries(raw)) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
+    }
+    const declaration = instrumentNamed(name);
+    if (declaration === undefined) {
+      notices.unknownInstruments.add(name);
+      continue;
+    }
+    const entry = value as Record<string, unknown>;
+    for (const key of Object.keys(entry)) {
+      if (!declaration.options.includes(key)) {
+        throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} carries an option its declaration does not have: ${JSON.stringify(key)}`);
+      }
+    }
+    const format = entry.format;
+    if (format !== undefined && typeof format !== "string") {
+      throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has a format that is not a string`);
+    }
+    let segments: FormatSegment[];
+    try {
+      segments = parseFormat(declaration, format ?? declaration.defaultFormat);
+    } catch (error) {
+      if (error instanceof Error) throw new RejectedConfiguration(error.message);
+      throw error;
+    }
+    let style: ThemeStyle;
+    try {
+      style = validateStyle(entry.style, theme);
+    } catch (error) {
+      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(declaration.name)} ${error.message}`);
+      throw error;
+    }
+    configured.set(declaration.name, { segments, style });
+  }
+  return configured;
 }
 
 function defaultRow(bind: BindInstrument): Row {
@@ -168,7 +221,7 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
 }
 
 /** Normalize the document: one top-level row, or a list under `rows`; never both (D2). */
-function normalizeDocument(document: unknown, notices: Notices, bind: BindInstrument): Row[] {
+function normalizeDocument(document: unknown, notices: Notices, theme: Theme): Row[] {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -192,7 +245,8 @@ function normalizeDocument(document: unknown, notices: Notices, bind: BindInstru
     rawRows = [doc];
   }
 
-  if (rawRows.length === 0) return [];
+  const bind = instrumentBindings(readInstruments(doc.instruments, theme, notices));
+  if (rawRows.length === 0) return [defaultRow(bind)];
 
   const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
   const seen = new Set<string>();
@@ -228,7 +282,7 @@ function acceptedWarning(path: string, notices: Notices): string | undefined {
  * rejected document yields the default row and a warning (D3).
  */
 export function readConfiguration(source: ConfigurationSource): Configuration {
-  const bind = defaultBindings();
+  const bind = instrumentBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
   if (!existsSync(path)) return { rows: [defaultRow(bind)], warning: undefined };
@@ -245,9 +299,9 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
 
   try {
     const notices: Notices = { containers: false, unknownInstruments: new Set() };
-    const rows = normalizeDocument(document, notices, bind);
+    const rows = normalizeDocument(document, notices, source.theme);
     return {
-      rows: rows.length === 0 ? [defaultRow(bind)] : rows,
+      rows,
       warning: acceptedWarning(path, notices),
     };
   } catch (error) {

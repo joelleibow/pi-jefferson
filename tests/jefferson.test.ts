@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { CONFIG_DIR_NAME, type Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { CONFIG_DIR_NAME, type ContextUsage, type Theme } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
@@ -57,6 +57,7 @@ interface SessionOptions {
   /** Absent for a session the host restored with no model. */
   model?: { provider: string; id: string };
   thinkingLevel?: string;
+  contextUsage?: ContextUsage;
 }
 
 interface Harness {
@@ -112,7 +113,7 @@ function harness(): Harness {
         cwd,
         model: options.model,
         thinkingLevel: options.thinkingLevel,
-        getContextUsage: () => undefined,
+        getContextUsage: () => options.contextUsage,
         sessionManager: {
           getSessionId: () => "session-1",
           getLeafId: () => null,
@@ -120,6 +121,7 @@ function harness(): Harness {
         },
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
+          theme: fakeTheme(),
           notify: (message: string, type?: string) => void notified.push({ message, type }),
           // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
           // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
@@ -489,4 +491,28 @@ test("disposing a footer then replacing the session releases the first install o
     " ".repeat(80),
     "the disposed footer resolves empty cells rather than the old values",
   );
+});
+
+test("configured formats, styles and a width-taking bar render end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { model: { format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { format: "$percent $bar", style: { fg: "accent" } } },
+    cells: [{ instrument: "model" }, { instrument: "context" }],
+  });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(stripTerminalSequences(line), "🧠: claude-opus-4 from anthropic".padEnd(40) + "43.2% " + "█".repeat(14) + "░".repeat(20));
+  assert.equal(visibleWidth(line), 80);
+  assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
+  assert.deepEqual(session.notified, []);
+});
+
+test("a rejected style warns with its exact envelope and installs the default footer", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, cells: [{ instrument: "model" }] });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
+  const lines = session.lines(80);
+  assert.equal(lines.length, 1);
+  assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));
 });

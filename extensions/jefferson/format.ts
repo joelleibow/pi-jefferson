@@ -1,6 +1,6 @@
 /** The plain-text format language; declarations supply already-formatted values. */
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
 
@@ -55,6 +55,48 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
   }
   flush();
   return segments;
+}
+
+const STYLE_KEYS = {
+  fg: true, bg: true, bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
+} satisfies Record<keyof ThemeStyle, true>;
+
+export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
+  if (raw === undefined) return {};
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("has a style that is not an object");
+  }
+  const validated: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!Object.hasOwn(STYLE_KEYS, key)) {
+      throw new Error(`has a style key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
+    }
+    if (key === "fg" || key === "bg") {
+      if (typeof value === "string") {
+        try {
+          if (key === "fg") theme.getFgAnsi(value as Parameters<Theme["getFgAnsi"]>[0]);
+          else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
+          validated[key] = value;
+          continue;
+        } catch {
+          // A non-token may still be a concrete color; only the parser can accept that.
+        }
+      }
+      const message = `has ${key === "fg" ? "an" : "a"} ${key} that is neither a ${key === "fg" ? "foreground" : "background"}-slot theme token nor a color pi's parser accepts: ${JSON.stringify(value)}`;
+      if (typeof value !== "string" && typeof value !== "number") throw new Error(message);
+      try {
+        validated[key] = parseColor(value);
+      } catch {
+        throw new Error(message);
+      }
+    } else {
+      if (typeof value !== "boolean") {
+        throw new Error(`has a style attribute that is not a boolean: ${JSON.stringify(key)}`);
+      }
+      validated[key] = value;
+    }
+  }
+  return validated as ThemeStyle;
 }
 
 function styledPiece(text: string, style: ThemeStyle, theme: Theme): string {
