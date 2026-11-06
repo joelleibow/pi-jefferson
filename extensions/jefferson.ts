@@ -75,19 +75,27 @@ export default function jefferson(pi: ExtensionAPI): void {
         provider: ctx.model?.provider,
         model: ctx.model?.id,
         thinkingLevel: ctx.thinkingLevel,
+        cwd: ctx.cwd,
       },
       requestRender: () => requestRepaint?.(),
+      readUsage: () => ({
+        contextUsage: ctx.getContextUsage(),
+        sessionId: ctx.sessionManager.getSessionId(),
+        leafId: ctx.sessionManager.getLeafId(),
+      }),
+      readEntries: () => ctx.sessionManager.getEntries(),
     });
 
-    // Both pushes are unwrapped here, so the store never names a host type (D5).
+    // Pushes are unwrapped here, so the store names no host event.
     const releaseModel = pi.on("model_select", (event) =>
       store.modelSelected(event.model.provider, event.model.id),
     );
     const releaseThinking = pi.on("thinking_level_select", (event) =>
       store.thinkingLevelSelected(event.level),
     );
+    const releaseTurn = pi.on("turn_end", () => store.turnEnded());
 
-    // The single teardown: both host subscriptions and the store, released together (D8). Two
+    // The single teardown: all three subscriptions and the store, released together. Two
     // callers reach it — the host's `dispose()` and the next session's `releasePrevious()`.
     let released = false;
     const release = (): void => {
@@ -95,6 +103,7 @@ export default function jefferson(pi: ExtensionAPI): void {
       released = true;
       releaseModel();
       releaseThinking();
+      releaseTurn();
       store.dispose();
     };
     releasePrevious = release;
@@ -103,13 +112,13 @@ export default function jefferson(pi: ExtensionAPI): void {
       agentPath: join(getAgentDir(), "pi-jefferson.json"),
       projectPath: join(ctx.cwd, CONFIG_DIR_NAME, "pi-jefferson.json"),
       projectTrusted: ctx.isProjectTrusted(),
+      theme: ctx.ui.theme,
     });
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;
-    const footer = createFooter(rows, () => store.sample());
-
-    ctx.ui.setFooter((tui) => {
+    ctx.ui.setFooter((tui, theme) => {
+      const footer = createFooter(rows, () => store.sample(), theme);
       requestRepaint = () => tui.requestRender();
       return {
         render: (width: number) => footer.render(width),

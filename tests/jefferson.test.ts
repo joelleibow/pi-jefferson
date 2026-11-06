@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
+import { fakeTheme } from "./fake-theme.ts";
 
 /**
  * Tests live in `tests/`, never beside the extension.
@@ -45,6 +46,8 @@ interface FakeSession {
   footers: FakeFooter[];
   repaints: () => number;
   subscriptions: Subscription[];
+  host: { contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[] };
+  reads: { usage: number; sessionId: number; leafId: number; entries: number };
   lines(width: number): string[];
 }
 
@@ -56,6 +59,8 @@ interface SessionOptions {
   /** Absent for a session the host restored with no model. */
   model?: { provider: string; id: string };
   thinkingLevel?: string;
+  contextUsage?: ContextUsage;
+  entries?: SessionEntry[];
 }
 
 interface Harness {
@@ -102,6 +107,8 @@ function harness(): Harness {
         footers,
         repaints: () => repaints,
         subscriptions: [],
+        host: { contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null, entries: options.entries ?? [] },
+        reads: { usage: 0, sessionId: 0, leafId: 0, entries: 0 },
         lines(width: number) {
           return footers.at(-1)?.render(width) ?? [];
         },
@@ -111,16 +118,23 @@ function harness(): Harness {
         cwd,
         model: options.model,
         thinkingLevel: options.thinkingLevel,
+        getContextUsage: () => { session.reads.usage++; return session.host.contextUsage; },
+        sessionManager: {
+          getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
+          getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
+          getEntries: () => { session.reads.entries++; return session.host.entries; },
+        },
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
+          theme: fakeTheme(),
           notify: (message: string, type?: string) => void notified.push({ message, type }),
           // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
           // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
           // drifting from the host it stands in for.
-          setFooter: (factory: (tui: Pick<TUI, "requestRender">) => FakeFooter) => {
+          setFooter: (factory: (tui: Pick<TUI, "requestRender">, theme: Theme) => FakeFooter) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
-            footers.push(factory(tui));
+            footers.push(factory(tui, fakeTheme()));
           },
         },
       };
@@ -285,7 +299,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
 
   const renderer = await import("../extensions/jefferson/row-renderer.ts");
-  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter", "renderRow"]);
+  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
   assert.deepEqual(
@@ -295,7 +309,8 @@ test("the exported surface offers no way to supply or replace cell content", asy
 
   const instrument = await import("../extensions/jefferson/instrument.ts");
   const store = await import("../extensions/jefferson/session-data-store.ts");
-  for (const key of [...Object.keys(instrument), ...Object.keys(store)]) {
+  const format = await import("../extensions/jefferson/format.ts");
+  for (const key of [...Object.keys(instrument), ...Object.keys(store), ...Object.keys(format)]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),
       `${key} looks like a contribution interface`,
@@ -340,13 +355,13 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
   });
 }
 
-test("in TUI mode a session takes exactly the two selection subscriptions", async (t) => {
+test("in TUI mode a session takes exactly the three subscriptions it names", async (t) => {
   useTempAgentDir(t);
   const session = await harness().start();
   assert.deepEqual(
     session.subscriptions.map((subscription) => subscription.event),
-    ["model_select", "thinking_level_select"],
-    "the two pushed datums, and no branch subscription for the deferred one",
+    ["model_select", "thinking_level_select", "turn_end"],
+    "the two selections and the named turn boundary, with no other subscription",
   );
 });
 
@@ -420,13 +435,14 @@ test("a second session_start releases the first install before installing its ow
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1],
-    "each of the first install's two unsubscribes fired exactly once",
+    [1, 1, 1],
+    "each of the first install's three unsubscribes fired exactly once",
   );
   assert.deepEqual(h.log, [
     "setFooter#1",
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
+    "unsubscribe:turn_end",
     "setFooter#2",
   ]);
 
@@ -462,13 +478,14 @@ test("disposing a footer then replacing the session releases the first install o
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1],
+    [1, 1, 1],
     "each unsubscribe fired exactly once in total, across both callers",
   );
   assert.deepEqual(h.log, [
     "setFooter#1",
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
+    "unsubscribe:turn_end",
     "setFooter#2",
   ]);
 
@@ -481,4 +498,105 @@ test("disposing a footer then replacing the session releases the first install o
     " ".repeat(80),
     "the disposed footer resolves empty cells rather than the old values",
   );
+});
+
+test("configured formats, styles and a width-taking bar render end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { model: { format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { format: "$percent $bar", style: { fg: "accent" } } },
+    cells: [{ instrument: "model" }, { instrument: "context" }],
+  });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(stripTerminalSequences(line), "🧠: claude-opus-4 from anthropic".padEnd(40) + "43.2% " + "█".repeat(14) + "░".repeat(20));
+  assert.equal(visibleWidth(line), 80);
+  assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
+  assert.deepEqual(session.notified, []);
+});
+
+test("a rejected style warns with its exact envelope and installs the default footer", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, cells: [{ instrument: "model" }] });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
+  const lines = session.lines(80);
+  assert.equal(lines.length, 1);
+  assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));
+});
+
+test("a turn boundary after disposal repaints nothing and calls no captured reader", async (t) => {
+  useTempAgentDir(t);
+  const h = harness();
+  const session = await h.start();
+  session.footers[0]?.dispose?.();
+  const before = { ...session.reads };
+  h.dispatch({ type: "turn_end" });
+  assert.equal(session.repaints(), 0);
+  assert.deepEqual(session.reads, before);
+});
+
+function usageEntry(input: number, cost: number): SessionEntry {
+  return { type: "usage", usage: { input, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 999, cost: { total: cost } } } as SessionEntry;
+}
+
+test("a dispatched turn boundary repaints only changed totals and its scan is reused by the footer", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
+  const h = harness();
+  const session = await h.start();
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(40) + "$0.000".padEnd(40));
+  session.host.entries.push(usageEntry(212, 0.125));
+  session.host.leafId = "turn-1";
+  h.dispatch({ type: "turn_end" });
+  assert.equal(session.repaints(), 1);
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "212".padEnd(40) + "$0.125".padEnd(40));
+  assert.equal(session.reads.entries, 2, "the render reuses the boundary's scan");
+  session.host.entries.push(usageEntry(0, 0));
+  session.host.leafId = "turn-2";
+  h.dispatch({ type: "turn_end" });
+  h.dispatch({ type: "turn_end" });
+  assert.equal(session.repaints(), 1, "unchanged totals never repaint, including at a moved leaf");
+  assert.equal(session.reads.entries, 3);
+});
+
+test("an unchanged turn boundary before the first render leaves the install-time cache filled without repainting", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "tokens" }] });
+  const h = harness();
+  const session = await h.start();
+  h.dispatch({ type: "turn_end" });
+  assert.equal(session.repaints(), 0);
+  assert.equal(session.reads.entries, 1, "createFooter's initial sample filled the cache");
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(80));
+  assert.equal(session.reads.entries, 1);
+});
+
+for (const reason of ["new", "resume", "fork", "reload"]) {
+  test(`a ${reason} replacement drops the old cwd, model, totals and captured readers`, async (t) => {
+    const agentDir = useTempAgentDir(t);
+    writeAgentDocument(agentDir, {
+      instruments: { model: { format: "$model" }, thinking: { format: "$level" } },
+      cells: Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] })),
+    });
+    const root = mkdtempSync(join(tmpdir(), "jefferson-replacement-"));
+    const oldCwd = join(root, "old"), newCwd = join(root, "new");
+    mkdirSync(oldCwd); mkdirSync(newCwd);
+    const h = harness();
+    const first = await h.start({ cwd: oldCwd, model: { provider: "old-provider", id: "old-id" }, thinkingLevel: "high", entries: [usageEntry(17, 0.125)] });
+    assert.equal(stripTerminalSequences(first.lines(80)[0] ?? ""), ["old", "old-id", "17", "$0.125", "high"].map(text => text.padEnd(8)).join("").repeat(2));
+    const oldReads = { ...first.reads };
+    const second = await h.start({ reason, cwd: newCwd, model: { provider: "new-provider", id: "new-id" }, thinkingLevel: "low", entries: [usageEntry(212, 0.25)] });
+    assert.equal(stripTerminalSequences(second.lines(80)[0] ?? ""), ["new", "new-id", "212", "$0.250", "low"].map(text => text.padEnd(8)).join("").repeat(2));
+    assert.equal(stripTerminalSequences(first.footers[0]?.render(80)[0] ?? ""), " ".repeat(80));
+    assert.deepEqual(first.reads, oldReads, "nothing reads the old context again after release");
+    assert.equal(second.reads.entries, 1, "the new install owns a new scan");
+  });
+}
+
+test("a session without context usage renders its context cell empty", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "context" }] });
+  const session = await harness().start();
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), " ".repeat(80));
+  assert.deepEqual(session.notified, []);
 });

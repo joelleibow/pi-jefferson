@@ -4,24 +4,44 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import type { Configuration } from "../extensions/jefferson/configuration.ts";
+import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
+
+import { createFooter } from "../extensions/jefferson/row-renderer.ts";
+import type { Cell, Configuration } from "../extensions/jefferson/configuration.ts";
 import {
   DEFAULT_CELLS,
   MAX_CELLS,
   readConfiguration,
 } from "../extensions/jefferson/configuration.ts";
-import { blank, model, thinking } from "../extensions/jefferson/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
+import type { Readings } from "../extensions/jefferson/session-data-store.ts";
+import { fakeTheme } from "./fake-theme.ts";
+
+const seed: Readings = {
+  provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: "/a/pi-jefferson",
+  contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
+  totals: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0, cost: 0.123 },
+};
+
+function cellText(cell: Cell): string {
+  return cell.instrument.render(seed, 80, fakeTheme());
+}
 
 /** Write `document` as the agent file of a fresh temp dir and read the configuration. */
-function readDocument(document: unknown): Configuration {
+function readDocument(document: unknown, theme: Theme = fakeTheme()): Configuration & { path: string } {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
   const agentPath = join(dir, "pi-jefferson.json");
   writeFileSync(agentPath, typeof document === "string" ? document : JSON.stringify(document));
-  return readConfiguration({
-    agentPath,
-    projectPath: join(dir, "missing.json"),
-    projectTrusted: false,
-  });
+  return {
+    ...readConfiguration({
+      agentPath,
+      projectPath: join(dir, "missing.json"),
+      projectTrusted: false,
+      theme,
+    }),
+    path: agentPath,
+  };
 }
 
 test("a top-level row object normalizes to one row", () => {
@@ -57,6 +77,7 @@ test("an absent configuration yields the default row with no warning", () => {
     agentPath: join(dir, "missing-agent.json"),
     projectPath: join(dir, "missing-project.json"),
     projectTrusted: true,
+    theme: fakeTheme(),
   });
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.cells.length, 10);
@@ -88,7 +109,8 @@ test("a row omitting cells holds ten blank cells", () => {
   const cells = rows[0]?.cells ?? [];
   assert.equal(cells.length, DEFAULT_CELLS);
   for (const cell of cells) {
-    assert.equal(cell.instrument, blank, "the instrument itself, not merely equal text");
+    assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+    assert.equal(cell.instrument, cells[0]?.instrument, "one bound blank within this document");
   }
   assert.equal(warning, undefined);
 });
@@ -96,8 +118,8 @@ test("a row omitting cells holds ten blank cells", () => {
 test("cells is both the count and the placement, in order", () => {
   const { rows, warning } = readDocument({ rows: [{ cells: [{ instrument: "model" }, { instrument: "thinking" }, { instrument: "blank" }] }] });
   assert.deepEqual(
-    rows[0]?.cells.map((cell) => cell.instrument),
-    [model, thinking, blank],
+    rows[0]?.cells.map(cellText),
+    ["anthropic: claude-opus-4", "thinking: high", DEFAULT_CELL_TEXT],
   );
   assert.equal(warning, undefined);
 });
@@ -172,7 +194,7 @@ test("a cells list of strings is rejected with no converted read", () => {
 test("a cell that declares no align normalizes to left", () => {
   const noAlign = readDocument({ rows: [{ cells: [{ instrument: "model" }] }] });
   assert.equal(noAlign.warning, undefined);
-  assert.deepEqual(noAlign.rows[0]?.cells.map((cell) => cell.instrument), [model]);
+  assert.deepEqual(noAlign.rows[0]?.cells.map(cellText), ["anthropic: claude-opus-4"]);
   for (const cell of noAlign.rows[0]?.cells ?? []) {
     assert.equal(cell.align, "left");
   }
@@ -227,7 +249,10 @@ test("a document carrying containers is accepted and renders ten blank cells", (
   const { rows, warning } = readDocument({ containers: 3 });
   const cells = rows[0]?.cells ?? [];
   assert.equal(cells.length, DEFAULT_CELLS, "the key is not read, so the count does not move");
-  for (const cell of cells) assert.equal(cell.instrument, blank);
+  for (const cell of cells) {
+    assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+    assert.equal(cell.instrument, cells[0]?.instrument);
+  }
   assert.ok(warning, "the break is breaking, so it warns");
   assert.match(warning, /containers/);
   assert.match(warning, /declare cells instead/);
@@ -252,8 +277,8 @@ test("a document naming cells and no containers warns nothing extra", () => {
 test("an instrument the extension does not implement renders blank and warns naming it", () => {
   const { rows, warning } = readDocument({ rows: [{ cells: [{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }] }] });
   assert.deepEqual(
-    rows[0]?.cells.map((cell) => cell.instrument),
-    [model, blank, thinking],
+    rows[0]?.cells.map(cellText),
+    ["anthropic: claude-opus-4", DEFAULT_CELL_TEXT, "thinking: high"],
     "the unknown name renders blank while the rest of the row renders its instruments",
   );
   assert.ok(warning);
@@ -354,7 +379,7 @@ test("a trusted project document replaces the agent document whole", () => {
     JSON.stringify({ rows: [{ cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "blank" }] }] }),
   );
   writeFileSync(projectPath, JSON.stringify({ rows: [{}, {}] }));
-  const { rows } = readConfiguration({ agentPath, projectPath, projectTrusted: true });
+  const { rows } = readConfiguration({ agentPath, projectPath, projectTrusted: true, theme: fakeTheme() });
   assert.deepEqual(
     rows.map((row) => row.cells.length),
     [10, 10],
@@ -370,7 +395,7 @@ test("an untrusted project document is ignored", () => {
     JSON.stringify({ rows: [{ cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "blank" }] }] }),
   );
   writeFileSync(projectPath, JSON.stringify({ rows: [{}, {}] }));
-  const { rows } = readConfiguration({ agentPath, projectPath, projectTrusted: false });
+  const { rows } = readConfiguration({ agentPath, projectPath, projectTrusted: false, theme: fakeTheme() });
   assert.deepEqual(
     rows.map((row) => row.cells.length),
     [3],
@@ -388,6 +413,7 @@ test("with only the agent file present, its rows are used", () => {
     agentPath,
     projectPath: join(dir, "missing.json"),
     projectTrusted: true,
+    theme: fakeTheme(),
   });
   assert.deepEqual(
     rows.map((row) => row.cells.length),
@@ -402,7 +428,8 @@ test("every cell carries an instrument and an alignment", () => {
     assert.ok(Array.isArray(cells) && cells.length === count);
     for (const cell of cells ?? []) {
       assert.deepEqual(Object.keys(cell), ["instrument", "align"]);
-      assert.equal(cell.instrument, blank);
+      assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+      assert.equal(cell.instrument, cells[0]?.instrument);
       assert.equal(cell.align, "left");
     }
   }
@@ -435,4 +462,269 @@ test("containers beside a rows list warns once rather than passing silently", ()
   assert.ok(warning, "the key is not read, and its removal is not silent");
   assert.equal(warning.match(/containers/g)?.length, 1);
   assert.match(warning, /declare cells instead/);
+});
+
+test("the instruments section alone configures the default row", () => {
+  const configured = readDocument({ instruments: { blank: { format: "configured" } } });
+  assert.equal(configured.warning, undefined);
+  assert.equal(configured.rows[0]?.cells.length, 10);
+  assert.deepEqual(configured.rows[0]?.cells.map(cellText), Array<string>(10).fill("configured"));
+  const empty = readDocument({ instruments: {} });
+  assert.equal(empty.warning, undefined);
+  assert.deepEqual(empty.rows[0]?.cells.map(cellText), Array<string>(10).fill(DEFAULT_CELL_TEXT));
+});
+
+test("the instruments section sits beside either row envelope", () => {
+  for (const envelope of [{ cells: [{ instrument: "model" }] }, { rows: [{ cells: [{ instrument: "model" }] }] }]) {
+    const { rows, warning } = readDocument({ ...envelope, instruments: { model: { format: "configured $model" } } });
+    assert.equal(warning, undefined);
+    assert.deepEqual(rows[0]?.cells.map(cellText), ["configured claude-opus-4"]);
+  }
+});
+
+test("trusted project instruments replace the agent document whole and untrusted instruments are ignored", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
+  const agentPath = join(dir, "agent.json"), projectPath = join(dir, "project.json");
+  writeFileSync(agentPath, JSON.stringify({ instruments: { blank: { format: "agent" }, model: { format: "agent-model" } }, cells: [{ instrument: "blank" }, { instrument: "model" }] }));
+  writeFileSync(projectPath, JSON.stringify({ instruments: { blank: { format: "project" } }, cells: [{ instrument: "blank" }, { instrument: "model" }] }));
+  const trusted = readConfiguration({ agentPath, projectPath, projectTrusted: true, theme: fakeTheme() });
+  assert.deepEqual(trusted.rows[0]?.cells.map(cellText), ["project", "anthropic: claude-opus-4"]);
+  const untrusted = readConfiguration({ agentPath, projectPath, projectTrusted: false, theme: fakeTheme() });
+  assert.deepEqual(untrusted.rows[0]?.cells.map(cellText), ["agent", "agent-model"]);
+});
+
+test("a configured name binds once across cells and rows while unconfigured names keep defaults", () => {
+  const { rows, warning } = readDocument({
+    instruments: { model: { format: "🧠: $model from $provider" }, tokens: { format: "↑$input ↓$output" }, context: { format: "unused" } },
+    rows: [
+      { cells: [{ instrument: "model" }, { instrument: "model" }, { instrument: "thinking" }, { instrument: "tokens" }] },
+      { cells: [{ instrument: "model" }, { instrument: "tokens" }] },
+    ],
+  });
+  assert.equal(warning, undefined);
+  assert.deepEqual(rows.map(row => row.cells.map(cellText)), [
+    ["🧠: claude-opus-4 from anthropic", "🧠: claude-opus-4 from anthropic", "thinking: high", "↑1.0k ↓2.0k"],
+    ["🧠: claude-opus-4 from anthropic", "↑1.0k ↓2.0k"],
+  ]);
+  assert.equal(rows[0]?.cells[0]?.instrument, rows[0]?.cells[1]?.instrument);
+  assert.equal(rows[0]?.cells[0]?.instrument, rows[1]?.cells[0]?.instrument);
+  assert.equal(rows[0]?.cells[3]?.instrument, rows[1]?.cells[1]?.instrument);
+});
+
+test("unknown instrument names in the section and cells share one exact notice", () => {
+  const onlySection = readDocument({ instruments: { nope: {} }, cells: [{ instrument: "model" }] });
+  assert.equal(onlySection.warning, `pi-jefferson: ${onlySection.path} names instruments the extension does not implement: nope; those cells render blank`);
+  assert.deepEqual(onlySection.rows[0]?.cells.map(cellText), ["anthropic: claude-opus-4"]);
+  const both = readDocument({ instruments: { nope: {}, blank: { format: "configured blank" } }, cells: [{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }] });
+  assert.equal(both.warning, `pi-jefferson: ${both.path} names instruments the extension does not implement: nope; those cells render blank`);
+  assert.deepEqual(both.rows[0]?.cells.map(cellText), ["anthropic: claude-opus-4", "configured blank", "thinking: high"]);
+});
+
+test("containers and multiple unknown section names retain the accepted-notice order", () => {
+  const result = readDocument({ containers: 3, instruments: { nope: {}, other: {} } });
+  assert.equal(result.warning, `pi-jefferson: ${result.path} carries the containers key, which is no longer read; declare cells instead; names instruments the extension does not implement: nope, other; those cells render blank`);
+  assert.equal(result.rows[0]?.cells.length, 10);
+});
+
+function rejected(document: unknown, message: string): void {
+  let result!: ReturnType<typeof readDocument>;
+  assert.doesNotThrow(() => { result = readDocument(document); }, `reject with ${message}, not an uncaught exception`);
+  assert.equal(result.warning, `pi-jefferson: ${result.path} was rejected (${message}); rendering the default row`);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0]?.cells.length, 10);
+  assert.deepEqual(result.rows[0]?.cells.map(cellText), Array<string>(10).fill(DEFAULT_CELL_TEXT));
+}
+
+test("the instruments section shape guard rejects non-objects with the exact message", () => {
+  for (const instruments of [null, [], 42, "model"]) {
+    rejected({ instruments, cells: [{ instrument: "model" }] }, "the instruments value is not an object");
+  }
+});
+
+test("the instrument entry shape guard rejects non-objects even without a holding cell", () => {
+  for (const entry of [null, [], 42, "format"]) {
+    rejected({ instruments: { model: entry } }, 'the instruments configuration for "model" is not an object');
+  }
+});
+
+test("the declaration option-key guard names misspellings and the declined width option", () => {
+  for (const key of ["frmát", "width"]) {
+    rejected({ instruments: { model: { [key]: 4 } } }, `instrument "model" carries an option its declaration does not have: ${JSON.stringify(key)}`);
+  }
+});
+
+test("the format type guard rejects present non-strings including null", () => {
+  for (const format of [42, null, true, {}]) {
+    rejected({ instruments: { model: { format } } }, 'instrument "model" has a format that is not a string');
+  }
+});
+
+test("an explicitly empty configured format is accepted and renders nothing", () => {
+  const result = readDocument({ instruments: { model: { format: "" } }, cells: [{ instrument: "model" }] });
+  assert.equal(result.warning, undefined);
+  assert.deepEqual(result.rows[0]?.cells.map(cellText), [""]);
+});
+
+test("the document surfaces the unknown-variable guard's full message", () => {
+  rejected({ instruments: { model: { format: "$nope" } } }, '"model"\'s format names a variable it does not declare: "$nope"');
+});
+
+test("the document surfaces the second-width-taker guard's full message", () => {
+  rejected({ instruments: { context: { format: "$bar $bar" } } }, '"context"\'s format names a second width-taking variable: "$bar"');
+});
+
+test("the style shape guard rejects a non-object with the full composed message", () => {
+  for (const style of [null, [], 42, "bold"]) {
+    rejected({ instruments: { model: { style } } }, 'instrument "model" has a style that is not an object');
+  }
+});
+
+test("the style-key guard rejects unknown keys with the full composed message", () => {
+  rejected({ instruments: { model: { style: { colour: "red" } } } }, 'instrument "model" has a style key that pi\'s ThemeStyle does not have: "colour"');
+});
+
+test("the style-key guard rejects inherited-name own keys including JSON proto keys", () => {
+  for (const key of ["constructor", "toString", "__proto__"]) {
+    rejected(`{"instruments":{"model":{"style":{${JSON.stringify(key)}:true}}}}`, `instrument "model" has a style key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
+  }
+});
+
+test("the style attribute guard rejects non-booleans for all six attributes", () => {
+  for (const key of ["bold", "dim", "italic", "underline", "inverse", "strikethrough"]) {
+    rejected({ instruments: { model: { style: { [key]: "true" } } } }, `instrument "model" has a style attribute that is not a boolean: ${JSON.stringify(key)}`);
+  }
+});
+
+test("the foreground value guard reports rejected types, wrong slots, colors and indices", () => {
+  for (const fg of ["nope", "selectedBg", "", {}, true, null, 256, ["#bf5700"]]) {
+    rejected({ instruments: { model: { style: { fg } } } }, `instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: ${JSON.stringify(fg)}`);
+  }
+});
+
+test("the background value guard reports rejected colors, wrong slots and fractional indices", () => {
+  for (const bg of ["nope", "accent", 1.5, ["#bf5700"]]) {
+    rejected({ instruments: { model: { style: { bg } } } }, `instrument "model" has a bg that is neither a background-slot theme token nor a color pi's parser accepts: ${JSON.stringify(bg)}`);
+  }
+});
+
+test("all six attributes accept boolean values and empty styles preserve unstyled bytes", () => {
+  const style = { bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true };
+  const result = readDocument({ instruments: { model: { format: "$model", style } }, cells: [{ instrument: "model" }] });
+  assert.equal(result.warning, undefined);
+  assert.deepEqual(result.rows[0]?.cells.map(cellText), [fakeTheme().style("claude-opus-4", style)]);
+  const falseAttributes = Object.fromEntries(Object.keys(style).map(key => [key, false]));
+  const disabled = readDocument({ instruments: { model: { format: "$model", style: falseAttributes } }, cells: [{ instrument: "model" }] });
+  assert.equal(disabled.warning, undefined);
+  assert.deepEqual(disabled.rows[0]?.cells.map(cellText), ["claude-opus-4"]);
+  const empty = readDocument({ instruments: { model: { style: {} } }, cells: [{ instrument: "model" }] });
+  const absent = readDocument({ cells: [{ instrument: "model" }] });
+  assert.equal(empty.warning, undefined);
+  assert.deepEqual(empty.rows[0]?.cells.map(cellText), absent.rows[0]?.cells.map(cellText));
+});
+
+test("error precedence reads the envelope before instruments and instruments before cells", () => {
+  rejected({ instruments: { model: { format: 42 } }, cells: [{ instrument: "model", align: "middle" }] }, 'instrument "model" has a format that is not a string');
+  rejected({ instruments: 42, rows: [{}], cells: [{ instrument: "model" }] }, "the configuration carries both a top-level row and a rows list");
+  rejected({ instruments: { model: { format: 42 } }, rows: [{ cells: [{ instrument: "model", align: "middle" }] }] }, 'instrument "model" has a format that is not a string');
+});
+
+const FRAME = "\x1b[0m\x1b]8;;\x07";
+const RESET = "\x1b[0m";
+
+function footerFor(document: unknown, theme: Theme = fakeTheme()) {
+  const result = readDocument(document, theme);
+  assert.equal(result.warning, undefined);
+  return createFooter(result.rows, () => seed, theme);
+}
+
+test("configured styled cells reset before every trailing pad, including attribute-only styles", () => {
+  const theme = fakeTheme();
+  for (const style of [{ fg: "accent" }, { bold: true }, { strikethrough: true }] as const) {
+    const footer = footerFor({ instruments: { blank: { format: "ab", style } }, cells: Array.from({ length: 3 }, () => ({ instrument: "blank" })) }, theme);
+    const line = footer.render(20)[0] ?? "";
+    assert.equal(visibleWidth(line), 20);
+    const styled = theme.style("ab", style);
+    const settings = styled.match(/\x1b\[[0-9;]*m/g) ?? [];
+    const cells = line.split(FRAME).slice(1, 4);
+    assert.equal(cells.length, 3);
+    for (const [index, cell] of cells.entries()) {
+      assert.equal(cell, styled + RESET + " ".repeat(index === 2 ? 4 : 5));
+      assert.equal(cell.match(/\x1b\[[0-9;]*m/g)?.length, settings.length + 1, "only the style's SGR and our pad reset");
+      assert.equal(cell.match(/\x1b\[0m/g)?.length, 1, "one reset immediately before the pad");
+    }
+  }
+});
+
+test("right-aligned styled cells lead with unstyled pad and exact-fill cells add no reset", () => {
+  const theme = fakeTheme();
+  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, cells: [{ instrument: "blank", align: "right" }] }, theme);
+  for (const width of [7, 2]) {
+    const line = footer.render(width)[0] ?? "";
+    const cell = line.split(FRAME)[1] ?? "";
+    assert.equal(stripTerminalSequences(cell), " ".repeat(width - 2) + "ab");
+    assert.ok(cell.startsWith(" ".repeat(width - 2) + theme.getFgAnsi("accent")));
+    assert.equal(cell.match(/\x1b\[0m/g)?.length ?? 0, 0, "no trailing pad means no reset of ours");
+    assert.equal((cell.match(/\x1b\[[0-9;]*m/g) ?? []).filter(sgr => sgr === theme.getFgAnsi("accent")).length, 1);
+  }
+});
+
+test("styled clips retain the clip's own resets around ellipsis before a wide-glyph pad", () => {
+  const theme = fakeTheme();
+  const footer = footerFor({ instruments: { blank: { format: "ab漢字cd", style: { fg: "accent" } } }, cells: Array.from({ length: 3 }, () => ({ instrument: "blank" })) }, theme);
+  const line = footer.render(20)[0] ?? "";
+  assert.equal(visibleWidth(line), 20);
+  const third = line.split(FRAME)[3] ?? "";
+  assert.equal(third, theme.getFgAnsi("accent") + "ab" + RESET + "..." + RESET + " ");
+  assert.equal(third.match(/\x1b\[0m/g)?.length, 2);
+});
+
+test("configured prose around a bar is styled per segment and the dim track retains its background", () => {
+  const theme = fakeTheme();
+  const style: ThemeStyle = { fg: "accent", bg: "selectedBg" };
+  const footer = footerFor({ instruments: { context: { format: "[$bar]", style } }, cells: [{ instrument: "context" }] }, theme);
+  const line = footer.render(12)[0] ?? "";
+  const cell = line.split(FRAME)[1] ?? "";
+  const filled = theme.style("█".repeat(4), style);
+  const empty = theme.style("░".repeat(6), { ...style, dim: true });
+  assert.equal(stripTerminalSequences(cell), "[" + "█".repeat(4) + "░".repeat(6) + "]");
+  assert.ok(cell.startsWith(theme.style("[", style) + filled + empty));
+  const sgr = cell.match(/\x1b\[[0-9;]*m/g) ?? [];
+  assert.equal(sgr.filter(code => code === theme.getFgAnsi("accent")).length, 4, "both literals and both track portions carry their own style");
+  assert.equal(sgr.filter(code => code === theme.getBgAnsi("selectedBg")).length, 4, "the dim track keeps the configured background");
+  assert.equal(sgr.filter(code => code === "\x1b[2m").length, 1);
+});
+
+test("empty configured styles are byte-identical to absent styles through the footer", () => {
+  const cells = [{ instrument: "blank" }, { instrument: "blank" }];
+  const absent = footerFor({ instruments: { blank: { format: "ab" } }, cells }).render(21);
+  const empty = footerFor({ instruments: { blank: { format: "ab", style: {} } }, cells }).render(21);
+  assert.deepEqual(empty, absent);
+  assert.equal(absent[0], FRAME + "ab".padEnd(11) + FRAME + "ab".padEnd(10) + FRAME);
+});
+
+test("theme invalidation re-styles the same footer with no bytes cached from the old theme", () => {
+  const a = fakeTheme(), b = fakeTheme({ accent: "\x1b[35m" });
+  let current = a;
+  let styles = 0;
+  const live = new Proxy(a, { get(_target, key) {
+    if (key === "style") return (text: string, style: ThemeStyle) => { styles++; return current.style(text, style); };
+    return Reflect.get(current, key);
+  } });
+  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, cells: [{ instrument: "blank" }] }, live);
+  const first = footer.render(10)[0] ?? "";
+  assert.equal(first, FRAME + a.style("ab", { fg: "accent" }) + RESET + " ".repeat(8) + FRAME);
+  assert.equal(styles, 1);
+  current = b;
+  footer.invalidate();
+  footer.invalidate();
+  const second = footer.render(10)[0] ?? "";
+  assert.equal(second, FRAME + b.style("ab", { fg: "accent" }) + RESET + " ".repeat(8) + FRAME);
+  assert.equal(second.includes(a.getFgAnsi("accent")), false);
+  assert.equal(styles, 2);
+  const resized = footer.render(20)[0] ?? "";
+  assert.equal(resized, FRAME + b.style("ab", { fg: "accent" }) + RESET + " ".repeat(18) + FRAME);
+  assert.equal(styles, 3);
+  footer.invalidate();
+  assert.equal(footer.render(20)[0], resized);
+  assert.equal(styles, 4, "even invalidation without a theme change re-resolves");
 });
