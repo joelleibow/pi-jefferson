@@ -254,3 +254,892 @@ typecheck_exit=0
 ℹ duration_ms 464.759417
 test_exit=0
 ```
+
+## Group 7 — final verification before the mutation sweep
+
+7.1: conductor confirmed the no-output claim means no compiler diagnostics, not suppressing pnpm's command echo. Raw result, with streams captured separately:
+
+```text
+typecheck_exit=0
+stdout_bytes=0
+stderr_bytes=15
+stdout: <empty>
+stderr: $ tsc --noEmit\n
+```
+
+7.2 raw result:
+
+```text
+stderr: $ node --test\n
+ℹ tests 196
+ℹ suites 0
+ℹ pass 196
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 342.096375
+test_exit=0
+```
+
+7.3 raw result:
+
+```text
+Change 'configurable-instruments' is valid
+validate_exit=0
+stderr: <empty>
+```
+
+7.4 raw `git diff ca9db67 --stat` (approved branch base used so committed task groups are included, not just the unstaged ledger; .openspec.yaml is the conductor-owned metadata already accounted for):
+
+```text
+ AGENTS.md                                          |   8 +-
+ ARCHITECTURE.md                                    |  53 ++--
+ README.md                                          |  11 +-
+ docs/adr/0002-rows-span-the-full-width.md          |  34 +++
+ extensions/jefferson.ts                            |  19 +-
+ extensions/jefferson/configuration.ts              | 109 +++++--
+ extensions/jefferson/format.ts                     | 134 +++++++++
+ extensions/jefferson/instrument.ts                 | 130 +++++---
+ extensions/jefferson/row-renderer.ts               | 126 +++-----
+ extensions/jefferson/session-data-store.ts         |  93 ++++--
+ .../configurable-instruments/.openspec.yaml        |   2 +-
+ .../implementation-evidence.md                     | 256 ++++++++++++++++
+ openspec/changes/configurable-instruments/tasks.md | 137 +++++----
+ tests/configuration.test.ts                        | 328 +++++++++++++++++++--
+ tests/fake-theme.ts                                |  28 ++
+ tests/format.test.ts                               | 203 +++++++++++++
+ tests/instrument.test.ts                           | 257 +++++++++++-----
+ tests/jefferson.test.ts                            | 142 ++++++++-
+ tests/row-renderer.test.ts                         | 204 ++++++++-----
+ tests/session-data-store.test.ts                   | 211 +++++++++++--
+ 20 files changed, 2027 insertions(+), 458 deletions(-)
+```
+
+The explicit allowed-map assertion passed for all 20 paths. The forbidden-path diff is empty for package.json, pnpm-lock.yaml, pnpm-workspace.yaml, tsconfig.json, .github/ and openspec/specs/. Full reread of all six changed source files found no implementation blocker. The pending gate owns final review; no merge is authorized.
+
+### 7.5 — final mutation sweep (last behavior-changing work)
+
+All 54 mutations were run one at a time after the implementation/docs and 7.1–7.4 checks, then restored in a finally block before the next edit. This repeats the earlier assertion demonstrations as well as every task-named guard, lookup, geometry, memo, reset, collapse, scan, key, compiler and repaint mutation. All 53 runtime edits failed at assertions; the compiler edit failed with TS2741. No survivor and no source/test diff remained afterward.
+
+Notable exact discriminators:
+
+- Dropping sample from the memo key failed **the second-render assertion**, not the within-render half: actual `[30, 30, 30, 10, 10, 10]`, expected `[30, 30, 30, 10, 10, 10, 30]` at tests/row-renderer.test.ts:357. This is the required 2.3 discriminator against the once-built tree.
+- Removing basis failed both 2.1(b)/(c). Conductor confirmed the distinction: the allocator-only minimal-component example still yields 13,11,… shares, whereas these cells pad their measured output to full row width. Here the mutation's visible bytes were `"Lorem ipsu" + " ".repeat(70)` at 80 and `"x" + " ".repeat(131)` at 132: the first cell fills the viewport. Code/tests remained unchanged; the actual failure shape, not a fabricated skew, is recorded.
+- The lying-totalTokens edit returned input 2775 instead of 118 in the all-five-field totals assertion; each of the four scan categories was also removed separately and caught.
+- Unconditional boundary repaint passed the first changed-total check but failed the unchanged-total check: actual 3 repaints, expected 1.
+- Deleting underline produced exactly the required type linkage failure (raw output below).
+
+| ID | Temporary edit | Catching test(s) | Exit / restoration |
+|---|---|---|---|
+| 7-01 | escape loses its literal-dollar meaning | an escaped dollar is literal text, not a variable | 1; restored |
+| 7-02 | brackets become groups | brackets and parentheses are literal text rather than groups | 1; restored |
+| 7-03 | Markdown markers are stripped | Markdown characters in formats and values remain literal | 1; restored |
+| 7-04 | variable name stops early | variable names consume the maximal alphanumeric and underscore run | 1; restored |
+| 7-05 | empty format gains a segment | an empty format has no segments and renders empty text | 1; restored |
+| 7-06 | trailing backslash discarded | a trailing backslash is literal | 1; restored |
+| 7-07 | resolve only named variables | unknown suppresses the whole model declaration even under a model-only format | 1; restored |
+| 7-08 | compact band moved to host cutoff | compact counts follow the ratified decimal band rather than the host's 10000 cutoff | 1; restored |
+| 7-09 | null tokens become zero | context distinguishes known estimates, null estimates, absent usage and real zero | 1; restored |
+| 7-10 | null percent becomes zero | context distinguishes known estimates, null estimates, absent usage and real zero | 1; restored |
+| 7-11 | path returns whole cwd | path renders only the basename including trailing-separator and root boundaries | 1; restored |
+| 7-12 | token sum drops cache categories | token variables use the four totals fields and cost uses the same totals | 1; restored |
+| 7-13 | cost precision changes | percent and cost variables arrive already formatted without a subscription annotation | 1; restored |
+| 7-14 | bar ignores prose width | bar takes the fourteen columns left by six columns of prose | 1; restored |
+| 7-15 | bar refuses to shrink to zero | a bar with no room contributes no track or escapes and leaves prose for the cell to clip | 1; restored |
+| 7-16 | style wraps the whole format | bar placement styles each prose segment so trailing prose keeps its configured style | 1; restored |
+| 7-17 | warning threshold becomes inclusive | bar thresholds replace only foreground above seventy and ninety | 1; restored |
+| 7-18 | error threshold becomes inclusive | bar thresholds replace only foreground above seventy and ninety | 1; restored |
+| 7-19 | dim track loses configured background | bar thresholds replace only foreground above seventy and ninety | 1; restored |
+| 7-20 | null estimate fills the track | a null estimate draws an entirely dim track beside the unknown estimate | 1; restored |
+| 7-21 | fill rounds instead of floors | bar-only formats fill their cell with clamped and floored pressure | 1; restored |
+| 7-22 | store disposal omitted from release | a new replacement drops the old cwd, model, totals and captured readers<br>a resume replacement drops the old cwd, model, totals and captured readers<br>a fork replacement drops the old cwd, model, totals and captured readers<br>a reload replacement drops the old cwd, model, totals and captured readers | 1; restored |
+| 7-23 | footer invalidation cascade removed | invalidation drops cell memos and keeps the footer's three lines | 1; restored |
+| 7-24 | section shape guard disabled | the instruments section shape guard rejects non-objects with the exact message | 1; restored |
+| 7-25 | entry shape guard disabled | the instrument entry shape guard rejects non-objects even without a holding cell | 1; restored |
+| 7-26 | option-key guard disabled | the declaration option-key guard names misspellings and the declined width option | 1; restored |
+| 7-27 | format type guard disabled | the format type guard rejects present non-strings including null | 1; restored |
+| 7-28 | unknown-variable rejection disabled | the document surfaces the unknown-variable guard's full message<br>an unknown variable rejects naming the instrument and variable | 1; restored |
+| 7-29 | second-width-taker rejection disabled | the document surfaces the second-width-taker guard's full message<br>a second bar rejects naming the second width-taking variable | 1; restored |
+| 7-30 | style shape guard disabled | the style shape guard rejects a non-object with the full composed message | 1; restored |
+| 7-31 | style key guard disabled | the style-key guard rejects unknown keys with the full composed message | 1; restored |
+| 7-32 | attribute type guard disabled | the style attribute guard rejects non-booleans for all six attributes | 1; restored |
+| 7-33 | foreground parser rejection swallowed | the foreground value guard reports rejected types, wrong slots, colors and indices | 1; restored |
+| 7-34 | background parser rejection swallowed | the background value guard reports rejected colors, wrong slots and fractional indices | 1; restored |
+| 7-35 | bare-dollar guard removed | a bare dollar rejects with the literal-dollar escape in the message | 1; restored |
+| 7-36 | undeclared bar allowed | bar is rejected when the declaration has no width-taking variable | 1; restored |
+| 7-37 | variable lookup accepts inherited members | inherited object properties are unknown format variables | 1; restored |
+| 7-38 | instrument lookup accepts inherited members | unimplemented and inherited names stay unresolved however often asked | 1; restored |
+| 7-39 | style key own-property check replaced by inherited lookup | the style-key guard rejects inherited-name own keys including JSON proto keys | 1; restored |
+| 7-40 | grow set to zero | a width that does not divide evenly spends the remainder on the row's earliest cells<br>the default row of ten cells at 132 spans all 132 columns | 1; restored |
+| 7-41 | basis removed while grow remains one | a width that divides evenly gives every cell the same columns<br>the default row of ten cells at 132 spans all 132 columns | 1; restored |
+| 7-42 | sample identity dropped from memo key | an instrument resolves once per (sample, width) within a render, and again in the next render | 1; restored |
+| 7-43 | cell tree rebuilt every render | the built-once tree keeps its cell memo when two renders share sample and width | 1; restored |
+| 7-44 | RESET before trailing pad deleted | configured styled cells reset before every trailing pad, including attribute-only styles | 1; restored |
+| 7-45 | collapse moved after styling | collapse runs before styling so data ESC becomes a space and the cell's SGR survives | 1; restored |
+| 7-46 | collapse runs instead of characters | control characters collapse per character in literals and substituted values<br>formats and data carrying controls keep three clipped footer rows at one line each | 1; restored |
+| 7-47 | scan reads lying usage.totalTokens instead of input | totals scan the whole getEntries array across all four host categories, never totalTokens | 1; restored |
+| 7-48 | usage entries dropped from scan | totals scan the whole getEntries array across all four host categories, never totalTokens | 1; restored |
+| 7-49 | assistant messages dropped from scan | totals scan the whole getEntries array across all four host categories, never totalTokens | 1; restored |
+| 7-50 | toolResult messages dropped from scan | totals scan the whole getEntries array across all four host categories, never totalTokens | 1; restored |
+| 7-51 | compaction and branch-summary category dropped from scan | totals scan the whole getEntries array across all four host categories, never totalTokens<br>a branch summary counts like a compaction and unrelated messages contribute nothing | 1; restored |
+| 7-52 | scan keyed on turn_end instead of leaf moves | a moved leafId scans again without a turn boundary<br>a null leaf is a cache key and moving away then back is two moves | 1; restored |
+| 7-53 | underline deleted from runtime ThemeStyle keys | pnpm typecheck: missing underline (TS2741) | 1; restored |
+| 7-54 | every turn boundary repaints without comparing totals | a dispatched turn boundary repaints only changed totals and its scan is reused by the footer | 1; restored |
+
+<details>
+<summary>Exact temporary edits and reproducible commands</summary>
+
+```json
+[
+  {
+    "id": "7-01",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "literal += \"$\";",
+        "after": "literal += \"\\\\$\";"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"escaped dollar\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-02",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "literal += character;",
+        "after": "literal += /[\\[\\]()]/.test(character) ? \"\" : character;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"brackets and parentheses\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-03",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "return text.replace(",
+        "after": "return text.replaceAll(\"**\", \"\").replace("
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"Markdown characters\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-04",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "/^[A-Za-z0-9_]+/",
+        "after": "/^[A-Za-z0-9_]+?/"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"maximal alphanumeric\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-05",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "  flush();\n  return segments;",
+        "after": "  flush();\n  if (format === \"\") segments.push({ kind: \"literal\", text: \"\" });\n  return segments;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"empty format has no segments\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-06",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "literal += character;",
+        "after": "literal += character === \"\\\\\" ? \"\" : character;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"trailing backslash\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-07",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "Object.entries(declaration.variables)",
+        "after": "Object.entries(declaration.variables).filter(([name]) => segments.some(segment => segment.kind === \"variable\" && segment.name === name))"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"unknown suppresses the whole\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-08",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "const DECIMAL_THOUSANDS_LIMIT = 100_000;",
+        "after": "const DECIMAL_THOUSANDS_LIMIT = 10_000;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"compact counts follow\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-09",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "usage.tokens === null ? \"?\"",
+        "after": "usage.tokens === null ? \"0\""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"context distinguishes\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-10",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "usage.percent === null ? \"?\"",
+        "after": "usage.percent === null ? \"0.0%\""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"context distinguishes\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-11",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "basename(r.cwd)",
+        "after": "r.cwd"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"path renders only\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-12",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "totals.input + totals.output + totals.cacheRead + totals.cacheWrite",
+        "after": "totals.input + totals.output"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"token variables use\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-13",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "totals.cost.toFixed(3)",
+        "after": "totals.cost.toFixed(2)"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"percent and cost variables\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-14",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "width - nonBar",
+        "after": "width"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"fourteen columns left\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-15",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "Math.max(0, width - nonBar)",
+        "after": "Math.max(1, width - nonBar)"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar with no room\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-16",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "return segments.map((segment, index) => segment.kind === \"bar\" ? bar : styledPiece(pieces[index]!, style, theme)).join(\"\");",
+        "after": "return styledPiece(segments.map((segment, index) => segment.kind === \"bar\" ? bar : pieces[index]!).join(\"\"), style, theme);"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar placement styles\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-17",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "percent > WARNING_PERCENT",
+        "after": "percent >= WARNING_PERCENT"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar thresholds\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-18",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "percent > ERROR_PERCENT",
+        "after": "percent >= ERROR_PERCENT"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar thresholds\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-19",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "{ ...style, dim: true }",
+        "after": "{ dim: true }"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar thresholds\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-20",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "percent === null ? 0 :",
+        "after": "percent === null ? barWidth :"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"null estimate draws\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-21",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "Math.floor((percent / 100) * barWidth)",
+        "after": "Math.round((percent / 100) * barWidth)"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar-only formats\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-22",
+    "path": "extensions/jefferson.ts",
+    "edit": [
+      {
+        "before": "      store.dispose();\n",
+        "after": ""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"replacement drops the old\" tests/jefferson.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-23",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "    invalidate() {\n      for (const { components } of rowViews) {\n        for (const component of components) component.invalidate();\n      }\n    },",
+        "after": "    invalidate() {},"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"invalidation drops cell memos\" tests/row-renderer.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-24",
+    "path": "extensions/jefferson/configuration.ts",
+    "edit": [
+      {
+        "before": "  if (raw === undefined) return configured;\n  if (typeof raw !== \"object\" || raw === null || Array.isArray(raw)) {",
+        "after": "  if (raw === undefined) return configured;\n  if (false && (typeof raw !== \"object\" || raw === null || Array.isArray(raw))) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"section shape guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-25",
+    "path": "extensions/jefferson/configuration.ts",
+    "edit": [
+      {
+        "before": "if (typeof value !== \"object\" || value === null || Array.isArray(value)) {",
+        "after": "if (false && (typeof value !== \"object\" || value === null || Array.isArray(value))) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"entry shape guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-26",
+    "path": "extensions/jefferson/configuration.ts",
+    "edit": [
+      {
+        "before": "if (!declaration.options.includes(key)) {",
+        "after": "if (false && !declaration.options.includes(key)) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"option-key guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-27",
+    "path": "extensions/jefferson/configuration.ts",
+    "edit": [
+      {
+        "before": "if (format !== undefined && typeof format !== \"string\") {",
+        "after": "if (false && format !== undefined && typeof format !== \"string\") {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"format type guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-28",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "if (!declared) {",
+        "after": "if (false && !declared) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"document surfaces the unknown-variable|unknown variable rejects\" tests/configuration.test.ts tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-29",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "if (hasBar) throw",
+        "after": "if (false && hasBar) throw"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"document surfaces the second-width|second bar rejects\" tests/configuration.test.ts tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-30",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "if (typeof raw !== \"object\" || raw === null || Array.isArray(raw)) {",
+        "after": "if (false && (typeof raw !== \"object\" || raw === null || Array.isArray(raw))) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"style shape guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-31",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "if (!Object.hasOwn(STYLE_KEYS, key)) {",
+        "after": "if (false && !Object.hasOwn(STYLE_KEYS, key)) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"style-key guard rejects unknown\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-32",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "if (typeof value !== \"boolean\") {",
+        "after": "if (false && typeof value !== \"boolean\") {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"style attribute guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-33",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "      } catch {\n        throw new Error(message);",
+        "after": "      } catch {\n        if (key !== \"fg\") throw new Error(message);"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"foreground value guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-34",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "      } catch {\n        throw new Error(message);",
+        "after": "      } catch {\n        if (key !== \"bg\") throw new Error(message);"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"background value guard\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-35",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "throw new Error(`${JSON.stringify(declaration.name)}'s format has a bare $; escape a literal dollar as \\\\$`);",
+        "after": "literal += \"$\"; continue;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bare dollar rejects\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-36",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "name === \"bar\" ? declaration.bar !== undefined",
+        "after": "name === \"bar\" ? true"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"bar is rejected when\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-37",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "Object.hasOwn(declaration.variables, name)",
+        "after": "name in declaration.variables"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"inherited object properties\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-38",
+    "path": "extensions/jefferson/instrument.ts",
+    "edit": [
+      {
+        "before": "return Object.hasOwn(SHIPPED, name) ? SHIPPED[name] : undefined;",
+        "after": "return SHIPPED[name];"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"unimplemented and inherited\" tests/instrument.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-39",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "Object.hasOwn(STYLE_KEYS, key)",
+        "after": "key in STYLE_KEYS"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"style-key guard rejects inherited-name\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-40",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "grow: 1, shrink: 0",
+        "after": "grow: 0, shrink: 0"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"spends the remainder|132 spans\" tests/row-renderer.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-41",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "basis: Math.floor(width / components.length), ",
+        "after": ""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"width that divides evenly|132 spans\" tests/row-renderer.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-42",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "cached?.sample !== current || cached?.width !== cellWidth",
+        "after": "cached?.width !== cellWidth"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"an instrument resolves once per\" tests/row-renderer.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-43",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "  const rowViews = rows.map((row) => ({",
+        "after": "  let rowViews = rows.map((row) => ({"
+      },
+      {
+        "before": "  const tree = new VStack(rowViews.map(({ stack }) => stack), { gap: 0 });",
+        "after": "  let tree = new VStack(rowViews.map(({ stack }) => stack), { gap: 0 });"
+      },
+      {
+        "before": "      current = sampleReadings();\n      if (width !== lastWidth) {",
+        "after": "      current = sampleReadings();\n      rowViews = rows.map(row => ({ components: row.cells.map(cellView), stack: new HStack([], { gap: GAP }) }));\n      tree = new VStack(rowViews.map(({ stack }) => stack), { gap: 0 });\n      lastWidth = undefined;\n      if (width !== lastWidth) {"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"built-once tree keeps its cell memo\" tests/row-renderer.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-44",
+    "path": "extensions/jefferson/row-renderer.ts",
+    "edit": [
+      {
+        "before": "(leavesStyleOpen(clipped) ? RESET : \"\") + ",
+        "after": ""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"configured styled cells reset\" tests/configuration.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-45",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "values.set(name, collapse(value));",
+        "after": "values.set(name, value);"
+      },
+      {
+        "before": "return Object.keys(style).length === 0 ? text : theme.style(text, style);",
+        "after": "return collapse(Object.keys(style).length === 0 ? text : theme.style(text, style));"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"collapse runs before styling\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-46",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "/[\\u0000-\\u001F\\u007F-\\u009F]/g",
+        "after": "/[\\u0000-\\u001F\\u007F-\\u009F]+/g"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"control characters collapse|formats and data carrying\" tests/format.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-47",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "totals.input += usage.input;",
+        "after": "totals.input += usage.totalTokens;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"totals scan the whole\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-48",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "entry.type === \"usage\"",
+        "after": "false"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"totals scan the whole\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-49",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "entry.message.role === \"assistant\" || entry.message.role === \"toolResult\"",
+        "after": "entry.message.role === \"toolResult\""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"totals scan the whole\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-50",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "entry.message.role === \"assistant\" || entry.message.role === \"toolResult\"",
+        "after": "entry.message.role === \"assistant\""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"totals scan the whole\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-51",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "entry.type === \"compaction\" || entry.type === \"branch_summary\"",
+        "after": "false"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"totals scan the whole|branch summary counts\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-52",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "scanCache?.sessionId !== sessionId || scanCache?.leafId !== leafId",
+        "after": "scanCache?.sessionId !== sessionId"
+      },
+      {
+        "before": "      const previous = scanCache?.totals;\n      const current = this.sample().totals;",
+        "after": "      const previous = scanCache?.totals;\n      scanCache = undefined;\n      const current = this.sample().totals;"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"moved leafId|two moves\" tests/session-data-store.test.ts",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-53",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "underline: true, ",
+        "after": ""
+      }
+    ],
+    "command": "direnv exec . pnpm typecheck",
+    "exit": 1,
+    "restored": true
+  },
+  {
+    "id": "7-54",
+    "path": "extensions/jefferson/session-data-store.ts",
+    "edit": [
+      {
+        "before": "if (previous !== undefined && current !== undefined && (\n        previous.input !== current.input || previous.output !== current.output ||\n        previous.cacheRead !== current.cacheRead || previous.cacheWrite !== current.cacheWrite ||\n        previous.cost !== current.cost\n      )) requestRender();",
+        "after": "if (previous !== undefined && current !== undefined) requestRender();"
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"dispatched turn boundary repaints only\" tests/jefferson.test.ts",
+    "exit": 1,
+    "restored": true
+  }
+]
+```
+</details>
+
+Raw compiler mutation output:
+
+```text
+extensions/jefferson/format.ts(62,3): error TS2741: Property 'underline' is missing in type '{ fg: true; bg: true; bold: true; dim: true; italic: true; inverse: true; strikethrough: true; }' but required in type 'Record<keyof ThemeStyle, true>'.
+$ tsc --noEmit
+[ELIFECYCLE] Command failed with exit code 1.
+```
+
+Raw final checks after every mutation was restored:
+
+```text
+typecheck_exit=0
+typecheck_stdout_bytes=0
+typecheck_stderr: $ tsc --noEmit\n
+ℹ tests 196
+ℹ suites 0
+ℹ pass 196
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 466.184584
+test_exit=0
+test_stderr: $ node --test\n
+Change 'configurable-instruments' is valid
+validate_exit=0
+```
+
+`git diff --exit-code HEAD -- extensions/ tests/` and `git diff --check` both exited 0 after restoration. Task 7.6 is deliberately open for Joel's own live observation; no live run, merge, publication, or independent implementation-gate approval is claimed by these checks.

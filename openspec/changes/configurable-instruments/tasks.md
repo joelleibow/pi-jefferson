@@ -176,6 +176,12 @@ would let a stale expectation survive.
   and `grow: 1` *without* the basis gives 13,11,10,9,8,7,6,6,5,5 at ten cells over 80 (owner-rulings;
   chidi §4.2), which (b) and (c) fail. Verified by: red before 2.6 under `node --test
   tests/row-renderer.test.ts`.
+  Final mutation observation (conductor confirmed): the allocator-only example with minimal
+  one-character components gives the cited grow-only skew. In this footer, cells pad to the width
+  passed by HStack's full-width measure call, so removing basis makes the first cell fill the
+  viewport instead: visible bytes `"Lorem ipsu" + " ".repeat(70)` at 80 and
+  `"x" + " ".repeat(131)` at 132. Both (b) and (c) fail unchanged, as required; these are different
+  intrinsic inputs, not contradictory allocator results.
 - [x] 2.2 Red — the resize and the re-seat. `cell widths are recomputed when the width changes` moves
   onto one footer rendered at 100 then 90: assert the second line is `composed(3 × padEnd(30))`, that
   `visibleWidth` is 90, and that **no cell kept its previous width** (34/33/33 → 30/30/30). Beside it,
@@ -724,14 +730,17 @@ gate: documentation the change made false is corrected). No code moves in this g
 
 ## 7. Verification, and the owner's live look
 
-- [ ] 7.1 — `pnpm typecheck` exits 0 with no output. Verified by: the exit status and the empty output,
+- [x] 7.1 — `pnpm typecheck` exits 0 with no output. Verified by: the exit status and the empty output,
   recorded raw.
-- [ ] 7.2 — `pnpm test` exits 0 for every file, including the new `tests/format.test.ts` and the five
+  Verification note (conductor confirmed): exit 0, stdout 0 bytes, stderr exactly
+  `$ tsc --noEmit\n` and nothing else. pnpm 12's command echo is not compiler output; tsc produced
+  no diagnostics. No runner flag or manifest edit silenced it.
+- [x] 7.2 — `pnpm test` exits 0 for every file, including the new `tests/format.test.ts` and the five
   existing files. Verified by: the exit status and the summary lines (`tests`, `pass`, `fail`),
   recorded raw.
-- [ ] 7.3 — `openspec validate configurable-instruments --strict` exits 0 and prints
+- [x] 7.3 — `openspec validate configurable-instruments --strict` exits 0 and prints
   `Change 'configurable-instruments' is valid`. Verified by: the raw output.
-- [ ] 7.4 — the diff is inside D1's file map and nothing else: `git diff --stat` lists only
+- [x] 7.4 — the diff is inside D1's file map and nothing else: `git diff --stat` lists only
   `extensions/jefferson.ts`, the five files under `extensions/jefferson/` (`instrument.ts`,
   `format.ts` (new), `configuration.ts`, `session-data-store.ts`, `row-renderer.ts`), `tests/`,
   `ARCHITECTURE.md`, `AGENTS.md`, `README.md`, `docs/adr/0002-…` and this change directory. **No diff**
@@ -740,7 +749,7 @@ gate: documentation the change made false is corrected). No code moves in this g
   load root needs no manifest or CI edit (eleanor §7, D1), and merge to `main` is the release. A diff
   in any of them is a design error to report, not a task to tick. Verified by: the `git diff --stat`
   output recorded raw.
-- [ ] 7.5 — re-run every mutation check this list claims, one edit at a time, recording each edit and
+- [x] 7.5 — re-run every mutation check this list claims, one edit at a time, recording each edit and
   the test that catches it: remove each D3 guard in turn → its own test fails naming the exact
   message, routed by guard rather than by count — 4.4 catches the section, entry, option-key,
   format-type, unknown-variable and second-width-taker guards; 4.5 catches the style shape, style
@@ -758,6 +767,14 @@ gate: documentation the change made false is corrected). No code moves in this g
   runtime `ThemeStyle` key list → `pnpm typecheck` fails (4.10); repaint on every `turn_end` without
   comparing → 5.2's second half fails. Verified by: the fifteen-plus edits and their failures recorded,
   each reverted afterwards, with `pnpm test` green again at the end.
+  Verification: all 54 final mutations were caught and individually restored; the full edit/test
+  ledger is in implementation-evidence.md. The sample-key mutation failed specifically at 2.3's
+  second-render assertion: actual widths `[30, 30, 30, 10, 10, 10]`, expected
+  `[30, 30, 30, 10, 10, 10, 30]`. The basis-less mutation failed (b)/(c) with the observed visible
+  bytes `"Lorem ipsu" + " ".repeat(70)` and `"x" + " ".repeat(131)`, for the intrinsic-width reason
+  recorded at 2.1; no assertion or production code changed to manufacture the cited skew. Removing
+  underline produced TS2741; every runtime mutation failed at an assertion. No source/test diff
+  remained after restoration, and all three final checks passed again.
 - [ ] 7.6 **(Joel — the owner's own eyes; nobody else can tick this)** — the live-footer observation,
   in his own pi session, with the columns and the documents recorded, and the understanding that **one
   run is a sample, never proof** (owner-rulings 2026-11-05; the suite carries the proof). What he
