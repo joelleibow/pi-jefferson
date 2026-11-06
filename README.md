@@ -54,8 +54,8 @@ cell that uses it:
 }
 ```
 
-`format` is plain text with the instrument's already-formatted `$variables`, not Markdown.
-Omit `format` to use its default:
+`format` is plain text with the instrument's already-formatted `$variables`, not Markdown. `$` and
+`|` are its two special characters, escaped `\$` and `\|`. Omit `format` to use its default:
 
 | Instrument | Variables | Default format |
 | --- | --- | --- |
@@ -67,16 +67,44 @@ Omit `format` to use its default:
 | `tokens` | `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens` | `$totalTokens` |
 | `cost` | `$cost` | `$cost` |
 
+A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
+each applying in the order the format writes them. On plain text a modifier covers the run of
+non-whitespace characters directly before it, so a multi-word phrase takes a modifier on each word:
+
+```
+🧠 $model via|dim $provider|capitalize
+```
+
+Here `via` renders dim and the provider's value is capitalized.
+
+| String modifier | Effect |
+| --- | --- |
+| `capitalize` | Upper-cases the first character and leaves the rest alone: `high` becomes `High` |
+| `upper` | Upper-cases the whole value: `high` becomes `HIGH` |
+| `lower` | Lower-cases the whole value: `HIGH` becomes `high` |
+
+A `|` begins a modifier only when a name follows it directly. Followed by a space, the end of the
+format or punctuation, it is the character itself, so `$model | $provider` renders
+`claude-opus-4 | anthropic`. Where a literal pipe has to sit beside a name, write `\|`.
+
+That escape changed meaning in this release. A format written `\|` used to render `\|`, because a
+backslash before anything but `$` was a literal backslash; it now renders `|`.
+
 `$bar` is available on `context`: it takes the width the rest of the format leaves in the cell,
-and shrinks to nothing when none is left. Use at most one per format. Its filled portion changes
-to the theme's `warning` color above 70% and `error` above 90%; without an estimate from the host,
-it draws an unfilled, dim track.
+and shrinks to nothing when none is left. Use at most one per format, and no modifier after it. Its
+filled portion changes to the theme's `warning` color above 70% and `error` above 90%; without an
+estimate from the host, it draws an unfilled, dim track.
 
 `style` uses pi's `ThemeStyle`: `fg` accepts foreground theme color tokens, `bg` background
 tokens, or either slot can use a color pi's parser accepts. The six boolean attributes are
-`bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`. If the extension cannot read
-a document's style or format, it rejects the whole document, renders the default row, and warns
-with a message naming the offender.
+`bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`, and each is also a modifier
+inside a format. A modifier only adds: `$model|bold` renders bold even where the instrument's
+`style` sets `bold: false`, and nothing in a format switches an attribute off. `fg` and `bg` are
+not modifiers; colors belong to `style`.
+
+If the extension cannot read a document's style or format, it rejects the whole document, renders
+the default row, and warns with a message naming the offender. The offenders include a modifier it
+does not implement, a modifier on `$bar`, and a modifier with nothing before it.
 
 ## Why another statusline
 
@@ -106,6 +134,12 @@ Tests live in `tests/`, never beside an extension. Pi loads every direct `.ts` f
 `dependencies`, because pi supplies them at runtime. A physical copy bypasses pi's module
 mapping and duplicates classes and registries; pi reports a warning when it sees a
 manifest configured that way.
+
+`lodash-es` is the package's one runtime `dependencies` entry. Its `upperFirst`, `toUpper` and
+`toLower` perform every string mutation a modifier makes. pi installs a package's dependencies when
+it installs the package, so it arrives with this one rather than shipping in the tarball; why this
+build and not the CommonJS one is
+[ADR 0004](docs/adr/0004-string-mutations-come-from-lodash-es.md).
 
 ### A workstation cannot publish
 
