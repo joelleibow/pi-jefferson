@@ -184,7 +184,11 @@ export function resolveFormat(
     if (value === undefined) return "";
     values.set(name, collapse(value));
   }
-  const pieces = segments.map(segment => segment.kind === "bar" ? "" : segment.kind === "literal" ? segment.text : values.get(segment.name)!);
+  const pieces = segments.map(segment => {
+    if (segment.kind === "bar") return "";
+    const text = segment.kind === "literal" ? segment.text : values.get(segment.name)!;
+    return segment.modifiers.reduce((piece, modifier) => "mutate" in modifier ? modifier.mutate(piece) : piece, text);
+  });
   let bar = "";
   if (segments.some(segment => segment.kind === "bar")) {
     const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);

@@ -151,7 +151,7 @@ Notes for the writing session:
 
 ## 6. The string mutations
 
-- [ ] 6.1 `capitalize` is `upperFirst`, not `capitalize` (D4). **Test first:** `$level|capitalize`
+- [x] 6.1 `capitalize` is `upperFirst`, not `capitalize` (D4). **Test first:** `$level|capitalize`
       renders `High` for `high` (spec, "Capitalizing a value"), `HIGH` for `HIGH` (spec,
       "Capitalizing a value whose first letter is already uppercase"), and `HELLO` for `hELLO` — the
       input on which the two lodash functions differ. **Verify:** all three pass, and the file
@@ -162,14 +162,14 @@ Notes for the writing session:
       and the test fail, then point it back. **Boundary:** a value that is already all-caps, which
       a lowercasing `capitalize` would flatten.
 
-- [ ] 6.2 `upper` and `lower` change the whole value, and a mutation can widen it (D8 step 3).
+- [x] 6.2 `upper` and `lower` change the whole value, and a mutation can widen it (D8 step 3).
       **Test first:** `$level|upper` renders `HIGH` for `high` and `$level|lower` renders `high` for
       `HIGH` (spec, "Upper and lower"); `$model|upper` renders `STRASSE` for `straße` (spec, "A
       mutation that changes the value's width"); and `hELLO wORLD` under `upper` renders
       `HELLO WORLD`, not `H ELLO W ORLD`. **Verify:** all four pass. **Boundary:** the last one is
       the word-splitting trap — lodash's `upperCase` re-tokenizes and would produce the second.
 
-- [ ] 6.3 A modifier cannot resurrect an unknown value (D8 step 1). **Test first:** `thinking` with
+- [x] 6.3 A modifier cannot resurrect an unknown value (D8 step 1). **Test first:** `thinking` with
       `$level|capitalize` and an unknown level renders nothing, exactly as `$level` alone does
       (spec, "A modifier on a value the store does not know"). **Verify:** the assertion passes and
       is byte-equal to the no-modifier render. **Boundary:** the undefined rule runs first, so no
