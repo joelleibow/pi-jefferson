@@ -10,8 +10,8 @@ import {
 } from "../extensions/jefferson/instrument.ts";
 import type { Reading, Readings } from "../extensions/jefferson/session-data-store.ts";
 
-const seed: Readings = { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
-const unknown: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined };
+const seed: Readings = { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: undefined, contextUsage: undefined, totals: undefined };
+const unknown: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, contextUsage: undefined, totals: undefined };
 
 /** Readings whose every datum throws if it is read, so a datum read fails the test. */
 function unreadable(): Readings {
@@ -26,6 +26,15 @@ function unreadable(): Readings {
       return fail();
     },
     get thinkingLevel() {
+      return fail();
+    },
+    get cwd() {
+      return fail();
+    },
+    get contextUsage() {
+      return fail();
+    },
+    get totals() {
       return fail();
     },
   };
@@ -51,24 +60,25 @@ test("thinking resolves a literal label over the level as data", () => {
 
 test("model yields an empty string when either half is unknown", () => {
   assert.equal(
-    model.render({ provider: undefined, model: "claude-opus-4", thinkingLevel: "high" }, 80),
+    model.render({ ...unknown, provider: undefined, model: "claude-opus-4", thinkingLevel: "high" }, 80),
     "",
   );
   assert.equal(
-    model.render({ provider: "anthropic", model: undefined, thinkingLevel: "high" }, 80),
+    model.render({ ...unknown, provider: "anthropic", model: undefined, thinkingLevel: "high" }, 80),
     "",
   );
 });
 
 test("thinking yields an empty string when the level is unknown", () => {
   assert.equal(
-    thinking.render({ provider: "anthropic", model: "claude-opus-4", thinkingLevel: undefined }, 80),
+    thinking.render({ ...unknown, provider: "anthropic", model: "claude-opus-4", thinkingLevel: undefined }, 80),
     "",
   );
 });
 
 test("model reads no datum its text does not use", () => {
   const readings: Readings = {
+    ...unknown,
     provider: "anthropic",
     model: "claude-opus-4",
     get thinkingLevel(): Reading {
@@ -80,6 +90,7 @@ test("model reads no datum its text does not use", () => {
 
 test("thinking reads no datum its text does not use", () => {
   const readings: Readings = {
+    ...unknown,
     get provider(): Reading {
       throw new Error("thinking read the provider");
     },

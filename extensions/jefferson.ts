@@ -75,11 +75,18 @@ export default function jefferson(pi: ExtensionAPI): void {
         provider: ctx.model?.provider,
         model: ctx.model?.id,
         thinkingLevel: ctx.thinkingLevel,
+        cwd: ctx.cwd,
       },
       requestRender: () => requestRepaint?.(),
+      readUsage: () => ({
+        contextUsage: ctx.getContextUsage(),
+        sessionId: ctx.sessionManager.getSessionId(),
+        leafId: ctx.sessionManager.getLeafId(),
+      }),
+      readEntries: () => ctx.sessionManager.getEntries(),
     });
 
-    // Both pushes are unwrapped here, so the store never names a host type (D5).
+    // Pushes are unwrapped here, so the store names no host event.
     const releaseModel = pi.on("model_select", (event) =>
       store.modelSelected(event.model.provider, event.model.id),
     );

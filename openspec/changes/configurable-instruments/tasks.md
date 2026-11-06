@@ -50,7 +50,7 @@ forbids: the ban is on shipped source, pinned at 4.10.
 D9, and the store side of D10. Traces to all five `session-data-store` delta requirements. The
 readers are faked at the boundary — counting closures over a fixture entry array — never the store.
 
-- [ ] 1.1 Red — in `tests/session-data-store.test.ts`, grow `newStore` to inject the two readers
+- [x] 1.1 Red — in `tests/session-data-store.test.ts`, grow `newStore` to inject the two readers
   (`readUsage`, `readEntries`) as counting fakes, and rename `a sample is exactly the three datums, in
   order, carrying the seed` to `a sample is exactly the six datums, in order, carrying the seed`,
   asserting `Object.keys(sample)` deep-equals `["provider", "model", "thinkingLevel", "cwd",
@@ -61,7 +61,7 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   back as given, the null never becoming `0`. Verified by: red before 1.7 under `pnpm typecheck`
   (`Readings` has no `cwd`, `contextUsage`, `totals`) and under `node --test
   tests/session-data-store.test.ts` for the keys assertion.
-- [ ] 1.2 Red — the scan fixture, D14's discriminating one: four entries, one per category the host
+- [x] 1.2 Red — the scan fixture, D14's discriminating one: four entries, one per category the host
   counts (chidi §1.6, addendum 2 Q2) — a `type: "usage"` entry, an assistant message, a toolResult
   message carrying usage, a compaction entry carrying usage — with per-field usage
   `{input: 10, output: 5, cacheRead: 2, cacheWrite: 1, cost: {total: 0.125}}`,
@@ -83,23 +83,23 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   entry array with no usage at all gives the five zeros; the `$0.123` cost-*rendering* pin (3.4,
   exercised again at 3.7) keeps its own numbers and stays separate from this fixture — no cost here
   is ever rendered. Verified by: red before 1.7.
-- [ ] 1.3 Red — the key cache, proven by counting `readEntries` calls: two samples under one
+- [x] 1.3 Red — the key cache, proven by counting `readEntries` calls: two samples under one
   `(sessionId, leafId)` → one call and the *same* `totals` object returned both times (so `cost` and
   `tokens` cannot disagree); a moved leaf → two calls; a changed session id → two calls; a sample
   after `dispose()` → no further call. Boundary cases: `leafId: null` is a key value like any other,
   and a leaf that moves and moves back is two moves, not a hit. Verified by: red before 1.7.
-- [ ] 1.4 Red — the per-sample context read: `readUsage` is called on **every** sample even when the
+- [x] 1.4 Red — the per-sample context read: `readUsage` is called on **every** sample even when the
   key did not move, and a `contextUsage` that changes with no append (a model selection changing the
   window) is what the next sample returns. Boundary cases: `percent: null` stays `null` through the
   sample, never `0`; `contextUsage: undefined` stays `undefined`. Verified by: red before 1.7.
-- [ ] 1.5 Red — `turnEnded()`: with totals that changed → exactly one repaint and the next sample
+- [x] 1.5 Red — `turnEnded()`: with totals that changed → exactly one repaint and the next sample
   carrying them; with totals unchanged → no repaint at all; with no `scanCache` yet → the cache is
   filled, no repaint is requested, and the next `sample()` calls `readEntries` once in total (the
   boundary's scan is the one the render reuses); after `dispose()` → no repaint and no reader call.
   Boundary cases: a leaf move that changes only `cacheWrite` still repaints (the comparison is field
   by field, all five); a `turn_end` that arrives before any render is the no-cache case. Verified by:
   red before 1.7 — `turnEnded` does not exist, so `pnpm typecheck` is red too.
-- [ ] 1.6 Red — totality and replacement (the living `A read is synchronous and total` requirement,
+- [x] 1.6 Red — totality and replacement (the living `A read is synchronous and total` requirement,
   which this change puts under pressure because `sample()` now calls host readers): inject readers
   that **throw**, `dispose()`, then assert `sample()` returns the all-unknown sample
   (`totals: undefined`, `contextUsage: undefined`, the four strings `undefined`), does not throw, and
@@ -117,7 +117,7 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   end. **Settled by Michael at PL7, so the open point this task carried is closed:** the living
   totality requirement does not bind a *live* throwing reader, no design amendment follows, and the
   writer adds no catch. Verified by: red before 1.7.
-- [ ] 1.7 Implement — `extensions/jefferson/session-data-store.ts` to D9: `UsageTotals`; `Readings`
+- [x] 1.7 Implement — `extensions/jefferson/session-data-store.ts` to D9: `UsageTotals`; `Readings`
   grown to the six members in D9's order with `contextUsage: ContextUsage | undefined` (a **type-only**
   import of pi's exported `ContextUsage`, design fact 12) and `totals: UsageTotals | undefined`;
   `seed` grown to the four static datums; the two injected readers beside `requestRender`;
@@ -129,14 +129,14 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   `requestRender`. The store still holds no host handle and names no host event. Verified by: 1.1–1.6
   green, `pnpm typecheck` clean, and `rg -n "sessionManager|getContextUsage|pi.on" extensions/jefferson/session-data-store.ts`
   empty.
-- [ ] 1.8 Implement — grow every other `Readings` fixture so the tree compiles, changing no
+- [x] 1.8 Implement — grow every other `Readings` fixture so the tree compiles, changing no
   expectation: `tests/instrument.test.ts`'s `seed`, `unknown` and `unreadable()` (the three new
   members are throwing getters there too, so a resolver that reads a datum it does not display fails);
   `tests/row-renderer.test.ts`'s `readings` and `live`. Verified by: `pnpm typecheck` clean and
   `pnpm test` green with every assertion byte-identical to `main` apart from the grown fixture
   literals — `git diff -U0 tests/instrument.test.ts tests/row-renderer.test.ts | grep -E '^[+-].*assert\.'`
   shows no changed assertion line.
-- [ ] 1.9 Implement — `extensions/jefferson.ts` seeds `cwd: ctx.cwd` and wraps `ctx` in the two
+- [x] 1.9 Implement — `extensions/jefferson.ts` seeds `cwd: ctx.cwd` and wraps `ctx` in the two
   readers (`readUsage` returning `ctx.getContextUsage()` plus `getSessionId()`/`getLeafId()`;
   `readEntries` returning `ctx.sessionManager.getEntries()`), so the entry still computes nothing and
   the store still holds callbacks (D9). In the same task, `tests/jefferson.test.ts`'s fake `ctx` grows
@@ -147,7 +147,7 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   Verified by: `node --test tests/jefferson.test.ts` green with no expectation changed, and
   `rg -n "getEntryCount|getBranch|buildSessionProjection" extensions/` empty (the readonly view
   withholds the first; the design keys on none of the others — design fact 5, chidi Gaps 1).
-- [ ] 1.10 Green — `pnpm typecheck` and `pnpm test` both pass at the group boundary. Verified by: the
+- [x] 1.10 Green — `pnpm typecheck` and `pnpm test` both pass at the group boundary. Verified by: the
   two exit statuses, recorded.
 
 ## 2. The layout: the once-built tree, the allocator's remainder, the sample-keyed memo

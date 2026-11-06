@@ -29,7 +29,7 @@ function visible(line: string): string {
 }
 
 /** The readings a geometry fixture's instrument ignores: these tests are about width, not data. */
-const readings: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined };
+const readings: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, contextUsage: undefined, totals: undefined };
 
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
@@ -330,7 +330,7 @@ test("an instrument renders once per (cell, width) — the row-width measure, th
 });
 
 test("two cells holding the model instrument resolve identical text", () => {
-  const live: Readings = { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
+  const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
     () => live,
@@ -348,8 +348,10 @@ test("a push between two renders shows up in the next render and not before", ()
     },
   };
   const store = createSessionDataStore({
-    seed: { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" },
+    seed: { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: undefined },
     requestRender: () => {},
+    readUsage: () => ({ contextUsage: undefined, sessionId: "session-1", leafId: null }),
+    readEntries: () => [],
   });
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],

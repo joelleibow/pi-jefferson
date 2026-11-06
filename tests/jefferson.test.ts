@@ -111,6 +111,12 @@ function harness(): Harness {
         cwd,
         model: options.model,
         thinkingLevel: options.thinkingLevel,
+        getContextUsage: () => undefined,
+        sessionManager: {
+          getSessionId: () => "session-1",
+          getLeafId: () => null,
+          getEntries: () => [],
+        },
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
           notify: (message: string, type?: string) => void notified.push({ message, type }),
