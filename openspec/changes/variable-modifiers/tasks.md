@@ -65,7 +65,7 @@ Notes for the writing session:
 
 ## 2. One modifier, end to end on a variable
 
-- [ ] 2.1 A modifier after a variable's name attaches to that variable segment and is applied inside
+- [x] 2.1 A modifier after a variable's name attaches to that variable segment and is applied inside
       the segment's single `theme.style()` call (D5 case 1, D7). Merge the segment's style modifiers
       into the instrument's style, writing only `true`, then make one call.
       **Test first**, reusing 1.2's `ATTRIBUTES`: for each of its keys,
@@ -81,13 +81,13 @@ Notes for the writing session:
       reach D5's nothing-to-modify guard; after a variable the literal buffer is empty, and that
       emptiness is not an error.
 
-- [ ] 2.2 A modifier after another modifier extends the same segment's chain (D5 case 2).
+- [x] 2.2 A modifier after another modifier extends the same segment's chain (D5 case 2).
       **Test first:** `$provider|bold|underline` yields one segment carrying two modifiers and
       renders the value bold and underlined (spec, "Chained modifiers"). **Verify:** the assertion
       passes and it counts one segment, not two. **Boundary:** an attribute written twice,
       `$model|bold|bold`, still renders one `\x1b[1m`.
 
-- [ ] 2.3 A format with no modifier renders exactly as it does today (D7's empty-style path, D8).
+- [x] 2.3 A format with no modifier renders exactly as it does today (D7's empty-style path, D8).
       **Test first:** `$model` renders `claude-opus-4` character for character (spec, "A value the
       format does not mutate"), and zero `style` calls are recorded for a cell whose instrument has
       no `style` and whose format carries no modifier. The counter is a wrapper defined in

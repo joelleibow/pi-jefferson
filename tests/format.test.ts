@@ -232,3 +232,55 @@ test("a modifier after an undeclared variable reports the variable, not the modi
   assert.throws(() => parseFormat(named("model"), "$nope|bold"),
     { message: '"model"\'s format names a variable it does not declare: "$nope"' });
 });
+
+function occurrences(text: string, sequence: string): number {
+  return text.split(sequence).length - 1;
+}
+
+test("each style modifier styles the value through one theme.style call", () => {
+  for (const key of Object.keys(ATTRIBUTES)) {
+    const theme = fakeTheme();
+    assert.equal(rendered("model", `$model|${key}`, { theme }), theme.style("claude-opus-4", { [key]: true }), key);
+  }
+});
+
+test("a modifier sets an attribute its instrument's style sets off", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|bold", { style: { bold: false }, theme }),
+    theme.style("claude-opus-4", { bold: true }));
+});
+
+test("a modifier merges into the instrument's style rather than wrapping it", () => {
+  const theme = fakeTheme();
+  assert.equal(occurrences(rendered("model", "$model|bold", { theme }), "\x1b[1m"), 1);
+  assert.equal(occurrences(rendered("model", "$model|dim", { style: { bold: true }, theme }), "\x1b[22m"), 1);
+});
+
+test("a chain extends the same segment rather than starting a new one", () => {
+  const theme = fakeTheme();
+  const segments = parseFormat(named("model"), "$provider|bold|underline");
+  assert.equal(segments.length, 1);
+  assert.equal(segments.flatMap(segment => segment.kind === "bar" ? [] : segment.modifiers).length, 2);
+  assert.equal(rendered("model", "$provider|bold|underline", { theme }),
+    theme.style("anthropic", { bold: true, underline: true }));
+  assert.equal(occurrences(rendered("model", "$model|bold|bold", { theme }), "\x1b[1m"), 1);
+});
+
+function countingTheme(): { theme: Theme; styleCalls: () => number } {
+  const base = fakeTheme();
+  let calls = 0;
+  return {
+    theme: { ...base, style: (text: string, options: ThemeStyle) => { calls++; return base.style(text, options); } } as Theme,
+    styleCalls: () => calls,
+  };
+}
+
+test("no modifier and no configured style makes no style call", () => {
+  const { theme, styleCalls } = countingTheme();
+  assert.equal(rendered("model", "$model", { theme }), "claude-opus-4");
+  assert.equal(styleCalls(), 0);
+});
+
+test("a value the format does not mutate renders character for character", () => {
+  assert.equal(rendered("model", "$model", { readings: { ...seed, model: "hELLO wORLD" } }), "hELLO wORLD");
+});

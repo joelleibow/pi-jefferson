@@ -143,6 +143,13 @@ function styledPiece(text: string, style: ThemeStyle, theme: Theme): string {
   return Object.keys(style).length === 0 ? text : theme.style(text, style);
 }
 
+function mergedStyle(style: ThemeStyle, modifiers: readonly Modifier[]): ThemeStyle {
+  return modifiers.reduce(
+    (merged, modifier) => "style" in modifier ? { ...merged, [modifier.style]: true } : merged,
+    style,
+  );
+}
+
 export function resolveFormat(
   declaration: InstrumentDeclaration,
   segments: FormatSegment[],
@@ -169,5 +176,5 @@ export function resolveFormat(
     bar = styledPiece("█".repeat(filled), filledStyle, theme)
       + styledPiece("░".repeat(barWidth - filled), { ...style, dim: true }, theme);
   }
-  return segments.map((segment, index) => segment.kind === "bar" ? bar : styledPiece(pieces[index]!, style, theme)).join("");
+  return segments.map((segment, index) => segment.kind === "bar" ? bar : styledPiece(pieces[index]!, mergedStyle(style, segment.modifiers), theme)).join("");
 }
