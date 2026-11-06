@@ -135,7 +135,7 @@ test("bar-only formats fill their cell with clamped and floored pressure", () =>
 
 test("control characters collapse per character in literals and substituted values", () => {
   const controls = "\r\n\t\u007f\u009b";
-  assert.deepEqual(parseFormat(named("model"), `L${controls}R`), [{ kind: "literal", text: "L     R" }]);
+  assert.deepEqual(parseFormat(named("model"), `L${controls}R`), [{ kind: "literal", text: "L     R", modifiers: [] }]);
   assert.equal(rendered("model", `$model`, { readings: { ...seed, model: `L${controls}R` } }), "L     R");
   assert.equal(rendered("model", "$model", { readings: { ...seed, model: controls } }), "     ");
 });
@@ -210,3 +210,25 @@ for (const [key, message] of [
     assert.throws(() => validateStyle({ [key]: ["#bf5700"] }, fakeTheme()), { message });
   });
 }
+
+const ATTRIBUTES = {
+  bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
+} satisfies Record<Exclude<keyof ThemeStyle, "fg" | "bg">, true>;
+
+test("every shipped modifier name parses", () => {
+  for (const name of [...Object.keys(ATTRIBUTES), "capitalize", "upper", "lower"]) {
+    assert.doesNotThrow(() => parseFormat(named("model"), `$model|${name}`), name);
+  }
+});
+
+test("an unknown modifier rejects naming the instrument and the modifier", () => {
+  for (const name of ["bd", "accent", "fg"]) {
+    assert.throws(() => parseFormat(named("model"), `$model|${name}`),
+      { message: `"model"'s format names a modifier it does not implement: "|${name}"` });
+  }
+});
+
+test("a modifier after an undeclared variable reports the variable, not the modifier", () => {
+  assert.throws(() => parseFormat(named("model"), "$nope|bold"),
+    { message: '"model"\'s format names a variable it does not declare: "$nope"' });
+});

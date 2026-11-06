@@ -1,15 +1,36 @@
 /** The plain-text format language; declarations supply already-formatted values. */
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
+import { toLower, toUpper, upperFirst } from "lodash-es";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
 
 type Readings = Parameters<Instrument["render"]>[0];
 
 export type FormatSegment =
-  | { kind: "literal"; text: string }
-  | { kind: "variable"; name: string }
+  | { kind: "literal"; text: string; modifiers: readonly Modifier[] }
+  | { kind: "variable"; name: string; modifiers: readonly Modifier[] }
   | { kind: "bar" };
+
+type StyleAttribute = Exclude<keyof ThemeStyle, "fg" | "bg">;
+
+type Modifier =
+  | { readonly style: StyleAttribute }
+  | { readonly mutate: (text: string) => string };
+
+const MODIFIERS: ReadonlyMap<string, Modifier> = new Map<string, Modifier>([
+  ["bold", { style: "bold" }],
+  ["dim", { style: "dim" }],
+  ["italic", { style: "italic" }],
+  ["underline", { style: "underline" }],
+  ["inverse", { style: "inverse" }],
+  ["strikethrough", { style: "strikethrough" }],
+  // lodash's `capitalize` lowercases the rest of the string; the ruling is first letter only,
+  // which is `upperFirst`. Swapping these two silently breaks owner-rulings.md, 2026-11-06.
+  ["capitalize", { mutate: upperFirst }],
+  ["upper", { mutate: toUpper }],
+  ["lower", { mutate: toLower }],
+]);
 
 const WARNING_PERCENT = 70;
 const ERROR_PERCENT = 90;
@@ -22,14 +43,16 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
   const segments: FormatSegment[] = [];
   let literal = "";
   let hasBar = false;
+  let afterName = false;
   const flush = (): void => {
-    if (literal !== "") segments.push({ kind: "literal", text: collapse(literal) });
+    if (literal !== "") segments.push({ kind: "literal", text: collapse(literal), modifiers: [] });
     literal = "";
   };
   for (let index = 0; index < format.length; index++) {
     const character = format[index]!;
     if (character === "\\" && format[index + 1] === "$") {
       literal += "$";
+      afterName = false;
       index++;
     } else if (character === "$") {
       const name = format.slice(index + 1).match(/^[A-Za-z0-9_]+/)?.[0];
@@ -46,11 +69,27 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         hasBar = true;
         segments.push({ kind: "bar" });
       } else {
-        segments.push({ kind: "variable", name });
+        segments.push({ kind: "variable", name, modifiers: [] });
       }
       index += name.length;
+      afterName = true;
+    } else if (character === "|") {
+      const name = format.slice(index + 1).match(/^[A-Za-z0-9_]+/)?.[0];
+      const subject = segments[segments.length - 1];
+      if (name === undefined || !afterName || subject === undefined || subject.kind === "bar") {
+        literal += character;
+        afterName = false;
+      } else {
+        const modifier = MODIFIERS.get(name);
+        if (modifier === undefined) {
+          throw new Error(`${JSON.stringify(declaration.name)}'s format names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
+        }
+        segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+        index += name.length;
+      }
     } else {
       literal += character;
+      afterName = false;
     }
   }
   flush();

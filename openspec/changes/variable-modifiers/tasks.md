@@ -25,7 +25,7 @@ Notes for the writing session:
 
 ## 1. The dependency and the modifier vocabulary
 
-- [ ] 1.1 Add a new top-level `dependencies` key to `package.json` with `"lodash-es": "^4.18.1"`,
+- [x] 1.1 Add a new top-level `dependencies` key to `package.json` with `"lodash-es": "^4.18.1"`,
       add `"@types/lodash-es": "^4.17.12"` to `devDependencies`, run `pnpm install`, and commit the
       rewritten `pnpm-lock.yaml` in the same change (D1, D2). Declare no other types package.
       **Verify:** `pnpm install --frozen-lockfile` exits 0 on a clean checkout — it fails until the
@@ -33,7 +33,7 @@ Notes for the writing session:
       commands, not a test. Nothing here yet proves the types resolve: no source file imports
       `lodash-es` until 1.2, and that task carries the proof.
 
-- [ ] 1.2 Add the table of nine modifiers to `extensions/jefferson/format.ts` and make `parseFormat`
+- [x] 1.2 Add the table of nine modifiers to `extensions/jefferson/format.ts` and make `parseFormat`
       resolve a name through it. The six style entries derive from
       `StyleAttribute = Exclude<keyof ThemeStyle, "fg" | "bg">`; `capitalize`, `upper` and `lower`
       map to `upperFirst`, `toUpper` and `toLower`, imported by name from `lodash-es` (D1, D3). The
