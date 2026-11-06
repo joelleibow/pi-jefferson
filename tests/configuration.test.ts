@@ -596,13 +596,13 @@ test("the style attribute guard rejects non-booleans for all six attributes", ()
 });
 
 test("the foreground value guard reports rejected types, wrong slots, colors and indices", () => {
-  for (const fg of ["nope", "selectedBg", "", {}, true, null, 256]) {
+  for (const fg of ["nope", "selectedBg", "", {}, true, null, 256, ["#bf5700"]]) {
     rejected({ instruments: { model: { style: { fg } } } }, `instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: ${JSON.stringify(fg)}`);
   }
 });
 
 test("the background value guard reports rejected colors, wrong slots and fractional indices", () => {
-  for (const bg of ["nope", "accent", 1.5]) {
+  for (const bg of ["nope", "accent", 1.5, ["#bf5700"]]) {
     rejected({ instruments: { model: { style: { bg } } } }, `instrument "model" has a bg that is neither a background-slot theme token nor a color pi's parser accepts: ${JSON.stringify(bg)}`);
   }
 });

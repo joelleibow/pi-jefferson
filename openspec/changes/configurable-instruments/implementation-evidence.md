@@ -318,9 +318,9 @@ stderr: <empty>
 
 The explicit allowed-map assertion passed for all 20 paths. The forbidden-path diff is empty for package.json, pnpm-lock.yaml, pnpm-workspace.yaml, tsconfig.json, .github/ and openspec/specs/. Full reread of all six changed source files found no implementation blocker. The pending gate owns final review; no merge is authorized.
 
-### 7.5 — final mutation sweep (last behavior-changing work)
+### 7.5 — mutation sweep and implementation-gate repair
 
-All 54 mutations were run one at a time after the implementation/docs and 7.1–7.4 checks, then restored in a finally block before the next edit. This repeats the earlier assertion demonstrations as well as every task-named guard, lookup, geometry, memo, reset, collapse, scan, key, compiler and repaint mutation. All 53 runtime edits failed at assertions; the compiler edit failed with TS2741. No survivor and no source/test diff remained afterward.
+The original 54 mutations were run one at a time after the implementation/docs and 7.1–7.4 checks, then restored in a finally block before the next edit. They repeated the earlier assertion demonstrations and the listed guard, lookup, geometry, memo, reset, collapse, scan, key, compiler and repaint checks. All 53 runtime edits failed at assertions; the compiler edit failed with TS2741. No survivor among those 54 and no source/test diff remained afterward. Michael's implementation gate subsequently found that 7-33/7-34 exercised parser-rejection handling but not deletion of the fg/bg primitive-value type guard. The test-only repair and additional mutation 7-55 below close that omitted discriminator; the original sweep is not claimed to have covered it.
 
 Notable exact discriminators:
 
@@ -386,6 +386,7 @@ Notable exact discriminators:
 | 7-52 | scan keyed on turn_end instead of leaf moves | a moved leafId scans again without a turn boundary<br>a null leaf is a cache key and moving away then back is two moves | 1; restored |
 | 7-53 | underline deleted from runtime ThemeStyle keys | pnpm typecheck: missing underline (TS2741) | 1; restored |
 | 7-54 | every turn boundary repaints without comparing totals | a dispatched turn boundary repaints only changed totals and its scan is reused by the footer | 1; restored |
+| 7-55 | delete the shared fg/bg `typeof value` string-or-number guard | the foreground value guard reports rejected types, wrong slots, colors and indices<br>the background value guard reports rejected colors, wrong slots and fractional indices<br>style validation rejects an array-valued fg with its exact fragment<br>style validation rejects an array-valued bg with its exact fragment | 1; all four assertions failed on array acceptance; restored byte-for-byte; all four green afterward |
 
 <details>
 <summary>Exact temporary edits and reproducible commands</summary>
@@ -1109,6 +1110,19 @@ Notable exact discriminators:
     "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"dispatched turn boundary repaints only\" tests/jefferson.test.ts",
     "exit": 1,
     "restored": true
+  },
+  {
+    "id": "7-55",
+    "path": "extensions/jefferson/format.ts",
+    "edit": [
+      {
+        "before": "      if (typeof value !== \"string\" && typeof value !== \"number\") throw new Error(message);\n",
+        "after": ""
+      }
+    ],
+    "command": "direnv exec . pnpm exec node --test --test-name-pattern=\"foreground value guard|background value guard|style validation rejects an array-valued\" tests/configuration.test.ts tests/format.test.ts",
+    "exit": 1,
+    "restored": true
   }
 ]
 ```
@@ -1143,3 +1157,68 @@ validate_exit=0
 ```
 
 `git diff --exit-code HEAD -- extensions/ tests/` and `git diff --check` both exited 0 after restoration. Task 7.6 is deliberately open for Joel's own live observation; no live run, merge, publication, or independent implementation-gate approval is claimed by these checks.
+
+### Implementation-gate repair — 4.5 / 7-55 primitive-value guard
+
+Michael's implementation gate (run 88d4a56f) requested exactly one test-side repair. The fg/bg primitive-value guard already rejects arrays correctly, but its deletion was not caught: pi-tui's parser coerces an array containing a color string and accepts it. The earlier parser-rejection mutations 7-33/7-34 did not prove this separate type guard. This correction qualifies the original coverage claim above rather than treating those mutations as proof of the omitted guard.
+
+The conductor confirmed the two test seams: document tests assert D3's full rejection envelope; direct validateStyle tests assert the exact name-free fragment, since configuration alone supplies the instrument prefix and envelope. The conductor-owned .openspec.yaml update (Michael/Chidi run ids and implement: changes_requested) remains unstaged and untouched.
+
+Changes, with no production or existing expectation changed:
+
+- tests/configuration.test.ts adds fg: ["#bf5700"] and bg: ["#bf5700"] to their existing value-guard loops. The existing rejected helper checks the complete path-bearing envelope, default row and placeholder bytes. Expected composed messages are exactly:
+  - `instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: ["#bf5700"]`
+  - `instrument "model" has a bg that is neither a background-slot theme token nor a color pi's parser accepts: ["#bf5700"]`
+- tests/format.test.ts adds two independently named direct-validator cases for the same fg/bg inputs, each matching the exact corresponding fragment beginning `has an fg` / `has a bg`. Separate cases ensure one slot's failure cannot mask the other.
+
+Repair red/green evidence for the exact guard-deletion edit recorded as 7-55 in the table and JSON ledger:
+
+```text
+Before adding the array cases, with only the typeof line temporarily deleted:
+ℹ tests 3
+ℹ pass 3
+ℹ fail 0
+mutation_before_exit=0
+production_restored_byte_for_byte=true
+
+After adding the cases, with that same typeof line temporarily deleted:
+✖ the foreground value guard reports rejected types, wrong slots, colors and indices
+✖ the background value guard reports rejected colors, wrong slots and fractional indices
+✖ style validation rejects an array-valued fg with its exact fragment
+✖ style validation rejects an array-valued bg with its exact fragment
+ℹ tests 4
+ℹ pass 0
+ℹ fail 4
+mutation_after_exit=1
+production_restored_byte_for_byte=true
+
+After restoring the line:
+ℹ tests 4
+ℹ pass 4
+ℹ fail 0
+restored_targeted_exit=0
+```
+
+The two document failures returned warning undefined instead of the exact rejection envelopes containing ["#bf5700"]. Both direct-validator cases failed with `AssertionError: Missing expected exception.` These are assertion-level failures from array acceptance, not compiler/import failures. The production file was restored in a finally block and compared byte-for-byte; `git diff --exit-code HEAD -- extensions/` exits 0.
+
+Only this focused mutation was rerun for the repair; the original 54 remain historical evidence. The cumulative 7.5 ledger has 55 distinct edits. Final full checks after restoration:
+
+```text
+typecheck_exit=0
+typecheck_stdout_bytes=0
+stderr: $ tsc --noEmit\n
+ℹ tests 198
+ℹ suites 0
+ℹ pass 198
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 459.465083
+test_exit=0
+stderr: $ node --test\n
+Change 'configurable-instruments' is valid
+validate_exit=0
+```
+
+Task 7.5's existing checkbox is amended with this proof; task 7.6 remains Joel's and open. Michael's re-review is not claimed as complete by this repair.

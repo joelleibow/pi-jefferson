@@ -767,7 +767,7 @@ gate: documentation the change made false is corrected). No code moves in this g
   runtime `ThemeStyle` key list → `pnpm typecheck` fails (4.10); repaint on every `turn_end` without
   comparing → 5.2's second half fails. Verified by: the fifteen-plus edits and their failures recorded,
   each reverted afterwards, with `pnpm test` green again at the end.
-  Verification: all 54 final mutations were caught and individually restored; the full edit/test
+  Verification: the original 54 mutations were caught and individually restored; the full edit/test
   ledger is in implementation-evidence.md. The sample-key mutation failed specifically at 2.3's
   second-render assertion: actual widths `[30, 30, 30, 10, 10, 10]`, expected
   `[30, 30, 30, 10, 10, 10, 30]`. The basis-less mutation failed (b)/(c) with the observed visible
@@ -775,6 +775,13 @@ gate: documentation the change made false is corrected). No code moves in this g
   recorded at 2.1; no assertion or production code changed to manufacture the cited skew. Removing
   underline produced TS2741; every runtime mutation failed at an assertion. No source/test diff
   remained after restoration, and all three final checks passed again.
+  Implementation-gate repair: Michael found that those fg/bg mutations removed parser rejection,
+  not the shared primitive-value type guard. Mutation 7-55 deletes that typeof line: the old three
+  targeted tests stayed green, but the added fg/bg `["#bf5700"]` cases failed in both document
+  envelopes and both exact direct-validator fragments (four assertion failures). The line was
+  restored byte-for-byte; all four cases then passed, and the full suite passed 198/198 with
+  typecheck and strict validation green. The ledger now records 55 distinct edits: the original
+  54 plus this focused repair mutation; production code is unchanged and 7.6 stays open.
 - [ ] 7.6 **(Joel — the owner's own eyes; nobody else can tick this)** — the live-footer observation,
   in his own pi session, with the columns and the documents recorded, and the understanding that **one
   run is a sample, never proof** (owner-rulings 2026-11-05; the suite carries the proof). What he

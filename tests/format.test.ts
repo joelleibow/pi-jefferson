@@ -201,3 +201,12 @@ test("style validation rejects wrong slots and invalid values at its own boundar
     assert.throws(() => validateStyle({ [key]: value }, theme), (error: unknown) => error instanceof Error && error.message.includes(JSON.stringify(value)));
   }
 });
+
+for (const [key, message] of [
+  ["fg", 'has an fg that is neither a foreground-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
+  ["bg", 'has a bg that is neither a background-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
+] as const) {
+  test(`style validation rejects an array-valued ${key} with its exact fragment`, () => {
+    assert.throws(() => validateStyle({ [key]: ["#bf5700"] }, fakeTheme()), { message });
+  });
+}
