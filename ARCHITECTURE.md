@@ -16,7 +16,7 @@ extensions/jefferson/
   row-renderer.ts                owns the footer tree and each cell's geometry
 ```
 
-**Entry.** `extensions/jefferson.ts` is the only module the host loads. It owns `pi.on(...)`
+**Entry.** `extensions/jefferson.ts` is the only file the host loads. It owns `pi.on(...)`
 subscriptions, the config file paths, `ctx.ui.setFooter`, and the repaint callback. It decides *when*
 things run; it computes nothing.
 
@@ -24,9 +24,10 @@ things run; it computes nothing.
 The four static datums are seeded at `session_start`; the two selection pushes update model and
 thinking level. Injected readers sample context usage each render and scan the whole session's
 usage-bearing entries only when `(sessionId, leafId)` moves. `turn_end` compares the five totals and
-requests a repaint only when they change. Sampling is synchronous; disposal clears the readers before
-the host invalidates their context, and later samples are all-unknown. One sample per render is handed
-to every cell, so cost and tokens share one totals object.
+requests a repaint only when they change. A read is synchronous, total, and never throws. The host
+disposes the footer, and through it the store, before it invalidates the session context, so a read
+cannot outlive its context; disposal clears the readers, and later samples are all-unknown. One sample
+per render is handed to every cell, so cost and tokens share one totals object.
 
 **Configuration.** Reads the document, validates it, resolves instrument names, and normalizes rows.
 The optional `instruments` section configures each name once; formats and styles are validated at read
