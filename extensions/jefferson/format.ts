@@ -1,7 +1,9 @@
 /** The plain-text format language; declarations supply already-formatted values. */
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
-import { toLower, toUpper, upperFirst } from "lodash-es";
+import toLower from "lodash-es/toLower.js";
+import toUpper from "lodash-es/toUpper.js";
+import upperFirst from "lodash-es/upperFirst.js";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
 
