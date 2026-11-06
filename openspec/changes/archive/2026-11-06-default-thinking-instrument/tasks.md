@@ -199,4 +199,6 @@ All tests in this group use the `tests/configuration.test.ts` route.
   change directory's Markdown); `package.json` and `pnpm-lock.yaml` are not in it; `git grep -n
   "getThinkingBorderColor" extensions/` finds nothing; `git diff v0.5.0 -- extensions/jefferson/format.ts` shows
   `resolveFormat`'s signature `(declaration, segments, style, readings, width, theme)` unchanged. Traces to D3, D5,
-  D6 and the Non-Goals. Boundary: none.
+  D6 and the Non-Goals. Boundary: none. `README.md`, `ARCHITECTURE.md` and `AGENTS.md` are not in the
+  implementation diff this task checks: they came from the planned docs pass after the implementation gate,
+  so the stated implementation-only scope holds for this task.
