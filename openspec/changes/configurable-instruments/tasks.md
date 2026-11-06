@@ -1,9 +1,11 @@
 # Tasks
 
 Built from `specs/statusline/spec.md`, `specs/session-data-store/spec.md` and the PL4-approved
-`design.md`. `D<n>` is a design decision; `chidi §n`, `chidi Gaps n`, `addendum 1 (Qn)` and
-`addendum 2 (Qn)` are the host-fact citations the design uses, and no task re-derives host
-behaviour — where a task rests on a host fact it cites it and Michael verifies it at his gate.
+`design.md`. `D<n>` is a design decision; `chidi §n`, `chidi Gaps n`, `addendum 1 (Qn)`,
+`addendum 2 (Qn)` and `addendum 3` are the host-fact citations the design uses, and no task
+re-derives host behaviour — where a task rests on a host fact it cites it and Michael verifies it at
+his gate. Addenda 1 and 2 are the Chidi runs `council.md`'s evidence list names (`183718c4`,
+`650e92d9`); addendum 3 is the PL8 export-route answer (run `676d9222`).
 
 **Green rule.** Inside a group a `Red` task is meant to fail, and the group's `Implement` tasks
 repair it; every *group* ends with `pnpm typecheck` and `pnpm test` passing, so no task leaves an
@@ -28,10 +30,15 @@ reserves or scaffolds one. Merge to `main` publishes and needs no release task.
 
 **One tasks-level choice the design left open** (design, Open Questions): the fake `Theme`. Chosen —
 a structural fake in one home, `tests/fake-theme.ts`, exposing only `getFgAnsi`, `getBgAnsi` and
-`style`, whose slot maps hold a known token set and whose `style` delegates to pi-tui's `styleText`
-(the helper the host's own `Theme.style` calls, chidi §3.1), so its output carries the host's
-*selective* closes (`\x1b[39m`, `\x1b[22m`) and never a trailing `\x1b[0m`. That last property is
-load-bearing: it is what makes the RESET-before-pad path live by default (4.7). A constructed real
+`style`, whose slot maps hold a known token set and whose `style` works the way the host's own
+`Theme.style` works (addendum 2 Q3): it resolves a token **string** through the same slot maps
+`getFgAnsi`/`getBgAnsi` read, passes a `Color` object through pi-tui's
+`foregroundAnsi`/`backgroundAnsi`, and hands both to pi-tui's `styleTextWithAnsi` — all three
+imported from the `@earendil-works/pi-tui` package root, which re-exports them at 1.4.0 and 1.5.0
+alike (addendum 3) and is the route pi's own `theme.js` takes, so the fake needs no deep import. Its
+output therefore carries the host's *selective* closes (`\x1b[39m`, `\x1b[22m`) and never a trailing
+`\x1b[0m` (Michael's PL7 check of pi-tui `colors.js:237–262`). That last property is load-bearing:
+it is what makes the RESET-before-pad path live by default (4.7). A constructed real
 `Theme` was beaten — it needs complete per-slot token records (design fact 8), which would put the
 host's theme data in a fixture. Naming real host tokens *in a test fixture* is not the copy the delta
 forbids: the ban is on shipped source, pinned at 4.10.
@@ -57,16 +64,25 @@ readers are faked at the boundary — counting closures over a fixture entry arr
 - [ ] 1.2 Red — the scan fixture, D14's discriminating one: four entries, one per category the host
   counts (chidi §1.6, addendum 2 Q2) — a `type: "usage"` entry, an assistant message, a toolResult
   message carrying usage, a compaction entry carrying usage — with per-field usage
-  `{input: 10, output: 5, cacheRead: 2, cacheWrite: 1, cost: {total: 0.1}}`,
-  `{100, 50, 20, 10, 0.2}`, `{7, 3, 0, 0, 0.05}`, `{1, 1, 1, 1, 0.02}`, and **every one of them
-  carrying a lying `usage.totalTokens`** (`999`, `777`, `555`, `444` — none equal to its own
+  `{input: 10, output: 5, cacheRead: 2, cacheWrite: 1, cost: {total: 0.125}}`,
+  `{100, 50, 20, 10, 0.25}`, `{7, 3, 0, 0, 0.0625}`, `{1, 1, 1, 1, 0.03125}`, and **every one of
+  them carrying a lying `usage.totalTokens`** (`999`, `777`, `555`, `444` — none equal to its own
   four-field sum). Assert `totals` is `{input: 118, output: 59, cacheRead: 23, cacheWrite: 12,
-  cost: 0.37}`: the right answer. The wrong answers differ on this one input — assistant-only gives
-  `{100, 50, 20, 10}` and cost `0.2`; reading `totalTokens` gives `2775`; branch-scoping cannot be
+  cost: 0.46875}`, one deep-equal over all five fields: the right answer. Of the two repairs
+  Michael's PL7 major finding offered, this takes the **binary-exact fixture**, not the tolerance:
+  every cost is a negative power of two (`2^-3`, `2^-2`, `2^-4`, `2^-5`), so the accumulation is
+  exact in IEEE 754 and the deep-equal needs neither a stated tolerance nor a rounding step in
+  `scanTotals`. The finding is why the old costs are gone — `0.1 + 0.2 + 0.05 + 0.02` accumulates to
+  `0.37000000000000005`, so a deep-equal on `0.37` could never go green against a correct
+  implementation and would have pushed the writer to round in the store or edit the expectation. The
+  wrong answers still differ on this one input — assistant-only gives `{100, 50, 20, 10}` and cost
+  `0.25`; reading `totalTokens` gives `2775`; branch-scoping cannot be
   distinguished here, so 1.2's fixture is the whole array `getEntries()` returns and the test names
   that. Boundary cases: a `branch_summary` entry carrying usage counts identically to the compaction
   one; a toolResult message with no `usage` and a user message carrying one both count nothing; an
-  entry array with no usage at all gives the five zeros. Verified by: red before 1.7.
+  entry array with no usage at all gives the five zeros; the `$0.123` cost-*rendering* pin (3.4,
+  exercised again at 3.7) keeps its own numbers and stays separate from this fixture — no cost here
+  is ever rendered. Verified by: red before 1.7.
 - [ ] 1.3 Red — the key cache, proven by counting `readEntries` calls: two samples under one
   `(sessionId, leafId)` → one call and the *same* `totals` object returned both times (so `cost` and
   `tokens` cannot disagree); a moved leaf → two calls; a changed session id → two calls; a sample
@@ -91,11 +107,16 @@ readers are faked at the boundary — counting closures over a fixture entry arr
   a push after disposal requests no repaint, and a sample handed out before disposal keeps its values
   (the existing three tests carry over unchanged). Boundary cases: none beyond the disposed and
   pre-seed paths named. **No `try`/`catch` is added around a live reader call** — the design describes
-  none and the readers' bodies are the host's own synchronous getters (chidi §1.5, §1.6); adding one
-  would be mechanism the design never described. Open point, named rather than decided: if Michael
-  reads the living totality requirement as binding a *live* throwing reader too, that is a design
-  amendment (a catch in `sample()`, or total readers in the entry), and settling it is a word from him
-  at PL7 — the writer must not add the catch silently. Verified by: red before 1.7.
+  none, and adding one would be mechanism the design never described. Totality does *not* rest on the
+  readers' bodies being the host's own synchronous getters: a captured ctx's getters throw once the
+  ctx goes stale (Michael's PL7 read of pi's `runner.js` `assertActive`). It rests on the host's
+  ordering — the host disposes the footer, and through `release` the store, **before** it invalidates
+  the ctx (`interactive-mode.js:366–367` `setBeforeSessionInvalidate` → `resetExtensionUI` →
+  `setExtensionFooter(undefined)` at `:1898–1910`, which disposes the footer at `:1958`; the same
+  ordering in chidi §2.3, at its approximate line numbers) — and 5.3 pins the release half end to
+  end. **Settled by Michael at PL7, so the open point this task carried is closed:** the living
+  totality requirement does not bind a *live* throwing reader, no design amendment follows, and the
+  writer adds no catch. Verified by: red before 1.7.
 - [ ] 1.7 Implement — `extensions/jefferson/session-data-store.ts` to D9: `UsageTotals`; `Readings`
   grown to the six members in D9's order with `contextUsage: ContextUsage | undefined` (a **type-only**
   import of pi's exported `ContextUsage`, design fact 12) and `totals: UsageTotals | undefined`;
@@ -180,8 +201,10 @@ would let a stale expectation survive.
   within-render half keeps the widths `[30, 30, 30, 10, 10, 10, 30]` and the one-`readings`-object
   assertion; the across-render half asserts that a second render at the same width with a **fresh
   sample object** resolves again. `a push between two renders shows up in the next render and not
-  before` and `two cells holding the model instrument resolve identical text` carry over unchanged
-  (D14). Boundary cases: two renders at the same width with the same sample object (2.2's hit) and a
+  before` carries over unchanged (D14). `two cells holding the model instrument resolve identical
+  text` carries over in **bytes but not in imports** — it imports the `model` `Instrument`, which
+  3.1/3.11 retire, so it cannot cross the group boundary as it stands; 3.13 names the move.
+  Boundary cases: two renders at the same width with the same sample object (2.2's hit) and a
   width change with the same sample object (a miss — the memo carries `width`). Discriminator: a
   width-only memo passes the within-render half and fails the across-render half, which is exactly the
   stale-styled-text survival D8 forbids. Verified by: red before 2.6 — the counts are off by the
@@ -204,9 +227,12 @@ would let a stale expectation survive.
   4/4-plus-1 to **5/4**; and the fixtures already at a zero remainder — 3@12, 2@20 (twice),
   `the host closes an open style between cells`, `the footer renders one line per row…` — keep their
   bytes exactly. Every moved test keeps `visibleWidth(line) === width` and its one-line assertion.
-  Boundary cases: the odd centred pad still puts its extra column on the right at 7 columns
-  (`floor(5/2) = 2` before, 3 after); the wide-glyph and combining-mark pads are still computed from
-  the **clipped** result (trap two). Verified by: red before 2.6 under `node --test
+  Boundary cases: the odd-pad fixture's moved bytes are `"  abé  "` for each of the first two cells
+  and `" abé  "` for the third — at 7/7/6 the first two pads are 4 and split evenly (2/2), so the
+  extra-column-on-the-right invariant now rests on the **third** cell alone, whose pad of 3 splits
+  1/2 (before the move all three cells had an odd pad of 3 at 6/6/6, which is what the retired
+  sentence described); the wide-glyph and combining-mark pads are still computed from the
+  **clipped** result (trap two). Verified by: red before 2.6 under `node --test
   tests/row-renderer.test.ts`, and `rg -n "renderRow" tests/` empty afterwards.
 - [ ] 2.5 Red — `footer.invalidate()` stops being a no-op: with a fixture returning one constant
   sample object, render, call `invalidate()`, render again, and assert the capture instrument resolved
@@ -280,7 +306,9 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   `"context"'s format names a second width-taking variable: "$bar"`; a `$` not followed by a name
   character throws `"model"'s format has a bare $; escape a literal dollar as \$` — **the backslash is
   part of the emitted message**, so the source writes `\\$` inside the template literal. Note for the
-  PL7 and implementation checks, per the owner's ruling through the conductor (2026-11-05):
+  PL7 and implementation checks, per the conductor's supervisor reply to the tasks Builder
+  (2026-11-06), derived from D4's escape rule and seen by Joel in session without objection — it is
+  **not** in `owner-rulings.md`, is not the owner's ruling, and is not added there:
   `design.md`'s D3 table cell spells that template as `` `…escape a literal dollar as \$` ``, which
   evaluated as TypeScript loses the backslash its own sentence advises; the table cell is a notation
   slip, the pinned string carries the backslash, and `design.md` is not edited. Maximal-run is pinned
@@ -362,7 +390,10 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   variable, never a resolution to an `Object.prototype` member; and `instrumentNamed("toString")`,
   `("constructor")`, `("__proto__")` stay `undefined`. Discriminator: an `in` check or a bare
   `variables[name]` index resolves all four, so the test fails the moment `Object.hasOwn` is dropped —
-  named here as the mutation 7.5 re-runs. Boundary cases: a declaration whose variables record was
+  named here as the mutation 7.5 re-runs. The same defect class has a third site, and this group
+  cannot test it: D6's style-key check against the runtime `Record<keyof ThemeStyle, true>` list,
+  which `validateStyle` only gains at 4.9 — so its rejecting case lives at 4.5, its own-property pin
+  at 4.9 and its mutation at 7.5. Boundary cases: a declaration whose variables record was
   created with `Object.create(null)` still behaves identically (the guard is the lookup's, not the
   record's). Verified by: red before 3.12/3.13 only if the first implementation uses a bare index; the
   task exists so that it cannot, and 7.5 proves it by removal.
@@ -403,8 +434,15 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   install timing, `footerRows` and the `release` wiring do not move (design fact 1); and
   `tests/jefferson.test.ts`'s `setFooter` fake calls `factory(tui, theme)` with a fake from
   `tests/fake-theme.ts` (D14's harness bullet). New in this task: `tests/fake-theme.ts`, the one
-  structural fake described in the intro. Verified by: `pnpm typecheck` clean and `pnpm test` green,
-  with 3.1's default sweep and 3.7's footer-level agreement now running through the real binding.
+  structural fake described in the intro. Also in this task, because 3.1/3.11 retire the export it
+  imports: `tests/row-renderer.test.ts`'s `two cells holding the model instrument resolve identical
+  text` (2.3) builds its instrument locally with D2's binding snippet over the `model` declaration —
+  `resolveFormat(model, parseFormat(model, model.defaultFormat), {}, readings, width, theme)` — and
+  keeps its bytes exactly. The alternative Michael offered, running that test through a bound
+  instrument from `readConfiguration`, is beaten here: it would drag the configuration reader and a
+  document harness into the renderer's test file, whose subject is the cell pipeline. Verified by:
+  `pnpm typecheck` clean and `pnpm test` green, with 3.1's default sweep and 3.7's footer-level
+  agreement now running through the real binding.
 - [ ] 3.14 Pin — the contribution-key sweep extends to `format.ts` (D1's consequence): in
   `tests/jefferson.test.ts`, the exported-surface test's `register|supply|contribute` sweep covers
   `instrument.ts`, `session-data-store.ts` **and** `format.ts`, and the two-call
@@ -456,7 +494,7 @@ message string, inside the unchanged envelope
   its siblings still render theirs. Boundary cases: the `containers` notice and the unknown-instrument
   notice in one document still join with `; ` in the existing order; two unknown section names list
   both, once each. Verified by: red before 4.9 — the section is not read yet, so no warning names it.
-- [ ] 4.4 Red — the five format-side guards, one test each, each asserting the exact message and each
+- [ ] 4.4 Red — the format-side guards, one test each, each asserting the exact message and each
   **failing when its guard is removed** (the removal is 7.5's re-run): a non-object section →
   `the instruments value is not an object`; a non-object entry →
   `the instruments configuration for "model" is not an object`; a key the declaration's `options` does
@@ -466,6 +504,8 @@ message string, inside the unchanged envelope
   `instrument "model" has a format that is not a string`; and the two grammar rejections surfacing
   through the document — `"model"'s format names a variable it does not declare: "$nope"` and
   `"context"'s format names a second width-taking variable: "$bar"`. Every one renders the default row.
+  The bare-`$` and the `$bar`-without-`bar` guards are the two D3 rows whose tests live at **3.2**,
+  not here, and 7.5 routes their removals there.
   Boundary cases: `format: ""` is a string and is accepted (it renders nothing); `format: null` is
   present-and-not-a-string and is rejected; an option key with a non-ASCII spelling (`frmát`) is named
   byte-exactly through `JSON.stringify`; a guard fires for a name in the section even when no cell
@@ -482,9 +522,22 @@ message string, inside the unchanged envelope
   `instrument "model" has a style key that pi's ThemeStyle does not have: "colour"`;
   `instrument "model" has a style attribute that is not a boolean: "bold"`;
   `instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser
-  accepts: "nope"`; and the `bg` twin reading `background-slot`. Boundary cases: all six attributes
+  accepts: "nope"`; and the `bg` twin reading `background-slot`. Beside them, the style-key case
+  Michael's PL7 major finding requires — 3.10's defect class at its third site: a style carrying
+  `constructor`, `toString` or `__proto__` as a key is **rejected**, asserting
+  `instrument "model" has a style key that pi's ThemeStyle does not have: "constructor"` byte for
+  byte and the same shape naming `"toString"` and `"__proto__"`. An `in` or bare-index check against
+  the `Record<keyof ThemeStyle, true>` list finds all three on `Object.prototype`, skips every value
+  check and accepts the style, which silently breaks the spec's `A style pi's ThemeStyle does not
+  allow` scenario; `JSON.parse` makes `__proto__` an **own** key of the parsed document object (it
+  defines rather than assigns), so the document-level case reaches the key check with the key
+  present and must name it. Boundary cases: all six attributes
   accepted as booleans and each rejected as `"true"`; `style: {}` accepted and rendering byte-identical
-  to no style at all; `oklch(…)`/`okhsl(…)` accepted (design fact 9); `fg` as `""` — the terminal
+  to no style at all; `oklch(…)`/`okhsl(…)` accepted (design fact 9); **a number `parseColor`
+  rejects** — `fg: 256` and `bg: 1.5` — takes D3's exact fg/bg message and *not* pi-tui's own
+  `ANSI color index must be an integer from 0 to 255`, which is what an unpinned out-of-range number
+  surfaces instead (Michael verified at PL7 that `parseColor` throws for `256`, `-1` and `1.5` at
+  pi-tui 1.4.0; design fact 9); `fg` as `""` — the terminal
   default in the host's own vocabulary — is a string naming no token, so it goes to `parseColor` and is
   rejected, which is the honest reading of D6 and is pinned here rather than left to a reader.
   Verified by: red before 4.9.
@@ -521,13 +574,17 @@ message string, inside the unchanged envelope
   dropped, not compared); a second `invalidate()` is harmless; a styled cell at a width change
   re-styles rather than reusing the old width's text. Verified by: red before 4.9.
 - [ ] 4.9 Implement — `extensions/jefferson/format.ts` gains `validateStyle(raw, theme)` exactly as D6
-  states it: the eight `ThemeStyle` keys checked, the six attributes `typeof boolean`, `fg` probed
-  through `theme.getFgAnsi(value)` in a `try`/`catch` with a throw falling through to `parseColor(value)`
-  and a parse throw becoming the D3 rejection, `bg` symmetric through `getBgAnsi`, a number through
-  `parseColor`, any other type rejected; a successful probe keeps the **string**, a successful parse
-  keeps the **`Color` object**. `extensions/jefferson/configuration.ts` gains the `instruments` section
-  in D3's read order, its twelve guards with D3's exact messages, `ConfigurationSource.theme`, and the
-  binding of a configured `format` and validated `style` into the memoized per-name `Instrument`.
+  states it: the eight `ThemeStyle` keys checked through an **own-property** lookup —
+  `Object.hasOwn` against the runtime `Record<keyof ThemeStyle, true>` key record (4.10(b)), never
+  `in` and never a bare index, both of which find `constructor`, `toString` and `__proto__` on
+  `Object.prototype` and accept them (4.5's rejecting case) — the six attributes `typeof boolean`,
+  `fg` probed through `theme.getFgAnsi(value)` in a `try`/`catch` with a throw falling through to
+  `parseColor(value)` and a parse throw becoming the D3 rejection, `bg` symmetric through
+  `getBgAnsi`, a number through `parseColor`, any other type rejected; a successful probe keeps the
+  **string**, a successful parse keeps the **`Color` object**. `extensions/jefferson/configuration.ts`
+  gains the `instruments` section in D3's read order, its guards with D3's exact messages,
+  `ConfigurationSource.theme`, and the binding of a configured `format` and validated `style` into
+  the memoized per-name `Instrument`.
   `extensions/jefferson.ts` passes `ctx.ui.theme` — the live theme at `session_start` (addendum 2 Q3) —
   and `tests/jefferson.test.ts`'s fake `ctx.ui` grows `theme`. Open point, named rather than decided:
   D3 says every guard *is* a `RejectedConfiguration` while D1's import edges forbid `format.ts` to
@@ -662,9 +719,14 @@ gate: documentation the change made false is corrected). No code moves in this g
   in any of them is a design error to report, not a task to tick. Verified by: the `git diff --stat`
   output recorded raw.
 - [ ] 7.5 — re-run every mutation check this list claims, one edit at a time, recording each edit and
-  the test that catches it: remove each of the twelve D3 guards in turn → its 4.4/4.5 test fails naming
-  the exact message; drop `Object.hasOwn` from the variable lookup → 3.10 fails with `$constructor`
-  resolved; drop it from `instrumentNamed` → 3.1 fails; set `grow: 0` → 2.1 (a) and (c) fail; remove the
+  the test that catches it: remove each D3 guard in turn → its own test fails naming the exact
+  message, routed by guard rather than by count — 4.4 catches the section, entry, option-key,
+  format-type, unknown-variable and second-width-taker guards; 4.5 catches the style shape, style
+  key, style attribute and `fg`/`bg` value guards; **3.2** catches the bare-`$` and the
+  `$bar`-without-`bar` guards, whose tests live there; drop `Object.hasOwn` from the variable lookup
+  → 3.10 fails with `$constructor` resolved; drop it from `instrumentNamed` → 3.1 fails; drop it from
+  the style-key check → 4.5's `constructor`/`toString`/`__proto__` case fails, the document
+  accepted; set `grow: 0` → 2.1 (a) and (c) fail; remove the
   `basis` and leave `grow: 1` → 2.1 (b) and (c) fail on the skewed shares; drop `sample` from the memo
   key → 2.3's across-render half fails; restore the per-render tree → 2.2's identity half fails; delete
   the RESET-before-pad → 4.7's styled byte shapes fail; move the collapse after styling → 3.9's ordering
@@ -726,7 +788,8 @@ render observes one state` by 2.3 and 3.7, `Every subscription is released when 
 by 5.1 and 5.4.
 
 **`design.md`** — D1: 3.11, 3.12, 3.14, 7.4 · D2: 3.1, 3.11, 4.2, 4.9 · D3: 4.1, 4.3, 4.4, 4.5, 4.6,
-4.9, 7.5 · D4: 3.2, 3.3, 3.9, 3.12, 4.7 · D5: 3.8, 3.12, 7.5 · D6: 4.5, 4.8, 4.9, 4.10 · D7: 2.4,
+4.9, 7.5, and 3.2 for the two grammar guards whose tests live there (bare `$`, `$bar` without
+`bar`) · D4: 3.2, 3.3, 3.9, 3.12, 4.7 · D5: 3.8, 3.12, 7.5 · D6: 4.5, 4.8, 4.9, 4.10 · D7: 2.4,
 2.6 (steps 3–5), 3.9, 3.12 (steps 1–2), 4.7 · D8: 2.2, 2.3, 2.5, 2.6, 3.13 · D9: 1.1–1.9 · D10: 5.1,
 5.4 · D11: 3.4 · D12: 7.4 · D13: 6.1–6.5 · D14: 1.2, 1.9, 2.1–2.4, 3.1, 3.8, 3.9, 3.14, 4.5, 4.7,
 4.10, 7.5. The design's Risks are covered by the tests their mitigation names: the O(entries) scan by
