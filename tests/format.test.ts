@@ -284,3 +284,21 @@ test("no modifier and no configured style makes no style call", () => {
 test("a value the format does not mutate renders character for character", () => {
   assert.equal(rendered("model", "$model", { readings: { ...seed, model: "hELLO wORLD" } }), "hELLO wORLD");
 });
+
+test("a pipe no name follows is literal text", () => {
+  assert.equal(rendered("model", "$model | $provider"), "claude-opus-4 | anthropic");
+  assert.equal(rendered("model", "$model|"), "claude-opus-4|");
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|bold", { theme }), theme.style("claude-opus-4", { bold: true }));
+});
+
+test("a pipe followed by a dollar, a pipe or punctuation stays literal", () => {
+  assert.equal(rendered("model", "$model|$provider"), "claude-opus-4|anthropic");
+  assert.equal(rendered("model", "$model||$provider"), "claude-opus-4||anthropic");
+  assert.equal(rendered("model", "$model|."), "claude-opus-4|.");
+});
+
+test("an escaped pipe is a literal pipe and starts no modifier", () => {
+  assert.equal(rendered("model", "a\\|b"), "a|b");
+  assert.equal(rendered("model", "\\|bold"), "|bold");
+});

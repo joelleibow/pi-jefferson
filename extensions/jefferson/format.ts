@@ -50,8 +50,8 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
   };
   for (let index = 0; index < format.length; index++) {
     const character = format[index]!;
-    if (character === "\\" && format[index + 1] === "$") {
-      literal += "$";
+    if (character === "\\" && (format[index + 1] === "$" || format[index + 1] === "|")) {
+      literal += format[index + 1];
       afterName = false;
       index++;
     } else if (character === "$") {

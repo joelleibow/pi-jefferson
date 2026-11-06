@@ -97,7 +97,7 @@ Notes for the writing session:
 
 ## 3. The pipe itself
 
-- [ ] 3.1 A `|` that no name follows stays the character it is. When the next character is a space,
+- [x] 3.1 A `|` that no name follows stays the character it is. When the next character is a space,
       the end of the format, `$`, `|` or punctuation, the pipe joins the literal text (D5).
       **Test first:** `$model | $provider` renders `claude-opus-4 | anthropic` (spec, "A pipe no
       name follows"); a format ending in `|` renders that bar as text; `$model|bold` still reaches
@@ -105,7 +105,7 @@ Notes for the writing session:
       green. **Boundary:** `|` followed by `$`, by `|`, by `.` and by end-of-string — the four
       shapes the lookahead must treat as text.
 
-- [ ] 3.2 `\|` writes a literal pipe. A backslash followed by `$` or `|` emits that character and
+- [x] 3.2 `\|` writes a literal pipe. A backslash followed by `$` or `|` emits that character and
       consumes both, and any other backslash, including a trailing one, still emits itself (D5).
       **Test first:** `a\|b` renders `a|b` and starts no modifier (spec, "A literal pipe beside a
       name"); `\|bold` renders `|bold` as text; and the two existing behaviours survive — `\$`
