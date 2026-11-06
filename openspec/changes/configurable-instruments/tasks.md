@@ -158,7 +158,7 @@ built once and reads the current render's sample`. D14's rule governs the whole 
 and memo expectations **move**, they are not duplicated — a parallel test left beside the old one
 would let a stale expectation survive.
 
-- [ ] 2.1 Red — in `tests/row-renderer.test.ts`, the three geometry fixtures D14 names, moved onto
+- [x] 2.1 Red — in `tests/row-renderer.test.ts`, the three geometry fixtures D14 names, moved onto
   `createFooter([row], () => readings).render(width)[0]` (`renderRow` retires at 2.6). (a) Rename
   `a width that does not divide evenly leaves the remainder blank at the right edge` to
   `a width that does not divide evenly spends the remainder on the row's earliest cells`: three cells
@@ -176,7 +176,7 @@ would let a stale expectation survive.
   and `grow: 1` *without* the basis gives 13,11,10,9,8,7,6,6,5,5 at ten cells over 80 (owner-rulings;
   chidi §4.2), which (b) and (c) fail. Verified by: red before 2.6 under `node --test
   tests/row-renderer.test.ts`.
-- [ ] 2.2 Red — the resize and the re-seat. `cell widths are recomputed when the width changes` moves
+- [x] 2.2 Red — the resize and the re-seat. `cell widths are recomputed when the width changes` moves
   onto one footer rendered at 100 then 90: assert the second line is `composed(3 × padEnd(30))`, that
   `visibleWidth` is 90, and that **no cell kept its previous width** (34/33/33 → 30/30/30). Beside it,
   the built-once proof: with a fixture `sampleReadings` returning **the same object identity** every
@@ -192,7 +192,7 @@ would let a stale expectation survive.
   path; and rows of differing cell counts in one footer each take `floor(width / that row's count)`.
   Verified by: red before 2.6 — the identity half fails on `main` (the memo dies with the render) and
   the geometry half fails under `grow: 0`.
-- [ ] 2.3 Red — the sample slot and the memo, restated per D14 rather than added beside:
+- [x] 2.3 Red — the sample slot and the memo, restated per D14 rather than added beside:
   `one render samples the store exactly once, whatever the row and cell count` keeps its name and
   **accounts for the install-time initial sample** — `createFooter` seeds its render slot by calling
   `sampleReadings()` once at build (D8), so three rows of eight cells assert 1 after install, 2 after
@@ -209,7 +209,11 @@ would let a stale expectation survive.
   width-only memo passes the within-render half and fails the across-render half, which is exactly the
   stale-styled-text survival D8 forbids. Verified by: red before 2.6 — the counts are off by the
   install-time sample and the across-render half fails.
-- [ ] 2.4 Red — every remaining `renderRow` fixture moves onto a single-row footer with its expected
+  Implementation observation (conductor confirmed): on the pre-2.6 per-render tree, the install
+  sample assertion is red (0 versus 1), but the across-render half is green because rebuilding
+  already re-resolves. Its discriminator is the 7.5 width-only-memo mutation against the once-built
+  tree; retain the assertions unchanged and stop if that mutation does not fail.
+- [x] 2.4 Red — every remaining `renderRow` fixture moves onto a single-row footer with its expected
   bytes recomputed from the allocator's widths; the rule is `floor(W / N) + 1` for the first
   `W mod N` cells and the disappearance of every row-level `+ " ".repeat(remainder)` tail. Named, so
   nobody discovers them by failing: the three-cell-at-20 fixtures — `short cell text is padded…`,
@@ -234,14 +238,18 @@ would let a stale expectation survive.
   sentence described); the wide-glyph and combining-mark pads are still computed from the
   **clipped** result (trap two). Verified by: red before 2.6 under `node --test
   tests/row-renderer.test.ts`, and `rg -n "renderRow" tests/` empty afterwards.
-- [ ] 2.5 Red — `footer.invalidate()` stops being a no-op: with a fixture returning one constant
+- [x] 2.5 Red — `footer.invalidate()` stops being a no-op: with a fixture returning one constant
   sample object, render, call `invalidate()`, render again, and assert the capture instrument resolved
   again — and, for the row views, that a three-row configuration still renders three lines after the
   invalidation (`A row is one line tall`'s footer-height scenario, which the existing
   `the footer renders one line per row…` also carries). Boundary cases: `invalidate()` twice in a row
   is harmless; `invalidate()` before any render does not throw. Verified by: red before 2.6 — today's
   `invalidate()` is documented as a no-op, so the resolve count stays 1.
-- [ ] 2.6 Implement — `extensions/jefferson/row-renderer.ts` to D8: the tree built once in
+  Implementation observation (conductor confirmed on resume): this assertion is initially green
+  against the per-render tree because rebuilding already re-resolves. With the once-built tree
+  installed and footer.invalidate still a no-op, the unchanged assertion was demonstrated red
+  (actual 3, expected 6), then the designed cascade made it green. No pre-2.6 red is claimed.
+- [x] 2.6 Implement — `extensions/jefferson/row-renderer.ts` to D8: the tree built once in
   `createFooter` (per row, in declaration order, the cell `Component`s constructed once and kept in a
   closure array; each row's `HStack` constructed empty as `new HStack([], { gap: GAP })` with `GAP`
   still `0`; the tree `new VStack(rowStacks, { gap: 0 })`); the `let current: Readings =
@@ -258,7 +266,7 @@ would let a stale expectation survive.
   `Footer` type, and in the same task `tests/jefferson.test.ts`'s export-surface pin for the renderer
   becomes `["createFooter"]` (D14). Verified by: 2.1–2.5 green, `pnpm typecheck` clean,
   `rg -n "renderRow|remainder" extensions/jefferson/row-renderer.ts` empty.
-- [ ] 2.7 Green — `pnpm typecheck` and `pnpm test` both pass; the two end-to-end expectations that
+- [x] 2.7 Green — `pnpm typecheck` and `pnpm test` both pass; the two end-to-end expectations that
   must *not* have moved are checked: `a rejected configuration warns and still installs the default
   row` (ten cells at 80 → 8 each, remainder 0) and `a right-aligned cell ends at its cell's right
   edge end to end` (two cells at 80 → 40 each, index 66) keep their bytes because 80 divides by ten

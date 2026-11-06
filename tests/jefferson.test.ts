@@ -291,7 +291,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
 
   const renderer = await import("../extensions/jefferson/row-renderer.ts");
-  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter", "renderRow"]);
+  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
   assert.deepEqual(
