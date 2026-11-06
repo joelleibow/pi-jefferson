@@ -37,7 +37,7 @@ const MODIFIERS: ReadonlyMap<string, Modifier> = new Map<string, Modifier>([
 const WARNING_PERCENT = 70;
 const ERROR_PERCENT = 90;
 
-function collapse(text: string): string {
+export function collapse(text: string): string {
   return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
 }
 
@@ -202,5 +202,11 @@ export function resolveFormat(
     bar = styledPiece("█".repeat(filled), filledStyle, theme)
       + styledPiece("░".repeat(barWidth - filled), { ...style, dim: true }, theme);
   }
-  return segments.map((segment, index) => segment.kind === "bar" ? bar : styledPiece(pieces[index]!, mergedStyle(style, segment.modifiers), theme)).join("");
+  return segments.map((segment, index) => {
+    if (segment.kind === "bar") return bar;
+    const merged = mergedStyle(style, segment.modifiers);
+    // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
+    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(values.get(segment.name)!) : undefined;
+    return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
+  }).join("");
 }

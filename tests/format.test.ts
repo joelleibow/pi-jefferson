@@ -351,12 +351,12 @@ test("a modifier with nothing before it rejects naming the instrument and the mo
 
 test("capitalize upper-cases the first letter and leaves the rest", () => {
   for (const [thinkingLevel, expected] of [["high", "High"], ["HIGH", "HIGH"], ["hELLO", "HELLO"]] as const) {
-    assert.equal(rendered("thinking", "$level|capitalize", { readings: { ...seed, thinkingLevel } }), expected, thinkingLevel);
+    assert.equal(stripTerminalSequences(rendered("thinking", "$level|capitalize", { readings: { ...seed, thinkingLevel } })), expected, thinkingLevel);
   }
 });
 
 test("upper and lower change the whole value without re-tokenizing it", () => {
-  assert.equal(rendered("thinking", "$level|upper", { readings: { ...seed, thinkingLevel: "high" } }), "HIGH");
+  assert.equal(stripTerminalSequences(rendered("thinking", "$level|upper", { readings: { ...seed, thinkingLevel: "high" } })), "HIGH");
   assert.equal(rendered("thinking", "$level|lower", { readings: { ...seed, thinkingLevel: "HIGH" } }), "high");
   assert.equal(rendered("model", "$model|upper", { readings: { ...seed, model: "straße" } }), "STRASSE");
   assert.equal(rendered("model", "$model|upper", { readings: { ...seed, model: "hELLO wORLD" } }), "HELLO WORLD");

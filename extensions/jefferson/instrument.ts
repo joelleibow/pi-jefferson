@@ -1,6 +1,6 @@
 /** Each instrument owns its name, variables, default format and accepted options. */
 import { basename } from "node:path";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 
 import type { Readings } from "./session-data-store.ts";
 
@@ -16,10 +16,12 @@ export interface InstrumentDeclaration {
   readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
   readonly bar?: (readings: Readings) => number | null;
   readonly defaultFormat: string;
+  readonly defaultLabel?: string;
+  readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
   readonly options: readonly string[];
 }
 
-const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style"] as const);
+const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style", "label"] as const);
 const THOUSAND = 1_000;
 const MILLION = 1_000_000;
 const DECIMAL_THOUSANDS_LIMIT = 100_000;
@@ -47,10 +49,18 @@ const model: InstrumentDeclaration = {
   options: FOUNDATIONAL_OPTIONS,
 };
 
+/** Pi's per-level editor-border tokens, the color its input box gives the thinking rules. */
+const THINKING_FG: Readonly<Record<string, ThemeColor>> = {
+  off: "thinkingOff", minimal: "thinkingMinimal", low: "thinkingLow", medium: "thinkingMedium",
+  high: "thinkingHigh", xhigh: "thinkingXhigh", max: "thinkingMax",
+};
+
 const thinking: InstrumentDeclaration = {
   name: "thinking",
   variables: { level: r => r.thinkingLevel },
-  defaultFormat: "thinking: $level",
+  variableFg: { level: level => THINKING_FG[level] },
+  defaultFormat: "$level|capitalize",
+  defaultLabel: "Thinking: ",
   options: FOUNDATIONAL_OPTIONS,
 };
 

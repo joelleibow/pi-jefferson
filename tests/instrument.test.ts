@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { DEFAULT_CELL_TEXT, blank, instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/instrument.ts";
 import type { Readings } from "../extensions/jefferson/session-data-store.ts";
+import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
@@ -29,7 +30,7 @@ function unreadable(known: Partial<Readings> = {}): Readings {
 const shapes = [
   ["blank", [], DEFAULT_CELL_TEXT],
   ["model", ["provider", "model"], "$provider: $model"],
-  ["thinking", ["level"], "thinking: $level"],
+  ["thinking", ["level"], "$level|capitalize"],
   ["path", ["path"], "$path"],
   ["context", ["tokens", "window", "percent"], "$percent/$window"],
   ["tokens", ["input", "output", "cacheRead", "cacheWrite", "totalTokens"], "$totalTokens"],
@@ -46,7 +47,7 @@ function named(name: string): InstrumentDeclaration {
 async function render(name: string, readings: Readings, format?: string): Promise<string> {
   const declaration = named(name);
   const { parseFormat, resolveFormat } = await import("../extensions/jefferson/format.ts");
-  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, (await import("./fake-theme.ts")).fakeTheme());
+  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
 }
 
 test("the seven shipped declarations own their names, variables, defaults and foundational options", () => {
@@ -54,7 +55,8 @@ test("the seven shipped declarations own their names, variables, defaults and fo
     const declaration = named(name);
     assert.deepEqual(Object.keys(declaration.variables), variables);
     assert.equal(declaration.defaultFormat, format);
-    assert.deepEqual(declaration.options, ["format", "style"]);
+    assert.deepEqual(declaration.options, ["format", "style", "label"]);
+    assert.equal(declaration.defaultLabel, name === "thinking" ? "Thinking: " : undefined);
     assert.equal(Object.isFrozen(declaration.options), true);
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
@@ -72,7 +74,7 @@ test("unimplemented and inherited names stay unresolved however often asked", ()
 });
 
 test("every shipped default parses and renders its declared text", async () => {
-  const expected = [DEFAULT_CELL_TEXT, "anthropic: claude-opus-4", "thinking: high", "pi-jefferson", "43.2%/200k", "0", "$0.000"];
+  const expected = [DEFAULT_CELL_TEXT, "anthropic: claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson", "43.2%/200k", "0", "$0.000"];
   for (const [index, [name]] of shapes.entries()) {
     assert.equal(await render(name, seed), expected[index], name);
   }
@@ -86,13 +88,28 @@ test("blank resolves its placeholder without reading any datum", async () => {
 
 test("model and thinking default formats keep their original text shapes", async () => {
   assert.equal(await render("model", seed), "anthropic: claude-opus-4");
-  assert.equal(await render("thinking", seed), "thinking: high");
-  assert.equal(await render("thinking", { ...seed, thinkingLevel: "off" }), "thinking: off");
+  assert.equal(await render("thinking", seed), fakeTheme().style("High", { fg: "thinkingHigh" }));
+  assert.equal(await render("thinking", { ...seed, thinkingLevel: "off" }), fakeTheme().style("Off", { fg: "thinkingOff" }));
+});
+
+test("every thinking level renders its level text in that level's own thinking foreground", async () => {
+  const theme = fakeTheme();
+  const levels = [
+    ["off", "thinkingOff"], ["minimal", "thinkingMinimal"], ["low", "thinkingLow"],
+    ["medium", "thinkingMedium"], ["high", "thinkingHigh"], ["xhigh", "thinkingXhigh"], ["max", "thinkingMax"],
+  ] as const;
+  const foregrounds: string[] = [];
+  for (const [level, token] of levels) {
+    const capitalized = level[0]!.toUpperCase() + level.slice(1);
+    assert.equal(await render("thinking", { ...seed, thinkingLevel: level }), theme.style(capitalized, { fg: token }), level);
+    foregrounds.push(theme.getFgAnsi(token));
+  }
+  assert.equal(new Set(foregrounds).size, levels.length, "no two levels share a foreground");
 });
 
 test("each declaration reads only the datums its variables display", async () => {
   assert.equal(await render("model", unreadable({ provider: "anthropic", model: "claude-opus-4" })), "anthropic: claude-opus-4");
-  assert.equal(await render("thinking", unreadable({ thinkingLevel: "high" })), "thinking: high");
+  assert.equal(await render("thinking", unreadable({ thinkingLevel: "high" })), fakeTheme().style("High", { fg: "thinkingHigh" }));
   assert.equal(await render("path", unreadable({ cwd: seed.cwd })), "pi-jefferson");
   assert.equal(await render("context", unreadable({ contextUsage: seed.contextUsage })), "43.2%/200k");
   assert.equal(await render("tokens", unreadable({ totals: seed.totals })), "0");
@@ -104,6 +121,10 @@ test("unknown suppresses the whole model declaration even under a model-only for
   assert.equal(await render("model", { ...seed, model: undefined }), "");
   assert.equal(await render("model", unknown), "");
   assert.equal(await render("model", { ...seed, provider: "" }, "$provider: $model"), ": claude-opus-4");
+});
+
+test("the level's token is chosen from the value before a modifier changes it", async () => {
+  assert.equal(await render("thinking", seed, "$level|capitalize"), fakeTheme().style("High", { fg: "thinkingHigh" }));
 });
 
 test("unknown thinking renders nothing and never invents off", async () => {
