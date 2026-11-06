@@ -116,7 +116,7 @@ Notes for the writing session:
 
 ## 4. Plain text
 
-- [ ] 4.1 A modifier on literal text takes the trailing non-whitespace run (D5 case 3, D6).
+- [x] 4.1 A modifier on literal text takes the trailing non-whitespace run (D5 case 3, D6).
       **Test first:** `🧠 $model via|dim $provider` renders `via` dim and no other text dim (spec,
       "A modifier on literal text"); `hello world|dim` renders `world` dim and `hello` plain;
       `a\u00a0b|dim` renders `b` dim alone, because U+00A0 is whitespace under `/\S+$/`; and
@@ -127,7 +127,7 @@ Notes for the writing session:
       **Boundary:** U+00A0, which is whitespace under the expression; and `\u0001`, which is not,
       and becomes one only after the collapse.
 
-- [ ] 4.2 A second modifier on literal text joins the same run rather than starting a new subject
+- [x] 4.2 A second modifier on literal text joins the same run rather than starting a new subject
       (D5 case 2). **Test first:** `$model via|dim|bold $provider` renders `via` both dim and bold,
       and nothing else carrying either attribute (spec, "A chain on literal text"). **Verify:** the
       assertion passes and `via` appears once in the rendered text. **Boundary:** the chain must not

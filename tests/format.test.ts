@@ -302,3 +302,19 @@ test("an escaped pipe is a literal pipe and starts no modifier", () => {
   assert.equal(rendered("model", "a\\|b"), "a|b");
   assert.equal(rendered("model", "\\|bold"), "|bold");
 });
+
+test("a modifier on literal text takes the non-whitespace run before it", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "🧠 $model via|dim $provider", { theme }),
+    "🧠 claude-opus-4 " + theme.style("via", { dim: true }) + " anthropic");
+  assert.equal(rendered("model", "hello world|dim", { theme }), "hello " + theme.style("world", { dim: true }));
+  assert.equal(rendered("model", "a\u00a0b|dim", { theme }), "a\u00a0" + theme.style("b", { dim: true }));
+  assert.equal(rendered("model", "a\u0001b|dim", { theme }), "a " + theme.style("b", { dim: true }));
+});
+
+test("a chain on literal text extends the same run", () => {
+  const theme = fakeTheme();
+  const text = rendered("model", "$model via|dim|bold $provider", { theme });
+  assert.equal(text, "claude-opus-4 " + theme.style("via", { dim: true, bold: true }) + " anthropic");
+  assert.equal(occurrences(stripTerminalSequences(text), "via"), 1);
+});

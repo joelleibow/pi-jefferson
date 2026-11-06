@@ -76,7 +76,7 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
     } else if (character === "|") {
       const name = format.slice(index + 1).match(/^[A-Za-z0-9_]+/)?.[0];
       const subject = segments[segments.length - 1];
-      if (name === undefined || !afterName || subject === undefined || subject.kind === "bar") {
+      if (name === undefined) {
         literal += character;
         afterName = false;
       } else {
@@ -84,8 +84,22 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         if (modifier === undefined) {
           throw new Error(`${JSON.stringify(declaration.name)}'s format names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
         }
-        segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+        const text = collapse(literal);
+        const run = afterName ? undefined : text.match(/\S+$/)?.[0];
+        if (subject !== undefined && subject.kind !== "bar" && afterName) {
+          segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+        } else if (subject?.kind !== "bar" && run !== undefined) {
+          const prefix = text.slice(0, text.length - run.length);
+          if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
+          segments.push({ kind: "literal", text: run, modifiers: [modifier] });
+          literal = "";
+        } else {
+          literal += character;
+          afterName = false;
+          continue;
+        }
         index += name.length;
+        afterName = true;
       }
     } else {
       literal += character;
