@@ -573,6 +573,10 @@ test("the document surfaces the second-width-taker guard's full message", () => 
   rejected({ instruments: { context: { format: "$bar $bar" } } }, '"context"\'s format names a second width-taking variable: "$bar"');
 });
 
+test("the document surfaces the unknown-modifier guard's full message", () => {
+  rejected({ instruments: { model: { format: "$model|bd" } } }, '"model"\'s format names a modifier it does not implement: "|bd"');
+});
+
 test("the style shape guard rejects a non-object with the full composed message", () => {
   for (const style of [null, [], 42, "bold"]) {
     rejected({ instruments: { model: { style } } }, 'instrument "model" has a style that is not an object');

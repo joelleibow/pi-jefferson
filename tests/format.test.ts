@@ -135,7 +135,7 @@ test("bar-only formats fill their cell with clamped and floored pressure", () =>
 
 test("control characters collapse per character in literals and substituted values", () => {
   const controls = "\r\n\t\u007f\u009b";
-  assert.deepEqual(parseFormat(named("model"), `L${controls}R`), [{ kind: "literal", text: "L     R" }]);
+  assert.deepEqual(parseFormat(named("model"), `L${controls}R`), [{ kind: "literal", text: "L     R", modifiers: [] }]);
   assert.equal(rendered("model", `$model`, { readings: { ...seed, model: `L${controls}R` } }), "L     R");
   assert.equal(rendered("model", "$model", { readings: { ...seed, model: controls } }), "     ");
 });
@@ -210,3 +210,183 @@ for (const [key, message] of [
     assert.throws(() => validateStyle({ [key]: ["#bf5700"] }, fakeTheme()), { message });
   });
 }
+
+const ATTRIBUTES = {
+  bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
+} satisfies Record<Exclude<keyof ThemeStyle, "fg" | "bg">, true>;
+
+test("every shipped modifier name parses", () => {
+  for (const name of [...Object.keys(ATTRIBUTES), "capitalize", "upper", "lower"]) {
+    assert.doesNotThrow(() => parseFormat(named("model"), `$model|${name}`), name);
+  }
+});
+
+test("an unknown modifier rejects naming the instrument and the modifier", () => {
+  for (const name of ["bd", "accent", "fg"]) {
+    assert.throws(() => parseFormat(named("model"), `$model|${name}`),
+      { message: `"model"'s format names a modifier it does not implement: "|${name}"` });
+  }
+});
+
+test("a modifier after an undeclared variable reports the variable, not the modifier", () => {
+  assert.throws(() => parseFormat(named("model"), "$nope|bold"),
+    { message: '"model"\'s format names a variable it does not declare: "$nope"' });
+});
+
+function occurrences(text: string, sequence: string): number {
+  return text.split(sequence).length - 1;
+}
+
+test("each style modifier styles the value through one theme.style call", () => {
+  for (const key of Object.keys(ATTRIBUTES)) {
+    const theme = fakeTheme();
+    assert.equal(rendered("model", `$model|${key}`, { theme }), theme.style("claude-opus-4", { [key]: true }), key);
+  }
+});
+
+test("a modifier sets an attribute its instrument's style sets off", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|bold", { style: { bold: false }, theme }),
+    theme.style("claude-opus-4", { bold: true }));
+});
+
+test("a modifier merges into the instrument's style rather than wrapping it", () => {
+  const theme = fakeTheme();
+  assert.equal(occurrences(rendered("model", "$model|bold", { theme }), "\x1b[1m"), 1);
+  assert.equal(occurrences(rendered("model", "$model|dim", { style: { bold: true }, theme }), "\x1b[22m"), 1);
+});
+
+test("a chain extends the same segment rather than starting a new one", () => {
+  const theme = fakeTheme();
+  const segments = parseFormat(named("model"), "$provider|bold|underline");
+  assert.equal(segments.length, 1);
+  assert.equal(segments.flatMap(segment => segment.kind === "bar" ? [] : segment.modifiers).length, 2);
+  assert.equal(rendered("model", "$provider|bold|underline", { theme }),
+    theme.style("anthropic", { bold: true, underline: true }));
+  assert.equal(occurrences(rendered("model", "$model|bold|bold", { theme }), "\x1b[1m"), 1);
+});
+
+function countingTheme(): { theme: Theme; styleCalls: () => number } {
+  const base = fakeTheme();
+  let calls = 0;
+  return {
+    theme: { ...base, style: (text: string, options: ThemeStyle) => { calls++; return base.style(text, options); } } as Theme,
+    styleCalls: () => calls,
+  };
+}
+
+test("no modifier and no configured style makes no style call", () => {
+  const { theme, styleCalls } = countingTheme();
+  assert.equal(rendered("model", "$model", { theme }), "claude-opus-4");
+  assert.equal(styleCalls(), 0);
+});
+
+test("a value the format does not mutate renders character for character", () => {
+  assert.equal(rendered("model", "$model", { readings: { ...seed, model: "hELLO wORLD" } }), "hELLO wORLD");
+});
+
+test("a pipe no name follows is literal text", () => {
+  assert.equal(rendered("model", "$model | $provider"), "claude-opus-4 | anthropic");
+  assert.equal(rendered("model", "$model|"), "claude-opus-4|");
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|bold", { theme }), theme.style("claude-opus-4", { bold: true }));
+});
+
+test("a pipe followed by a dollar, a pipe or punctuation stays literal", () => {
+  assert.equal(rendered("model", "$model|$provider"), "claude-opus-4|anthropic");
+  assert.equal(rendered("model", "$model||$provider"), "claude-opus-4||anthropic");
+  assert.equal(rendered("model", "$model|."), "claude-opus-4|.");
+});
+
+test("an escaped pipe is a literal pipe and starts no modifier", () => {
+  assert.equal(rendered("model", "a\\|b"), "a|b");
+  assert.equal(rendered("model", "\\|bold"), "|bold");
+});
+
+test("a modifier on literal text takes the non-whitespace run before it", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "🧠 $model via|dim $provider", { theme }),
+    "🧠 claude-opus-4 " + theme.style("via", { dim: true }) + " anthropic");
+  assert.equal(rendered("model", "hello world|dim", { theme }), "hello " + theme.style("world", { dim: true }));
+  assert.equal(rendered("model", "a\u00a0b|dim", { theme }), "a\u00a0" + theme.style("b", { dim: true }));
+  assert.equal(rendered("model", "a\u0001b|dim", { theme }), "a " + theme.style("b", { dim: true }));
+});
+
+test("a chain on literal text extends the same run", () => {
+  const theme = fakeTheme();
+  const text = rendered("model", "$model via|dim|bold $provider", { theme });
+  assert.equal(text, "claude-opus-4 " + theme.style("via", { dim: true, bold: true }) + " anthropic");
+  assert.equal(occurrences(stripTerminalSequences(text), "via"), 1);
+});
+
+test("a modifier on the bar rejects naming the bar and the modifier", () => {
+  assert.throws(() => parseFormat(named("context"), "$bar|bold"),
+    { message: '"context"\'s format puts a modifier on "$bar": "|bold"' });
+});
+
+test("a modifier on text after the bar styles the text, not the bar", () => {
+  const theme = fakeTheme();
+  const text = rendered("context", "$bar ok|bold", { width: 20, theme });
+  assert.equal(stripTerminalSequences(text), "█".repeat(7) + "░".repeat(10) + " ok");
+  assert.ok(text.endsWith(" " + theme.style("ok", { bold: true })));
+});
+
+test("a modifier on the text closing a bar styles that text", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("context", "[$bar]|dim", { width: 20, theme }),
+    "[" + "█".repeat(7) + theme.style("░".repeat(11), { dim: true }) + theme.style("]", { dim: true }));
+});
+
+test("a modifier after the bar and a space has nothing before it", () => {
+  assert.throws(() => parseFormat(named("context"), "$bar |dim"),
+    { message: '"context"\'s format has a modifier with nothing before it: "|dim"' });
+});
+
+test("a modifier with nothing before it rejects naming the instrument and the modifier", () => {
+  for (const format of ["🧠 |dim $model", "|dim"]) {
+    assert.throws(() => parseFormat(named("model"), format),
+      { message: '"model"\'s format has a modifier with nothing before it: "|dim"' });
+  }
+});
+
+test("capitalize upper-cases the first letter and leaves the rest", () => {
+  for (const [thinkingLevel, expected] of [["high", "High"], ["HIGH", "HIGH"], ["hELLO", "HELLO"]] as const) {
+    assert.equal(rendered("thinking", "$level|capitalize", { readings: { ...seed, thinkingLevel } }), expected, thinkingLevel);
+  }
+});
+
+test("upper and lower change the whole value without re-tokenizing it", () => {
+  assert.equal(rendered("thinking", "$level|upper", { readings: { ...seed, thinkingLevel: "high" } }), "HIGH");
+  assert.equal(rendered("thinking", "$level|lower", { readings: { ...seed, thinkingLevel: "HIGH" } }), "high");
+  assert.equal(rendered("model", "$model|upper", { readings: { ...seed, model: "straße" } }), "STRASSE");
+  assert.equal(rendered("model", "$model|upper", { readings: { ...seed, model: "hELLO wORLD" } }), "HELLO WORLD");
+});
+
+test("a modifier cannot resurrect an unknown value", () => {
+  const readings = { ...seed, thinkingLevel: undefined };
+  assert.equal(rendered("thinking", "$level|capitalize", { readings }), "");
+  assert.equal(rendered("thinking", "$level", { readings }), "");
+});
+
+test("a mutation runs before the bar measures the columns left over", () => {
+  const width = 20;
+  for (const format of ["straße|upper $bar", "STRASSE|upper $bar"]) {
+    const text = rendered("context", format, { width });
+    const plain = stripTerminalSequences(text);
+    assert.ok(plain.startsWith("STRASSE "), format);
+    assert.equal(visibleWidth(plain.slice("STRASSE ".length)), width - visibleWidth("STRASSE "), format);
+    assert.equal(visibleWidth(text), width, format);
+  }
+});
+
+test("a mutation runs before styling so it cannot rewrite an escape sequence", () => {
+  const text = rendered("model", "$model|upper", { style: { bold: true } });
+  assert.ok(text.includes("\x1b[1m"));
+  assert.equal(text.includes("\x1b[1M"), false);
+  assert.equal(rendered("model", "$model|lower", { style: { bold: true } }),
+    rendered("model", "$model", { style: { bold: true } }));
+});
+
+test("a chain applies its string mutations in the order the format writes them", () => {
+  assert.equal(rendered("thinking", "$level|lower|capitalize", { readings: { ...seed, thinkingLevel: "HIGH" } }), "High");
+});

@@ -38,8 +38,11 @@ message that names what was wrong. An unknown instrument *name* is different: it
 
 **Instrument.** One declaration owns its name, variables, default format and options. Variables read
 the store and arrive already formatted. The bound `(readings, width, theme) => string` renders its
-format with those values; the language collapses controls before styling each segment and drawing
-`$bar`. Instruments know nothing about alignment.
+format with those values. A format may carry `|name` modifiers after a variable or after the text
+in front of them, and the language commits to one order: it renders the cell empty when a value it
+declares is unknown, collapses control characters, runs a segment's string mutations in the order
+the format writes them, measures the columns `$bar` leaves, and styles each segment once.
+Instruments know nothing about alignment.
 
 **Row renderer.** Builds one `VStack` of `HStack` rows at install, retaining every cell component.
 The basis is ours (`floor(W / N)` per cell); the remainder is the allocator's (`grow: 1`, `gap: 0`).
@@ -58,9 +61,13 @@ working parts  →  each other (types and pure functions)
 working parts  ✗→  entry
 ```
 
-Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never `dependencies`.
-Any shipped file may import one; see `docs/adr/0001-imports-run-one-way.md` for why the older
-entry-only rule was retired.
+Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never
+`dependencies`. Any shipped file may import one; see `docs/adr/0001-imports-run-one-way.md` for why
+the older entry-only rule was retired.
+
+The package's one runtime dependency, `lodash-es`, supplies a format modifier's string mutations;
+see [ADR 0004](docs/adr/0004-string-mutations-come-from-lodash-es.md). A format's styling needs no
+dependency: its modifiers are pi's own six attributes.
 
 ## Two things that will bite
 
