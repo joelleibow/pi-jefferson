@@ -30,15 +30,18 @@ cannot outlive its context; disposal clears the readers, and later samples are a
 per render is handed to every cell, so cost and tokens share one totals object.
 
 **Configuration.** Reads the document, validates it, resolves instrument names, and normalizes rows.
-The optional `instruments` section configures each name once; formats and styles are validated at read
-time against its declaration and the live theme, then one bound instrument per name is shared across
-the document. Every failure mode rejects the whole document, renders the default row, and warns with a
+The optional `instruments` section configures each name once; formats, labels and styles are validated
+at read time against its declaration and the live theme, then one bound instrument per name is shared
+across the document. Every failure mode rejects the whole document, renders the default row, and warns with a
 message that names what was wrong. An unknown instrument *name* is different: it warns and renders
 `blank` in that cell.
 
-**Instrument.** One declaration owns its name, variables, default format and options. Variables read
-the store and arrive already formatted. The bound `(readings, width, theme) => string` renders its
-format with those values. A format may carry `|name` modifiers after a variable or after the text
+**Instrument.** One declaration owns its name, variables, default format and options, and may carry a
+default label and a per-variable foreground token. Variables read the store and arrive already
+formatted. Configuration resolves the label (configured, else the declaration's default), collapses its
+control characters once, and hands it to the format language as a leading literal segment, so the label
+is styled and measured like the format's own text. A variable's declared token can replace that
+segment's `fg`. The bound `(readings, width, theme) => string` renders its format with those values. A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
 declares is unknown, collapses control characters, runs a segment's string mutations in the order
 the format writes them, measures the columns `$bar` leaves, and styles each segment once.

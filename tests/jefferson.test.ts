@@ -289,9 +289,9 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
 
   const line = session.lines(80)[0] ?? "";
   assert.equal(visibleWidth(line), 80);
-  // Two frames of ten characters precede the text in the raw line, so the index is taken on what
-  // a reader sees: 66 in visible(line), never the framing-shifted 86 of the raw line.
-  assert.equal(visible(line).indexOf("thinking: high"), 66);
+  // Two frames of ten characters precede the text in the raw line, so the index is taken on
+  // stripTerminalSequences(line): 66 in the stripped text, never the framing-shifted 86 raw.
+  assert.equal(stripTerminalSequences(line).indexOf("Thinking: High"), 66);
 });
 
 test("the exported surface offers no way to supply or replace cell content", async () => {
@@ -350,7 +350,7 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
 
     const [line] = session.lines(80);
     assert.ok(visible(line ?? "").startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
-    assert.ok(visible(line ?? "").includes("thinking: high"), "the thinking cell renders the seed");
+    assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: High"), "the thinking cell renders the seed");
     assert.deepEqual(session.notified, []);
   });
 }
@@ -397,8 +397,24 @@ test("a thinking-level push changes the line and requests one repaint", async (t
 
   h.dispatch({ type: "thinking_level_select", level: "low" });
 
-  assert.ok(visible(session.lines(80)[0] ?? "").includes("thinking: low"));
+  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: Low"));
   assert.equal(session.repaints(), 1);
+});
+
+test("the thinking cell follows the host through the label path", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "thinking" }] });
+  const h = harness();
+  const session = await h.start({ reason: "startup", thinkingLevel: "high" });
+  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: High"));
+  h.dispatch({ type: "thinking_level_select", level: "low" });
+  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: Low"));
+  assert.equal(session.repaints(), 1);
+  h.dispatch({ type: "thinking_level_select", level: "low" });
+  assert.equal(session.repaints(), 1, "a repeated level requests no extra repaint");
+
+  const restored = await harness().start({ reason: "resume", thinkingLevel: "xhigh" });
+  assert.ok(stripTerminalSequences(restored.lines(80)[0] ?? "").includes("Thinking: Xhigh"), "a restored session shows the level it was seeded with");
 });
 
 test("a push carrying the values the store already holds requests no repaint", async (t) => {
@@ -448,7 +464,7 @@ test("a second session_start releases the first install before installing its ow
 
   const [line] = second.lines(80);
   assert.ok(visible(line ?? "").startsWith("openai: gpt-5"), "the second footer renders the second context");
-  assert.ok(visible(line ?? "").includes("thinking: low"), "never the first install's values");
+  assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: Low"), "never the first install's values");
 
   h.dispatch({ type: "model_select", model: { provider: "google", id: "gemini-3" } });
   assert.equal(second.repaints(), 1, "the repaint lands on the second tui");
@@ -575,7 +591,7 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
   test(`a ${reason} replacement drops the old cwd, model, totals and captured readers`, async (t) => {
     const agentDir = useTempAgentDir(t);
     writeAgentDocument(agentDir, {
-      instruments: { model: { format: "$model" }, thinking: { format: "$level" } },
+      instruments: { model: { format: "$model" }, thinking: { format: "$level", label: "" } },
       cells: Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] })),
     });
     const root = mkdtempSync(join(tmpdir(), "jefferson-replacement-"));

@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
-import { parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { collapse, parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./format.ts";
 
 /** The values a cell's `align` may take. The type and every message derive from this tuple. */
 const ALIGNMENTS = ["left", "right", "center"] as const;
@@ -69,6 +69,7 @@ type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 interface ConfiguredInstrument {
   segments: FormatSegment[];
   style: ThemeStyle;
+  label?: string;
 }
 
 function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
@@ -79,8 +80,11 @@ function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument
       const entry = configured.get(declaration.name);
       const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
       const style = entry?.style ?? {};
+      const label = collapse(entry?.label ?? declaration.defaultLabel ?? "");
+      const labelled: FormatSegment[] = label === "" ? segments
+        : [{ kind: "literal", text: label, modifiers: [] }, ...segments];
       instrument = {
-        render: (readings, width, renderTheme) => resolveFormat(declaration, segments, style, readings, width, renderTheme),
+        render: (readings, width, renderTheme) => resolveFormat(declaration, labelled, style, readings, width, renderTheme),
       };
       bound.set(declaration.name, instrument);
     }
@@ -120,6 +124,10 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
       if (error instanceof Error) throw new RejectedConfiguration(error.message);
       throw error;
     }
+    const label = entry.label;
+    if (label !== undefined && typeof label !== "string") {
+      throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has a label that is not a string`);
+    }
     let style: ThemeStyle;
     try {
       style = validateStyle(entry.style, theme);
@@ -127,7 +135,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
       if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(declaration.name)} ${error.message}`);
       throw error;
     }
-    configured.set(declaration.name, { segments, style });
+    configured.set(declaration.name, label === undefined ? { segments, style } : { segments, style, label });
   }
   return configured;
 }
