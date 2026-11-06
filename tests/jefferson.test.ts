@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
+import { fakeTheme } from "./fake-theme.ts";
 
 /**
  * Tests live in `tests/`, never beside the extension.
@@ -123,10 +124,10 @@ function harness(): Harness {
           // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
           // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
           // drifting from the host it stands in for.
-          setFooter: (factory: (tui: Pick<TUI, "requestRender">) => FakeFooter) => {
+          setFooter: (factory: (tui: Pick<TUI, "requestRender">, theme: Theme) => FakeFooter) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
-            footers.push(factory(tui));
+            footers.push(factory(tui, fakeTheme()));
           },
         },
       };
@@ -301,7 +302,8 @@ test("the exported surface offers no way to supply or replace cell content", asy
 
   const instrument = await import("../extensions/jefferson/instrument.ts");
   const store = await import("../extensions/jefferson/session-data-store.ts");
-  for (const key of [...Object.keys(instrument), ...Object.keys(store)]) {
+  const format = await import("../extensions/jefferson/format.ts");
+  for (const key of [...Object.keys(instrument), ...Object.keys(store), ...Object.keys(format)]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),
       `${key} looks like a contribution interface`,

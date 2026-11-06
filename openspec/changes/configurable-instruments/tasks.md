@@ -284,7 +284,16 @@ variables`, `$bar takes the width the rest of the format leaves`, and the one-li
 `tests/format.test.ts` (the house rule: tests live under `tests/`, named for their source file; a
 non-`.test.ts` helper under `tests/` is not run by `node --test`).
 
-- [ ] 3.1 Red — in `tests/instrument.test.ts`, the declarations replace the instrument objects: a test
+Implementation red evidence (conductor confirmed): 3.1's declaration-shape assertions failed at
+undefined names before importing the language. The new-file tests in 3.2–3.10 honestly had a
+compile-time TS2307 red while format.ts did not exist; no module-load failure is claimed as an
+assertion red and no stub was added. After 3.11–3.13, temporary working-tree mutations demonstrated
+the grammar, whole-declaration unknown rule, value formats, bar and collapse assertions catching
+their intended defects, each restored; implementation-evidence.md records them. 7.5 repeats the
+required mutation sweep last. The existing own-safe instrument lookup was baseline green, not a
+fabricated red; its temporary inherited-member mutation fails the assertion.
+
+- [x] 3.1 Red — in `tests/instrument.test.ts`, the declarations replace the instrument objects: a test
   asserts the shipped table holds exactly the seven names `blank`, `model`, `thinking`, `path`,
   `context`, `tokens`, `cost`; that each declaration carries its own variable names, its
   `defaultFormat` and `options` deep-equal to `["format", "style"]` (D2's one frozen
@@ -304,7 +313,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   anything under `blank` is a rejection (3.2); `thinking`'s default keeps the literal `thinking: `
   prefix. Verified by: red before 3.12/3.13 under `pnpm typecheck` (`InstrumentDeclaration` does not
   exist) and `node --test tests/instrument.test.ts`.
-- [ ] 3.2 Red — in `tests/format.test.ts`, one test per grammar rule (D4), each asserting behaviour
+- [x] 3.2 Red — in `tests/format.test.ts`, one test per grammar rule (D4), each asserting behaviour
   through `parseFormat`/`resolveFormat` and, where the rule rejects, the **exact** thrown message from
   D3's table: `\$` renders a literal `$` and names no variable; `[a](b)` renders `[a](b)`; `**bold**`
   in a format *and* in a substituted value renders the characters `**bold**` (no Markdown, no group
@@ -326,7 +335,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   characters, so `$_x` is one unknown name); an empty format string (zero segments, renders `""`, no
   rejection); a format of only `\$`; `\$bar` (a literal `$bar`, no width-taker). Verified by: red
   before 3.13.
-- [ ] 3.3 Red — the whole-declaration unknown rule (D4 step 1), with the input that discriminates:
+- [x] 3.3 Red — the whole-declaration unknown rule (D4 step 1), with the input that discriminates:
   under a configured **`$model`-only** format, `model` renders nothing when `provider` is unknown and
   `model` is known — resolving only the variables the format names would render `claude-opus-4`, which
   is the wrong answer and fails this test. Symmetrically `thinking` renders nothing when the level is
@@ -334,7 +343,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   draws (3.8). Boundary cases: both datums unknown; `provider: ""` (a known empty string, which is not
   unknown, so the format renders with an empty hole — the store's `Unknown is a distinguished value`
   rule, not the instrument's to fix). Verified by: red before 3.12/3.13.
-- [ ] 3.4 Red — the value formatters (D11), asserted **through the declarations' own resolvers** — a
+- [x] 3.4 Red — the value formatters (D11), asserted **through the declarations' own resolvers** — a
   format naming one variable, resolved against fixture readings — never by exporting a formatter:
   `compactCount`'s band edges `0 → "0"`, `999 → "999"`, `1000 → "1.0k"`, `20400 → "20.4k"`,
   `86400 → "86.4k"`, `99999 → "100.0k"`, `100000 → "100k"`, `200000 → "200k"`, `999999 → "1000k"`,
@@ -346,19 +355,19 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   `999999 → "1000k"` is this rule's output, not a host-mirroring claim. Boundary cases: every band
   edge above, and a negative or fractional count does not arise (the host's usage fields are
   non-negative integers, chidi §1.6) — stated, not tested. Verified by: red before 3.12.
-- [ ] 3.5 Red — `context`'s three states, from the delta's scenarios: `{tokens: 86400, percent: 43.2,
+- [x] 3.5 Red — `context`'s three states, from the delta's scenarios: `{tokens: 86400, percent: 43.2,
   contextWindow: 200000}` renders `43.2%/200k` and hands `$tokens` `86.4k`; `{tokens: null, percent:
   null, contextWindow: 200000}` renders `?/200k` — never `0%`, never `0/200k`; `contextUsage:
   undefined` renders nothing at all. Boundary cases: `percent: 0` renders `0.0%` (a real zero, distinct
   from the null); `percent: 100`; a percent the host reports above 100 is handed out as reported (the
   format language never formats a number) while `$bar` clamps (3.8). Verified by: red before 3.12.
-- [ ] 3.6 Red — `path`: `cwd: "/Users/joelleibow/Projects/pi-jefferson"` renders `pi-jefferson`;
+- [x] 3.6 Red — `path`: `cwd: "/Users/joelleibow/Projects/pi-jefferson"` renders `pi-jefferson`;
   `cwd: undefined` renders nothing; the declaration reads `cwd` and no other datum (1.8's throwing
   fixture). Boundary cases: a trailing separator (`"/a/b/"` → `b`) and a single-character directory
   are `node:path`'s `basename` behaviour, asserted as such; `cwd: "/"` gives `basename("/") === ""`, so
   the cell renders empty — that is `node:path`'s answer, not a fallback the instrument invents, and the
   test pins it rather than "fixing" it. Verified by: red before 3.12.
-- [ ] 3.7 Red — `tokens` and `cost` from the store's `totals`: the five variables
+- [x] 3.7 Red — `tokens` and `cost` from the store's `totals`: the five variables
   (`$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens`) each render a compact count;
   `$totalTokens` is the four-field sum, proven with 1.2's fixture numbers (`212`, never `2775`);
   `totals: undefined` (post-dispose) renders nothing for both instruments; a fresh session's zeros
@@ -367,7 +376,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   `totals` object identity handed to both resolvers. Boundary cases: a cost of exactly `0` and a
   sub-tenth cost (`0.0004 → "$0.000"`); `cacheRead`/`cacheWrite` zero while `input`/`output` are not.
   Verified by: red before 3.12/3.14.
-- [ ] 3.8 Red — `$bar` (D5, D14), at the `resolveFormat` boundary with a literal validated style:
+- [x] 3.8 Red — `$bar` (D5, D14), at the `resolveFormat` boundary with a literal validated style:
   `$percent $bar` in a 20-column cell whose prose takes 6 columns draws a **14-column** track
   (`"43.2% "` is the 6, so `filled = floor(0.432 × 14) = 6` → six `█` then eight `░`); a format that
   fills the cell leaves the bar **nothing**, and the format's own text is what the cell clips;
@@ -381,7 +390,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   Discriminator for the per-segment rule: styling the whole resolved string once would let the bar's own
   resets strip the prose after it (council, accepted from argon), so the placement case asserts the
   trailing prose still carries its configured style. Verified by: red before 3.13.
-- [ ] 3.9 Red — the one-line guarantee's collapse half (D7 steps 1–2): a format carrying `\n` and a
+- [x] 3.9 Red — the one-line guarantee's collapse half (D7 steps 1–2): a format carrying `\n` and a
   datum carrying `\r`, `\t` and a lone `\x1b` each render **one line**, clipped to the cell width, with
   the footer's height unchanged (a three-row configuration still renders three lines). Each control
   character becomes **one space**, per character — not one space per run, which is pi-tui 1.5.0's
@@ -393,7 +402,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   C1 character (`\u009b`) both become one space — the class is all of C0, DEL and C1; a value that is
   *only* control characters collapses to spaces and then clips; literals are collapsed at parse time
   and values at resolve time, and neither is collapsed twice. Verified by: red before 3.13.
-- [ ] 3.10 Red — the `Object.hasOwn` pin (Michael's PL4 list): a format naming `$toString`,
+- [x] 3.10 Red — the `Object.hasOwn` pin (Michael's PL4 list): a format naming `$toString`,
   `$constructor`, `$hasOwnProperty` or `$valueOf` is an unknown-variable rejection naming that
   variable, never a resolution to an `Object.prototype` member; and `instrumentNamed("toString")`,
   `("constructor")`, `("__proto__")` stay `undefined`. Discriminator: an `in` check or a bare
@@ -405,7 +414,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   created with `Object.create(null)` still behaves identically (the guard is the lookup's, not the
   record's). Verified by: red before 3.12/3.13 only if the first implementation uses a bare index; the
   task exists so that it cannot, and 7.5 proves it by removal.
-- [ ] 3.11 Implement — `extensions/jefferson/instrument.ts` to D2 and D11: `Instrument.render(readings,
+- [x] 3.11 Implement — `extensions/jefferson/instrument.ts` to D2 and D11: `Instrument.render(readings,
   width, theme)`; `InstrumentDeclaration` with `name`, `variables` (each resolver returning
   `string | undefined`, `undefined` for unknown — never `""`, never `0`), the optional `bar`,
   `defaultFormat` and `options`; `FOUNDATIONAL_OPTIONS` as one frozen `["format", "style"]` tuple; the
@@ -416,7 +425,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   `Object.hasOwn`; `labelled()` retired. Imports stay D1's edges: pi's `type Theme`, `node:path`'s
   `basename`, the store's `type Readings`. Verified by: 3.1, 3.3–3.7, 3.10 green for the declaration
   half; `pnpm typecheck` clean.
-- [ ] 3.12 Implement — `extensions/jefferson/format.ts` (new, D1) : `parseFormat(declaration, format)`
+- [x] 3.12 Implement — `extensions/jefferson/format.ts` (new, D1) : `parseFormat(declaration, format)`
   scanning left to right to `FormatSegment[]` (`literal` with control characters already collapsed,
   `variable`, `bar`) and throwing D3's exact messages; `resolveFormat(declaration, segments, style,
   readings, width, theme)` in D4's six steps — resolve **every declared variable**, return `""` on any
@@ -429,7 +438,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   `instrument.ts` types only. Clipping, padding and the pad reset stay the cell's (D7) — `format.ts`
   owns no geometry. Verified by: 3.2, 3.4, 3.8, 3.9 green; `pnpm typecheck` clean;
   `rg -n "truncateToWidth|\" \"" extensions/jefferson/format.ts` shows no clipping and no padding.
-- [ ] 3.13 Implement — the consumers of the moved seam, in one task because the seam does not compile
+- [x] 3.13 Implement — the consumers of the moved seam, in one task because the seam does not compile
   without them: `configuration.ts` binds one `Instrument` per configured name via D2's snippet —
   `parseFormat(declaration, declaration.defaultFormat)` and an empty validated style, memoized across
   the document so two cells holding one name hold the **same** bound object, with an unknown cell name
@@ -451,7 +460,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   document harness into the renderer's test file, whose subject is the cell pipeline. Verified by:
   `pnpm typecheck` clean and `pnpm test` green, with 3.1's default sweep and 3.7's footer-level
   agreement now running through the real binding.
-- [ ] 3.14 Pin — the contribution-key sweep extends to `format.ts` (D1's consequence): in
+- [x] 3.14 Pin — the contribution-key sweep extends to `format.ts` (D1's consequence): in
   `tests/jefferson.test.ts`, the exported-surface test's `register|supply|contribute` sweep covers
   `instrument.ts`, `session-data-store.ts` **and** `format.ts`, and the two-call
   `instrumentNamed("nope")` stability check stays. The configuration pin is unchanged
@@ -459,7 +468,7 @@ non-`.test.ts` helper under `tests/` is not run by `node --test`).
   and the entry pin is unchanged (`["VERSION", "default"]`). Verified by: `node --test
   tests/jefferson.test.ts` green, and the three pins byte-identical to `main` apart from the renderer's
   (2.6).
-- [ ] 3.15 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
+- [x] 3.15 Green — `pnpm typecheck` and `pnpm test` both pass. Verified by: the two exit statuses,
   recorded.
 
 ## 4. The `instruments` section: guards, style validation, and one bound instrument per name

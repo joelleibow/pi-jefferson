@@ -1,54 +1,102 @@
-/**
- * The instruments: the text a cell displays, resolved by reading the store.
- *
- * An instrument is a label over a data field, where either half may itself be data (D9). It is
- * handed one `Readings` and the width its cell has, and nothing else — no store, no context,
- * no `tui` — so it cannot subscribe, poll, mutate, or retain a handle, and `readonly` makes
- * that a compile-time property rather than a convention (D2). The only import is that type.
- */
+/** Each instrument owns its name, variables, default format and accepted options. */
+import { basename } from "node:path";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 
-import type { Reading, Readings } from "./session-data-store.ts";
+import type { Readings } from "./session-data-store.ts";
 
-/** The text `blank` displays and every cell of a row that declares no `cells` carries (D9). */
 export const DEFAULT_CELL_TEXT =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor";
 
-/**
- * A cell's content: one line rendered synchronously from one render's readings into the width
- * the cell has. The shipped instruments are text and ignore the width; the cell clips
- * defensively regardless.
- */
 export interface Instrument {
-  render(readings: Readings, width: number): string;
+  render(readings: Readings, width: number, theme: Theme): string;
 }
 
-/** The placeholder instrument: it displays a constant, so it reads no datum and no width. */
-export const blank: Instrument = { render: () => DEFAULT_CELL_TEXT };
-
-/** `label: data`, or "" when either half is unknown: there is no text it can honestly render. */
-function labelled(label: (r: Readings) => Reading, data: (r: Readings) => Reading): Instrument {
-  return {
-    render(readings) {
-      const l = label(readings);
-      const d = data(readings);
-      return l === undefined || d === undefined ? "" : `${l}: ${d}`;
-    },
-  };
+export interface InstrumentDeclaration {
+  readonly name: string;
+  readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
+  readonly bar?: (readings: Readings) => number | null;
+  readonly defaultFormat: string;
+  readonly options: readonly string[];
 }
 
-/** The active model, labelled by the active provider. */
-export const model: Instrument = labelled((r) => r.provider, (r) => r.model);
+const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style"] as const);
+const THOUSAND = 1_000;
+const MILLION = 1_000_000;
+const DECIMAL_THOUSANDS_LIMIT = 100_000;
+const DECIMAL_MILLIONS_LIMIT = 10_000_000;
 
-/** The active thinking level under a literal label. */
-export const thinking: Instrument = labelled(() => "thinking", (r) => r.thinkingLevel);
+function compactCount(count: number): string {
+  if (count < THOUSAND) return String(count);
+  if (count < DECIMAL_THOUSANDS_LIMIT) return (count / THOUSAND).toFixed(1) + "k";
+  if (count < MILLION) return Math.round(count / THOUSAND) + "k";
+  if (count < DECIMAL_MILLIONS_LIMIT) return (count / MILLION).toFixed(1) + "M";
+  return Math.round(count / MILLION) + "M";
+}
 
-/** The three instruments this extension implements, by the name configuration uses for them. */
-const SHIPPED: Readonly<Record<string, Instrument>> = { blank, model, thinking };
+export const blank: InstrumentDeclaration = {
+  name: "blank",
+  variables: {},
+  defaultFormat: DEFAULT_CELL_TEXT,
+  options: FOUNDATIONAL_OPTIONS,
+};
 
-/**
- * Resolve a configured instrument name. A lookup: an unknown name stays unknown, nothing is
- * added, and no table is mutated.
- */
-export function instrumentNamed(name: string): Instrument | undefined {
+const model: InstrumentDeclaration = {
+  name: "model",
+  variables: { provider: r => r.provider, model: r => r.model },
+  defaultFormat: "$provider: $model",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const thinking: InstrumentDeclaration = {
+  name: "thinking",
+  variables: { level: r => r.thinkingLevel },
+  defaultFormat: "thinking: $level",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const path: InstrumentDeclaration = {
+  name: "path",
+  variables: { path: r => r.cwd === undefined ? undefined : basename(r.cwd) },
+  defaultFormat: "$path",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const context: InstrumentDeclaration = {
+  name: "context",
+  variables: {
+    tokens: ({ contextUsage: usage }) => usage === undefined ? undefined : usage.tokens === null ? "?" : compactCount(usage.tokens),
+    window: ({ contextUsage: usage }) => usage === undefined ? undefined : compactCount(usage.contextWindow),
+    percent: ({ contextUsage: usage }) => usage === undefined ? undefined : usage.percent === null ? "?" : `${usage.percent.toFixed(1)}%`,
+  },
+  bar: r => r.contextUsage?.percent ?? null,
+  defaultFormat: "$percent/$window",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const tokens: InstrumentDeclaration = {
+  name: "tokens",
+  variables: {
+    input: ({ totals }) => totals === undefined ? undefined : compactCount(totals.input),
+    output: ({ totals }) => totals === undefined ? undefined : compactCount(totals.output),
+    cacheRead: ({ totals }) => totals === undefined ? undefined : compactCount(totals.cacheRead),
+    cacheWrite: ({ totals }) => totals === undefined ? undefined : compactCount(totals.cacheWrite),
+    totalTokens: ({ totals }) => totals === undefined ? undefined : compactCount(totals.input + totals.output + totals.cacheRead + totals.cacheWrite),
+  },
+  defaultFormat: "$totalTokens",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const cost: InstrumentDeclaration = {
+  name: "cost",
+  variables: { cost: ({ totals }) => totals === undefined ? undefined : `$${totals.cost.toFixed(3)}` },
+  defaultFormat: "$cost",
+  options: FOUNDATIONAL_OPTIONS,
+};
+
+const SHIPPED: Readonly<Record<string, InstrumentDeclaration>> = Object.fromEntries(
+  [blank, model, thinking, path, context, tokens, cost].map(declaration => [declaration.name, declaration]),
+);
+
+export function instrumentNamed(name: string): InstrumentDeclaration | undefined {
   return Object.hasOwn(SHIPPED, name) ? SHIPPED[name] : undefined;
 }

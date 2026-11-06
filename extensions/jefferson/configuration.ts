@@ -10,7 +10,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 
-import { blank, instrumentNamed, type Instrument } from "./instrument.ts";
+import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
+import { parseFormat, resolveFormat } from "./format.ts";
 
 /** The values a cell's `align` may take. The type and every message derive from this tuple. */
 const ALIGNMENTS = ["left", "right", "center"] as const;
@@ -61,12 +62,29 @@ interface Notices {
   unknownInstruments: Set<string>;
 }
 
-function defaultRow(): Row {
-  return { id: "row-0", cells: blankCells(DEFAULT_CELLS) };
+type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
+
+function defaultBindings(): BindInstrument {
+  const bound = new Map<string, Instrument>();
+  return declaration => {
+    let instrument = bound.get(declaration.name);
+    if (instrument === undefined) {
+      const segments = parseFormat(declaration, declaration.defaultFormat);
+      instrument = {
+        render: (readings, width, renderTheme) => resolveFormat(declaration, segments, {}, readings, width, renderTheme),
+      };
+      bound.set(declaration.name, instrument);
+    }
+    return instrument;
+  };
 }
 
-function blankCells(count: number): Cell[] {
-  return Array.from({ length: count }, () => ({ instrument: blank, align: ALIGNMENTS[0] }));
+function defaultRow(bind: BindInstrument): Row {
+  return { id: "row-0", cells: blankCells(DEFAULT_CELLS, bind) };
+}
+
+function blankCells(count: number, bind: BindInstrument): Cell[] {
+  return Array.from({ length: count }, () => ({ instrument: bind(blank), align: ALIGNMENTS[0] }));
 }
 
 /**
@@ -74,7 +92,7 @@ function blankCells(count: number): Cell[] {
  * narrowed before it is resolved, so a name reaches `instrumentNamed` as the `string` it takes.
  * An empty list is rejected: a row of no cells has no `floor(W / N)` geometry (D11).
  */
-function cellsFromNames(names: readonly unknown[], index: number, notices: Notices): Cell[] {
+function cellsFromNames(names: readonly unknown[], index: number, notices: Notices, bind: BindInstrument): Cell[] {
   if (names.length === 0) {
     throw new RejectedConfiguration(`row ${index} has an empty cells list`);
   }
@@ -112,14 +130,14 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
     // The push is guarded rather than breaking, so every entry past the ceiling is still
     // validated and checked for unknowns before the ceiling decides (D2).
     if (cells.length < MAX_CELLS) {
-      cells.push({ instrument: instrument ?? blank, align });
+      cells.push({ instrument: bind(instrument ?? blank), align });
     }
   }
   return cells;
 }
 
 /** Normalize one row object: id synthesized from its index, cells named or defaulted. */
-function normalizeRow(raw: unknown, index: number, notices: Notices): Row {
+function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindInstrument): Row {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration(`row ${index} is not an object`);
   }
@@ -133,9 +151,9 @@ function normalizeRow(raw: unknown, index: number, notices: Notices): Row {
     if (!Array.isArray(row.cells)) {
       throw new RejectedConfiguration(`row ${index} has a cells value that is not a list`);
     }
-    cells = cellsFromNames(row.cells, index, notices);
+    cells = cellsFromNames(row.cells, index, notices, bind);
   } else {
-    cells = blankCells(DEFAULT_CELLS);
+    cells = blankCells(DEFAULT_CELLS, bind);
   }
 
   let id = `row-${index}`;
@@ -150,7 +168,7 @@ function normalizeRow(raw: unknown, index: number, notices: Notices): Row {
 }
 
 /** Normalize the document: one top-level row, or a list under `rows`; never both (D2). */
-function normalizeDocument(document: unknown, notices: Notices): Row[] {
+function normalizeDocument(document: unknown, notices: Notices, bind: BindInstrument): Row[] {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -176,7 +194,7 @@ function normalizeDocument(document: unknown, notices: Notices): Row[] {
 
   if (rawRows.length === 0) return [];
 
-  const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices));
+  const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
   const seen = new Set<string>();
   for (const row of rows) {
     if (seen.has(row.id)) {
@@ -210,31 +228,32 @@ function acceptedWarning(path: string, notices: Notices): string | undefined {
  * rejected document yields the default row and a warning (D3).
  */
 export function readConfiguration(source: ConfigurationSource): Configuration {
+  const bind = defaultBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
-  if (!existsSync(path)) return { rows: [defaultRow()], warning: undefined };
+  if (!existsSync(path)) return { rows: [defaultRow(bind)], warning: undefined };
 
   let document: unknown;
   try {
     document = JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return {
-      rows: [defaultRow()],
+      rows: [defaultRow(bind)],
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
     };
   }
 
   try {
     const notices: Notices = { containers: false, unknownInstruments: new Set() };
-    const rows = normalizeDocument(document, notices);
+    const rows = normalizeDocument(document, notices, bind);
     return {
-      rows: rows.length === 0 ? [defaultRow()] : rows,
+      rows: rows.length === 0 ? [defaultRow(bind)] : rows,
       warning: acceptedWarning(path, notices),
     };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {
-        rows: [defaultRow()],
+        rows: [defaultRow(bind)],
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,
       };
     }

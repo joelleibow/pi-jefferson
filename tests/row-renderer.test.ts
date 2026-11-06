@@ -4,7 +4,9 @@ import { test } from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/configuration.ts";
-import { type Instrument, model } from "../extensions/jefferson/instrument.ts";
+import { type Instrument, instrumentNamed } from "../extensions/jefferson/instrument.ts";
+import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
+import { fakeTheme } from "./fake-theme.ts";
 import {
   createFooter,
 } from "../extensions/jefferson/row-renderer.ts";
@@ -38,18 +40,18 @@ function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
 }
 
 function lineAt(row: Row, width: number): string {
-  return createFooter([row], () => readings).render(width)[0] ?? "";
+  return createFooter([row], () => readings, fakeTheme()).render(width)[0] ?? "";
 }
 
 test("a width that divides evenly gives every cell the same columns", () => {
   // Cell text fits the cell exactly, so no truncation intervenes in the geometry check.
-  const line = createFooter([rowOf(8, "Lorem ipsu")], () => readings).render(80)[0] ?? "";
+  const line = createFooter([rowOf(8, "Lorem ipsu")], () => readings, fakeTheme()).render(80)[0] ?? "";
   assert.equal(visibleWidth(line), 80);
   assert.equal(line, composed(...Array<string>(8).fill("Lorem ipsu")));
 });
 
 test("a width that does not divide evenly spends the remainder on the row's earliest cells", () => {
-  const line = createFooter([rowOf(3)], () => readings).render(100)[0] ?? "";
+  const line = createFooter([rowOf(3)], () => readings, fakeTheme()).render(100)[0] ?? "";
   assert.equal(visibleWidth(line), 100);
   assert.equal(line, composed(
     "Lorem ipsum dolor sit amet".padEnd(34),
@@ -59,7 +61,7 @@ test("a width that does not divide evenly spends the remainder on the row's earl
 });
 
 test("the default row of ten cells at 132 spans all 132 columns", () => {
-  const line = createFooter([rowOf(10, "x")], () => readings).render(132)[0] ?? "";
+  const line = createFooter([rowOf(10, "x")], () => readings, fakeTheme()).render(132)[0] ?? "";
   assert.equal(line, composed("x".padEnd(14), "x".padEnd(14), ...Array<string>(8).fill("x".padEnd(13))));
   assert.equal(visibleWidth(line), 132);
 });
@@ -259,6 +261,7 @@ test("the footer renders one line per row, in order, each spanning the width", (
   const footer = createFooter(
     [rowOf(2, "aa"), rowOf(4, "b"), rowOf(8, "c")],
     () => readings,
+    fakeTheme(),
   );
   const lines = footer.render(80);
   assert.equal(lines.length, 3);
@@ -278,7 +281,7 @@ test("more cells than columns still renders exactly one line of the width", () =
 });
 
 test("cell widths are recomputed when the width changes", () => {
-  const footer = createFooter([rowOf(3)], () => readings);
+  const footer = createFooter([rowOf(3)], () => readings, fakeTheme());
   const first = footer.render(100)[0] ?? "";
   assert.equal(first, composed("Lorem ipsum dolor sit amet".padEnd(34), "Lorem ipsum dolor sit amet".padEnd(33), "Lorem ipsum dolor sit amet".padEnd(33)));
   const resized = footer.render(90)[0] ?? "";
@@ -291,7 +294,7 @@ test("the built-once tree keeps its cell memo when two renders share sample and 
   const footer = createFooter([{
     id: "row-0",
     cells: [{ instrument: { render: () => { resolves++; return "kept"; } }, align: "left" }],
-  }], () => readings);
+  }], () => readings, fakeTheme());
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
   assert.equal(resolves, 1, "rebuilding the tree would discard the cell's memo");
@@ -300,7 +303,7 @@ test("the built-once tree keeps its cell memo when two renders share sample and 
 });
 
 test("each row seats its own basis on the first render", () => {
-  const footer = createFooter([rowOf(3, "a"), rowOf(4, "b")], () => readings);
+  const footer = createFooter([rowOf(3, "a"), rowOf(4, "b")], () => readings, fakeTheme());
   assert.deepEqual(footer.render(13), [
     composed("a    ", "a   ", "a   "),
     composed("b   ", "b  ", "b  ", "b  "),
@@ -315,6 +318,7 @@ test("one render samples the store exactly once, whatever the row and cell count
       samples += 1;
       return readings;
     },
+    fakeTheme(),
   );
   assert.equal(samples, 1, "installation seeds the render slot");
   footer.render(80);
@@ -338,6 +342,7 @@ test("an instrument resolves once per (sample, width) within a render, and again
     ],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
+    fakeTheme(),
   );
   footer.render(30); // row 0's cells are 10 columns wide; row 1's single cell is 30
   assert.deepEqual(
@@ -360,7 +365,7 @@ test("invalidation drops cell memos and keeps the footer's three lines", () => {
   const footer = createFooter([0, 1, 2].map((index) => ({
     id: `row-${index}`,
     cells: [{ instrument: capture, align: "left" }],
-  })), () => readings);
+  })), () => readings, fakeTheme());
   footer.invalidate();
   assert.equal(footer.render(20).length, 3);
   assert.equal(resolves, 3);
@@ -371,10 +376,15 @@ test("invalidation drops cell memos and keeps the footer's three lines", () => {
 });
 
 test("two cells holding the model instrument resolve identical text", () => {
+  const declaration = instrumentNamed("model");
+  assert.ok(declaration);
+  const segments = parseFormat(declaration, declaration.defaultFormat);
+  const model: Instrument = { render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
   const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
     () => live,
+    fakeTheme(),
   );
   const [line] = footer.render(48);
   assert.equal(line, composed("anthropic: claude-opus-4", "anthropic: claude-opus-4"));
@@ -397,6 +407,7 @@ test("a push between two renders shows up in the next render and not before", ()
   const footer = createFooter(
     [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
     () => store.sample(),
+    fakeTheme(),
   );
 
   const first = footer.render(26)[0];

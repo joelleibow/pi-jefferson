@@ -1,114 +1,202 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  DEFAULT_CELL_TEXT,
-  blank,
-  instrumentNamed,
-  model,
-  thinking,
-} from "../extensions/jefferson/instrument.ts";
-import type { Reading, Readings } from "../extensions/jefferson/session-data-store.ts";
+import { DEFAULT_CELL_TEXT, blank, instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/instrument.ts";
+import type { Readings } from "../extensions/jefferson/session-data-store.ts";
 
-const seed: Readings = { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: undefined, contextUsage: undefined, totals: undefined };
-const unknown: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, contextUsage: undefined, totals: undefined };
+const seed: Readings = {
+  provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
+  cwd: "/Users/joelleibow/Projects/pi-jefferson",
+  contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
+  totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
+};
+const unknown: Readings = {
+  provider: undefined, model: undefined, thinkingLevel: undefined,
+  cwd: undefined, contextUsage: undefined, totals: undefined,
+};
 
-/** Readings whose every datum throws if it is read, so a datum read fails the test. */
-function unreadable(): Readings {
-  const fail = (): never => {
-    throw new Error("the instrument read a datum it does not display");
-  };
-  return {
-    get provider() {
-      return fail();
-    },
-    get model() {
-      return fail();
-    },
-    get thinkingLevel() {
-      return fail();
-    },
-    get cwd() {
-      return fail();
-    },
-    get contextUsage() {
-      return fail();
-    },
-    get totals() {
-      return fail();
-    },
-  };
+/** Any datum this declaration does not display must remain unread. */
+function unreadable(known: Partial<Readings> = {}): Readings {
+  const readings = {} as Readings;
+  for (const key of Object.keys(unknown) as Array<keyof Readings>) {
+    Object.defineProperty(readings, key, Object.hasOwn(known, key)
+      ? { value: known[key], enumerable: true }
+      : { get: () => { throw new Error(`the instrument read ${key}, a datum it does not display`); }, enumerable: true });
+  }
+  return readings;
 }
 
-test("blank resolves the placeholder for any readings", () => {
-  assert.equal(blank.render(seed, 80), DEFAULT_CELL_TEXT);
-  assert.equal(blank.render(unknown, 80), DEFAULT_CELL_TEXT);
-});
+const shapes = [
+  ["blank", [], DEFAULT_CELL_TEXT],
+  ["model", ["provider", "model"], "$provider: $model"],
+  ["thinking", ["level"], "thinking: $level"],
+  ["path", ["path"], "$path"],
+  ["context", ["tokens", "window", "percent"], "$percent/$window"],
+  ["tokens", ["input", "output", "cacheRead", "cacheWrite", "totalTokens"], "$totalTokens"],
+  ["cost", ["cost"], "$cost"],
+] as const;
 
-test("blank reads no datum", () => {
-  assert.equal(blank.render(unreadable(), 80), DEFAULT_CELL_TEXT);
-});
+function named(name: string): InstrumentDeclaration {
+  const declaration = instrumentNamed(name);
+  assert.ok(declaration, `${name} is shipped`);
+  assert.equal(declaration.name, name);
+  return declaration;
+}
 
-test("model resolves the provider as label over the model as data", () => {
-  assert.equal(model.render(seed, 80), "anthropic: claude-opus-4");
-});
+async function render(name: string, readings: Readings, format?: string): Promise<string> {
+  const declaration = named(name);
+  const { parseFormat, resolveFormat } = await import("../extensions/jefferson/format.ts");
+  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, (await import("./fake-theme.ts")).fakeTheme());
+}
 
-test("thinking resolves a literal label over the level as data", () => {
-  assert.equal(thinking.render(seed, 80), "thinking: high");
-  assert.equal(thinking.render({ ...seed, thinkingLevel: "off" }, 80), "thinking: off");
-});
-
-test("model yields an empty string when either half is unknown", () => {
-  assert.equal(
-    model.render({ ...unknown, provider: undefined, model: "claude-opus-4", thinkingLevel: "high" }, 80),
-    "",
-  );
-  assert.equal(
-    model.render({ ...unknown, provider: "anthropic", model: undefined, thinkingLevel: "high" }, 80),
-    "",
-  );
-});
-
-test("thinking yields an empty string when the level is unknown", () => {
-  assert.equal(
-    thinking.render({ ...unknown, provider: "anthropic", model: "claude-opus-4", thinkingLevel: undefined }, 80),
-    "",
-  );
-});
-
-test("model reads no datum its text does not use", () => {
-  const readings: Readings = {
-    ...unknown,
-    provider: "anthropic",
-    model: "claude-opus-4",
-    get thinkingLevel(): Reading {
-      throw new Error("model read the thinking level");
-    },
-  };
-  assert.equal(model.render(readings, 80), "anthropic: claude-opus-4");
-});
-
-test("thinking reads no datum its text does not use", () => {
-  const readings: Readings = {
-    ...unknown,
-    get provider(): Reading {
-      throw new Error("thinking read the provider");
-    },
-    get model(): Reading {
-      throw new Error("thinking read the model");
-    },
-    thinkingLevel: "high",
-  };
-  assert.equal(thinking.render(readings, 80), "thinking: high");
-});
-
-test("each shipped name resolves the instrument that name denotes", () => {
+test("the seven shipped declarations own their names, variables, defaults and foundational options", () => {
+  const declarations = shapes.map(([name, variables, format]) => {
+    const declaration = named(name);
+    assert.deepEqual(Object.keys(declaration.variables), variables);
+    assert.equal(declaration.defaultFormat, format);
+    assert.deepEqual(declaration.options, ["format", "style"]);
+    assert.equal(Object.isFrozen(declaration.options), true);
+    assert.equal(typeof declaration.bar === "function", name === "context");
+    return declaration;
+  });
+  assert.equal(declarations.length, 7);
+  for (const declaration of declarations) assert.equal(declaration.options, blank.options);
   assert.equal(instrumentNamed("blank"), blank);
-  assert.equal(instrumentNamed("model"), model);
-  assert.equal(instrumentNamed("thinking"), thinking);
 });
 
-test("a name the extension does not implement stays unresolved, however often it is asked", () => {
-  assert.equal(instrumentNamed("nope"), undefined);
-  assert.equal(instrumentNamed("nope"), undefined, "the lookup gained nothing from the first ask");
+test("unimplemented and inherited names stay unresolved however often asked", () => {
+  for (const name of ["git", "branch", "nope", "toString", "constructor", "hasOwnProperty", "__proto__"]) {
+    assert.equal(instrumentNamed(name), undefined, name);
+    assert.equal(instrumentNamed(name), undefined, name);
+  }
+});
+
+test("every shipped default parses and renders its declared text", async () => {
+  const expected = [DEFAULT_CELL_TEXT, "anthropic: claude-opus-4", "thinking: high", "pi-jefferson", "43.2%/200k", "0", "$0.000"];
+  for (const [index, [name]] of shapes.entries()) {
+    assert.equal(await render(name, seed), expected[index], name);
+  }
+});
+
+test("blank resolves its placeholder without reading any datum", async () => {
+  assert.equal(await render("blank", seed), DEFAULT_CELL_TEXT);
+  assert.equal(await render("blank", unknown), DEFAULT_CELL_TEXT);
+  assert.equal(await render("blank", unreadable()), DEFAULT_CELL_TEXT);
+});
+
+test("model and thinking default formats keep their original text shapes", async () => {
+  assert.equal(await render("model", seed), "anthropic: claude-opus-4");
+  assert.equal(await render("thinking", seed), "thinking: high");
+  assert.equal(await render("thinking", { ...seed, thinkingLevel: "off" }), "thinking: off");
+});
+
+test("each declaration reads only the datums its variables display", async () => {
+  assert.equal(await render("model", unreadable({ provider: "anthropic", model: "claude-opus-4" })), "anthropic: claude-opus-4");
+  assert.equal(await render("thinking", unreadable({ thinkingLevel: "high" })), "thinking: high");
+  assert.equal(await render("path", unreadable({ cwd: seed.cwd })), "pi-jefferson");
+  assert.equal(await render("context", unreadable({ contextUsage: seed.contextUsage })), "43.2%/200k");
+  assert.equal(await render("tokens", unreadable({ totals: seed.totals })), "0");
+  assert.equal(await render("cost", unreadable({ totals: seed.totals })), "$0.000");
+});
+
+test("unknown suppresses the whole model declaration even under a model-only format", async () => {
+  assert.equal(await render("model", { ...seed, provider: undefined }, "$model"), "");
+  assert.equal(await render("model", { ...seed, model: undefined }), "");
+  assert.equal(await render("model", unknown), "");
+  assert.equal(await render("model", { ...seed, provider: "" }, "$provider: $model"), ": claude-opus-4");
+});
+
+test("unknown thinking renders nothing and never invents off", async () => {
+  assert.equal(await render("thinking", { ...seed, thinkingLevel: undefined }), "");
+});
+
+test("compact counts follow the ratified decimal band rather than the host's 10000 cutoff", async () => {
+  for (const [value, expected] of [
+    [0, "0"], [999, "999"], [1000, "1.0k"], [20400, "20.4k"], [86400, "86.4k"],
+    [99999, "100.0k"], [100000, "100k"], [200000, "200k"], [999999, "1000k"],
+    [1000000, "1.0M"], [9999999, "10.0M"], [10000000, "10M"],
+  ] as const) {
+    assert.equal(await render("context", { ...seed, contextUsage: { tokens: value, percent: 43.2, contextWindow: 200000 } }, "$tokens"), expected, String(value));
+    assert.equal(await render("tokens", { ...seed, totals: { input: value, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 } }, "$input"), expected, String(value));
+  }
+});
+
+test("percent and cost variables arrive already formatted without a subscription annotation", async () => {
+  assert.equal(await render("context", seed, "$percent"), "43.2%");
+  assert.equal(await render("context", { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } }, "$percent"), "?");
+  assert.equal(await render("cost", { ...seed, totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.123 } }), "$0.123");
+  assert.equal(await render("cost", seed), "$0.000");
+});
+
+test("context distinguishes known estimates, null estimates, absent usage and real zero", async () => {
+  assert.equal(await render("context", seed), "43.2%/200k");
+  assert.equal(await render("context", seed, "$tokens"), "86.4k");
+  const compacted = { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } };
+  assert.equal(await render("context", compacted), "?/200k");
+  assert.equal(await render("context", compacted, "$tokens"), "?");
+  assert.equal(await render("context", { ...seed, contextUsage: undefined }), "");
+  for (const percent of [0, 100, 150]) {
+    assert.equal(await render("context", { ...seed, contextUsage: { tokens: 0, percent, contextWindow: 200000 } }), `${percent.toFixed(1)}%/200k`);
+  }
+});
+
+test("path renders only the basename including trailing-separator and root boundaries", async () => {
+  for (const [cwd, expected] of [
+    ["/Users/joelleibow/Projects/pi-jefferson", "pi-jefferson"], ["/a/b/", "b"], ["x", "x"], ["/", ""], [undefined, ""],
+  ] as const) {
+    assert.equal(await render("path", { ...seed, cwd }), expected);
+  }
+});
+
+test("token variables use the four totals fields and cost uses the same totals", async () => {
+  const readings = { ...seed, totals: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 } };
+  assert.equal(await render("tokens", readings, "$input $output $cacheRead $cacheWrite $totalTokens"), "118 59 23 12 212");
+  assert.equal(await render("cost", readings), "$0.123");
+  assert.equal(await render("tokens", { ...seed, totals: undefined }), "");
+  assert.equal(await render("cost", { ...seed, totals: undefined }), "");
+  assert.equal(await render("tokens", seed), "0");
+  assert.equal(await render("cost", seed), "$0.000");
+  assert.equal(await render("cost", { ...seed, totals: { ...readings.totals, cost: 0.0004 } }), "$0.000");
+  assert.equal(await render("tokens", { ...seed, totals: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0, cost: 0 } }, "$input $output $cacheRead $cacheWrite $totalTokens"), "1.0k 2.0k 0 0 3.0k");
+});
+
+test("a footer's bound cost and tokens read one identical totals object from one store scan", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { readConfiguration } = await import("../extensions/jefferson/configuration.ts");
+  const { createFooter } = await import("../extensions/jefferson/row-renderer.ts");
+  const { createSessionDataStore } = await import("../extensions/jefferson/session-data-store.ts");
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  const { fakeTheme } = await import("./fake-theme.ts");
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-agreement-"));
+  const agentPath = join(dir, "pi-jefferson.json");
+  writeFileSync(agentPath, JSON.stringify({ cells: [{ instrument: "cost" }, { instrument: "tokens" }] }));
+  const { rows, warning } = readConfiguration({ agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false });
+  assert.equal(warning, undefined);
+  let scans = 0;
+  const store = createSessionDataStore({
+    seed,
+    requestRender: () => {},
+    readUsage: () => ({ contextUsage: seed.contextUsage, sessionId: "session-1", leafId: "leaf-1" }),
+    readEntries: () => {
+      scans++;
+      return [{ type: "usage", usage: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, totalTokens: 2775, cost: { total: 0.123 } } }] as import("@earendil-works/pi-coding-agent").SessionEntry[];
+    },
+  });
+  const seen: Array<Readings["totals"]> = [];
+  for (const cell of rows[0]?.cells ?? []) {
+    const bound = cell.instrument;
+    cell.instrument = { render(readings, width, theme) {
+      seen.push(readings.totals);
+      return bound.render(readings, width, theme);
+    } };
+  }
+  const footer = createFooter(rows, () => store.sample(), fakeTheme());
+  const line = footer.render(80)[0] ?? "";
+  assert.equal(stripTerminalSequences(line), "$0.123".padEnd(40) + "212".padEnd(40));
+  assert.equal(scans, 1);
+  assert.equal(seen.length, 4);
+  for (const totals of seen) assert.equal(totals, seen[0]);
+  assert.deepEqual(seen[0], { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 });
 });

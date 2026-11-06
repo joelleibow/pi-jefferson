@@ -114,9 +114,8 @@ export default function jefferson(pi: ExtensionAPI): void {
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;
-    const footer = createFooter(rows, () => store.sample());
-
-    ctx.ui.setFooter((tui) => {
+    ctx.ui.setFooter((tui, theme) => {
+      const footer = createFooter(rows, () => store.sample(), theme);
       requestRepaint = () => tui.requestRender();
       return {
         render: (width: number) => footer.render(width),

@@ -1,5 +1,6 @@
 /** A once-built footer tree; the host allocates columns, each cell owns its clip and pad. */
 import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { Cell, Row } from "./configuration.ts";
 import type { Readings } from "./session-data-store.ts";
@@ -19,6 +20,7 @@ function leavesStyleOpen(text: string): boolean {
 export function createFooter(
   rows: Row[],
   sampleReadings: () => Readings,
+  theme: Theme,
 ): Footer {
   let current: Readings = sampleReadings();
   let lastWidth: number | undefined;
@@ -28,7 +30,7 @@ export function createFooter(
     return {
       render(cellWidth) {
         if (cached?.sample !== current || cached?.width !== cellWidth) {
-          cached = { sample: current, width: cellWidth, text: cell.instrument.render(current, cellWidth) };
+          cached = { sample: current, width: cellWidth, text: cell.instrument.render(current, cellWidth, theme) };
         }
         const clipped = truncateToWidth(cached.text, cellWidth);
         const pad = Math.max(0, cellWidth - visibleWidth(clipped));

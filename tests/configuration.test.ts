@@ -4,13 +4,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import type { Configuration } from "../extensions/jefferson/configuration.ts";
+import type { Cell, Configuration } from "../extensions/jefferson/configuration.ts";
 import {
   DEFAULT_CELLS,
   MAX_CELLS,
   readConfiguration,
 } from "../extensions/jefferson/configuration.ts";
-import { blank, model, thinking } from "../extensions/jefferson/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
+import type { Readings } from "../extensions/jefferson/session-data-store.ts";
+import { fakeTheme } from "./fake-theme.ts";
+
+const seed: Readings = {
+  provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: "/a/pi-jefferson",
+  contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
+  totals: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0, cost: 0.123 },
+};
+
+function cellText(cell: Cell): string {
+  return cell.instrument.render(seed, 80, fakeTheme());
+}
 
 /** Write `document` as the agent file of a fresh temp dir and read the configuration. */
 function readDocument(document: unknown): Configuration {
@@ -88,7 +100,8 @@ test("a row omitting cells holds ten blank cells", () => {
   const cells = rows[0]?.cells ?? [];
   assert.equal(cells.length, DEFAULT_CELLS);
   for (const cell of cells) {
-    assert.equal(cell.instrument, blank, "the instrument itself, not merely equal text");
+    assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+    assert.equal(cell.instrument, cells[0]?.instrument, "one bound blank within this document");
   }
   assert.equal(warning, undefined);
 });
@@ -96,8 +109,8 @@ test("a row omitting cells holds ten blank cells", () => {
 test("cells is both the count and the placement, in order", () => {
   const { rows, warning } = readDocument({ rows: [{ cells: [{ instrument: "model" }, { instrument: "thinking" }, { instrument: "blank" }] }] });
   assert.deepEqual(
-    rows[0]?.cells.map((cell) => cell.instrument),
-    [model, thinking, blank],
+    rows[0]?.cells.map(cellText),
+    ["anthropic: claude-opus-4", "thinking: high", DEFAULT_CELL_TEXT],
   );
   assert.equal(warning, undefined);
 });
@@ -172,7 +185,7 @@ test("a cells list of strings is rejected with no converted read", () => {
 test("a cell that declares no align normalizes to left", () => {
   const noAlign = readDocument({ rows: [{ cells: [{ instrument: "model" }] }] });
   assert.equal(noAlign.warning, undefined);
-  assert.deepEqual(noAlign.rows[0]?.cells.map((cell) => cell.instrument), [model]);
+  assert.deepEqual(noAlign.rows[0]?.cells.map(cellText), ["anthropic: claude-opus-4"]);
   for (const cell of noAlign.rows[0]?.cells ?? []) {
     assert.equal(cell.align, "left");
   }
@@ -227,7 +240,10 @@ test("a document carrying containers is accepted and renders ten blank cells", (
   const { rows, warning } = readDocument({ containers: 3 });
   const cells = rows[0]?.cells ?? [];
   assert.equal(cells.length, DEFAULT_CELLS, "the key is not read, so the count does not move");
-  for (const cell of cells) assert.equal(cell.instrument, blank);
+  for (const cell of cells) {
+    assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+    assert.equal(cell.instrument, cells[0]?.instrument);
+  }
   assert.ok(warning, "the break is breaking, so it warns");
   assert.match(warning, /containers/);
   assert.match(warning, /declare cells instead/);
@@ -252,8 +268,8 @@ test("a document naming cells and no containers warns nothing extra", () => {
 test("an instrument the extension does not implement renders blank and warns naming it", () => {
   const { rows, warning } = readDocument({ rows: [{ cells: [{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }] }] });
   assert.deepEqual(
-    rows[0]?.cells.map((cell) => cell.instrument),
-    [model, blank, thinking],
+    rows[0]?.cells.map(cellText),
+    ["anthropic: claude-opus-4", DEFAULT_CELL_TEXT, "thinking: high"],
     "the unknown name renders blank while the rest of the row renders its instruments",
   );
   assert.ok(warning);
@@ -402,7 +418,8 @@ test("every cell carries an instrument and an alignment", () => {
     assert.ok(Array.isArray(cells) && cells.length === count);
     for (const cell of cells ?? []) {
       assert.deepEqual(Object.keys(cell), ["instrument", "align"]);
-      assert.equal(cell.instrument, blank);
+      assert.equal(cellText(cell), DEFAULT_CELL_TEXT);
+      assert.equal(cell.instrument, cells[0]?.instrument);
       assert.equal(cell.align, "left");
     }
   }

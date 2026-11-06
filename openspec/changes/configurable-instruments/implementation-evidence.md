@@ -86,3 +86,65 @@ typecheck_exit=0
 ℹ duration_ms 438.091583
 test_exit=0
 ```
+
+## Group 3 — declarations, format language, bound instruments
+
+Conductor answers:
+
+- Approved migrating the configuration tests' retired blank/model/thinking object-identity assertions to observable rendered text and same-bound-object identity within one read of one document. No cross-document identity is asserted; normalization, error-message and alignment expectations stayed byte-identical. The migrated subjects are omitted cells, declared cell order, default alignment's instrument, containers' blank cells, unknown-name fallback/siblings, and each cell's instrument.
+- Approved honest TS2307 compile-time reds for 3.2–3.10 while the new format.ts (and task-named fake-theme.ts) did not exist, with no test-only stubs. The tests and real sources commit together, never as a red suite. After implementing the real sources, assertion-level mutations below prove the intended discriminators; the final 7.5 sweep is still required.
+
+3.1 runtime red: declaration.name was undefined, expected blank; tests 6 / pass 1 / fail 5. Typecheck named missing InstrumentDeclaration (TS2305) and missing format.ts (TS2307). The inherited-name lookup was already own-safe and baseline green; its mutation below is its assertion proof. 3.2–3.10 each ran pnpm typecheck and exited 1 with TS2307 on the missing format.ts. After 3.11, the two declaration-shape/lookup tests pass. After 3.12–3.14, all 157 tests pass. Default bytes, all band edges, unknown/null/zero boundaries, and the bound cost/tokens footer agreement run through real declarations and the language.
+
+Early assertion demonstrations (every edit individually restored; every command exited 1 at an AssertionError, not import/loading failure):
+
+| Edit | Catching test | Result |
+|---|---|---|
+| 3-1: escape loses its literal-dollar meaning (extensions/jefferson/format.ts) | an escaped dollar is literal text, not a variable | exit 1, assertion red; restored |
+| 3-2: brackets become groups (extensions/jefferson/format.ts) | brackets and parentheses are literal text rather than groups | exit 1, assertion red; restored |
+| 3-3: Markdown markers are stripped (extensions/jefferson/format.ts) | Markdown characters in formats and values remain literal | exit 1, assertion red; restored |
+| 3-4: unknown-variable guard removed (extensions/jefferson/format.ts) | an unknown variable rejects naming the instrument and variable | exit 1, assertion red; restored |
+| 3-5: undeclared bar allowed (extensions/jefferson/format.ts) | bar is rejected when the declaration has no width-taking variable | exit 1, assertion red; restored |
+| 3-6: second-bar guard removed (extensions/jefferson/format.ts) | a second bar rejects naming the second width-taking variable | exit 1, assertion red; restored |
+| 3-7: bare-dollar guard removed (extensions/jefferson/format.ts) | a bare dollar rejects with the literal-dollar escape in the message | exit 1, assertion red; restored |
+| 3-8: variable name stops early (extensions/jefferson/format.ts) | variable names consume the maximal alphanumeric and underscore run | exit 1, assertion red; restored |
+| 3-9: empty format gains a segment (extensions/jefferson/format.ts) | an empty format has no segments and renders empty text | exit 1, assertion red; restored |
+| 3-10: trailing backslash discarded (extensions/jefferson/format.ts) | a trailing backslash is literal | exit 1, assertion red; restored |
+| 3-11: resolve only named variables (extensions/jefferson/format.ts) | unknown suppresses the whole model declaration even under a model-only format | exit 1, assertion red; restored |
+| 3-12: compact band moved to host cutoff (extensions/jefferson/instrument.ts) | compact counts follow the ratified decimal band rather than the host's 10000 cutoff | exit 1, assertion red; restored |
+| 3-13: null tokens become zero (extensions/jefferson/instrument.ts) | context distinguishes known estimates, null estimates, absent usage and real zero | exit 1, assertion red; restored |
+| 3-14: null percent becomes zero (extensions/jefferson/instrument.ts) | context distinguishes known estimates, null estimates, absent usage and real zero | exit 1, assertion red; restored |
+| 3-15: path returns whole cwd (extensions/jefferson/instrument.ts) | path renders only the basename including trailing-separator and root boundaries | exit 1, assertion red; restored |
+| 3-16: token sum drops cache categories (extensions/jefferson/instrument.ts) | token variables use the four totals fields and cost uses the same totals | exit 1, assertion red; restored |
+| 3-17: cost precision changes (extensions/jefferson/instrument.ts) | percent and cost variables arrive already formatted without a subscription annotation | exit 1, assertion red; restored |
+| 3-18: bar ignores prose width (extensions/jefferson/format.ts) | bar takes the fourteen columns left by six columns of prose | exit 1, assertion red; restored |
+| 3-19: bar refuses to shrink to zero (extensions/jefferson/format.ts) | a bar with no room contributes no track or escapes and leaves prose for the cell to clip | exit 1, assertion red; restored |
+| 3-20: style wraps the whole format (extensions/jefferson/format.ts) | bar placement styles each prose segment so trailing prose keeps its configured style | exit 1, assertion red; restored |
+| 3-21: warning threshold becomes inclusive (extensions/jefferson/format.ts) | bar thresholds replace only foreground above seventy and ninety | exit 1, assertion red; restored |
+| 3-22: error threshold becomes inclusive (extensions/jefferson/format.ts) | bar thresholds replace only foreground above seventy and ninety | exit 1, assertion red; restored |
+| 3-23: dim track loses configured background (extensions/jefferson/format.ts) | bar thresholds replace only foreground above seventy and ninety | exit 1, assertion red; restored |
+| 3-24: null estimate fills the track (extensions/jefferson/format.ts) | a null estimate draws an entirely dim track beside the unknown estimate | exit 1, assertion red; restored |
+| 3-25: fill rounds instead of floors (extensions/jefferson/format.ts) | bar-only formats fill their cell with clamped and floored pressure | exit 1, assertion red; restored |
+| 3-26: collapse runs instead of characters (extensions/jefferson/format.ts) | control characters collapse per character in literals and substituted values | exit 1, assertion red; restored |
+| 3-27: collapse moved after styling (extensions/jefferson/format.ts) | collapse runs before styling so data ESC becomes a space and the cell's SGR survives | exit 1, assertion red; restored |
+| 3-28: variable lookup accepts inherited members (extensions/jefferson/format.ts) | inherited object properties are unknown format variables | exit 1, assertion red; restored |
+| 3-29: instrument lookup accepts inherited members (extensions/jefferson/instrument.ts) | unimplemented and inherited names stay unresolved however often asked | exit 1, assertion red; restored |
+| 3-30: collapse runs instead of characters (extensions/jefferson/format.ts) | control characters collapse per character in literals and substituted values | exit 1, assertion red; restored |
+
+Raw group boundary after all restorations:
+
+```text
+$ tsc --noEmit
+typecheck_exit=0
+ℹ tests 157
+ℹ suites 0
+ℹ pass 157
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 310.215917
+test_exit=0
+```
+
+The format geometry search finds only the one control-collapse replacement space; no truncateToWidth or padding exists in format.ts. The entry/configuration export pins are unchanged; the renderer pin is createFooter only. The contribution-key sweep now includes format.ts.
