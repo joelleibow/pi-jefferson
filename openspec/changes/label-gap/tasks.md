@@ -11,7 +11,7 @@ Conventions for every task below, stated once:
 
 ## 1. Baseline
 
-- [ ] 1.1 Record the green starting point. Verify: `pnpm typecheck` exits 0 and `pnpm test` reports 243 tests, 243 passing (`research-eleanor.md` §5, command runs), and HEAD descends from `ad0e28f` (`git merge-base --is-ancestor ad0e28f HEAD` exits 0) with `git diff --name-only ad0e28f HEAD -- extensions/ tests/ package.json pnpm-lock.yaml` empty: the commits ahead of `ad0e28f` are change artifacts under `openspec/changes/label-gap`, and the rider commits are behind it (`owner-rulings.md`, 2026-11-06). Rests on: design D7 (the inventory counts from this base). Boundary cases: none.
+- [x] 1.1 Record the green starting point. Verify: `pnpm typecheck` exits 0 and `pnpm test` reports 243 tests, 243 passing (`research-eleanor.md` §5, command runs), and HEAD descends from `ad0e28f` (`git merge-base --is-ancestor ad0e28f HEAD` exits 0) with `git diff --name-only ad0e28f HEAD -- extensions/ tests/ package.json pnpm-lock.yaml` empty: the commits ahead of `ad0e28f` are change artifacts under `openspec/changes/label-gap`, and the rider commits are behind it (`owner-rulings.md`, 2026-11-06). Rests on: design D7 (the inventory counts from this base). Boundary cases: none.
 
 ## 2. A format's outer whitespace is trimmed (`visuals/format.ts`, `tests/format.test.ts`)
 
