@@ -78,6 +78,33 @@ test("a trailing backslash is literal", () => {
   assert.equal(rendered("model", "tail\\"), "tail\\");
 });
 
+test("a format with whitespace at either edge renders as if it had none", () => {
+  const expected = rendered("model", "$model");
+  for (const format of ["  $model  ", "$model\n", "\u0085$model"]) {
+    assert.equal(rendered("model", format), expected, JSON.stringify(format));
+  }
+});
+
+test("a format with nothing but whitespace has no segments", () => {
+  for (const format of ["   ", "\t\n"]) {
+    assert.deepEqual(parseFormat(named("model"), format), [], JSON.stringify(format));
+  }
+});
+
+test("a literal the trim empties is dropped and the trim goes on to the next segment", () => {
+  for (const format of ["  hello|dim", "hello|dim  "]) {
+    assert.deepEqual(parseFormat(named("model"), format), [{ kind: "literal", text: "hello", modifiers: [{ style: "dim" }] }], JSON.stringify(format));
+  }
+});
+
+test("whitespace inside a format is kept and the trim stops at a variable or at the bar", () => {
+  const theme = fakeTheme();
+  const line = "█".repeat(6) + theme.style("░".repeat(8), { dim: true }) + " 43.2%";
+  assert.equal(rendered("context", "$bar $percent", { width: 20, theme }), line);
+  assert.equal(rendered("context", "  $bar $percent  ", { width: 20, theme }), line);
+  assert.equal(rendered("model", "  L $model"), "L " + rendered("model", "$model"));
+});
+
 const cellStyle: ThemeStyle = { fg: "accent", bg: "selectedBg", bold: true };
 
 function pressure(percent: number | null): Readings {
