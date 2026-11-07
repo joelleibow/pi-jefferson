@@ -595,12 +595,17 @@ test("a whitespace-only format counts as empty and leaves the label alone", () =
   assert.equal(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔");
 });
 
-test("an unknown datum beside a whitespace-only format leaves no label and no lone gap", () => {
+test("an unknown datum leaves no label and no lone gap, whatever the format", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
-  const result = readDocument({ instruments: { thinking: { label: "🤔", format: "   " } }, cells: [{ instrument: "thinking" }] });
-  assert.equal(result.warning, undefined);
-  assert.equal(result.rows[0]?.cells[0]?.instrument.render(unknownLevel, 80, fakeTheme()), "", "the guard reads the declared variables, not the trimmed segments");
-  assert.equal(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔", "the same document with a known level renders the label alone");
+  for (const format of ["$level", "", "   "]) {
+    const result = readDocument({ instruments: { thinking: { label: "🤔", format } }, cells: [{ instrument: "thinking" }] });
+    assert.equal(result.warning, undefined, JSON.stringify(format));
+    assert.equal(result.rows[0]?.cells[0]?.instrument.render(unknownLevel, 80, fakeTheme()), "",
+      `an unknown level with ${JSON.stringify(format)} renders no cell, label included: the guard reads the declared variables, not the trimmed segments`);
+  }
+  const known = readDocument({ instruments: { thinking: { label: "🤔", format: "$level" } }, cells: [{ instrument: "thinking" }] });
+  assert.equal(known.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()),
+    "🤔 " + fakeTheme().style("high", { fg: "thinkingHigh" }), "the same label with a known level renders it after the gap");
 });
 
 test("a label is literal text, never a variable and never parsed", () => {
