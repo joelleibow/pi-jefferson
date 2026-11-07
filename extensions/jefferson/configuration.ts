@@ -1,11 +1,10 @@
 /**
  * The configuration reader: owns the extension's `pi-jefferson.json` surface.
  *
- * Handed two resolved paths and a trust flag by the entry (D1), this source file reads
- * and parses the document, normalizes both envelope shapes to a list of rows (D2),
- * applies the default row and the cells ceiling (D3, D4), synthesizes row ids (D6),
- * and resolves each cell's instrument at parse time (D10). It keeps its `node:`
- * builtins and imports the instrument seam; a host type would arrive by `import type`.
+ * It resolves where the two documents live, then reads and parses the one that applies,
+ * normalizes both envelope shapes to a list of rows, applies the default row and the cells
+ * ceiling, synthesizes row ids, and resolves each cell's instrument at parse time. A document
+ * it refuses renders the default row and warns; that is the whole of its error handling.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -32,7 +31,7 @@ function isAlign(value: unknown): value is CellAlign {
   return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
 }
 
-/** The two resolved document paths and the entry's trust decision (D1). */
+/** The two resolved document paths and the caller's trust decision. */
 export interface ConfigurationSource {
   agentPath: string;
   projectPath: string;
@@ -43,8 +42,8 @@ export interface ConfigurationSource {
 export interface Configuration {
   rows: Row[];
   /**
-   * Set when a present document was rejected (D3), and also when an accepted document has
-   * something to report: instruments the extension does not implement, or a `containers` key (D10).
+   * Set when a present document was rejected, and also when an accepted document has
+   * something to report: instruments the extension does not implement, or a `containers` key.
    */
   warning: string | undefined;
 }
@@ -52,7 +51,7 @@ export interface Configuration {
 export const DEFAULT_CELLS = 10;
 export const MAX_CELLS = 10;
 
-/** A document the extension refused: the default row renders, none of it (D3). */
+/** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
 /** What an accepted document still has to say for itself, gathered across all its rows. */
@@ -120,7 +119,7 @@ function blankCells(count: number, bind: BindInstrument): Cell[] {
 /**
  * The row's cells, from its `cells` entries in order, clamped to the ceiling. Each entry is
  * narrowed before it is resolved, so a name reaches `instrumentNamed` as the `string` it takes.
- * An empty list is rejected: a row of no cells has no `floor(W / N)` geometry (D11).
+ * An empty list is rejected: a row of no cells has no `floor(W / N)` geometry.
  */
 function cellsFromNames(names: readonly unknown[], index: number, notices: Notices, bind: BindInstrument): Cell[] {
   if (names.length === 0) {
@@ -128,7 +127,7 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
   }
   const cells: Cell[] = [];
   for (const entry of names) {
-    // The entry is an object: not an array, not null, not a primitive (D2).
+    // The entry is an object: not an array, not null, not a primitive.
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
       throw new RejectedConfiguration(`row ${index} has a cells entry that is not an object; declare {"instrument": "model"}`);
     }
@@ -158,7 +157,7 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
     if (instrument === undefined) notices.unknownInstruments.add(instrumentValue);
     // The ceiling truncates last: the first MAX_CELLS entries render, the rest are not rendered.
     // The push is guarded rather than breaking, so every entry past the ceiling is still
-    // validated and checked for unknowns before the ceiling decides (D2).
+    // validated and checked for unknowns before the ceiling decides.
     if (cells.length < MAX_CELLS) {
       cells.push({ instrument: bind(instrument ?? blank), align });
     }
@@ -197,7 +196,7 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
   return { id, cells };
 }
 
-/** Normalize the document: one top-level row, or a list under `rows`; never both (D2). */
+/** Normalize the document: one top-level row, or a list under `rows`; never both. */
 function normalizeDocument(document: unknown, notices: Notices, theme: Theme): Row[] {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
@@ -262,9 +261,9 @@ export function configurationPaths(cwd: string): { agentPath: string; projectPat
 
 /**
  * Read the configuration the source points at: the project document replaces the
- * agent document whole, and is read only when the project is trusted (D1). Absent
- * or empty configuration yields the default row with no warning; a present but
- * rejected document yields the default row and a warning (D3).
+ * agent document whole, and is read only when the project is trusted. Absent or empty
+ * configuration yields the default row with no warning; a present but rejected document
+ * yields the default row and a warning.
  */
 export function readConfiguration(source: ConfigurationSource): Configuration {
   const bind = instrumentBindings();
