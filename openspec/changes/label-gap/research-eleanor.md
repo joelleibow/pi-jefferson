@@ -298,3 +298,116 @@ duration ≈ 562 ms).
   "manualNotes": "Brief honored: no repo edits besides this report, no pi installed-package source read, ~/.pi/agent/pi-jefferson.json never touched, no workflow disposition given."
 }
 ```
+
+## Eleanor addendum 1 — label-gap: format whitespace and the binder
+
+Answers to `/tmp/labelgap-brief-eleanor-addendum-1.md`, cited file:line. Tree: branch `label-gap`,
+HEAD `ad0e28f`; the working tree is dirty only in `openspec/changes/label-gap/proposal.md` and
+`openspec/changes/label-gap/specs/statusline/spec.md` (the design drafts) — every cited source and
+test file is at HEAD, unmodified. Read-only apart from this file. No design proposals, no verdicts.
+Per this run's authoritative output path, this addendum is written to
+`openspec/changes/label-gap/research-eleanor.2a0dab84.md`.
+
+## 1. Format whitespace inventory in `tests/`
+
+Method: every format string in `tests/{format,configuration,jefferson,instrument,row-renderer}.test.ts`
+— arguments of `rendered(name, "…")` / `parseFormat(decl, "…")` / `render(name, readings, "…")` /
+`format: "…"`, including the `for (const format of […])` arrays (format.test.ts:61, :346, :373;
+configuration.test.ts:525) — was checked after `collapse` (`format.ts:40-42`, control chars → space)
+for leading/trailing whitespace or whitespace-only text.
+
+Result: **no non-empty format in `tests/` begins or ends with whitespace after collapse, and none is
+whitespace-only.** The only matches are the empty format `""` (collapse of `""` is `""`):
+
+| file:line | format | expected |
+| --- | --- | --- |
+| `tests/format.test.ts:73` | `parseFormat(named("model"), "")` | segments `[]` (deepEqual) |
+| `tests/format.test.ts:74` | `rendered("model", "")` | `""` |
+| `tests/configuration.test.ts:525` (test at :523, `for (const format of ["$level", ""])`) | `""` with `label: "Thinking: "` (:526) | render under unknown level is `""` (:528) |
+| `tests/configuration.test.ts:535` | `format: ""` with `label: "🤔"` | `"🤔"` (:537) |
+| `tests/configuration.test.ts:538` | `format: ""` with `label: ""` | `""` (:539) |
+| `tests/configuration.test.ts:719` (test at :718, "an explicitly empty configured format is accepted and renders nothing") | `format: ""` | cell text `[""]` (:722) |
+
+Near-miss worth recording: `tests/format.test.ts:145` uses format `"L\n$model"` — the internal `\n`
+collapses to a space inside the leading literal (`"L "`), but the format string itself starts with
+`L` and ends with `$model`, so it is not edge-whitespace. `tests/row-renderer.test.ts` uses the
+format language only at :380 (`parseFormat(declaration, declaration.defaultFormat)`); its other
+cell texts ("ab", "provider: a-very-long-model-name", :38, :85-86, :147-148) are raw instrument
+outputs, never parsed. Fixtures: `tests/format.test.ts:181` fixture `defaultFormat: "$value"` — no
+edge whitespace; `tests/instrument.test.ts:36-44` `shapes` table lists all seven defaultFormats —
+none with edge whitespace.
+
+## 2. Shipped `defaultFormat`s and edge whitespace
+
+No. `extensions/jefferson/visuals/instrument.ts`: `DEFAULT_CELL_TEXT` :7-8 (used by `blank` :41),
+`model` :48 `"$provider: $model"`, `thinking` :62 `"$level|capitalize"`, `path` :70 `"$path"`,
+`context` :82 `"$percent/$window"`, `tokens` :95 `"$totalTokens"`, `cost` :102 `"$cost"`. None begins
+or ends with whitespace, and none contains a control character, so `collapse` is the identity on all
+seven.
+
+## 3. Where the binder gets segments for an unconfigured instrument
+
+In the binder itself: `extensions/jefferson/visuals/instrument-binding.ts:21`
+`const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);` — for an
+instrument the document does not configure (`entry === undefined`), the binder calls
+`parseFormat(declaration, declaration.defaultFormat)` at :21. The other producer is
+`extensions/jefferson/configuration.ts:90` inside `readInstruments`
+(`segments = parseFormat(declaration, format ?? declaration.defaultFormat)`), stored at :106 into
+`ConfiguredInstrument.segments`, which the binder reads as `entry?.segments`.
+Yes — a `parseFormat` result is the only way segments reach the binder: the only other segment-list
+construction is the label prepend at `instrument-binding.ts:24-25`. (Tests also call `parseFormat`
+directly — format.test.ts:30, row-renderer.test.ts:380, instrument.test.ts:50 — but that is not the
+binder path.)
+
+## 4. `parseFormat`: adjacent literals, empty literals, modifier-segment whitespace
+
+All in `extensions/jefferson/visuals/format.ts`:
+
+- **Empty-text literal segments: never.** `flush` guards `literal !== ""` (:54); the modifier branch
+  guards `prefix !== ""` (:105); the run is `text.match(/\S+$/)` (:100), always non-empty, pushed at
+  :106. The binder's label segment is likewise guarded by `label === ""`
+  (`instrument-binding.ts:24`).
+- **Two adjacent literal segments: yes.** The modifier-on-literal branch splits the pending literal
+  into a prefix pushed at :105 and the run pushed at :106, back to back. Example: `"hello world|dim"`
+  → literal `"hello "` (no modifiers) + literal `"world"` `[dim]` (asserted at
+  `tests/format.test.ts:310`); `"$model via|dim|bold $provider"` → variable + literal `" "`
+  (whitespace-only, no modifiers) + `"via"` (tests/format.test.ts:317-318).
+- **Modifier-carrying literal with whitespace at its edges: no.** The segment that receives the
+  modifier is exactly `run = text.match(/\S+$/)` (:100, :106); `\S` excludes every whitespace
+  character (JS `\s` includes NBSP `\u00a0` — see tests/format.test.ts:311), so the modifier segment
+  can neither begin nor end with whitespace. The whitespace stays in the prefix segment (:104-105),
+  which carries `modifiers: []`. This confirms ADR 0003's line 33 ("the run of non-whitespace text
+  directly before it") at `format.ts:99-106`.
+- Note: a literal consisting only of control characters (e.g. `"\t"`) is non-empty before collapse,
+  so `flush` emits it as a whitespace-only literal segment with `modifiers: []` (collapse at :54;
+  exercised at tests/format.test.ts:137-140).
+
+## 5. Label tests with no trailing space in the label and format `""` or absent
+
+- `tests/configuration.test.ts:279-286` ("a configured label replaces the default label"):
+  :280 `readDocument({ instruments: { thinking: { label: "🤔" } }, cells: [{ instrument: "thinking" }] })`
+  — format absent, so the declaration default `"$level|capitalize"` (instrument.ts:62) is used;
+  :282 expected `["🤔" + fakeTheme().style("High", { fg: "thinkingHigh" })]`.
+  :284-285 `label: ""`, format absent → expected `[fakeTheme().style("High", { fg: "thinkingHigh" })]`
+  ("an empty label removes the default").
+- `tests/configuration.test.ts:534-539` ("a known datum with an intentionally empty format renders the
+  label alone"): :535 `label: "🤔", format: ""` → :537 expected `"🤔"`; :538 `label: "", format: ""`
+  → :539 expected `""`.
+- `tests/configuration.test.ts:557-558` (second case of the test at :551): :557
+  `label: "T\tB\r", format: "$level"` → :558 expected
+  `"T B " + fakeTheme().style("high", { fg: "thinkingHigh" })`. The raw label has no trailing space;
+  after `collapse` `"T\tB\r"` becomes `"T B "`, which does end with a space.
+- `tests/configuration.test.ts:577-578` (the `x`.repeat(20) case of the test at :570): :577
+  `label: "x".repeat(20), format: "$bar"` → :578
+  `render(seed, 20, theme)` expected `"x".repeat(20)` ("a label as wide as the cell leaves the bar
+  nothing").
+
+## 6. README lines showing a format with leading or trailing whitespace
+
+None. The format examples in `README.md` are: :47 `"format": "🧠: $model from $provider"`,
+:51 `"format": "$bar $percent"`, the default-format table :62-68 (`Lorem ipsum …`, `$provider: $model`,
+`$level\|capitalize`, `$path`, `$percent/$window`, `$totalTokens`, `$cost`), the modifier example
+:92-94 `` `🧠 $model via|dim $provider|capitalize` ``, and the pipe prose :104-108
+(`$model | $provider` → `claude-opus-4 | anthropic`, `\|`). No format string in the README begins or
+ends with whitespace. The only edge-whitespace strings in the README are label prose: :79 and :85
+(`Thinking: `, with its trailing space).
