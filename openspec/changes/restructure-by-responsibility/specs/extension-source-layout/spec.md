@@ -22,7 +22,7 @@ A change that moves or separates source files MUST leave unchanged everything a 
 #### Scenario: String mutations
 
 - **WHEN** the shipped source is inspected
-- **THEN** `lodash-es` is still imported per function from its own path, never from an index, which ADR 0004 records as passing `tsc` and failing `node --test`
+- **THEN** `lodash-es` is still imported per function from its own path, never from an index. ADR 0004 chooses the per-function paths so three modules load rather than the library's index; the index import is caught only by a search of the source, because `lodash-es` works under both `tsc` and `node --test`. The form that passes `tsc` and fails `node --test` is a named import from the CommonJS `lodash`
 
 ### Requirement: The existing tests are the proof of unchanged behavior
 
