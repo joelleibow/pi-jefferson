@@ -319,6 +319,9 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const footerSetup = await import("../extensions/jefferson/footer-setup.ts");
   assert.deepEqual(Object.keys(footerSetup).sort(), ["installFooter"]);
 
+  const startup = await import("../extensions/jefferson/startup.ts");
+  assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
+
   const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/visuals/format.ts");
@@ -330,6 +333,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ...Object.keys(binding),
     ...Object.keys(feed),
     ...Object.keys(footerSetup),
+    ...Object.keys(startup),
   ]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),

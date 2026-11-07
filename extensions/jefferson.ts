@@ -7,80 +7,20 @@
  * `extensions/jefferson/` directory beside it is the extension's working parts,
  * imported by relative path; the host never loads them.
  *
- * This file is the entry; any shipped file may import a host package (`@earendil-works/*`).
- * Imports run one way only — from the entry to the working parts, never back, and no cycles.
- * Because the working-parts directory shares its stem with this file, an import from here
- * must name a file inside it (`./jefferson/configuration.ts`), not the bare `./jefferson`.
- *
- * The entry registers the `/jefferson` version command and installs the statusline
- * footer: on every `session_start` in TUI mode it reads `pi-jefferson.json` (agent
- * directory, plus the trusted project copy), seeds the session data store from the
- * context, captures the footer's repaint request, and
- * replaces the built-in footer with one line per declared row. Reload clears the
- * custom footer, so the install re-runs on every `session_start`.
+ * This file is the entry, and it only registers the extension: it hands the host's `pi`
+ * to `startUp`, which holds the install lifecycle. Any shipped file may import a host
+ * package (`@earendil-works/*`). Imports run one way only — from the entry to the working
+ * parts, never back, and no cycles. Because the working-parts directory shares its stem
+ * with this file, an import from here must name a file inside it
+ * (`./jefferson/startup.ts`), not the bare `./jefferson`.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { configurationPaths, readConfiguration } from "./jefferson/configuration.ts";
-import { installFooter } from "./jefferson/footer-setup.ts";
-import { feedSessionData } from "./jefferson/data/session-data-feed.ts";
+import { startUp } from "./jefferson/startup.ts";
 
 export const VERSION = "0.0.0-alpha";
 
 export default function jefferson(pi: ExtensionAPI): void {
-  // Retained across `session_start` calls: the previous install's release, so a store the
-  // entry still holds is disposed — and its subscriptions dropped — before its replacement
-  // exists (D5).
-  let releasePrevious: (() => void) | undefined;
-
-  // Retained for the same reason: how many rows the footer this session installed renders, so
-  // `/jefferson` describes the installed footer rather than claiming there is none.
-  let footerRows: number | undefined;
-
-  pi.registerCommand("jefferson", {
-    description: "Report the installed statusline footer",
-    handler: async (_args, ctx) => {
-      // `VERSION` is deliberately not printed: it is `0.0.0-alpha` while `package.json` says
-      // `0.1.1`, so it would report a wrong version (see `tasks.md`'s deferred debt).
-      ctx.ui.notify(
-        footerRows === undefined
-          ? "pi-jefferson — no statusline footer is installed."
-          : `pi-jefferson — the statusline footer is installed, ${footerRows} ${
-              footerRows === 1 ? "row" : "rows"
-            }.`,
-        "info",
-      );
-    },
-  });
-
-  pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
-
-    releasePrevious?.();
-
-    // The repaint request reaches the host's `tui` only when the host invokes the factory, which
-    // it does synchronously inside `setFooter`, before any push can arrive (D5).
-    let requestRepaint: (() => void) | undefined;
-
-    const { store, release } = feedSessionData(pi, ctx, () => requestRepaint?.());
-    releasePrevious = release;
-
-    const { rows, warning } = readConfiguration({
-      ...configurationPaths(ctx.cwd),
-      projectTrusted: ctx.isProjectTrusted(),
-      theme: ctx.ui.theme,
-    });
-    if (warning !== undefined) ctx.ui.notify(warning, "warning");
-
-    footerRows = rows.length;
-    installFooter(ctx.ui, {
-      rows,
-      sample: () => store.sample(),
-      dispose: release,
-      receiveRepaint: (repaint) => {
-        requestRepaint = repaint;
-      },
-    });
-  });
+  startUp(pi);
 }
