@@ -72,8 +72,8 @@ to use its default:
 Every instrument also accepts `label`, a string placed in front of its format, whether the format
 is configured or the default. It is literal text: `$` means nothing in it, and `$label` is not a
 variable (a format that names it rejects the document). Each control character in it becomes one
-space, then whitespace at its front and back is removed. A `label` that is not a string rejects the
-document.
+space, then whitespace at its front and back is removed, and it takes the instrument's `style`. A
+`label` that is not a string rejects the document.
 
 ```json
 "thinking": { "label": "🤔" }
