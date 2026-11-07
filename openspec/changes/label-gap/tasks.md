@@ -55,7 +55,7 @@ Rests on design D7's last guard row, `michael-orientation.md` §1 (`🧠 `, `�
 
 ## 7. Joel's observation
 
-- [ ] 7.1 **Joel's, not ticked by the writer.** In his own pi session, with his `~/.pi/agent/pi-jefferson.json` as it is, his three labels (`🧠 `, `🤔 `, `🔋 `) render with one gap each. He then removes the trailing spaces from his own config himself and sees the same footer. No task edits that file. Verify: Joel says what he saw. Per the conductor skill's Validate flow, this observation happens before the archive. Rests on: design D8 and Migration Plan; `owner-rulings.md` 2026-11-06 (his config is never edited by a task) and 2026-11-07.
+- [ ] 7.1 **Joel's, not ticked by the writer.** In his own pi session, with his `~/.pi/agent/pi-jefferson.json` as it is (the labels `🧠`, `🤔` and `🔋` carry no trailing space), each of the three cells renders its label, one gap, then the content. Optionally he adds a trailing space back to one label himself and sees that it still renders a single gap. No task edits that file. Verify: Joel says what he saw. Per the conductor skill's Validate flow, this observation happens before the archive. Rests on: design D8 and Migration Plan; `owner-rulings.md` 2026-11-06 (his config is never edited by a task) and 2026-11-07; Michael's finding at the implementation gate (run `558737db-7f71-4e39-86c4-e3cf642b6cae`) that the file already holds the labels without trailing spaces.
 
 ## Coverage
 
