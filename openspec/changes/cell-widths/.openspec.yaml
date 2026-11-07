@@ -1,2 +1,9 @@
 schema: marbleization
 created: 2026-11-07
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "89be94f9-d89f-4bcb-acaf-4cd532e4ebae"
+    chidi: "6c93d701-b972-4ed8-a03a-548863b3635c"
+    eleanor: "46b4966d-194e-4b67-9a8c-9e8b93d61120"
+  gates: {}
