@@ -153,3 +153,15 @@ From Node's documentation via Context7 (S11) and verified empirically on Node v2
 - Whether jiti accepts extensionless relative imports or directory imports inside an extension (it likely does, being CJS-style resolution); not documented in S1–S2 and not tested. Moot if the source follows the Node rules, which jiti also accepts.
 - Whether the pi docs' statement "Discovery goes one level deep" treats `extensions/<name>/index.ts` inside an *installed npm package* identically to the user-level directory — the docs present the same layouts for both (S1) but the installed-package path was not executed end-to-end.
 - The exact Node version(s) end users run was not checked (repo `engines` field unread, Eleanor's lane). Type stripping is default-on since Node v23.6; earlier LTS lines need `--experimental-strip-types`, which changes the `node --test` discovery behavior noted above.
+
+## Addendum 1 — the session_start handler's context type
+
+The `ctx` parameter of `pi.on("session_start", (event, ctx) => ...)` is typed **`ExtensionContext`**, declared at `dist/core/extensions/types.d.ts:232` (`export interface ExtensionContext`, documented "Context passed to extension event handlers"; it carries `ui`, `mode`, `hasUI`, `cwd`, `sessionManager`, `modelRegistry`, `model`, `thinkingLevel?`, `isIdle()`, `isProjectTrusted()`, `getContextUsage()`, etc., exactly matching Derek's list). It **is** exported from the package root: `dist/index.d.ts:8` re-exports `ExtensionContext` (alongside `ExtensionAPI`, `SessionStartEvent`, `ExtensionHandler`, …) from `./core/extensions/index.ts`, which in turn re-exports it from `./types.ts` (`dist/core/extensions/index.d.ts:9`). So a separate source file can simply write:
+
+```ts
+import type { ExtensionAPI, ExtensionContext, SessionStartEvent } from "@earendil-works/pi-coding-agent";
+
+export function onSessionStart(event: SessionStartEvent, ctx: ExtensionContext): void { /* ... */ }
+```
+
+No `Parameters<...>` workaround is needed; the type is public. Related subtypes also exported from the root: `ExtensionToolContext` (types.d.ts:288) and `ExtensionCommandContext` (types.d.ts:305). The generic handler signature is `ExtensionHandler<E, R> = (event: E, ctx: ExtensionContext) => ...` (types.d.ts:1205), should Derek want a shared handler type.
