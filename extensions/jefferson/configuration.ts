@@ -11,8 +11,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
-import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
-import { collapse, parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./visuals/instrument.ts";
+import { collapse, parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
 
 /** The values a cell's `align` may take. The type and every message derive from this tuple. */
 const ALIGNMENTS = ["left", "right", "center"] as const;

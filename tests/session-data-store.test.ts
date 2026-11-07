@@ -3,8 +3,8 @@ import { test } from "node:test";
 
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
-import { createSessionDataStore } from "../extensions/jefferson/session-data-store.ts";
-import type { Readings, SessionDataStore } from "../extensions/jefferson/session-data-store.ts";
+import { createSessionDataStore } from "../extensions/jefferson/data/session-data-store.ts";
+import type { Readings, SessionDataStore } from "../extensions/jefferson/data/session-data-store.ts";
 
 const zeroTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
 const seed: Readings = {

@@ -29,8 +29,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { readConfiguration } from "./jefferson/configuration.ts";
-import { createFooter } from "./jefferson/row-renderer.ts";
-import { createSessionDataStore } from "./jefferson/session-data-store.ts";
+import { createFooter } from "./jefferson/visuals/row-renderer.ts";
+import { createSessionDataStore } from "./jefferson/data/session-data-store.ts";
 
 export const VERSION = "0.0.0-alpha";
 

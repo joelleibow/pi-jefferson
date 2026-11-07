@@ -8,7 +8,7 @@ import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } fro
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -298,7 +298,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const entry = await import("../extensions/jefferson.ts");
   assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
 
-  const renderer = await import("../extensions/jefferson/row-renderer.ts");
+  const renderer = await import("../extensions/jefferson/visuals/row-renderer.ts");
   assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
@@ -307,9 +307,9 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["DEFAULT_CELLS", "MAX_CELLS", "readConfiguration"],
   );
 
-  const instrument = await import("../extensions/jefferson/instrument.ts");
-  const store = await import("../extensions/jefferson/session-data-store.ts");
-  const format = await import("../extensions/jefferson/format.ts");
+  const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
+  const store = await import("../extensions/jefferson/data/session-data-store.ts");
+  const format = await import("../extensions/jefferson/visuals/format.ts");
   for (const key of [...Object.keys(instrument), ...Object.keys(store), ...Object.keys(format)]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),

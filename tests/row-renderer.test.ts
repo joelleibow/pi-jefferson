@@ -4,16 +4,16 @@ import { test } from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/configuration.ts";
-import { type Instrument, instrumentNamed } from "../extensions/jefferson/instrument.ts";
-import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
+import { type Instrument, instrumentNamed } from "../extensions/jefferson/visuals/instrument.ts";
+import { parseFormat, resolveFormat } from "../extensions/jefferson/visuals/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import {
   createFooter,
-} from "../extensions/jefferson/row-renderer.ts";
+} from "../extensions/jefferson/visuals/row-renderer.ts";
 import {
   createSessionDataStore,
   type Readings,
-} from "../extensions/jefferson/session-data-store.ts";
+} from "../extensions/jefferson/data/session-data-store.ts";
 
 
 /** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
