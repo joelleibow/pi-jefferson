@@ -8,7 +8,8 @@ import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
 import { createFooter } from "../extensions/jefferson/visuals/row-renderer.ts";
-import type { Cell, Configuration } from "../extensions/jefferson/configuration.ts";
+import type { Cell } from "../extensions/jefferson/visuals/row.ts";
+import type { Configuration } from "../extensions/jefferson/configuration.ts";
 import {
   DEFAULT_CELLS,
   MAX_CELLS,

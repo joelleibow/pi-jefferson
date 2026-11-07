@@ -13,26 +13,11 @@ import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./visuals/instrument.ts";
 import { collapse, parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
-
-/** The values a cell's `align` may take. The type and every message derive from this tuple. */
-const ALIGNMENTS = ["left", "right", "center"] as const;
-export type CellAlign = (typeof ALIGNMENTS)[number];
+import { ALIGNMENTS, type Cell, type CellAlign, type Row } from "./visuals/row.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
   return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
-}
-
-/** A single cell of a row: the instrument whose text it displays, padded against its align (D1). */
-export interface Cell {
-  instrument: Instrument;
-  align: CellAlign;
-}
-
-/** A normalized statusline row: one footer line of evenly divided cells. */
-export interface Row {
-  id: string;
-  cells: Cell[];
 }
 
 /** The two resolved document paths and the entry's trust decision (D1). */

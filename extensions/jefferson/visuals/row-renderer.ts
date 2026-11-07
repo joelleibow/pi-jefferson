@@ -2,7 +2,7 @@
 import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-import type { Cell, Row } from "../configuration.ts";
+import type { Cell, Row } from "./row.ts";
 import type { Readings } from "../data/session-data-store.ts";
 
 export interface Footer {

@@ -307,10 +307,18 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["DEFAULT_CELLS", "MAX_CELLS", "readConfiguration"],
   );
 
+  const row = await import("../extensions/jefferson/visuals/row.ts");
+  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);
+
   const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/visuals/format.ts");
-  for (const key of [...Object.keys(instrument), ...Object.keys(store), ...Object.keys(format)]) {
+  for (const key of [
+    ...Object.keys(instrument),
+    ...Object.keys(store),
+    ...Object.keys(format),
+    ...Object.keys(row),
+  ]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),
       `${key} looks like a contribution interface`,

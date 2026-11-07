@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 
-import type { Row } from "../extensions/jefferson/configuration.ts";
+import type { Row } from "../extensions/jefferson/visuals/row.ts";
 import { type Instrument, instrumentNamed } from "../extensions/jefferson/visuals/instrument.ts";
 import { parseFormat, resolveFormat } from "../extensions/jefferson/visuals/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
