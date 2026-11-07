@@ -1,4 +1,4 @@
-/** The plain-text format language; declarations supply already-formatted values. */
+/** The format language: literal text, $variables and |modifiers; declarations supply already-formatted values. */
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
 import toLower from "lodash-es/toLower.js";
