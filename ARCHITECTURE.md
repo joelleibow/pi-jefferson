@@ -22,10 +22,10 @@ The decision behind the layout, and the alternatives it weighed, are in
 **Entry.** `extensions/jefferson.ts` is the only file the host loads. It registers the extension and
 hands the host's API to startup, and does nothing else.
 
-**Startup.** Owns the `/jefferson` command and the `session_start` handler, which releases the
-previous install and then installs the data, reads the configuration and installs the footer, in that
-order. It owns the repaint callback's wiring: the footer hands the host's repaint request back out, and
-the data side calls it. It decides *when* things run; it computes nothing.
+**Startup.** Owns the `/jefferson` command and the `session_start` handler. The handler releases the
+previous install, then installs the data, reads the configuration and installs the footer, in that
+order. Startup also wires the repaint callback: the footer hands the host's repaint request back out,
+and the data side calls it. It decides *when* things run; it computes nothing.
 
 **Data feed.** Lives in `data/`. Seeds the store from the session context, supplies the readers, and
 subscribes to the events that push into the store. One release undoes the subscriptions and disposes
@@ -47,8 +47,8 @@ per render is handed to every cell, so cost and tokens share one totals object.
 reads it, validates it, resolves instrument names, and normalizes rows.
 The optional `instruments` section configures each name once; formats, labels and styles are validated
 at read time against its declaration and the live theme, then one bound instrument per name is shared
-across the document; the binding itself lives in `visuals/`. Every failure mode rejects the whole document, renders the default row, and warns with a
-message that names what was wrong. An unknown instrument *name* is different: it warns and renders
+across the document. The binding itself lives in `visuals/`. Every failure mode rejects the whole
+document, renders the default row, and warns with a message that names what was wrong. An unknown instrument *name* is different: it warns and renders
 `blank` in that cell.
 
 **Instrument.** One declaration owns its name, variables, default format and options, and may carry a
@@ -71,11 +71,11 @@ and returns one line; composition and allocation stay with the host.
 
 ## Import direction
 
-One way only, and no cycles: the entry imports startup and nothing else, startup imports what it
-installs, and no file imports the entry. Within `extensions/jefferson/`:
+One way only, and no cycles. The entry imports startup and nothing else. Startup imports what it
+installs. No file imports the entry. Within `extensions/jefferson/`:
 
 - `data/` holds the files that keep session data and take it from the host. It imports host packages
-  and its own files, and nothing outside itself.
+  and its own files, and no file outside `data/`.
 - `visuals/` holds the files that decide what a cell shows or how rows are laid out and drawn. It
   imports host packages, its own files and the types of `data/`. It never imports startup, footer
   setup or configuration.

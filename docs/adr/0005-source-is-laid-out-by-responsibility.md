@@ -5,7 +5,7 @@ Status: Accepted. Narrows [ADR 0001](0001-imports-run-one-way.md)'s statement th
 
 ## Context
 
-Joel's 2026-11-06 ruling named the problem: the source was one flat directory with no separation of
+Joel's 2026-11-06 ruling named the problem: the source was one flat directory that did not separate
 startup, config loading, footer setup, and data and its updates from visuals and process flow. The
 flat layout hid two files that each held several responsibilities. The entry held the install
 lifecycle, the two config-document paths, the footer's `setFooter` callback and the adaptation of
@@ -29,10 +29,10 @@ responsibility that owns several files gets a directory. One that owns a single 
   `extensions/jefferson/`. Startup holds the install lifecycle and its order. Configuration holds
   where the document lives and what it may contain. Footer setup holds pi's footer factory.
 - `extensions/jefferson/data/` holds the session data and the adaptation of the host's session and
-  events to it: the seed, the readers and the push subscriptions. A datum added or a payload unwrapped
-  differently edits `data/` and not the lifecycle.
-- `extensions/jefferson/visuals/` holds what decides what a cell shows and how rows are laid out and
-  drawn, including the row types and the binding of a configured format to an instrument.
+  events to it: the seed, the readers and the push subscriptions. Adding a datum, or unwrapping a payload
+  differently, edits `data/` and not the lifecycle.
+- `extensions/jefferson/visuals/` holds the source files that decide what a cell shows and how rows are
+  laid out and drawn, including the row types and the binding of a configured format to an instrument.
 - `data/` imports no file outside itself. `visuals/` imports only itself and the types of `data/`.
   Neither imports startup, footer setup or configuration.
 - Separation uses plain imports. A function crosses a boundary only as a parameter that carries a
@@ -44,7 +44,7 @@ responsibility that owns several files gets a directory. One that owns a single 
   each.
 - Adding an instrument for another datum pi provides touches `data/` and `visuals/` and not the
   lifecycle.
-- The directory rules are a convention, checked by reading the imports. The change that made them
+- The directory rules are a convention, checked by reading the imports. The change that introduced them
   checked them with a throwaway script and left no standing check in CI.
 - Rejected: one directory each for configuration and footer setup, which would hold a single file
   apiece; a `src/` root, which revises Joel's layout ruling and would not ship unless the manifest
