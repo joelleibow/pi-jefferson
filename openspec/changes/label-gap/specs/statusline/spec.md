@@ -2,7 +2,7 @@
 
 ### Requirement: The thinking instrument
 
-The extension MUST implement a `thinking` instrument declaring the variable `$level`, with a default label that renders, gap included, as `Thinking: ` and the default format `$level|capitalize`. Configuration MUST be able to place it in a row's cell and to configure its label, format and style, and the footer MUST render it. Its text MUST be correct when a session is restored, MUST change when the host reports a thinking-level selection, and MUST be nothing when the level is unknown — not a fallback the host did not report.
+The extension MUST implement a `thinking` instrument declaring the variable `$level`, with a default label that renders, gap included, as `Thinking: ` and the default format `$level|capitalize`. Configuration MUST be able to place it in a row's cell and to configure its label, format and style, and the footer MUST render it. Its text MUST be correct when a session is restored, MUST change when the host reports a selection, and MUST be nothing when the level is unknown.
 
 #### Scenario: The default thinking cell
 
@@ -33,13 +33,10 @@ The extension MUST implement a `thinking` instrument declaring the variable `$le
 ### Requirement: An instrument's format is plain text and variables
 
 A `format` MUST be plain text: literal characters render verbatim, and `$name` substitutes the value
-the instrument hands out, already formatted. The format language MUST NOT format a number or parse
-Markdown, and `[`, `]`, `(` and `)` are the characters they are. `$` starts a variable; `|` starts
-a modifier when a name follows it directly, and is text otherwise; both are escaped with a
-backslash: `\$`, `\|`. Whitespace at the front and back of a format MUST be removed, after control
-characters collapse to spaces, so a format renders as if it had none there; whitespace between a
-format's parts is text and renders as written. An undeclared `$name` MUST reject the document, naming
-the instrument and the variable.
+the instrument hands out. The format language MUST NOT format a number or parse Markdown. `$` starts a
+variable and `|` a modifier when a name follows it; `\$` and `\|` escape them. Whitespace at the front
+and back of a format MUST be removed, after control characters collapse to spaces. An undeclared
+`$name` MUST reject the document, naming the instrument and the variable.
 
 #### Scenario: Literal text among variables
 
@@ -105,20 +102,11 @@ the instrument and the variable.
 
 ### Requirement: An instrument's label is placed in front of its format
 
-Every instrument MUST accept a `label` option, a string, beside `format` and `style`. The label MUST be
-rendered in front of the text the instrument's format produces, configured or default, as literal text
-in which `$` has no meaning, in the instrument's configured `style`. It MUST NOT be a variable: no
-instrument declares `$label`. A `label` that is not a string MUST reject the document. An unknown datum
-MUST suppress the whole cell, label included.
-
-Whitespace at the front and back of a label MUST be removed, after control characters collapse to
-spaces, so the label carries no space of its own at its edges. When the label, so trimmed, is non-empty
-and the format, so trimmed, is non-empty, the cell MUST show a gap between the label and the content
-that follows, on every instrument: always, with no option, setting or opt-out, so a label never sits flush
-against its content. The condition is the format being non-empty, not what it renders: a format that is
-empty after the trim leaves the label alone, with no gap. A configured label that is empty, or empty after the trim, replaces the instrument's default label with no label, and no gap renders. The gap MUST be one column wide. It MUST take the style the label
-has, so it leaves no unstyled hole between label and content; it MUST count in the cell's width and in
-what `$bar` leaves; and it MUST NOT add a line. Nothing in a label gains meaning from the gap.
+Every instrument MUST accept a string `label` option, rendered as literal text in front of its format
+text. Whitespace at the front and back of a label MUST be removed, after control characters collapse to
+spaces. When the label and the format, so trimmed, are both non-empty, a one-column gap MUST separate
+them, always, with no option, setting or opt-out, whatever the format renders. A configured label empty
+after the trim replaces the default label with none, and no gap renders.
 
 #### Scenario: A label with no trailing whitespace gets a gap
 
@@ -157,6 +145,11 @@ what `$bar` leaves; and it MUST NOT add a line. Nothing in a label gains meaning
 #### Scenario: An empty label replaces the default label
 
 - **WHEN** `thinking` is configured with `label: ""` and the default format, and the level is `high`
+- **THEN** the cell renders only the styled `High`, with no `Thinking:` and no leading gap
+
+#### Scenario: A whitespace-only label replaces the default label
+
+- **WHEN** `thinking` is configured with `label: "   "` and the default format, and the level is `high`
 - **THEN** the cell renders only the styled `High`, with no `Thinking:` and no leading gap
 
 #### Scenario: A label in front of the default format
