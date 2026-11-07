@@ -153,8 +153,10 @@ pnpm typecheck
 pnpm test
 ```
 
-Tests live in `tests/`, never beside an extension. Pi loads every direct `.ts` file in
-`extensions/` as an extension, so a test file there would run on every pi start.
+Tests live in `tests/`, never beside a source file. The `pi.extensions` manifest in `package.json`
+names the one entry, `extensions/jefferson.ts`, and pi loads only what the manifest lists, so
+the files under `extensions/jefferson/` are never entries. A test file there would still ship in the
+package, because `files` includes `extensions`.
 
 `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui` are `peerDependencies`, not
 `dependencies`, because pi supplies them at runtime. A physical copy bypasses pi's module
