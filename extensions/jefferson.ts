@@ -23,7 +23,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { configurationPaths, readConfiguration } from "./jefferson/configuration.ts";
-import { createFooter } from "./jefferson/visuals/row-renderer.ts";
+import { installFooter } from "./jefferson/footer-setup.ts";
 import { feedSessionData } from "./jefferson/data/session-data-feed.ts";
 
 export const VERSION = "0.0.0-alpha";
@@ -74,14 +74,13 @@ export default function jefferson(pi: ExtensionAPI): void {
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;
-    ctx.ui.setFooter((tui, theme) => {
-      const footer = createFooter(rows, () => store.sample(), theme);
-      requestRepaint = () => tui.requestRender();
-      return {
-        render: (width: number) => footer.render(width),
-        invalidate: () => footer.invalidate(),
-        dispose: release,
-      };
+    installFooter(ctx.ui, {
+      rows,
+      sample: () => store.sample(),
+      dispose: release,
+      receiveRepaint: (repaint) => {
+        requestRepaint = repaint;
+      },
     });
   });
 }
