@@ -1,4 +1,4 @@
-schema: spec-driven
+schema: marbleization
 
 # Project context. Every `openspec instructions` call prints this block, which is how a seat that
 # does not read AGENTS.md (the documenter, the researchers) still gets it. It repeats facts owned
