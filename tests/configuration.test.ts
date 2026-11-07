@@ -279,7 +279,7 @@ test("with a level and nothing configured, the thinking cell renders its default
 test("a configured label replaces the default label", () => {
   const replaced = readDocument({ instruments: { thinking: { label: "🤔" } }, cells: [{ instrument: "thinking" }] });
   assert.equal(replaced.warning, undefined);
-  assert.deepEqual(replaced.rows[0]?.cells.map(cellText), ["🤔" + fakeTheme().style("High", { fg: "thinkingHigh" })]);
+  assert.deepEqual(replaced.rows[0]?.cells.map(cellText), ["🤔 " + fakeTheme().style("High", { fg: "thinkingHigh" })]);
   assert.equal(replaced.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme())?.includes("Thinking: "), false, "the default label is not shown beside a configured one");
   const removed = readDocument({ instruments: { thinking: { label: "" } }, cells: [{ instrument: "thinking" }] });
   assert.deepEqual(removed.rows[0]?.cells.map(cellText), [fakeTheme().style("High", { fg: "thinkingHigh" })], "an empty label removes the default");
@@ -520,6 +520,37 @@ test("a configured label is placed in front of a configured format and a default
   assert.deepEqual(emptied.rows[0]?.cells.map(cellText), ["claude-opus-4"], 'an empty label leaves the format text unchanged');
 });
 
+test("a label with no trailing whitespace gets a one-column gap before its content", () => {
+  const result = readDocument({ instruments: { model: { label: "🧠", format: "$model" } }, cells: [{ instrument: "model" }] });
+  assert.equal(result.warning, undefined);
+  assert.deepEqual(result.rows[0]?.cells.map(cellText), ["🧠 claude-opus-4"]);
+});
+
+test("every instrument that has a label gets the gap", () => {
+  for (const name of ["blank", "model", "thinking", "path", "context", "tokens", "cost"]) {
+    const result = readDocument({ instruments: { [name]: { label: "L" } }, cells: [{ instrument: name }] });
+    assert.equal(result.warning, undefined, name);
+    const text = stripTerminalSequences(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()) ?? "");
+    assert.ok(text.startsWith("L "), `${name} renders its label, then one blank column: ${JSON.stringify(text)}`);
+    assert.notEqual(text.charAt(2), " ", `${name} renders one gap, not two`);
+    assert.ok(text.length > 2, `${name} renders content after the gap`);
+  }
+});
+
+test("a label that ends in whitespace or in a control character gets one gap, never two", () => {
+  for (const label of [" 🧠 ", "🧠\n", "🧠\u0085", "🧠\u00a0"]) {
+    const result = readDocument({ instruments: { model: { label, format: "$model" } }, cells: [{ instrument: "model" }] });
+    assert.equal(result.warning, undefined, JSON.stringify(label));
+    assert.deepEqual(result.rows[0]?.cells.map(cellText), ["🧠 claude-opus-4"], JSON.stringify(label));
+  }
+});
+
+test("a label that is empty after the trim shows no label and no gap", () => {
+  const result = readDocument({ instruments: { model: { label: "  ", format: "$model" } }, cells: [{ instrument: "model" }] });
+  assert.equal(result.warning, undefined);
+  assert.deepEqual(result.rows[0]?.cells.map(cellText), ["claude-opus-4"]);
+});
+
 test("an unknown datum suppresses the whole cell, label included", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
   for (const format of ["$level", ""]) {
@@ -537,6 +568,20 @@ test("a known datum with an intentionally empty format renders the label alone",
   assert.equal(labelled.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔");
   const bare = readDocument({ instruments: { thinking: { label: "", format: "" } }, cells: [{ instrument: "thinking" }] });
   assert.equal(bare.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "");
+});
+
+test("a whitespace-only format counts as empty and leaves the label alone", () => {
+  const result = readDocument({ instruments: { thinking: { label: "🤔", format: "   " } }, cells: [{ instrument: "thinking" }] });
+  assert.equal(result.warning, undefined);
+  assert.equal(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔");
+});
+
+test("an unknown datum beside a whitespace-only format leaves no label and no lone gap", () => {
+  const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
+  const result = readDocument({ instruments: { thinking: { label: "🤔", format: "   " } }, cells: [{ instrument: "thinking" }] });
+  assert.equal(result.warning, undefined);
+  assert.equal(result.rows[0]?.cells[0]?.instrument.render(unknownLevel, 80, fakeTheme()), "", "the guard reads the declared variables, not the trimmed segments");
+  assert.equal(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔", "the same document with a known level renders the label alone");
 });
 
 test("a label is literal text, never a variable and never parsed", () => {
@@ -575,7 +620,16 @@ test("the label's width reduces what the bar has left", () => {
   assert.equal(text, "ab 43.2% " + "█".repeat(4) + theme.style("░".repeat(7), { dim: true }));
   assert.equal(visibleWidth(text), 20);
   const full = readDocument({ instruments: { context: { label: "x".repeat(20), format: "$bar" } }, cells: [{ instrument: "context" }] });
-  assert.equal(full.rows[0]?.cells[0]?.instrument.render(seed, 20, theme), "x".repeat(20), "a label as wide as the cell leaves the bar nothing");
+  assert.equal(full.rows[0]?.cells[0]?.instrument.render(seed, 20, theme), "x".repeat(20) + " ", "a label as wide as the cell leaves the bar nothing");
+});
+
+test("a label narrower than the cell shrinks the bar by its columns and the gap's one", () => {
+  const theme = fakeTheme();
+  const result = readDocument({ instruments: { context: { label: "ab", format: "$percent $bar" } }, cells: [{ instrument: "context" }] });
+  assert.equal(result.warning, undefined);
+  const text = result.rows[0]?.cells[0]?.instrument.render(seed, 20, theme) ?? "";
+  assert.equal(text, "ab 43.2% " + "█".repeat(4) + theme.style("░".repeat(7), { dim: true }));
+  assert.equal(visibleWidth(text), 20);
 });
 
 test("a configured foreground does not beat the level's color", () => {
@@ -813,6 +867,27 @@ test("configured styled cells reset before every trailing pad, including attribu
       assert.equal(cell.match(/\x1b\[0m/g)?.length, 1, "one reset immediately before the pad");
     }
   }
+});
+
+test("the gap takes the label's style, so the background runs unbroken across it", () => {
+  const theme = fakeTheme();
+  for (const style of [{ bg: "selectedBg" }, { underline: true }] as const) {
+    const document = { instruments: { context: { label: "Q", format: "$percent", style } }, cells: [{ instrument: "context" }] };
+    const { rows } = readDocument(document, theme);
+    const text = theme.style("Q ", style) + theme.style("43.2%", style);
+    assert.equal(rows[0]?.cells[0]?.instrument.render(seed, 80, theme), text, JSON.stringify(style));
+    const line = footerFor(document, theme).render(20)[0] ?? "";
+    assert.equal(visibleWidth(line), 20);
+    assert.ok(line.includes(text + RESET + " ".repeat(13)), "the cell's pad follows the styled gap and one reset");
+  }
+});
+
+test("a cell narrower than the label, the gap and the content clips them together", () => {
+  const footer = footerFor({ instruments: { model: { label: "ab", format: "$model" } }, cells: [{ instrument: "model" }] });
+  const lines = footer.render(10);
+  assert.equal(lines.length, 1);
+  assert.equal(visibleWidth(lines[0] ?? ""), 10);
+  assert.ok(stripTerminalSequences(lines[0] ?? "").startsWith("ab c"), "the label, the gap, then the clipped content");
 });
 
 test("right-aligned styled cells lead with unstyled pad and exact-fill cells add no reset", () => {
