@@ -21,8 +21,8 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
       const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
       const style = entry?.style ?? {};
       // The label carries no edge whitespace of its own, and one gap stands between it and its
-      // content (design D1, D2, D4): the gap is due from the document, and the label's segment
-      // holds it so `$bar` counts its column and the label's style covers it.
+      // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
+      // `$bar` counts its column and the label's style covers it.
       const label = collapse(entry?.label ?? declaration.defaultLabel ?? "").trim();
       const gap = label !== "" && segments.length > 0 ? " " : "";
       const labelled: FormatSegment[] = label === "" ? segments

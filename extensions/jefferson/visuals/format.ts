@@ -46,6 +46,8 @@ function formatError(declaration: InstrumentDeclaration, detail: string): Error 
 }
 
 export function parseFormat(declaration: InstrumentDeclaration, format: string): FormatSegment[] {
+  // A format's outer whitespace is not text (ADR 0006); collapse first so a trailing control character becomes a space the trim removes.
+  format = collapse(format).trim();
   const segments: FormatSegment[] = [];
   let literal = "";
   let hasBar = false;
@@ -115,36 +117,7 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
     }
   }
   flush();
-  trimEdges(segments);
   return segments;
-}
-
-/**
- * A format's outer whitespace is not text (design D3): trim it from the unmodified literal at each
- * edge, drop the ones the trim empties, and stop at a variable, at the bar or at text that remains.
- * A modifier-carrying literal is a non-whitespace run, so it holds no edge whitespace to trim.
- */
-function trimEdges(segments: FormatSegment[]): void {
-  while (true) {
-    const first = segments[0];
-    if (first === undefined || first.kind !== "literal" || first.modifiers.length > 0) break;
-    const text = first.text.trimStart();
-    if (text !== "") {
-      segments[0] = { ...first, text };
-      break;
-    }
-    segments.shift();
-  }
-  while (true) {
-    const last = segments[segments.length - 1];
-    if (last === undefined || last.kind !== "literal" || last.modifiers.length > 0) break;
-    const text = last.text.trimEnd();
-    if (text !== "") {
-      segments[segments.length - 1] = { ...last, text };
-      break;
-    }
-    segments.pop();
-  }
 }
 
 const STYLE_KEYS = {
