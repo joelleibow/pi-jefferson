@@ -24,7 +24,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { configurationPaths, readConfiguration } from "./jefferson/configuration.ts";
 import { createFooter } from "./jefferson/visuals/row-renderer.ts";
-import { createSessionDataStore } from "./jefferson/data/session-data-store.ts";
+import { feedSessionData } from "./jefferson/data/session-data-feed.ts";
 
 export const VERSION = "0.0.0-alpha";
 
@@ -63,43 +63,7 @@ export default function jefferson(pi: ExtensionAPI): void {
     // it does synchronously inside `setFooter`, before any push can arrive (D5).
     let requestRepaint: (() => void) | undefined;
 
-    // Seeded from the context because the host reports no selection when it restores a session.
-    const store = createSessionDataStore({
-      seed: {
-        provider: ctx.model?.provider,
-        model: ctx.model?.id,
-        thinkingLevel: ctx.thinkingLevel,
-        cwd: ctx.cwd,
-      },
-      requestRender: () => requestRepaint?.(),
-      readUsage: () => ({
-        contextUsage: ctx.getContextUsage(),
-        sessionId: ctx.sessionManager.getSessionId(),
-        leafId: ctx.sessionManager.getLeafId(),
-      }),
-      readEntries: () => ctx.sessionManager.getEntries(),
-    });
-
-    // Pushes are unwrapped here, so the store names no host event.
-    const releaseModel = pi.on("model_select", (event) =>
-      store.modelSelected(event.model.provider, event.model.id),
-    );
-    const releaseThinking = pi.on("thinking_level_select", (event) =>
-      store.thinkingLevelSelected(event.level),
-    );
-    const releaseTurn = pi.on("turn_end", () => store.turnEnded());
-
-    // The single teardown: all three subscriptions and the store, released together. Two
-    // callers reach it — the host's `dispose()` and the next session's `releasePrevious()`.
-    let released = false;
-    const release = (): void => {
-      if (released) return;
-      released = true;
-      releaseModel();
-      releaseThinking();
-      releaseTurn();
-      store.dispose();
-    };
+    const { store, release } = feedSessionData(pi, ctx, () => requestRepaint?.());
     releasePrevious = release;
 
     const { rows, warning } = readConfiguration({
