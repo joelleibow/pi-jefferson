@@ -14,6 +14,9 @@ Joel's rulings for this change, quoted and dated. Binding, and newer than any ot
 
 - **Trim the label and the format.** Following the ruling above, he added: *"We should be trimming labels and text. Remove spaces blased at the front or back of labels and format. They really shouldn't be needed if we have sensible defaults."* **Whitespace at the front or back of a label, and at the front or back of a format, is removed; it carries no meaning. The gap is the one separator, so a label that already ends in a space (his own `🧠 `, `🤔 `, `🔋 `, and the default `Thinking: `) renders with one gap, not two.** This settles Open Decision (a) of the proposal and widens the change's scope from the label alone to the label and the format's outer whitespace; both belong to this one change. It is a breaking change for any document that relied on leading or trailing space in a format, which is cheap before 1.0 with no shim (inherited ruling).
 
+- **An explicit empty label is still acceptable.** While the design was being drafted he added: *"A user explicitly setting a label to "" is acceptable and replaces the default with nothing."* **A label configured as the empty string replaces the instrument's default label with no label at all, and no gap is rendered.**
+- **Default labels for the shipped instruments are not this change.** Asked whether this spec was the place to set a default label on every shipped instrument (his examples: "Thinking:" on thinking, "Context:" on context, "Path:" on path), the conductor ruled it out of scope: it changes what every default cell shows and needs its own rulings, so it is its own card on the pi-jefferson board, after this one.
+
 ## Earlier rulings this change inherits (as quoted in the brain's pi-jefferson page)
 
 - Breaks are cheap before 1.0: 0.2.0 and 0.3.0 each broke the shape of `cells` with no shim, on his ruling that pre-release is the time for it (*"that's okay since we're in pre release"*).
