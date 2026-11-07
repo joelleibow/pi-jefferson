@@ -56,7 +56,7 @@ test("the seven shipped declarations own their names, variables, defaults and fo
     assert.deepEqual(Object.keys(declaration.variables), variables);
     assert.equal(declaration.defaultFormat, format);
     assert.deepEqual(declaration.options, ["format", "style", "label"]);
-    assert.equal(declaration.defaultLabel, name === "thinking" ? "Thinking: " : undefined);
+    assert.equal(declaration.defaultLabel, name === "thinking" ? "Thinking:" : undefined);
     assert.equal(Object.isFrozen(declaration.options), true);
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
