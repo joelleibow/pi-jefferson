@@ -7,15 +7,16 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { createFooter } from "../extensions/jefferson/row-renderer.ts";
-import type { Cell, Configuration } from "../extensions/jefferson/configuration.ts";
+import { createFooter } from "../extensions/jefferson/visuals/row-renderer.ts";
+import type { Cell } from "../extensions/jefferson/visuals/row.ts";
+import type { Configuration } from "../extensions/jefferson/configuration.ts";
 import {
   DEFAULT_CELLS,
   MAX_CELLS,
   readConfiguration,
 } from "../extensions/jefferson/configuration.ts";
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
-import type { Readings } from "../extensions/jefferson/session-data-store.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
+import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {

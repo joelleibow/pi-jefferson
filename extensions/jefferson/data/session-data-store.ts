@@ -1,4 +1,4 @@
-/** Session datums and usage derivations; the entry supplies readers, never a host handle. */
+/** Session datums and usage derivations; the session data feed supplies readers, never a host handle. */
 import type { ContextUsage, SessionEntry } from "@earendil-works/pi-coding-agent";
 
 /** `undefined` is unknown — never an empty string, zero, or a stale value. */
@@ -30,7 +30,7 @@ export interface SessionDataStore {
   dispose(): void;
 }
 
-/** The host footer counts these four categories over the whole session (D9, chidi §1.6). */
+/** The host footer counts these four categories over the whole session. */
 function scanTotals(entries: SessionEntry[]): UsageTotals {
   const totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
   for (const entry of entries) {

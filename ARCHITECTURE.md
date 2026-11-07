@@ -7,18 +7,32 @@ so it is worth reading before one.
 ## The parts
 
 ```
-extensions/jefferson.ts          the entry: the only thing pi loads
+extensions/jefferson.ts          the entry: the only thing pi loads; it registers and calls startup
 extensions/jefferson/
-  configuration.ts               reads pi-jefferson.json, validates it, binds instruments to cells
-  instrument.ts                  declares names, variables, defaults and options
-  format.ts                      owns the format-and-style language, including $bar
-  session-data-store.ts          holds session datums, samples context usage, derives keyed totals
-  row-renderer.ts                owns the footer tree and each cell's geometry
+  startup.ts                     the install lifecycle: the command, then the session-start installs
+  configuration.ts               where pi-jefferson.json lives, reads it, validates it, normalizes rows
+  footer-setup.ts                pi's footer factory and the component it returns
+  data/                          the session data and how the host's session and events reach it
+  visuals/                       what a cell shows, the format language, rows, binding, and drawing them
 ```
 
-**Entry.** `extensions/jefferson.ts` is the only file the host loads. It owns `pi.on(...)`
-subscriptions, the config file paths, `ctx.ui.setFooter`, and the repaint callback. It decides *when*
-things run; it computes nothing.
+The decision behind the layout, and the alternatives it weighed, are in
+[ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility.md).
+
+**Entry.** `extensions/jefferson.ts` is the only file the host loads. It registers the extension and
+hands the host's API to startup, and does nothing else.
+
+**Startup.** Owns the `/jefferson` command and the `session_start` handler. The handler releases the
+previous install, then installs the data, reads the configuration and installs the footer, in that
+order. Startup also wires the repaint callback: the footer hands the host's repaint request back out,
+and the data side calls it. It decides *when* things run; it computes nothing.
+
+**Data feed.** Lives in `data/`. Seeds the store from the session context, supplies the readers, and
+subscribes to the events that push into the store. One release undoes the subscriptions and disposes
+the store. The store names no host event; the feed does.
+
+**Footer setup.** Calls `ctx.ui.setFooter` with a factory that builds the row renderer's footer, and
+returns the component the host expects. Disposing that component runs the release it was given.
 
 **Store.** Holds provider, model, thinking level, working directory, context usage and usage totals.
 The four static datums are seeded at `session_start`; the two selection pushes update model and
@@ -29,19 +43,21 @@ disposes the footer, and through it the store, before it invalidates the session
 cannot outlive its context; disposal clears the readers, and later samples are all-unknown. One sample
 per render is handed to every cell, so cost and tokens share one totals object.
 
-**Configuration.** Reads the document, validates it, resolves instrument names, and normalizes rows.
+**Configuration.** Resolves where the document lives (the agent directory's, and a trusted project's),
+reads it, validates it, resolves instrument names, and normalizes rows.
 The optional `instruments` section configures each name once; formats, labels and styles are validated
 at read time against its declaration and the live theme, then one bound instrument per name is shared
-across the document. Every failure mode rejects the whole document, renders the default row, and warns with a
-message that names what was wrong. An unknown instrument *name* is different: it warns and renders
-`blank` in that cell.
+across the document. The binding itself lives in `visuals/`. Every failure mode rejects the whole
+document, renders the default row, and warns with a message that names what was wrong. An unknown
+instrument *name* is different: it warns and renders `blank` in that cell.
 
 **Instrument.** One declaration owns its name, variables, default format and options, and may carry a
 default label and a per-variable foreground token. Variables read the store and arrive already
-formatted. Configuration resolves the label (configured, else the declaration's default), collapses its
+formatted. Binding resolves the label (configured, else the declaration's default), collapses its
 control characters once, and hands it to the format language as a leading literal segment, so the label
 is styled and measured like the format's own text. A variable's declared token can replace that
-segment's `fg`. The bound `(readings, width, theme) => string` renders its format with those values. A format may carry `|name` modifiers after a variable or after the text
+segment's `fg`. The bound `(readings, width, theme) => string` renders its format with those values.
+A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
 declares is unknown, collapses control characters, runs a segment's string mutations in the order
 the format writes them, measures the columns `$bar` leaves, and styles each segment once.
@@ -56,13 +72,15 @@ and returns one line; composition and allocation stay with the host.
 
 ## Import direction
 
-One way only, and no cycles:
+One way only, and no cycles. The entry imports startup and nothing else. Startup imports what it
+installs. No file imports the entry. Within `extensions/jefferson/`:
 
-```
-entry  →  configuration, instrument, store, row-renderer
-working parts  →  each other (types and pure functions)
-working parts  ✗→  entry
-```
+- `data/` holds the files that keep session data and take it from the host. It imports host packages
+  and its own files, and no file outside `data/`.
+- `visuals/` holds the files that decide what a cell shows or how rows are laid out and drawn. It
+  imports host packages, its own files and the types of `data/`. It never imports startup, footer
+  setup or configuration.
+- Everything above those directories may import any of their files.
 
 Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never
 `dependencies`. Any shipped file may import one; see `docs/adr/0001-imports-run-one-way.md` for why

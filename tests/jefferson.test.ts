@@ -8,7 +8,7 @@ import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } fro
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -298,19 +298,43 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const entry = await import("../extensions/jefferson.ts");
   assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
 
-  const renderer = await import("../extensions/jefferson/row-renderer.ts");
+  const renderer = await import("../extensions/jefferson/visuals/row-renderer.ts");
   assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
   assert.deepEqual(
     Object.keys(configuration).sort(),
-    ["DEFAULT_CELLS", "MAX_CELLS", "readConfiguration"],
+    ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
   );
 
-  const instrument = await import("../extensions/jefferson/instrument.ts");
-  const store = await import("../extensions/jefferson/session-data-store.ts");
-  const format = await import("../extensions/jefferson/format.ts");
-  for (const key of [...Object.keys(instrument), ...Object.keys(store), ...Object.keys(format)]) {
+  const row = await import("../extensions/jefferson/visuals/row.ts");
+  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);
+
+  const binding = await import("../extensions/jefferson/visuals/instrument-binding.ts");
+  assert.deepEqual(Object.keys(binding).sort(), ["instrumentBindings"]);
+
+  const feed = await import("../extensions/jefferson/data/session-data-feed.ts");
+  assert.deepEqual(Object.keys(feed).sort(), ["feedSessionData"]);
+
+  const footerSetup = await import("../extensions/jefferson/footer-setup.ts");
+  assert.deepEqual(Object.keys(footerSetup).sort(), ["installFooter"]);
+
+  const startup = await import("../extensions/jefferson/startup.ts");
+  assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
+
+  const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
+  const store = await import("../extensions/jefferson/data/session-data-store.ts");
+  const format = await import("../extensions/jefferson/visuals/format.ts");
+  for (const key of [
+    ...Object.keys(instrument),
+    ...Object.keys(store),
+    ...Object.keys(format),
+    ...Object.keys(row),
+    ...Object.keys(binding),
+    ...Object.keys(feed),
+    ...Object.keys(footerSetup),
+    ...Object.keys(startup),
+  ]) {
     assert.ok(
       !/register|supply|contribute/i.test(key),
       `${key} looks like a contribution interface`,

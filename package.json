@@ -1,7 +1,7 @@
 {
   "name": "pi-jefferson",
   "version": "0.1.1",
-  "description": "A starship-style statusline for pi — modules, a real layout, and per-module formatting.",
+  "description": "A starship-style statusline for pi — instruments, a real layout, and per-instrument formatting.",
   "license": "MIT",
   "author": "Joel Leibow",
   "type": "module",
@@ -27,7 +27,8 @@
   "keywords": [
     "pi",
     "statusline",
-    "prompt"
+    "prompt",
+    "pi-package"
   ],
   "scripts": {
     "test": "node --test",
