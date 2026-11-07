@@ -149,7 +149,9 @@ Amended after the Validate gate. The first draft trimmed the segment list in a 2
 Michael's reproduction found it behaviorally identical to the one line above: segments and errors matched in 0
 differing cases over all 3,368,421 strings of up to five pieces built from 20 (space, `\n`, `\t`, `\u0001`,
 `\u0085`, `\u00a0`, `\u2028`, `a`, `$percent`, `$bar`, `|dim`, `|upper`, `\$`, `\|`, `\`, `|`, `x y`, `$`,
-`\ `, `|dim|bold`; run `4509f7a2-7150-47a1-83f4-c5e13a326cb7`). One line replaces the helper, nothing in it needs
+`\ `, `|dim|bold`; Validate adjudication, run `4509f7a2-7150-47a1-83f4-c5e13a326cb7`). His round-2 implementation gate (run
+`925cfea6-68e2-48eb-a4a9-63c694b84e7d`) re-ran the equivalence over 6,728,904 strings per instrument (`model`
+and `context`, from 23 pieces) with 0 differences. One line replaces the helper, nothing in it needs
 a comment to stay correct, and the measurement says the behavior is the same. The behavior and the four format
 tests are unchanged.
 
