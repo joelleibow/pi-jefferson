@@ -411,3 +411,52 @@ None. The format examples in `README.md` are: :47 `"format": "🧠: $model from 
 (`$model | $provider` → `claude-opus-4 | anthropic`, `\|`). No format string in the README begins or
 ends with whitespace. The only edge-whitespace strings in the README are label prose: :79 and :85
 (`Thinking: `, with its trailing space).
+
+## Eleanor bounded addendum — label-gap (tasks drafting)
+
+Answers only, file:line. Tree: branch `label-gap` HEAD `ad0e28f`. No file besides this one touched;
+`~/.pi/agent/pi-jefferson.json` never read.
+
+1. **Scratch agent directory.** `tests/configuration.test.ts:33-44` `readDocument(document, theme)`:
+   `mkdtempSync` temp dir (:34), writes `pi-jefferson.json` as `agentPath` (:36), calls
+   `readConfiguration({ agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme })`
+   (:38-42). `readConfiguration` takes `ConfigurationSource.agentPath` (`extensions/jefferson/configuration.ts:35-36`,
+   used at :271); `configurationPaths` (:255-258) is the only caller of `getAgentDir()`, so tests never touch
+   `~/.pi/agent`. End-to-end: `tests/jefferson.test.ts:171-180` `useTempAgentDir(t)` (mkdtemp + sets
+   `PI_CODING_AGENT_DIR` :174-175, restored via `t.after` :176-179) with `writeAgentDocument(agentDir, document)`
+   (:182-184). Cell-to-text helper: `tests/configuration.test.ts:28-30` `cellText(cell)` =
+   `cell.instrument.render(seed, 80, fakeTheme())`, used at :282 via `rows[0].cells.map(cellText)`; the
+   :570-579 bar tests instead call `rows[0].cells[0].instrument.render(seed, 20, theme)` directly (:575, :578).
+2. **`$bar` segment kind.** `extensions/jefferson/visuals/format.ts:12-15`: `FormatSegment` =
+   `{ kind: "literal"; … } | { kind: "variable"; … } | { kind: "bar" }` — `$bar` is its own kind `"bar"`
+   (:15), pushed at :76. Not a `variable` segment.
+3. **`$bar`-width tests + styled render through an instrument.** `tests/format.test.ts:87-90` uses helper
+   `rendered(name, format, { width, theme })` (:26-30, = `resolveFormat(decl, parseFormat(decl, format), …)`)
+   with `rendered("context", "$percent $bar", { width: 20, theme })` → `"43.2% " + "█".repeat(6) +
+   theme.style("░".repeat(8), { dim: true })`; also `tests/configuration.test.ts:570-576` via `readDocument`
+   + `instrument.render(seed, 20, theme)`. Yes, bg and underline already render through an instrument:
+   `tests/format.test.ts:81` `cellStyle = { fg: "accent", bg: "selectedBg", bold: true }` rendered at :96 and
+   :108 (expected built from `theme.style(…, cellStyle)` :103-107); underline at :261-264
+   (`rendered("model", "$provider|bold|underline")` → `theme.style("anthropic", { bold: true, underline: true })`).
+   Fake theme for reuse: `tests/fake-theme.ts:5` `fakeTheme()`, whose `style()` is at :22.
+
+## Eleanor bounded fact — label-gap (clip test for "A narrow cell clips the gap with the rest")
+
+file:line only. Tree: branch `label-gap` HEAD `ad0e28f`. No other file written; `~/.pi/agent/pi-jefferson.json` never read.
+
+- Clip tests in `tests/row-renderer.test.ts`: `lineAt(row, width)` helper at :44-46
+  (`createFooter([row], () => readings, fakeTheme()).render(width)[0]`); "content wider than its cell is
+  truncated to one line" :73-79 (`lineAt(rowOf(3), 12)`, asserts `visibleWidth(line) === 12`, no full text);
+  "an instrument resolving text wider than its cell is clipped and stays one line" :81-96 (cells with
+  `render: () => "provider: a-very-long-model-name"` at :85-86, `lineAt(row, 20)`, asserts
+  `text.startsWith("provide")` and no `"a-very-long-model-name"` at :94-95); same pattern at :147-148.
+- Helper instrument source: `rowOf(count, text)` :37-42 builds cells with `{ render: () => text }`; `lineAt`
+  takes any `Row`, i.e. any structural `Instrument` (`render(readings, width, theme)`). Existing row-renderer
+  tests use only hand-built instruments — :380-381 builds one from `instrumentNamed("model")` +
+  `parseFormat`/`resolveFormat`, not from `instrumentBindings` — but a bound instrument from
+  `instrumentBindings()`/`readDocument` is structurally accepted by `lineAt`/`rowOf` cells.
+- Bound instrument + cell clip already combined: `tests/configuration.test.ts:794-798` `footerFor(document, theme)`
+  = `readDocument` (→ `instrumentBindings`) → `createFooter(rows, () => seed, theme)`; clip-at-fixed-width
+  assertions: :833-838 (`format: "ab漢字cd"`, `footer.render(20)`, third cell asserted as
+  `getFgAnsi("accent") + "ab" + RESET + "..." + RESET + " "`), also :803-816, :820-828, :859-862.
+  End-to-end at width 80: `tests/jefferson.test.ts:430-441`, :587-592, :610, :629-630, :640 (`session.lines(80)`).
