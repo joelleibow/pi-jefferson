@@ -54,13 +54,17 @@ instrument *name* is different: it warns and renders `blank` in that cell.
 **Instrument.** One declaration owns its name, variables, default format and options, and may carry a
 default label and a per-variable foreground token. Variables read the store and arrive already
 formatted. Binding resolves the label (configured, else the declaration's default), collapses its
-control characters once, and hands it to the format language as a leading literal segment, so the label
-is styled and measured like the format's own text. A variable's declared token can replace that
-segment's `fg`. The bound `(readings, width, theme) => string` renders its format with those values.
+control characters once, trims it, and hands it to the format language as a leading literal segment, so
+the label is styled and measured like the format's own text. When a non-empty format follows, that
+segment ends in one space, the gap, so the label's style covers it and `$bar` counts its column; see
+[ADR 0006](docs/adr/0006-a-label-gets-one-gap-and-outer-whitespace-is-not-text.md). A variable's
+declared token can replace that segment's `fg`. The bound `(readings, width, theme) => string`
+renders its format with those values.
 A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
-declares is unknown, collapses control characters, runs a segment's string mutations in the order
-the format writes them, measures the columns `$bar` leaves, and styles each segment once.
+declares is unknown, collapses control characters, trims a format's outer whitespace when it parses,
+runs a segment's string mutations in the order the format writes them, measures the columns `$bar`
+leaves, and styles each segment once.
 Instruments know nothing about alignment.
 
 **Row renderer.** Builds one `VStack` of `HStack` rows at install, retaining every cell component.
