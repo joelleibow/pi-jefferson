@@ -561,11 +561,12 @@ test("a document carrying Joel's three labels renders each cell with one gap", (
     cells: [{ instrument: "model" }, { instrument: "thinking" }, { instrument: "context" }],
   });
   assert.equal(result.warning, undefined);
-  const cells = ["🧠", "🤔", "🔋"].map((_label, index) => result.rows[0]?.cells[index]?.instrument.render(seed, 20, fakeTheme()) ?? "");
-  ["🧠", "🤔", "🔋"].forEach((label, index) => {
-    const text = stripTerminalSequences(cells[index] ?? "");
+  const cells = ["🧠", "🤔", "🔋"].map((label, index) => {
+    const raw = result.rows[0]?.cells[index]?.instrument.render(seed, 20, fakeTheme()) ?? "";
+    const text = stripTerminalSequences(raw);
     assert.ok(text.startsWith(label + " "), `${label} renders its label and one gap: ${JSON.stringify(text)}`);
     assert.notEqual(text.charAt(label.length + 1), " ", `${label} renders one gap, not two`);
+    return raw;
   });
   assert.ok(visibleWidth(cells[2] ?? "") <= 20, "the context cell is no wider than its width");
 });
