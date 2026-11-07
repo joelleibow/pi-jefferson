@@ -139,23 +139,29 @@ Collapsing once, at binding, is the archived D2 and stays.
 sits outside `visuals/` where the label's other handling lives); trimming per render (the label cannot change
 between renders, and the binder memoizes per instrument name, `research-eleanor.md` §3.1).
 
-### D3. A format's outer whitespace is trimmed in `parseFormat`, once, on the segment list
+### D3. A format is collapsed and trimmed once, at the top of `parseFormat`
 
-The trim is the last step of `parseFormat` in `visuals/format.ts`. It works on the segments the function
-has just built, whose literal text `parseFormat` has already collapsed (`format.ts:54, :99`), so "after
-collapse" holds without a second collapse. From the front, then from the back: while the edge segment is a
-literal with no modifiers, remove the whitespace from its edge; if that leaves it empty, drop it and look at
-the next segment; stop at the first variable or at text that remains.
+The first line of `parseFormat` in `visuals/format.ts` is `format = collapse(format).trim()`, and there is no
+edge loop over the segments. Collapse comes first, so a trailing C1 character becomes a space and goes with the
+rest. The segments are then built from a string with no edge whitespace.
+
+Amended after the Validate gate. The first draft trimmed the segment list in a 29-line `trimEdges` helper.
+Michael's reproduction found it behaviorally identical to the one line above: segments and errors matched in 0
+differing cases over all 3,368,421 strings of up to five pieces built from 20 (space, `\n`, `\t`, `\u0001`,
+`\u0085`, `\u00a0`, `\u2028`, `a`, `$percent`, `$bar`, `|dim`, `|upper`, `\$`, `\|`, `\`, `|`, `x y`, `$`,
+`\ `, `|dim|bold`; run `4509f7a2-7150-47a1-83f4-c5e13a326cb7`). One line replaces the helper, nothing in it needs
+a comment to stay correct, and the measurement says the behavior is the same. The behavior and the four format
+tests are unchanged.
 
 Why this is enough, from `research-eleanor.md` addendum 1 §4:
 
 - `parseFormat` never emits an empty-text literal, so after the trim the list is empty exactly when the
   format holds no variable and no non-whitespace text. That is the fact the gap condition reads (D4).
 - It can emit two adjacent literals, a whitespace-bearing prefix and a modifier run (`format.ts:105-106`).
-  The prefix carries no modifier and the loop handles it. A modifier-carrying literal is exactly
-  `/\S+$/` and cannot hold edge whitespace (`format.ts:100, :106`; ADR 0003:33), so the loop never edits a
-  modified literal. A format `  hello|dim` loses its prefix and keeps `hello`.
-- Whitespace between a format's parts is untouched: `$percent $bar` keeps its space, and `"L\n$model"`
+  A modifier-carrying literal is exactly `/\S+$/` and cannot hold edge whitespace (`format.ts:100, :106`;
+  ADR 0003:33), so the trim never reaches one. A format `  hello|dim` is trimmed to `hello|dim` and parses to
+  `hello` carrying `dim`, with no whitespace prefix.
+- Whitespace between a format's parts is untouched, because the trim reaches only the two ends of the string: `$percent $bar` keeps its space, and `"L\n$model"`
   (`tests/format.test.ts:145`) keeps its inner space.
 
 This is one place for both producers of segments (`configuration.ts:90` and `instrument-binding.ts:21`), so a
@@ -172,8 +178,10 @@ and a format are put together.
   `parseFormat` would hand out segments that mean something different from the document.
 - **Trimming in `readInstruments` (`configuration.ts:90`).** It misses the default format
   (`instrument-binding.ts:21`), and `configuration.ts` sits outside `visuals/` (ADR 0005).
-- **Trimming the format string before parsing.** The string has not been collapsed, so a trailing C1 character
-  would survive, and the gap condition would read a string and not the parsed segments it is about to build.
+- **Trimming the segment list after parsing (the first draft).** It was rejected on the premise that a string
+  trimmed before parsing is not yet collapsed, so a trailing C1 character would survive. Collapsing first
+  removes that premise, and the measured result is identical. The gap condition still reads the parsed segments
+  (D4), which are empty exactly when the trimmed string is.
 - **Trimming the rendered text.** It would also trim a variable's value, which Joel did not ask for
   (`owner-rulings.md`, 2026-11-07: "labels and format"), and it runs after `$bar` is sized.
 
@@ -210,7 +218,7 @@ and nothing else moves.
 
 ### D6. Whitespace means JavaScript's `\s`, through the platform's `trim`, with no new dependency
 
-The label's trim is `String.prototype.trim`, and the format's trim is `trimStart` and `trimEnd` on a literal's text.
+The label's trim is `String.prototype.trim`, and the format's trim is the same `trim`, applied to the collapsed format string.
 ECMAScript defines trim's set and `\s` as the same set (WhiteSpace and LineTerminator), stated here from the
 language specification and not measured. The language-level fact that matters is `research-eleanor.md`
 addendum 1 §4: `\s` includes NBSP (`tests/format.test.ts:311`), and the modifier run uses `\S`, so the
@@ -277,7 +285,7 @@ The new tests, which separate the right answer from the wrong:
 | `$bar` width (D1) | a bar one column too wide | the gap is in piece 0 | label `ab`, format `$percent $bar`, cell 20, rest takes 6 → bar 11 columns, line exactly 20 | gap outside the segment gives a 12-column bar and a 21-column line |
 | Style (D1) | an unstyled hole under `bg`/underline | the gap is in the styled label segment | label `Q`, format `$percent`, style `{"bg":"selectedBg"}` then `{"underline":true}` → `Q ` is one styled run, built with the fake theme's own styling | an unstyled gap yields `style("Q")` + `" "` + `style(...)`, a different string |
 | Label trim (D2) | a doubled gap | collapsed label ends in whitespace | label `🧠 `, ` 🧠 `, `🧠\n`, `🧠\u0085`, `🧠\u00a0` → each `🧠 ` + model id | no trim gives two columns; trim-before-collapse leaves two for `\u0085` |
-| Format trim (D3) | edge space in a format | an unmodified literal at an edge | format `  $model  ` → `claude-opus-4`; format ending in `\n` → one line, no trailing space; `$percent $bar` keeps its inner space; in `parseFormat`, `  hello|dim` → `hello` carrying `dim` | no trim renders `  claude-opus-4  `; trimming inside renders `$percent$bar` |
+| Format trim (D3) | edge space in a format | an unmodified literal at an edge | format `  $model  ` → `claude-opus-4`; format ending in `\n` → one line, no trailing space; `$percent $bar` keeps its inner space; in `parseFormat`, `  hello|dim` → `hello` carrying `dim` | removing the format's `.trim()` renders `  claude-opus-4  ` |
 | Whitespace-only format (D3, D4) | a trailing gap after a label with nothing to follow | trimmed format has no segments | label `🤔`, format `"   "` → `🤔` | the gap renders `🤔 ` |
 | Known datum, empty format (D4) | the same | `segments.length === 0` | label `🤔`, format `""`, datum known → `🤔` (existing :535) | the gap renders `🤔 ` |
 | Empty or whitespace-only label (D4) | a leading gap | `label === ""` after the trim | label `"  "`, format `$model` → model id with no leading space; `thinking` with label `""` and the default format → the styled level alone, no `Thinking:` and no gap (existing :284-285) | a gap-first rule renders ` claude-opus-4` or ` High` |
@@ -288,8 +296,9 @@ The new tests, which separate the right answer from the wrong:
 | Joel's labels | a doubled gap from his own file | trim of `🧠 `, `🤔 `, `🔋 ` | a test builds a scratch agent directory carrying his three labels and renders the three cells | no trim shows two gaps; edits to his file are not made |
 
 Each guard has a mutation that turns its test red: drop the trim, drop the gap, move the gap after
-`resolveFormat`, drop the `segments.length > 0` condition, unstyle the gap, swap D2's order, and remove D3's
-edge loop. The implementation gate re-runs them.
+`resolveFormat`, drop the `segments.length > 0` condition, unstyle the gap, swap D2's order, and remove the
+`.trim()` from the format (D3). An earlier draft also listed "let the edge loop walk past a bar or variable
+segment"; it was superseded with the edge loop and has no counterpart. The implementation gate re-runs them.
 
 ### D8. No flag, no log line and no new option
 
