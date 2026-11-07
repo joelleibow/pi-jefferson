@@ -70,7 +70,8 @@ Tasks are Derek's unless marked Joel's. Sources: `design.md` (D1 to D12, cited a
 
 ## 12. End-to-end check in the installed package (Joel's)
 
-- [ ] 12.1 **Joel's check.** Joel loads the branch's package in pi, runs `/reload`, runs `/jefferson`, and reads the footer. Observed: the footer shows his rows as before; `/jefferson` says the footer is installed and how many rows it renders; a second `/reload` leaves one footer. Only Joel can observe this against his own `~/.pi/agent/pi-jefferson.json`, which he does not edit for it. No other task needs it. This closes the runtime claim no test makes: pi's loader (jiti) resolving `.ts` specifiers two directories deep in an installed package (D10.6; `research-chidi.md` Unknowns). Boundary cases: a reload after a first load. Source: D10.6.
+- [x] 12.1 **Joel's check.** Joel loads the branch's package in pi, runs `/reload`, runs `/jefferson`, and reads the footer. Observed: the footer shows his rows as before; `/jefferson` says the footer is installed and how many rows it renders; a second `/reload` leaves one footer. Only Joel can observe this against his own `~/.pi/agent/pi-jefferson.json`, which he does not edit for it. No other task needs it. This closes the runtime claim no test makes: pi's loader (jiti) resolving `.ts` specifiers two directories deep in an installed package (D10.6; `research-chidi.md` Unknowns). Boundary cases: a reload after a first load. Source: D10.6.
+  Ticked 2026-11-06 at Joel's instruction, with no observation recorded.
 
 ## Traceability
 
