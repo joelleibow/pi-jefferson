@@ -11,9 +11,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
-import { blank, instrumentNamed, type Instrument, type InstrumentDeclaration } from "./visuals/instrument.ts";
-import { collapse, parseFormat, resolveFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
+import { blank, instrumentNamed } from "./visuals/instrument.ts";
+import { parseFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
 import { ALIGNMENTS, type Cell, type CellAlign, type Row } from "./visuals/row.ts";
+import {
+  instrumentBindings,
+  type BindInstrument,
+  type ConfiguredInstrument,
+} from "./visuals/instrument-binding.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
@@ -47,34 +52,6 @@ class RejectedConfiguration extends Error {}
 interface Notices {
   containers: boolean;
   unknownInstruments: Set<string>;
-}
-
-type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
-
-interface ConfiguredInstrument {
-  segments: FormatSegment[];
-  style: ThemeStyle;
-  label?: string;
-}
-
-function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
-  const bound = new Map<string, Instrument>();
-  return declaration => {
-    let instrument = bound.get(declaration.name);
-    if (instrument === undefined) {
-      const entry = configured.get(declaration.name);
-      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
-      const style = entry?.style ?? {};
-      const label = collapse(entry?.label ?? declaration.defaultLabel ?? "");
-      const labelled: FormatSegment[] = label === "" ? segments
-        : [{ kind: "literal", text: label, modifiers: [] }, ...segments];
-      instrument = {
-        render: (readings, width, renderTheme) => resolveFormat(declaration, labelled, style, readings, width, renderTheme),
-      };
-      bound.set(declaration.name, instrument);
-    }
-    return instrument;
-  };
 }
 
 function readInstruments(raw: unknown, theme: Theme, notices: Notices): ReadonlyMap<string, ConfiguredInstrument> {
