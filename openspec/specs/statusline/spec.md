@@ -949,7 +949,7 @@ Every instrument MUST accept a string `label` option, rendered as literal text i
 text. Whitespace at the front and back of a label MUST be removed, after control characters collapse to
 spaces. When the label and the format, so trimmed, are both non-empty, a one-column gap MUST separate
 them, always, with no option, setting or opt-out, whatever the format renders. A configured label empty
-after the trim replaces the default label with none, and no gap renders.
+after the trim MUST replace the default label with none, and no gap renders.
 
 #### Scenario: A label with no trailing whitespace gets a gap
 

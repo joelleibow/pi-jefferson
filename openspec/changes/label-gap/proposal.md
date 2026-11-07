@@ -90,8 +90,9 @@ None.
 
 - `statusline`:
   - **MODIFIED** "An instrument's label is placed in front of its format": the label is no longer
-    only literal text rendered as written, so it names the trim and the gap (presence and absence
-    conditions, width, style, `$bar`, clipping and the one-line guarantee) in its own text, once. Its
+    only literal text rendered as written, so its text states the trim, the gap's presence
+    condition and width, and the empty-label rule, once; the gap's style, `$bar`, clipping and the
+    one-line guarantee are stated by its scenarios. Its
     scenarios are restated where the gap or the trim changes them: "A label in front of a configured
     format", "An empty format leaves the label alone" and "The label takes width from a bar", and new ones
     cover a label that ends in a space or a control character, a whitespace-only format and the gap's
