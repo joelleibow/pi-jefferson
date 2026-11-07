@@ -46,6 +46,8 @@ function formatError(declaration: InstrumentDeclaration, detail: string): Error 
 }
 
 export function parseFormat(declaration: InstrumentDeclaration, format: string): FormatSegment[] {
+  // A format's outer whitespace is not text (ADR 0006); collapse first so a trailing control character becomes a space the trim removes.
+  format = collapse(format).trim();
   const segments: FormatSegment[] = [];
   let literal = "";
   let hasBar = false;

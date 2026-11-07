@@ -231,12 +231,15 @@ file passes under both.
       `extensions/*`, with `pi.extensions` still `["./extensions/jefferson.ts"]` — the dependency
       does not ship (D2). **Boundary:** none; this task is the four commands.
 
-- [ ] 8.4 **Joel's — he leaves this unticked; it is not Derek's to check.** In Joel's own pi
+- [x] 8.4 **Joel's — he leaves this unticked; it is not Derek's to check.** In Joel's own pi
       session, a `thinking` instrument configured with `$level|capitalize` shows `High` in the
       footer, and a format written `$model | $provider` renders exactly as it did before this
       change.
       **Verify:** Joel's own eyes, because the 2026-11-05 rulings reserve that observation for him
       and one run is a sample, never proof.
+      Ticked 2026-11-06 at Joel's instruction so `openspec validate --archived` passes. Observed by screenshot
+      the same day: `$level|capitalize` shows `High`, and `via|dim` dims "via". Not observed: a spaced pipe
+      (`$model | $provider`) rendering unchanged, which no configuration of his exercises; the suite carries it.
 
 ## Coverage
 

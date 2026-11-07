@@ -19,7 +19,8 @@ extension.
 
 1. Add one declaration to `extensions/jefferson/visuals/instrument.ts` — name, variables, defaults
    and options, plus a `defaultLabel` or a `variableFg` if it needs them — and include it in the
-   shipped declarations table so `instrumentNamed` resolves it.
+   shipped declarations table so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
+   space: binding adds the one gap, and a declared space would only be trimmed.
 2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
    `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
 3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`,

@@ -782,7 +782,7 @@ gate: documentation the change made false is corrected). No code moves in this g
   restored byte-for-byte; all four cases then passed, and the full suite passed 198/198 with
   typecheck and strict validation green. The ledger now records 55 distinct edits: the original
   54 plus this focused repair mutation; production code is unchanged and 7.6 stays open.
-- [ ] 7.6 **(Joel — the owner's own eyes; nobody else can tick this)** — the live-footer observation,
+- [x] 7.6 **(Joel — the owner's own eyes; nobody else can tick this)** — the live-footer observation,
   in his own pi session, with the columns and the documents recorded, and the understanding that **one
   run is a sample, never proof** (owner-rulings 2026-11-05; the suite carries the proof). What he
   watches: the row spanning his window's full width with nothing blank at the right edge; a configured
@@ -794,6 +794,12 @@ gate: documentation the change made false is corrected). No code moves in this g
   (design Open Questions); a rejected document's warning text naming the offender; and the default
   document rendering the placeholder row unchanged in text. Verified by: his recorded observation, with
   the terminal width and each document, appended to this task.
+  Ticked 2026-11-06 at Joel's instruction so `openspec validate --archived` passes. Observed in his own pi
+  session that day, eight configurations screen-capped one at a time: the default ten blank cells spanning
+  the window, his own format byte-exact, a context bar whose fill matched its printed percent, an escaped
+  literal dollar, two rows, an italic style on a background band, a whole-document rejection with its exact
+  warning, and an unknown instrument name warning and rendering blank. Not observed: the narrow-window
+  re-seat, the bar's 70 and 90 percent recolor, and the post-compaction bar; they rest on the suite.
 
 ---
 

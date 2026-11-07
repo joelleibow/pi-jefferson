@@ -55,7 +55,9 @@ cell that uses it:
 ```
 
 `format` is plain text with the instrument's already-formatted `$variables`, not Markdown. `$` and
-`|` are its two special characters, escaped `\$` and `\|`. Omit `format` to use its default:
+`|` are its two special characters, escaped `\$` and `\|`. Control characters become spaces, then
+whitespace at the front and back of a format is removed; whitespace inside it is text. Omit `format`
+to use its default:
 
 | Instrument | Variables | Default format |
 | --- | --- | --- |
@@ -70,20 +72,27 @@ cell that uses it:
 Every instrument also accepts `label`, a string placed in front of its format, whether the format
 is configured or the default. It is literal text: `$` means nothing in it, and `$label` is not a
 variable (a format that names it rejects the document). Each control character in it becomes one
-space, and it takes the instrument's `style`. A `label` that is not a string rejects the document.
+space, then whitespace at its front and back is removed, and it takes the instrument's `style`. A
+`label` that is not a string rejects the document.
 
 ```json
 "thinking": { "label": "🤔" }
 ```
 
-Only `thinking` has a default label, `Thinking: `, so its default cell reads `Thinking: High`. A
+That renders `🤔 High`. A label followed by a format always gets one space between them, so you never
+write it yourself. The space takes the label's `style`, counts toward the cell's width, and comes out
+of what `$bar` has left. A label that is empty after the trim, `label: ""` included, shows no label
+and no space. A format that is empty or only whitespace leaves the label alone, with no space after it.
+
+Only `thinking` has a default label, `Thinking:`, so its default cell reads `Thinking: High`. A
 configured `label` replaces the default, and `label: ""` removes it. When an instrument's data is
 unknown the cell renders nothing, label included. With known data and `"format": ""`, the cell is the
 label alone.
 
 Upgrading: the default label also applies to a `thinking` format you had already configured. If that
-format has no `label`, the cell now starts with `Thinking: `. Set `label: ""` to get the previous
-text back.
+format has no `label`, the cell now starts with `Thinking:` and one space. Set `label: ""` to get the
+previous text back. A space you wrote at the front or back of a label or a format is now removed, and a
+label's one space comes from the gap.
 
 A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
 each applying in the order the format writes them. On plain text a modifier covers the run of

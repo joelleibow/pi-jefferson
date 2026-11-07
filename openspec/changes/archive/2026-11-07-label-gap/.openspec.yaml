@@ -1,0 +1,14 @@
+schema: marbleization
+created: 2026-11-07
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "c98b7abc-97c9-4f23-bb7f-813094046bcd"
+    chidi: "76409516-fae4-4cb5-9ee0-f66d50e84801"
+    eleanor: "cf2a7be5-fb87-4685-87f1-f2ba77be91de"
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
