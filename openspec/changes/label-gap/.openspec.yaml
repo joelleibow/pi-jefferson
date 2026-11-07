@@ -6,4 +6,5 @@ x-marbleization:
     michael: "dfb5cfa4-63b3-4940-9b31-e9f7ae20fb15"
     chidi: "76409516-fae4-4cb5-9ee0-f66d50e84801"
     eleanor: "cf2a7be5-fb87-4685-87f1-f2ba77be91de"
-  gates: {}
+  gates:
+    council_owner: approved
