@@ -1,7 +1,8 @@
 # 5. Source is laid out by responsibility, with data kept apart from visuals
 
 Date: 2026-11-06
-Status: Accepted. Narrows [ADR 0001](0001-imports-run-one-way.md)'s statement that the entry may import the working parts: both stay in force.
+Status: Accepted. Narrows [ADR 0001](0001-imports-run-one-way.md)'s statement that the entry may
+import the working parts: both stay in force.
 
 ## Context
 
