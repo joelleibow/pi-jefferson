@@ -551,6 +551,25 @@ test("a label that is empty after the trim shows no label and no gap", () => {
   assert.deepEqual(result.rows[0]?.cells.map(cellText), ["claude-opus-4"]);
 });
 
+test("a document carrying Joel's three labels renders each cell with one gap", () => {
+  const result = readDocument({
+    instruments: {
+      model: { label: "🧠 ", format: "$model" },
+      thinking: { label: "🤔 " },
+      context: { label: "🔋 ", format: "$bar $percent" },
+    },
+    cells: [{ instrument: "model" }, { instrument: "thinking" }, { instrument: "context" }],
+  });
+  assert.equal(result.warning, undefined);
+  const cells = ["🧠", "🤔", "🔋"].map((_label, index) => result.rows[0]?.cells[index]?.instrument.render(seed, 20, fakeTheme()) ?? "");
+  ["🧠", "🤔", "🔋"].forEach((label, index) => {
+    const text = stripTerminalSequences(cells[index] ?? "");
+    assert.ok(text.startsWith(label + " "), `${label} renders its label and one gap: ${JSON.stringify(text)}`);
+    assert.notEqual(text.charAt(label.length + 1), " ", `${label} renders one gap, not two`);
+  });
+  assert.ok(visibleWidth(cells[2] ?? "") <= 20, "the context cell is no wider than its width");
+});
+
 test("an unknown datum suppresses the whole cell, label included", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
   for (const format of ["$level", ""]) {
