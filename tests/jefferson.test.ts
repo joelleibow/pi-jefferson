@@ -304,7 +304,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const configuration = await import("../extensions/jefferson/configuration.ts");
   assert.deepEqual(
     Object.keys(configuration).sort(),
-    ["DEFAULT_CELLS", "MAX_CELLS", "readConfiguration"],
+    ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
   );
 
   const row = await import("../extensions/jefferson/visuals/row.ts");

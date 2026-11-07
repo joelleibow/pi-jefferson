@@ -9,7 +9,14 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
+import { join } from "node:path";
+
+import {
+  CONFIG_DIR_NAME,
+  getAgentDir,
+  type Theme,
+  type ThemeStyle,
+} from "@earendil-works/pi-coding-agent";
 
 import { blank, instrumentNamed } from "./visuals/instrument.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
@@ -243,6 +250,14 @@ function acceptedWarning(path: string, notices: Notices): string | undefined {
     );
   }
   return parts.length === 0 ? undefined : `pi-jefferson: ${path} ${parts.join("; ")}`;
+}
+
+/** The two documents the extension reads: the agent's own, and a trusted project's copy. */
+export function configurationPaths(cwd: string): { agentPath: string; projectPath: string } {
+  return {
+    agentPath: join(getAgentDir(), "pi-jefferson.json"),
+    projectPath: join(cwd, CONFIG_DIR_NAME, "pi-jefferson.json"),
+  };
 }
 
 /**

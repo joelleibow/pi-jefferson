@@ -20,15 +20,9 @@
  * custom footer, so the install re-runs on every `session_start`.
  */
 
-import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import {
-  CONFIG_DIR_NAME,
-  type ExtensionAPI,
-  getAgentDir,
-} from "@earendil-works/pi-coding-agent";
-
-import { readConfiguration } from "./jefferson/configuration.ts";
+import { configurationPaths, readConfiguration } from "./jefferson/configuration.ts";
 import { createFooter } from "./jefferson/visuals/row-renderer.ts";
 import { createSessionDataStore } from "./jefferson/data/session-data-store.ts";
 
@@ -109,8 +103,7 @@ export default function jefferson(pi: ExtensionAPI): void {
     releasePrevious = release;
 
     const { rows, warning } = readConfiguration({
-      agentPath: join(getAgentDir(), "pi-jefferson.json"),
-      projectPath: join(ctx.cwd, CONFIG_DIR_NAME, "pi-jefferson.json"),
+      ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
     });
