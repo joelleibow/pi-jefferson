@@ -4,7 +4,9 @@
 
 A row MUST be able to place two instruments so that only the joint separates their text, the second
 one's text ends at the row's right edge, and another instrument's text starts at the row's left edge.
-The space between the two MUST NOT grow with the row's width.
+The space between the two MUST NOT grow with the row's width. The joint is one column, between two
+non-empty content-sized cells with no spare room between them; there is none beside a fill cell, nor
+where an absorbing cell's spare columns land.
 
 #### Scenario: A working directory at the left, two instruments together at the right
 
@@ -56,9 +58,9 @@ bar's own output, and a row holding a bar MUST still span the full width in one 
 
 ### Requirement: Cell widths are measured in terminal columns
 
-Any width a row derives from a cell's content MUST be the visible terminal columns of that content as
-clipped, label and gap included, never code units, so that a wide glyph or an escape sequence neither
-moves a neighbour nor makes a cell overrun.
+Any width a row derives from a cell's content MUST be the visible terminal columns of that content,
+unclipped and unpadded, label and gap included, never code units, so that a wide glyph or an escape
+sequence neither moves a neighbour nor makes a cell overrun.
 
 #### Scenario: A wide-glyph label
 
@@ -76,10 +78,10 @@ moves a neighbour nor makes a cell overrun.
 ### Requirement: Cells are evenly distributed across the width
 
 By default a cell MUST take the width its content needs, except a `blank` cell and a `$bar` cell, which
-MUST fill: they share the spare columns equally, the remainder to the earliest. With no fill cell, the
-spare columns go to the last left-aligned cell, else the first. Adjacent content-sized cells with no
-spare room between them MUST get one column between them, which MUST give way before any content does.
-A row option MUST restore equal shares, `floor(W / N)` each.
+MUST fill and share the spare columns, the remainder to the earliest. With no fill cell the spare columns
+go to the last left-aligned non-empty cell, else the first non-empty one; an empty cell MUST take none.
+A row's `distribution` MUST be `"content"` (absent) or `"equal"`, which gives `floor(W / N)` each; any
+other value MUST be rejected. The joint MUST give way before any content does.
 
 #### Scenario: The default gives each cell what its content needs
 
@@ -118,6 +120,55 @@ A row option MUST restore equal shares, `floor(W / N)` each.
 - **THEN** the first two cells occupy 14 columns and the other eight 13 each, so the row spans all 132
   columns
 
+#### Scenario: The row option's values
+
+- **WHEN** a row declares `distribution` `"content"`, or declares none
+- **THEN** its cells are sized by their content; and `"equal"` gives the equal shares of the scenarios
+  below
+
+#### Scenario: A distribution that is not one of the two
+
+- **WHEN** a row declares `distribution` as `"equl"`, `"Equal"`, `4` or `null`
+- **THEN** the configuration is rejected, the default row renders, and the warning names the key and the
+  value and lists the two valid ones, `"content"` and `"equal"`
+
+#### Scenario: A distribution beside rows
+
+- **WHEN** a document carries a top-level `distribution` and a `rows` list together
+- **THEN** the configuration is rejected like a top-level `cells` or `id` beside `rows`, the default row
+  renders, and the warning says the document carries both a top-level row and a rows list
+
+#### Scenario: An empty cell takes no column
+
+- **WHEN** a row of a left-aligned `path` cell, a `model` cell and a last left-aligned cell whose
+  instrument renders nothing is rendered at 80 columns
+- **THEN** the empty cell occupies 0 columns, and the spare columns go to the `path` cell, the last
+  left-aligned non-empty cell, so the empty cell's presence does not change where any text sits
+
+#### Scenario: No joint beside an absorbing cell
+
+- **WHEN** a left-aligned `path` cell absorbs the spare columns beside a right-aligned `model` cell
+- **THEN** only those spare columns separate their texts, and the `model` cell occupies exactly its
+  text's width
+
+#### Scenario: No joint beside a fill cell
+
+- **WHEN** a row of a `model` cell, a `blank` cell and a `thinking` cell renders at a width equal to the
+  sum of the two texts' widths
+- **THEN** the two texts abut, no joint is added beside the `blank` cell, and neither text is shortened
+
+#### Scenario: A joint beside an absorbing cell at the margin
+
+- **WHEN** a row of a left-aligned `path`, a right-aligned `model` and a right-aligned `thinking` renders
+  at one column more than its three texts' widths
+- **THEN** the `thinking` text keeps its joint, the `path` text abuts the `model` text, and no text is
+  shortened
+
+#### Scenario: The joints collapse together
+
+- **WHEN** the same row renders at exactly its three texts' widths
+- **THEN** no joint remains anywhere in it, no text is shortened, and the row is one line
+
 #### Scenario: The joint collapses before content does
 
 - **WHEN** two adjacent content-sized cells have text that fits the row only without the one column
@@ -141,8 +192,8 @@ A row option MUST restore equal shares, `floor(W / N)` each.
 A row's `cells` array MUST be both the number of cells in the row and the cell object at each
 position. An absent value MUST mean ten cells and the ceiling MUST be ten: a longer array MUST be
 truncated to ten, not rejected. Each entry MUST be an object whose `instrument` is a non-empty
-string. A key the extension does not recognise MUST be rejected, naming that key. No other key states
-a cell count.
+string. A key on a cell object that the extension does not recognise MUST be rejected, naming that key.
+No other key states a cell count.
 
 #### Scenario: cells absent
 
@@ -210,9 +261,9 @@ promise says which loses first or by what ratio. `align` in a cell with no spare
 
 #### Scenario: Content that needs more than the row
 
-- **WHEN** a row's cells hold text needing 120 columns in all and the row renders at 80 columns
+- **WHEN** a row of three cells, each holding text 40 columns wide, renders at 80 columns
 - **THEN** the footer shows one line for that row, 80 columns wide, no cell's text carries a line
-  break, and every cell's text is clipped at its end with the ellipsis
+  break, and each cell's text is whole or clipped at its end with the ellipsis
 
 #### Scenario: A cell's content grows
 
@@ -274,3 +325,68 @@ Cached text MUST NOT survive into a later render, and MUST be dropped on `invali
 - **WHEN** the `thinking` text changes from `High` to `Max` between two renders at the same width
 - **THEN** the second render lays the row out for the new text: the `thinking` text still ends at the
   row's right edge and the `model` text ends one column before it starts
+
+### Requirement: A cell's alignment is the padding side inside it
+
+A cell MAY declare `align`, whose value MUST be `left`, `right` or `center`; an absent value MUST
+mean `left`. Clipping stays at the text's end with the ellipsis the row already uses, and the space
+the text leaves in its cell, whether or not clipping occurred, MUST become padding that puts the
+text against the side `align` names — `center` splits it across both sides. The pad MUST be
+measured in visible terminal columns, after clipping, never in code units.
+
+#### Scenario: A cell that declares no align
+
+- **WHEN** a cell declares no `align`
+- **THEN** its text is clipped at its end and the space it leaves is padding to its right, so the
+  text starts at the cell's left edge
+
+#### Scenario: A right-aligned cell narrower than its cell
+
+- **WHEN** a cell declaring `align` `right` holds text narrower than the cell
+- **THEN** the pad sits to the text's left, so the text ends at the cell's right edge
+
+#### Scenario: A centred cell narrower than its cell
+
+- **WHEN** a cell declaring `align` `center` holds text narrower than the cell
+- **THEN** the pad is split across both sides of the text, `floor(pad / 2)` columns to its left and
+  the remainder to its right, so an odd pad leaves its extra column on the right and the text sits
+  half a column left of exact centre
+
+#### Scenario: Text wider than the cell, under any alignment
+
+- **WHEN** a cell's text is wider than the cell, whichever `align` it declares
+- **THEN** clipping consumes the cell's whole width, no pad remains, and every alignment renders the
+  same columns
+
+#### Scenario: An align outside the three
+
+- **WHEN** a cell declares an `align` other than `left`, `right` or `center` — `"middle"`,
+  `"Center"`, or a value that is not a string such as `4`
+- **THEN** the configuration is rejected, the default row renders, and the warning names the align
+  value
+
+#### Scenario: A wide glyph at the clip boundary
+
+- **WHEN** a cell's text is clipped where a wide glyph straddles the cut, so the glyph is dropped and
+  the text is narrower than its cell by more than an ASCII clip would leave
+- **THEN** the pad it leaves sits to the text's left under `right` and to the text's right under
+  `left`, and the cell still occupies the columns its row gave it
+
+#### Scenario: An emoji in a cell
+
+- **WHEN** a cell's text carries an emoji and clips narrower than its cell
+- **THEN** the pad sits to the text's left under `right` and to the text's right under `left`, with
+  the emoji measured the way the host measures it
+
+#### Scenario: ANSI styling in a cell
+
+- **WHEN** a cell's text carries ANSI styling and clips narrower than its cell
+- **THEN** the pad sits to the text's left under `right` and to the text's right under `left`, the
+  pad carries none of that styling — which the renderer may achieve with a style reset before the
+  pad — and the host's line-end style reset is untouched
+
+#### Scenario: A combining mark in a cell
+
+- **WHEN** a cell's text carries a combining mark and clips narrower than its cell
+- **THEN** the pad sits to the text's left under `right` and to the text's right under `left`, with
+  the mark measured the way the host measures it
