@@ -1,0 +1,16 @@
+schema: marbleization
+created: 2026-11-08
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "efb75444-1a64-4e37-b462-277d70ce98a9"
+    chidi: "742a5086-fa07-4381-97f4-4650e7cd6e7e"
+    eleanor: "2f90ecaf-bdce-4924-b1fd-90f9a68ba539"
+  gates:
+    council_owner: pending
+    design: pending
+    tasks: pending
+    implement: pending
+    validate: pending
+  routing:
+    - "2026-11-08 bambadjan proposal+specs: run 00a44c02 aborted by the oMLX memory guard mid-prefill (25.1 GB over the 24.8 GB hard watermark) on localllm-omlx/flint-oQ4e; this run routed to anthropic/claude-sonnet-5.5. Agent file pin unchanged."
