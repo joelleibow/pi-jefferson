@@ -78,7 +78,7 @@ The constraints the design meets, each with its source:
 
 ### Requirements this change revises
 
-Four living requirements, revised by name under MODIFIED in the delta spec [`council.md`, "Accepted"]:
+Five living requirements, revised by name under MODIFIED in the delta spec [`council.md`, "Accepted"]:
 
 - **"Cells are evenly distributed across the width"** (spec l.63). Today each of N cells gets `basis:
   floor(W / N)` and `grow`, the remainder goes to the earliest cells; scenarios 8 at 80 → 10 each, 3 at 100
@@ -93,9 +93,9 @@ Four living requirements, revised by name under MODIFIED in the delta spec [`cou
 - **"The footer's tree is built once and reads the current render's sample"** (spec l.433). Today entry
   options are re-seated only on a width change [E §3, M 2i]; now also when a cell's width changes.
 
-Possibly also, for the design to settle: "A cell's alignment is the padding side inside it" (spec l.368),
-whose wide-glyph scenario still says `floor(W / N)` and whose `center` and `right` become no-ops in a cell
-with no pad [M 2g]. The delta modifies it for that scenario.
+- **"A cell's alignment is the padding side inside it"** (spec l.368). Its wide-glyph scenario still says
+  `floor(W / N)`, and its `center` and `right` become no-ops in a cell with no pad [M 2g]. The delta modifies
+  it for that scenario.
 
 ### What the design must still handle
 
@@ -130,12 +130,15 @@ each configuration surface rejects today [E §5, §10].
 
 ### Open questions for the design
 
-- The exact slack rule and the equal-share rule among several fill cells (the council's rule is the
-  starting point) [`council.md`].
-- Which width measures a content cell [M 2c].
-- Whether a per-cell override is needed, and the row option's name and spelling [R].
-- Whether ten has a new reason, or is kept as Joel's earlier acceptance [M 1f].
-- The living requirement at spec l.368, whose wide-glyph scenario the delta modifies.
+All are closed in `design.md`; none remains open. Where each is settled:
+
+- The slack rule and the equal share among fill cells: decision 4.
+- Which width measures a content cell: decision 2.
+- The per-cell override, and the row option's name and spelling: decision 5.
+- Ten as the ceiling: kept on Joel's earlier acceptance only, no new reason (decision 10).
+- The joint beside a fill cell: none (decisions 3 and 6). An unknown row key: unchanged, silent (decision 5).
+  Where `fills` is read: the parse at bind time (decision 3).
+- The requirement at spec l.368: modified for its wide-glyph scenario, now the fifth requirement above.
 
 ## Capabilities
 
@@ -145,7 +148,7 @@ None.
 
 ### Modified Capabilities
 
-- `statusline`: the delta modifies the four requirements named above (and one scenario of the alignment requirement at spec l.368), and adds the ones that hold whatever
+- `statusline`: the delta modifies the five requirements named above, and adds the ones that hold whatever
   the mechanism: two neighbors reading as one at the right edge, the full width, `$bar` and column
   measurement. The overflow, no-cells and equal-distribution sentences that the first version of this
   delta carried as added requirements now live in the modified ones.

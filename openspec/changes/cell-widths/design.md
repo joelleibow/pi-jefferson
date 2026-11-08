@@ -221,7 +221,7 @@ renders that column as a leading space [R 2026-11-07, Spec: The joint collapses 
   lost for that.
 - **Reachable states.** The cases are the guards table's joint rows plus S = 0 with an absorber (the texts abut, because
   there is no column to give), S < G with a fill cell between content cells (they abut), and a centered absorber with S = 1 (one side abuts, because the pad splits `floor` left, remainder
-  right [E §6, l.368]). Both are named and tested, not left to be discovered.
+  right [E §6, l.368]). Each is named and tested, not left to be discovered.
 
 ### 7. Overflow is pi-tui's; every cell can give up columns
 

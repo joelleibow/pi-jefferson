@@ -77,11 +77,11 @@ sequence neither moves a neighbour nor makes a cell overrun.
 
 ### Requirement: Cells are evenly distributed across the width
 
-By default a cell MUST take the width its content needs, except a `blank` cell and a `$bar` cell, which
-MUST fill and share the spare columns, the remainder to the earliest. With no fill cell the spare columns
-go to the last left-aligned non-empty cell, else the first non-empty one; an empty cell MUST take none.
-A row's `distribution` MUST be `"content"` (absent) or `"equal"`, which gives `floor(W / N)` each; any
-other value MUST be rejected. The joint MUST give way before any content does.
+By default a cell MUST take the width its content needs, except a `blank` or `$bar` cell, which MUST fill and
+share the spare columns, the remainder to the earliest. With none, they go to the last left-aligned
+non-empty cell, else the first non-empty one, else the first cell, even when empty; an empty cell MUST otherwise
+take none. `distribution` MUST be `"content"` (absent) or `"equal"` (`floor(W / N)` each); any other value MUST
+be rejected. The joint MUST give way before any content does.
 
 #### Scenario: The default gives each cell what its content needs
 
@@ -140,10 +140,17 @@ other value MUST be rejected. The joint MUST give way before any content does.
 
 #### Scenario: An empty cell takes no column
 
-- **WHEN** a row of a left-aligned `path` cell, a `model` cell and a last left-aligned cell whose
-  instrument renders nothing is rendered at 80 columns
+- **WHEN** a row of a left-aligned `path` cell, a right-aligned `model` cell and a last left-aligned cell
+  whose instrument renders nothing is rendered at 80 columns
 - **THEN** the empty cell occupies 0 columns, and the spare columns go to the `path` cell, the last
   left-aligned non-empty cell, so the empty cell's presence does not change where any text sits
+
+#### Scenario: A row whose cells all render nothing
+
+- **WHEN** a row of `model` and `thinking` cells, with no fill cell, renders at 80 columns before either
+  datum is known
+- **THEN** the first cell, though empty, takes the spare columns, and the row renders one line 80 columns
+  wide
 
 #### Scenario: No joint beside an absorbing cell
 
