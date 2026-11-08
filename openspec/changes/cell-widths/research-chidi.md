@@ -234,3 +234,83 @@ The local prefix below is `/Users/joelleibow/.local/share/fnm/node-versions/v26.
 - [S25] i3bar input protocol — https://i3wm.org/docs/i3bar-protocol.html
 - [S26] Neovim `options.txt`, `'statusline'` — https://raw.githubusercontent.com/neovim/neovim/master/runtime/doc/options.txt
 - [S27] Figma, “Guide to auto layout” — https://help.figma.com/hc/en-us/articles/360040451373-Explore-auto-layout-properties
+
+## Chidi addendum 1: pi-tui 1.4.0 vs 1.5.0 allocator
+
+Scope: repository `node_modules/@earendil-works/pi-tui` is 1.4.0 (`package.json:1-4`); the pi-coding-agent installation Joel runs embeds 1.5.0 (`package.json:1-4`). I compared only installed package docs/declarations/dist files and explicitly requested package metadata. I did not read repository source outside `node_modules`, the change directory, `package.json`, and `pnpm-lock.yaml`.
+
+## 1. `allocateStackSizes` in 1.4.0 and 1.5.0
+
+**The two implementations are byte-for-byte identical.** Byte comparison (`cmp`) finds no difference in `dist/components/stack.js`; both have SHA-256 `02b4dafebc728f1c0e8d01b5cc330f82eb760c58bc71c5cc9bff6d98bf34dbf3`. The relevant lines are identical in both files: candidate selection and weights at `stack.js:63-98`, initial basis/intrinsic sizing and gap subtraction at `stack.js:99-109`.
+
+I ran `/tmp/cellw-allocator-probe.mjs` against both installed packages. Every result below was identical in 1.4.0 and 1.5.0.
+
+### 1(a). Numeric bases summing to `W - r`, all `grow: 1`
+
+**Yes, under the stated `0 <= r < G` condition, the earliest `r` children each receive one extra column**, provided `minSize`/`maxSize` values do not clamp their bases. With equal grow weights and a surplus smaller than the candidate count, each pass's floored weighted share is zero but `Math.max(1, ...)` gives one column to each earliest candidate until the surplus is exhausted (`stack.js:80-94`).
+
+Probe results:
+
+- `G=3`, bases `[33,33,33]`, `W=100`: both versions return `[34,33,33]`.
+- `G=10`, bases `[13 × 10]`, `W=132`: both return `[14,14,13,13,13,13,13,13,13,13]`.
+- Unequal bases `[5,15,20,25,33]`, `W=100`, `r=2`: both return `[6,16,20,25,33]`.
+
+This is narrower than a general proportional-growth rule: for larger surpluses, the loop at `stack.js:63-98` can produce unequal distributions even for equal grow weights.
+
+### 1(b). Content children with `grow: 0` plus fill children with numeric `floor(S/G)` bases and `grow: 1`
+
+The content children remain at their numeric bases; the fill children absorb the fill-basis remainder in entry order. Example: content bases `[7,8]` with `grow:0`, three fill bases `floor(25/3)=8` with `grow:1`, `W=40`:
+
+- 1.4.0: `[7,8,9,8,8]`
+- 1.5.0: `[7,8,9,8,8]`
+
+Thus the two content children stay `[7,8]`; the first fill receives the one-column remainder.
+
+### 1(c). Overflow with every child `shrink: 1`, `minSize: 0`
+
+For gap `0` and a nonnegative width, **the allocated total is exactly `W`** when all children can shrink to zero. The allocator repeats until the deficit is gone; candidates remain available while their size is above `minSize` (`stack.js:69-88`, `99-109`). An additional scratch exhaustive probe checked 46,201 over-width combinations across 1–6 children, widths 0–100, and pseudo-random bases: 0 version mismatches and 0 bad totals.
+
+Probe examples, identical in both versions:
+
+| Bases | W | Allocated | Losses by child |
+|---|---:|---|---|
+| `[60,40,40]` | 80 | `[26,25,29]` | `[34,15,11]` |
+| `[10,0,70]` | 40 | `[3,0,37]` | `[7,0,33]` |
+| `[20,20]` | 30 | `[13,17]` | `[7,3]` |
+
+There is no documented priority such as “clip the leftmost” or “shrink proportionally once.” Each pass selects children still above `minSize`, weights them as `shrink * max(1,currentSize)`, then processes candidates in child order and gives each candidate at least one column of loss until that pass's remaining deficit is exhausted (`stack.js:63-98`). This means earlier children often lose first and may lose more than later equal-sized children, but large bases also affect the weights. The zero-basis child above loses nothing because it is already at `minSize:0` and is not a shrink candidate.
+
+### 1(d). Basis zero or allocated width zero in direct `HStack.render`
+
+In **both versions**, a zero-width child is still rendered once at the full stack width for intrinsic measurement, because direct `HStack.render` calls `entry.component.render(safeWidth)` for every entry before allocation, even when `basis` is numeric (`h-stack.js:15-18`). It is not rendered in the final pass when its allocated width is zero; the final map substitutes `[]` for width-zero entries (`h-stack.js:19-20`). The composed line therefore contains nothing from that child, subject to any configured `gap` (`h-stack.js:23-39`).
+
+Probe results:
+
+- Basis-zero child `Z` beside numeric-basis child `F`, `W=80`: render calls are `Z:80`, `F:80`, `F:8`; the composed line contains `F` and padding, no `Z`.
+- Child `S` shrunk from basis 80 to allocated 0 beside `O`, `W=1`: render calls are `S:1`, `O:1`, `O:1`; the composed line contains only `O`.
+
+## 2. Direct `HStack.render(width)` measure-then-render calls
+
+**Yes: in both versions, every visible child is rendered once at the full width before allocation, even when its `basis` is numeric.** There is no `typeof basis === "number"` branch in direct `HStack.render`; lines `h-stack.js:15-18` unconditionally measure every entry at `safeWidth`. Allocation happens at `h-stack.js:19`; nonzero-width children are rendered a second time at their allocated widths at `h-stack.js:20`.
+
+For two numeric-basis children with `basis:40` each and `W=80`, the exact call sequence per frame is:
+
+```text
+1.4.0: child1.render(80), child2.render(80), child1.render(40), child2.render(40)
+1.5.0: child1.render(80), child2.render(80), child1.render(40), child2.render(40)
+```
+
+That is Michael's measured `[80,80,40,40]`. The direct `h-stack.js` files are also byte-for-byte identical across versions, SHA-256 `b4cf1819879bcbbf20f2cfd3a5d5960b92c7f69308310d2ad44f0dbae4ed9c0f`, with the behavior at lines `9-41` in both.
+
+## 3. npm publication, peer range, and lockfile effect
+
+**Yes on registry availability and exact dependency.** `npm view @earendil-works/pi-tui@1.5.0 version dist.tarball --json` returns version `1.5.0` and an npmjs tarball URL. `npm view @earendil-works/pi-coding-agent@1.5.0 dependencies.@earendil-works/pi-tui --json` returns exactly `1.5.0`. The installed pi-coding-agent 1.5.0 package says the same at `package.json:2-4` and `43-49`: `@earendil-works/pi-tui: "1.5.0"`.
+
+The repository's current `package.json` has peer ranges of `"*"` for both `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui` (`package.json:41-44`), so the peer declaration does not exclude 1.5.0. Its current dev ranges are both `^1.4.0` (`package.json:48-50`), and the lockfile records both as version 1.4.0 (`pnpm-lock.yaml:173-178`, `310-312`, `1061-1067`, `1103-1107`).
+
+Lockfile effect, measured with scratch copies outside the repository:
+
+- Moving only `@earendil-works/pi-tui` from `^1.4.0` to `^1.5.0` changes the root importer to `specifier: ^1.5.0`, `version: 1.5.0` and adds the `@earendil-works/pi-tui@1.5.0` package/snapshot entries. Because repository `@earendil-works/pi-coding-agent@1.4.0` depends exactly on pi-tui 1.4.0, the lockfile still retains the 1.4.0 pi-tui entries for that transitive dependency. The scratch lockfile consequently contains both pi-tui 1.4.0 and 1.5.0.
+- Moving both devDependencies to `^1.5.0` updates both root importers to 1.5.0, replaces the pi-coding-agent snapshot dependency with `@earendil-works/pi-tui: 1.5.0`, and updates the related `@earendil-works/pi-*` snapshots plus their changed transitive entries. The scratch simulation added `@earendil-works/pi-schema@1.5.0` and updated entries including minimatch and undici.
+
+No peer-range change is indicated by the metadata itself: the peer range is already `*`.
