@@ -88,7 +88,8 @@ export function createFooter(
         stack.clear();
         for (const [index, component] of components.entries()) {
           const cell = plan[index]!;
-          stack.addChild(component, { basis: cell.basis, grow: cell.grow, shrink: 0 });
+          // Every cell may give up columns, so the allocator always reaches the row's width.
+          stack.addChild(component, { basis: cell.basis, grow: cell.grow, shrink: 1, minSize: 0 });
         }
       },
     };

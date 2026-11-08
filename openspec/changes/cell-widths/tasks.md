@@ -332,7 +332,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
 
 ## 6. One line at every width, and overflow
 
-- [ ] 6.1 **When the content needs more than the row, every cell can give up columns, and a row is still one line of
+- [x] 6.1 **When the content needs more than the row, every cell can give up columns, and a row is still one line of
   W.** Test first: three cells of 40 columns each at 80 render one line of 80 columns, no cell's text carries a line break,
   and each of the three cells' text ends with the ellipsis (pi-tui allocates `[22, 27, 31]` [CA §1(c)]); the same three cells growing from 5 to 40 columns between two renders at 80 give the same one line of 80 columns on the second; a row whose
   cells need 41 columns with `[L40, L1]` at 40 renders 40. The assertion names no column count for who lost. Red
@@ -343,7 +343,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   later cells are dropped by the host's clip while the earlier ones are not ellipsized (red at the ellipsis assertion
   only; the one-line assertions are not claimed red). Source: [Spec: Content that needs more than the row;
   An instrument's text is wider than its cell; A cell's content grows], [R 2026-11-05], [D7, CA §1(c); design guards table, "One line when content grows"].
-- [ ] 6.2 **Every column is allocated, at any width, with the composition the host's.** Characterization of the plan and
+- [x] 6.2 **Every column is allocated, at any width, with the composition the host's.** Characterization of the plan and
   the footer through the real allocator (first-run green; its failing side is the mutation). It follows 6.1 because
   its overflow widths (W below C+J for `[L12, R20, R6]` and `[R6, R6, R6]`) rely on the `shrink: 1` that 6.1 seats. Test
   (`tests/row-renderer.test.ts`): for each W from 1 to 150, over the rows `[L12, R20, R6]`, `[F, L10, F, R7]`, `[L0, L0]`,
@@ -352,12 +352,12 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   composed line would show) [E §7]. Fixed cases at S=0, S=1, `S mod G` = 0 and G−1, and W < N. Mutation: an absorber base of `n + S − 1` and `ceil` in place of `floor` each turn a fixed case red.
   Also run in both pi-tui versions in 9.3. Source: [Spec: A row spans the full width however its cells are sized], [D4,
   D11 conditions 1-3].
-- [ ] 6.3 **`align` in a content cell with no spare columns changes nothing.** Characterization; the design adds no code
+- [x] 6.3 **`align` in a content cell with no spare columns changes nothing.** Characterization; the design adds no code
   for it [D7]. Test: `[X, L "yy"]` at 20, where `X` declares `left`, `right` and `center` in turn over text `abc`: the
   three lines are equal (the last cell is the left-aligned absorber each time; `X` has exactly its text's columns).
   Boundary: the three alignments. Mutation: give a non-absorbing content cell one extra column without a joint and the
   `right` and `center` lines differ from `left` (red). Source: [Spec: An align in a cell with no spare columns].
-- [ ] 6.4 **The tests that assert only one line of W columns hold under the default.** Characterization. These four
+- [x] 6.4 **The tests that assert only one line of W columns hold under the default.** Characterization. These four
   declare `"content"` in place of `"equal"` and pass with their expectations untouched: "content wider than its cell is
   truncated to one line", "an instrument resolving text wider than its cell is clipped and stays one line", "the footer
   renders one line per row, in order, each spanning the width", "more cells than columns still renders exactly one line

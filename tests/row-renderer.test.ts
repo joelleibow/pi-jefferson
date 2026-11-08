@@ -71,7 +71,7 @@ test("content wider than its cell is truncated to one line", () => {
   // 3 cells at width 12: 4 columns each, against far wider content. Each cell is truncated to
   // fill — pad 0, ending in "\x1b[0m" — so visible() absorbs each trailing reset into the
   // closing frame, and the width and substring assertions stand read from visible(line).
-  const line = lineAt(rowOf(3), 12);
+  const line = lineAt(contentRowOf(3, "Lorem ipsum dolor sit amet"), 12);
   const text = visible(line);
   assert.equal(typeof line, "string");
   assert.equal(visibleWidth(line), 12);
@@ -82,7 +82,7 @@ test("content wider than its cell is truncated to one line", () => {
 test("an instrument resolving text wider than its cell is clipped and stays one line", () => {
   const row: Row = {
     id: "row-0",
-    distribution: "equal",
+    distribution: "content",
     cells: [
       { instrument: { fills: false, render: () => "provider: a-very-long-model-name" }, align: "left" },
       { instrument: { fills: false, render: () => "thinking: high" }, align: "left" },
@@ -265,7 +265,7 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
 
 test("the footer renders one line per row, in order, each spanning the width", () => {
   const footer = createFooter(
-    [rowOf(2, "aa"), rowOf(4, "b"), rowOf(8, "c")],
+    [contentRowOf(2, "aa"), contentRowOf(4, "b"), contentRowOf(8, "c")],
     () => readings,
     fakeTheme(),
   );
@@ -281,7 +281,7 @@ test("the footer renders one line per row, in order, each spanning the width", (
 });
 
 test("more cells than columns still renders exactly one line of the width", () => {
-  const line = lineAt(rowOf(8), 4);
+  const line = lineAt(contentRowOf(8, "Lorem ipsum dolor sit amet"), 4);
   assert.equal(typeof line, "string");
   assert.equal(visibleWidth(line), 4);
 });
@@ -428,6 +428,11 @@ test("a push between two renders shows up in the next render and not before", ()
   assert.equal(second, composed(...Array<string>(2).fill("gpt-5".padEnd(13))), "both cells see the pushed value");
   assert.equal(handed[0]?.model, "claude-opus-4", "the first render's object kept its values");
 });
+
+/** A content-distribution row of one text, repeated, for the tests the default holds. */
+function contentRowOf(count: number, text: string): Row {
+  return rowOfCells(Array.from({ length: count }, () => cellOf(text)));
+}
 
 /** A content-distribution row: one fake instrument per cell, holding the given text. */
 function contentRow(cells: Array<{ text: string; align?: "left" | "right" | "center" }>): Row {
@@ -611,7 +616,9 @@ test("no joint beside a fill cell, and none for an empty cell", () => {
 
   const oneShort = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("x", { fills: true }), cellOf("b".repeat(7), { align: "right" })]), 11);
   assert.equal(visibleWidth(oneShort), 11, "one line, the row's width");
-  assert.ok(!visible(oneShort).includes("bbbbbbb"), "a text is clipped at its end");
+  // Which of the two content cells loses the column is the allocator's, so this asks only that a
+  // text gave way at its end rather than the row overflowing.
+  assert.ok(visible(oneShort).includes("..."), "a text is clipped at its end");
 
   const between = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("x", { fills: true }), cellOf("b".repeat(7), { align: "right" })]), 30);
   assert.equal(visible(between), "a".repeat(5) + "x".padEnd(18) + "b".repeat(7), "the fill cell sits between the texts");
@@ -675,4 +682,96 @@ test("a centred absorber with one spare column puts it on the right", () => {
   assert.equal(visible(line), "a".repeat(5) + " " + "b".repeat(3) + " " + "c".repeat(3));
   assert.equal(visibleWidth(line), 13);
   assert.equal(line.split("\n").length, 1);
+});
+
+test("when the content needs more than the row, every cell can give up columns, and a row is still one line of W", () => {
+  const wide = (): Row => rowOfCells([
+    cellOf("a".repeat(40)),
+    cellOf("b".repeat(40), { align: "right" }),
+    cellOf("c".repeat(40), { align: "right" }),
+  ]);
+  const line = lineAt(wide(), 80);
+  assert.equal(line.split("\n").length, 1, "one line");
+  assert.equal(visibleWidth(line), 80);
+  // No cell is dropped in favour of the others: each gives up columns, so each ends in its own
+  // ellipsis. Which cell lost how much is the allocator's call, and is not asserted.
+  assert.equal(visible(line).match(/\.\.\./g)?.length, 3, "every cell's text is clipped at its end");
+
+  // The same cells grow between two renders at the same width.
+  let size = 5;
+  const growing: Instrument = { fills: false, render: () => "g".repeat(size) };
+  const footer = createFooter([rowOfCells([
+    { instrument: growing, align: "left" },
+    { instrument: growing, align: "left" },
+    { instrument: growing, align: "left" },
+  ])], () => ({ ...readings }), fakeTheme());
+  assert.equal(visibleWidth(footer.render(80)[0] ?? ""), 80);
+  size = 40;
+  const grown = footer.render(80)[0] ?? "";
+  assert.equal(grown.split("\n").length, 1, "still one line");
+  assert.equal(visibleWidth(grown), 80);
+
+  // One column over the row, with nothing to give but a cell's own text.
+  const tight = lineAt(rowOfCells([cellOf("x".repeat(40)), cellOf("y")]), 40);
+  assert.equal(visibleWidth(tight), 40);
+  assert.equal(tight.split("\n").length, 1);
+});
+
+test("every column is allocated, at any width, with the composition the host's", () => {
+  const footer = createFooter([
+    // Content cells with an absorber, a fill between content cells, an empty row, ten fills, three
+    // right-aligned cells, and one equal row of seven.
+    rowOfCells([cellOf("a".repeat(12)), cellOf("b".repeat(20), { align: "right" }), cellOf("c".repeat(6), { align: "right" })]),
+    rowOfCells([cellOf("x", { fills: true }), cellOf("d".repeat(10)), cellOf("y", { fills: true }), cellOf("e".repeat(7), { align: "right" })]),
+    rowOfCells([cellOf(""), cellOf("")]),
+    rowOfCells(Array.from({ length: 10 }, () => cellOf("z", { fills: true }))),
+    rowOfCells([cellOf("f".repeat(6), { align: "right" }), cellOf("g".repeat(6), { align: "right" }), cellOf("h".repeat(6), { align: "right" })]),
+    { id: "row-5", distribution: "equal", cells: Array.from({ length: 7 }, (_, index) => cellOf(String(index).repeat(3))) },
+  ], () => readings, fakeTheme());
+
+  for (let width = 1; width <= 150; width++) {
+    const lines = footer.render(width);
+    assert.equal(lines.length, 6, `six rows at ${width}`);
+    for (const line of lines) {
+      assert.equal(line.split("\n").length, 1, `one line at ${width}`);
+      assert.equal(visibleWidth(line), width, `exactly the row's width at ${width}`);
+      // The line is the host's composition of its children and nothing else: every column belongs
+      // to a cell, so the extension padded nothing onto the line.
+      const children = line.split(FRAME).slice(1, -1);
+      assert.equal(children.reduce((sum, child) => sum + visibleWidth(child), 0), width, `the cells hold every column at ${width}`);
+    }
+  }
+
+  // Fixed cases at the boundaries the plan's arithmetic has, where a column's owner is visible.
+  const fill = (text: string): Row["cells"][number] => cellOf(text, { fills: true });
+  const twoTexts = (width: number): string => visible(lineAt(rowOfCells([
+    cellOf("a".repeat(5), { align: "right" }),
+    fill("x"),
+    cellOf("b".repeat(7), { align: "right" }),
+  ]), width));
+  assert.equal(twoTexts(12), "a".repeat(5) + "b".repeat(7), "S = 0 leaves the fill nothing");
+  assert.equal(twoTexts(13), "a".repeat(5) + "x" + "b".repeat(7), "S = 1 is the fill's");
+
+  assert.equal(
+    visible(lineAt(rowOfCells([fill("x"), cellOf("y".repeat(31)), fill("z")]), 90)),
+    "x".padEnd(30) + "y".repeat(31) + "z".padEnd(29),
+    "S mod G = 0",
+  );
+  assert.equal(
+    visible(lineAt(rowOfCells([fill("x"), fill("y")]), 81)),
+    "x".padEnd(41) + "y".padEnd(40),
+    "S mod G = G - 1: the remainder column goes to the earliest fill",
+  );
+  assert.equal(visibleWidth(lineAt(rowOfCells(Array.from({ length: 8 }, () => cellOf("w"))), 4)), 4, "W < N");
+});
+
+test("align in a content cell with no spare columns changes nothing", () => {
+  const lines = (["left", "right", "center"] as const).map((align) =>
+    lineAt(rowOfCells([cellOf("abc", { align }), cellOf("yy")]), 20));
+  // The last cell is the left-aligned absorber and the first has exactly its three columns, so
+  // the pad arithmetic emits nothing for any of the three alignments: the line is the first text,
+  // the joint before the absorber, the absorber's text, and its slack.
+  assert.equal(visible(lines[0] ?? ""), "abc" + " yy" + " ".repeat(14));
+  assert.equal(lines[1], lines[0], "right renders the same columns as left");
+  assert.equal(lines[2], lines[0], "center renders the same columns as left");
 });
