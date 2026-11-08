@@ -20,12 +20,17 @@ extension.
 1. Add one declaration to `extensions/jefferson/visuals/instrument.ts` — name, variables, defaults
    and options, plus a `defaultLabel` or a `variableFg` if it needs them — and include it in the
    shipped declarations table so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
-   space: binding adds the one gap, and a declared space would only be trimmed.
+   space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required
+   on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as
+   `blank` does. A `$bar` in a format makes the cell fill without saying so.
 2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
    `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
 3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`,
    along with whatever seeds or pushes it. Do not reach for host state inside the instrument.
-4. Add a test that proves the cell renders it, and one that proves alignment still applies.
+4. A row sizes a cell from its text rendered at width 0, so an instrument's text must not depend on
+   the width unless it fills. The test in `tests/instrument.test.ts` that compares width 0 with width
+   200 across the shipped instruments fails when one breaks this.
+5. Add a test that proves the cell renders it, and one that proves alignment still applies.
 
 ## Two traps this repository has already paid for
 
