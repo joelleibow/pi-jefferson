@@ -13,7 +13,7 @@ extensions/jefferson/
   configuration.ts               where pi-jefferson.json lives, reads it, validates it, normalizes rows
   footer-setup.ts                pi's footer factory and the component it returns
   data/                          the session data and how the host's session and events reach it
-  visuals/                       what a cell shows, the format language, rows, binding, and drawing them
+  visuals/                       what a cell shows, the format language, rows, their widths, binding, and drawing them
 ```
 
 The decision behind the layout, and the alternatives it weighed, are in
@@ -65,14 +65,23 @@ in front of them, and the language commits to one order: it renders the cell emp
 declares is unknown, collapses control characters, trims a format's outer whitespace when it parses,
 runs a segment's string mutations in the order the format writes them, measures the columns `$bar`
 leaves, and styles each segment once.
+It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
 **Row renderer.** Builds one `VStack` of `HStack` rows at install, retaining every cell component.
-The basis is ours (`floor(W / N)` per cell); the remainder is the allocator's (`grow: 1`, `gap: 0`).
-On a width change, `clear()` plus `addChild` re-seats the same components with the new basis. Every
-cell reads the current render's sample from the footer's slot and memoizes by `(sample, width)`;
-invalidation clears those memos. Each cell clips with `truncateToWidth`, pads with `visibleWidth`,
-and returns one line; composition and allocation stay with the host.
+On each render the renderer asks every cell for the width of its text at width 0 and gives those to the width
+plan in `visuals/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
+cells fill. The joint is one column owned by the right-hand cell, drawn as a leading space inside it.
+Every cell is `shrink: 1` with `minSize: 0`, so a row over its width loses columns to the host's
+allocator and stays one line; the allocator also spends any remainder (`gap: 0`). A row with
+`distribution: "equal"` skips the probe: every cell gets `floor(W / N)` and `grow: 1`, as
+[ADR 0002](docs/adr/0002-rows-span-the-full-width.md) recorded. The same components are re-seated with
+`clear()` plus `addChild` when the width changes or any plan field the cells read does: the basis, the
+grow or the joint. Every cell reads the current render's sample from the footer's slot, and its memo
+holds one text per width per sample, so a repeated render of the same sample resolves nothing new;
+invalidation clears the memo. Each cell clips with `truncateToWidth`, pads with `visibleWidth`, and
+returns one line; composition and allocation stay with the host. The choice and what it weighed are
+in [ADR 0007](docs/adr/0007-a-cell-takes-the-width-its-content-needs.md).
 
 ## Import direction
 
@@ -110,9 +119,12 @@ be computed from the clipped result.
 
 ## Fidelity
 
-Rows span the full width: the allocator gives leftover columns to the earliest cells, one each.
-A right-aligned last cell ends at the window's edge. This replaces the former blank-right-edge
-property, recorded in [ADR 0002](docs/adr/0002-rows-span-the-full-width.md).
+Rows span the full width. The leftover columns go to the fill cells, split evenly with the odd
+columns to the earliest; with no fill cell, to the last left-aligned non-empty cell, else the first
+non-empty cell, else the first cell. Under `distribution: "equal"` they go to the earliest cells, one
+each. A right-aligned last cell ends at the window's edge. This replaces the former blank-right-edge
+property, recorded in [ADR 0002](docs/adr/0002-rows-span-the-full-width.md); the content-sized default
+is [ADR 0007](docs/adr/0007-a-cell-takes-the-width-its-content-needs.md).
 
 ## Tests
 
