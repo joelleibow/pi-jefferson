@@ -93,9 +93,9 @@ Four living requirements, revised by name under MODIFIED in the delta spec [`cou
 - **"The footer's tree is built once and reads the current render's sample"** (spec l.433). Today entry
   options are re-seated only on a width change [E §3, M 2i]; now also when a cell's width changes.
 
-Possibly also, for the design to settle: "Cell content comes from an instrument" (spec l.100) and "A cell's
-alignment is the padding side inside it" (spec l.368), whose scenarios still say `floor(W / N)` and whose
-`center` and `right` become no-ops in a cell with no pad [M 2g]. The delta does not touch them.
+Possibly also, for the design to settle: "A cell's alignment is the padding side inside it" (spec l.368),
+whose wide-glyph scenario still says `floor(W / N)` and whose `center` and `right` become no-ops in a cell
+with no pad [M 2g]. The delta modifies it for that scenario.
 
 ### What the design must still handle
 
@@ -135,7 +135,7 @@ each configuration surface rejects today [E §5, §10].
 - Which width measures a content cell [M 2c].
 - Whether a per-cell override is needed, and the row option's name and spelling [R].
 - Whether ten has a new reason, or is kept as Joel's earlier acceptance [M 1f].
-- The living requirements at spec l.100 and l.368, which the delta leaves untouched.
+- The living requirement at spec l.368, whose wide-glyph scenario the delta modifies.
 
 ## Capabilities
 
@@ -145,7 +145,7 @@ None.
 
 ### Modified Capabilities
 
-- `statusline`: the delta modifies the four requirements named above, and adds the ones that hold whatever
+- `statusline`: the delta modifies the four requirements named above (and one scenario of the alignment requirement at spec l.368), and adds the ones that hold whatever
   the mechanism: two neighbors reading as one at the right edge, the full width, `$bar` and column
   measurement. The overflow, no-cells and equal-distribution sentences that the first version of this
   delta carried as added requirements now live in the modified ones.

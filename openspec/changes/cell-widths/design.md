@@ -106,7 +106,9 @@ same text at width 0 as at width 200. A future instrument that reads the width a
 A cell *fills* when its instrument is `blank` or its format contains `$bar` [R 2026-11-07; Spec: A blank cell and a bar
 cell fill]. Every other cell is content-sized. The bound `Instrument` gains one read-only fact, `fills`, which the cell
 reads; it comes from the declaration for `blank` and from the format's parse for `$bar`, in the same files that already
-enforce one `$bar` per format and bind the label [E §2, §4]. A `context` cell whose format drops `$bar` is content-sized.
+enforce one `$bar` per format and bind the label [E §2, §4]. The parse is already in hand where the fact is set:
+`instrumentBindings` in `visuals/instrument-binding.ts` holds the parsed `segments` at bind time [Michael's gate run
+`f8bac3ce`; E §4], so `fills` reads the parse and there is no second one. A `context` cell whose format drops `$bar` is content-sized.
 
 **No per-cell override.** The delta has no scenario that needs one: Joel's rows, every scenario in the delta and the
 council's three calls are met by the default plus `blank` as the filler and the row option as the opt-out [R, Spec]. A
@@ -120,14 +122,15 @@ change, as the 2026-11-04 ruling said of proportional layout [E §6].
 Inputs per cell *i* in a row of N, at row width W: `fills`, `align`, and for content cells the content width *n*.
 
 1. **Equal distribution** (`distribution: "equal"`): every cell gets `basis = floor(W / N)`, `grow: 1`, no joint. No
-   probe is taken. This is today's arithmetic [E §3, ADR 0002] and its only difference is the entry options in
-   decision 5.
+   probe is taken. This is today's arithmetic [E §3, ADR 0002] and its only difference is the `shrink: 1` of step 4
+   below.
 2. **Content distribution (the default):**
    - *Classify.* Fill cells F (G of them). Content cells are empty (*n* = 0) or non-empty K.
    - *Absorber.* Only when G = 0: the last left-aligned cell among the non-empty K, else the first non-empty K, else
      the first cell. The slack goes to it and to no other cell. An empty cell never absorbs while a non-empty one exists;
-     otherwise a datum that goes missing (it renders `""` [E §4]) would flip the whole row's geometry; this refines the delta's "last left-aligned cell" and is request 3 under "What the specs must still carry".
-   - *Joints (decision 6).* Compute the set of joint columns J.
+     otherwise a datum that goes missing (it renders `""` [E §4]) would flip the whole row's geometry; the delta carries it (see "What the specs carry", 3).
+   - *Joints (decision 6).* Compute the set of joint columns J: only boundaries between two non-empty content cells
+     with no absorber slack and no fill cell between them count.
    - *Collapse.* C = sum of *n* over K. If C + J > W, J becomes 0.
    - *Slack.* S = W − C − J.
 3. **Entry options.**
@@ -174,9 +177,16 @@ the same function that reads them [E §5]. In a top-level row document it works 
   `distribution`, mirroring `ALIGNMENTS` and `CellAlign` [E §5]. The default row carries `"content"`.
 - **Validation.** A value that is not one of the two rejects the whole document, so the default row renders and the
   warning names the key and the value and lists the two valid ones, in the form of the align message
-  (`…has an align that is not "left", "right" or "center"…`) [E §5]. The row is checked before its `cells`, outermost
-  first, as the existing precedence runs envelope, instruments, cells [E §7, `configuration.test.ts:864`]. When one row
-  is malformed in both places the first reported is the distribution.
+  (`…has an align that is not "left", "right" or "center"…`) [E §5]. Within a row `distribution` is checked
+  first, then `cells`, then `id` (`normalizeRow` reads `cells`, then `id` [E §5]), so a row malformed in more than one
+  place reports the distribution first; the whole order is envelope, instruments, then the row [E §7,
+  `configuration.test.ts:864`].
+- **Beside `rows`.** A top-level `cells` or `id` beside a `rows` list already rejects the document (`the configuration
+  carries both a top-level row and a rows list`), while any other top-level key is ignored silently [Michael's gate run
+  `f8bac3ce`, `configuration.ts:208`; E §5 `:209`]. A top-level `distribution` beside `rows` rejects the same way: it is a
+  row option, the row is where it belongs, and a silent copy beside `rows` would never take effect
+  [Spec: Cells are evenly distributed]. This envelope check runs before any row is read, so it precedes every
+  precedence above.
 - **Unknown keys.** A cell's unknown key still rejects, `width` still included, with today's message [E §5]. A row's
   unknown key is still ignored silently; this design does not add a rule nobody asked for. The cost is in Risks.
 
@@ -186,17 +196,22 @@ When two non-empty content cells meet with no spare room between them, the right
 renders that column as a leading space [R 2026-11-07, Spec: The joint collapses before content does].
 
 - **Where it exists.** At a boundary between two non-empty content cells with only empty content cells between them. Not
-  at a boundary with a fill cell on either side: a fill cell has spare room by definition and [R] names two
-  *content-sized* cells. Not at the boundary an absorber's slack lands on: the slack is the room, and it is at least one
-  column whenever S ≥ 1, so the joint and the slack coincide. A left-aligned absorber's slack lands after it, a
+  beside a fill cell: [R] is *"one system space"* between *content-sized* neighbors, and a fill cell is not
+  content-sized, so the ruling gives none there [conductor ruling on the former open question 3]. Not at the boundary
+  an absorber's slack lands on: the slack is the room, and it is at least one column whenever S ≥ 1, so the joint and
+  the slack coincide. Both exclusions depend on that room being at least one column: the absorber's boundary has none
+  when S = 0, and a fill boundary has none when S < G (the fill share is `floor(S / G)`) or S ≤ 0. A left-aligned absorber's slack lands after it, a
   right-aligned absorber's before it, a centered one's on both [E §3, `align` arithmetic]. In Joel's top row `path`
   absorbs, so the joint sits between `model` and `thinking` and not between `path` and `model`
   [Spec: Two neighbouring instruments, scenario 1: `model` takes only its text's width].
 - **Counted and clipped.** The joint is in the right cell's `basis`, so it is in the measured width, and the cell clips
   the joint and its text together to its allocated width, so a surprise from the allocator can never overflow a line.
-- **It gives way first.** If C + J > W every joint is dropped (decision 4), before any cell's text is shortened and
-  before pi-tui shrinks anything. All joints or none, not as many as fit: it is one sentence, it never has to choose which
-  joint to keep, and it costs at most J − 1 columns of looks in a row already within J columns of overflowing.
+- **It gives way first.** If C + J > W every counted joint is dropped together (decision 4), before any cell's text is
+  shortened and before pi-tui shrinks anything. J counts only the joints described above, so "all or none" means those:
+  the absorber's boundary and a fill boundary are not in J and are present or absent with the slack. At W = C + J with an
+  absorber, S = 0, so the absorber's neighbor abuts it while a counted joint elsewhere keeps its column; at S < G or
+  S ≤ 0 two content cells with a fill cell between them abut while their texts fit. The counted joints never choose
+  which to keep, and the collapse costs at most J − 1 columns of looks in a row already within J columns of overflowing.
 - **Pad and ADR 0006.** The joint is part of the string the cell aligns and pads, ahead of the text, never part of the
   format: the label's one gap, the trim of a format's outer whitespace and `$bar`'s arithmetic are untouched
   [ADR 0006, E §4]. The joint is a plain unstyled space, so the reset-before-pad rule still concerns only the cell's own
@@ -204,8 +219,8 @@ renders that column as a leading space [R 2026-11-07, Spec: The joint collapses 
 - **No knob.** Joel chose one system space and no setting [R]. A stack `gap: 1` would put a column between every pair,
   empty cells and fill cells included, and break the byte-for-byte equal option and ADR 0002's "no gap" [E §6, M 1b]; it
   lost for that.
-- **Reachable states.** The cases are the table above plus S = 0 with an absorber (the texts abut, because there is no
-  column to give) and a centered absorber with S = 1 (one side abuts, because the pad splits `floor` left, remainder
+- **Reachable states.** The cases are the guards table's joint rows plus S = 0 with an absorber (the texts abut, because
+  there is no column to give), S < G with a fill cell between content cells (they abut), and a centered absorber with S = 1 (one side abuts, because the pad splits `floor` left, remainder
   right [E §6, l.368]). Both are named and tested, not left to be discovered.
 
 ### 7. Overflow is pi-tui's; every cell can give up columns
@@ -244,7 +259,7 @@ reads [E §3], not a shared object.
 Ten stays (`DEFAULT_CELLS` and `MAX_CELLS` [E §5]; the delta keeps it). The reason Joel gave, that with the remainder
 spread by `grow` no ceiling has a geometric advantage [E §6, M 1f], does not hold for content-sized cells, and the
 evidence names no other. The design therefore claims no new reason: ten is an accepted number, and the one thing that
-grows with it is the per-frame probe work (one extra resolve per content cell). See Open Questions.
+grows with it is the per-frame probe work (one extra resolve per content cell). Closed: see Open Questions, 1.
 
 ### 11. The host version: what the design depends on and how it is checked
 
@@ -262,7 +277,8 @@ pinned and the running versions and every probe agreed [CA §1]. The repository'
 allocator that runs. The design does not move the `devDependencies` to 1.5.0: it is not needed for any claim above, and
 the move would add transitive lockfile entries unrelated to this change [CA §3]; "don't invent what we don't have to" [R
 2026-11-03]. A task's verification runs the footer tests once against pi-tui 1.5.0 in a scratch copy outside the
-repository, and Joel confirms the result in his own pi session (his observation).
+repository, and Joel confirms the result in his own pi session (his observation). This is decided, not open (Open
+Questions, 2).
 
 **If the allocator differs in a later version,** the end-to-end width tests at the boundaries in the guards table fail on
 the first run against it. The design has no fallback in Jefferson: a fallback is Jefferson-owned allocation, which
@@ -277,13 +293,13 @@ Each test must be shown failing against the named mutation before the code that 
 | One line when content grows | A cell wider than its allocation, a line break, a stale cached text | A cell's text longer than its allocation, a new sample | Text grows from short to long between two renders at W; each line is one line and W columns; a cell at 120 needed columns in 80 ends with the ellipsis in all three cells of 40 | A cell with `shrink: 0`, or a memo that survives a new sample, gives a line over W |
 | Exactly W at every width | A column unallocated or over-allocated | Any W from 1 to 150 across rows of content, fill and absorber cells | Sum and `visibleWidth(line) === W` for each W; fixed cases at S = 0, S = 1, `S mod G` = 0 and G − 1, and W < N | An absorber base of `n + S − 1`, or `ceil` in place of `floor`, is off by one column at one of them |
 | Content width in columns | A neighbor shifted by code units, an ellipsis when the text exactly fits | Wide BMP glyph (`漢`), combining mark, ANSI-styled text, the emoji label `🧠` | A cell at S = 0 renders its whole text with no ellipsis and no pad; the neighbor's text starts the same column styled or unstyled | Measuring `.length` fails on the combining mark and on the styled text, by columns |
-| Joint absent when a cell is empty, present between two non-empty cells | A joint beside an empty or a fill cell; a joint inside the absorber's slack | `[a, empty, b]` (joint skips the empty cell), `[a, blank, b]` (none), `[path-left-absorber, model, thinking]` (only before `thinking`) | The column of each text start in each row at one width | Counting the empty cell as a neighbor, or giving every boundary a joint, moves a text start by one column |
-| The joint gives way before content | A shortened text while the joint is present | C + J = W, C + J − 1, C + J + 1 | At C + J − 1 the joint is gone and both texts are whole; at C + J it is there; both with both-right-aligned cells so no absorber boundary | A collapse test using `>=` in place of `>`, or a joint that clips text first, fails at exactly one of the three |
+| Joint absent when a cell is empty, present between two non-empty cells | A joint beside an empty or a fill cell; a joint inside the absorber's slack | `[a, empty, b]` (joint skips the empty cell), `[a, blank, b]` (none), `[path-left-absorber, model, thinking]` (only before `thinking`); `[model, blank, thinking]` at S < G, and at S ≤ 0 (the two content cells abut while their texts fit) | The column of each text start in each row at one width | Counting the empty cell as a neighbor, or giving every boundary a joint, moves a text start by one column |
+| The joint gives way before content | A shortened text while the joint is present | C + J = W, C + J − 1, C + J + 1 with both-right-aligned cells; and W = C + J with an absorber (`[path-left-absorber, model, thinking]`) | At C + J − 1 the joint is gone and both texts are whole; at C + J it is there; with the absorber at W = C + J, `path` abuts `model` and `model`\|`thinking` keeps its joint, and at W = C every joint is gone and no text is shortened | A collapse test using `>=` in place of `>`, or a joint that clips text first, fails at exactly one of the widths |
 | `$bar` and `blank` cells fill | A bar that starves, a hugging `blank` | Joel's second row at 100; `[blank, model, $bar]` at 90; `[path, context]` | 34, 33, 33; `model` at its text's width and the others differing by at most one; the bar's block count is the cell's share minus the rest of its format | A fill cell that keeps its natural width changes 34/33/33 |
-| Overflow still clips | A line longer than W when the content needs more | Three cells of 40 columns in 80, and 120 needed in 80 | One line, W columns, no line break, each cell ends with the ellipsis; no assertion on which cell lost how much [Spec] | `shrink: 0`, or `minSize` above 0, gives over W |
-| Equal distribution reproduces today | Any difference from today under the option | 8 cells at 80, 3 at 100, 10 at 132, 8 at 4, a right-aligned last cell at 132 | The strings of the current tests, unchanged: 10 each; 34/33/33; 14/14/13 × 8; the last cell ends at column 132 | An `equal` row that probes, or applies a joint, changes one of them |
+| Overflow still clips | A line longer than W when the content needs more | Three cells of 40 columns in 80 (allocated 22, 27, 31), and other totals over W | One line, W columns, no line break; in the three-of-40 fixture each cell ends with the ellipsis, elsewhere each cell's text is whole or clipped at its end; no assertion on which cell lost how much [Spec] | `shrink: 0`, or `minSize` above 0, gives over W |
+| Equal distribution reproduces today | Any difference from today under the option | 8 cells at 80, 3 at 100, 10 at 132, 8 at 4, a right-aligned last cell at 132 | The strings of the current tests, unchanged: 10 each; 34/33/33; 14/14/13 × 8; the last cell ends at column 132 | An `equal` row that applies a joint changes one of the strings. An `equal` row that probes changes resolve counts, not strings, so the guard for that mutation is the resolve-sequence test (`[30, 30, 30, 10, 10, 10, 30]`, `tests/row-renderer.test.ts:330`) run under `equal` |
 | Re-seat on content change | A stale basis after `High` becomes `Max` | The same row rendered twice at the same W, the thinking text one column shorter | `thinking` still ends at the row's right edge and the `model` text ends exactly one column before it | Re-seating on width only leaves `thinking`'s cell one column too wide, so the joint reads as two columns |
-| Memo | A miss on every render | The same sample rendered twice at the same W | The instrument's resolve count after the second render equals the count after the first | The one-slot memo resolves again on the second render |
+| Memo | A miss on every render | The same sample rendered twice at the same W, in a row of two or more cells whose allocated width differs from W (Joel's top row at 100: 61, 32, 7) | The instrument's resolve count after the second render equals the count after the first | The one-slot memo resolves again on the second render. The existing test at `tests/row-renderer.test.ts:292` is not this guard: its one cell has measured and allocated width both W, so it passes the one-slot defect |
 | The probe assumption | A content cell that reads the width | Every shipped instrument not marked as filling | Text at width 0 equals text at width 200 | A new width-reading instrument without `fills` fails |
 | The option's validation | A misspelled value taking effect | `"equl"`, `4`, `null`, `"Equal"` | The document rejects, the default row renders, the warning names the key and the value | Accepting an unknown string passes it |
 
@@ -295,10 +311,11 @@ the fake host.
 never read or edited [R]). With the sample he saw (`🧠 claude-opus-5-5 via Anthropic`, `🤔 Max`) and a working directory of
 `~/Projects/pi-jefferson`:
 
-- the contents are 23, 32 and 6 columns, so C = 61 and the one joint (before `thinking`) makes J = 1. At 100 columns
-  S = 38: `path` takes 61 columns, `model` 32 and `thinking` 7. The line is the working directory, 38 spaces, the model
-  text, one space, the thinking text. At 132 the same row has 70 spaces and the same tail. The thinking text ends at the
-  last column in both;
+- the contents are 15, 32 and 6 columns (`path` renders `basename(cwd)`, `visuals/instrument.ts:69`, and with Joel's
+  label measured 15 [Michael's gate run `f8bac3ce`]), so C = 53 and the one joint (before `thinking`) makes J = 1. At
+  100 columns S = 46: `path` takes 61 columns, `model` 32 and `thinking` 7. The line is the `path` text, 46 spaces, the
+  model text, one space, the thinking text. At 132 the same row has 78 spaces and the same tail. The thinking text ends
+  at the last column in both. The joint collapses below 54 columns (C + J);
 - the second row at 100 columns: the three cells take 34, 33 and 33 columns and the bar fills the third's cell after the
   rest of its format, as before [Spec: Joel's second row keeps its thirds].
 
@@ -310,14 +327,14 @@ The test builds the expected strings from these counts and from the fixture's ow
   council]. → The row option `equal` restores stable shares per row; the re-seat and the memo keep the move correct.
 - **[A misspelled option is ignored]** A row's unknown key is silent today [E §5], so `distrubtion` leaves the default
   on without telling the user. → Not designed in (no requirement asks); a once-per-document warning of the kind
-  `containers` has [E §5] would close it. Open question 4.
+  `containers` has [E §5] would close it, and would be its own change. Open question 4, closed.
 - **[Overflow order is the allocator's]** The first column lost is the earlier cells', often the working directory
   [CA §1(c)]. → Accepted and unpromised by spec; a priority would revise Joel's 2026-11-05 ruling [R, M 1b].
-- **[The joint is all or nothing]** A row within J columns of overflow loses all joints. → Named in decision 6; the cost is
-  at most J − 1 columns of spacing.
+- **[The joints collapse together]** A row within J columns of overflow loses every counted joint. → Named in decision 6;
+  the cost is at most J − 1 columns of spacing.
 - **[A fill cell next to a content cell can abut]** `[model, context]` puts the model's text hard against the context
-  cell's start, as it did under equal shares. → The joint is Joel's for two content-sized cells [R]; extending it is open
-  question 3.
+  cell's start, as it did under equal shares. → The joint is Joel's for two content-sized cells [R] and a fill cell is not content-sized: none there
+  (decision 6; open question 3, closed).
 - **[The probe's assumption]** `$bar` is the only width-reading variable [E §4]. → The probe-assumption guard in the table.
 - **[Three resolves per content cell per frame]** Not measured. → They are string formatting, pi-tui already renders each
   cell twice [CA §2], and the memo caps the count at three per sample; a measurement would be a task of Derek's report, not
@@ -351,9 +368,9 @@ kept as a twin that runs with `distribution: "equal"`.
 
 - *The fixture gains the option, the expectation is untouched.* These pin equal shares, which Joel's default no longer
   gives, so their rows declare `distribution: "equal"`; each passing unchanged is the evidence that the option reproduces
-  today. In `tests/row-renderer.test.ts`: "a width that divides evenly gives every cell the same columns" (:40), "a width
-  that does not divide evenly spends the remainder on the row's earliest cells" (:47), "the default row of ten cells at 132
-  spans all 132 columns" (:56), "short cell text is padded so the line spans the full width" (:86), the four alignment tests
+  today. In `tests/row-renderer.test.ts`: "a width that divides evenly gives every cell the same columns" (:46), "a width
+  that does not divide evenly spends the remainder on the row's earliest cells" (:53), "the default row of ten cells at 132
+  spans all 132 columns" (:63), "short cell text is padded so the line spans the full width" (:86), the four alignment tests
   at :92, :99, :109 and :118, "text wider than its cell renders identically under any alignment" (:127), the clip, wide-glyph
   and ANSI tests at :143, :157, :170, :183 and :221, "cell widths are recomputed when the width changes" (:257) and "each
   row seats its own basis on the first render" (:287). They test the cell's clip, pad and alignment inside an equal share,
@@ -388,8 +405,8 @@ kept as a twin that runs with `distribution: "equal"`.
 - ADR 0002 stays as accepted history; its decision ("Give each of a row's N cells `basis: floor(W / N)`…") becomes the
   `equal` option and no longer the default. Whether a new ADR supersedes it, and what the new ADR records (content sizing,
   the joint, the option), is the docs pass's call.
-- The living spec, by sync: the four modified requirements, plus spec l.100 and l.368 (see "What the specs must still
-  carry").
+- The living spec, by sync: the four modified requirements, plus spec l.368, whose wide-glyph scenario the delta modifies
+  (see "What the specs carry"). Spec l.100 needs nothing: it has no `floor(W / N)` scenario.
 - `AGENTS.md` and any other instruction file: only if Derek's report lists a sentence.
 
 ## What is deliberately not done
@@ -403,31 +420,33 @@ kept as a twin that runs with `distribution: "equal"`.
 - **Clickable cells, the other three cards, any edit to Joel's file** [proposal.md Impact, R].
 - **A fallback for a different allocator** (decision 11).
 
-## What the specs must still carry
+## What the specs carry
 
-The design builds the following and the delta does not yet say it; each wants a requirement or scenario before the
-tasks gate can trace a task to it:
+The items the design builds that the delta first lacked are now in `specs/statusline/spec.md`:
 
-1. **The row option's values and rejection** (decision 5): absent is `content`, `"equal"` restores shares, any other value
-   rejects the document naming the key and the value. [Spec: Cells are evenly distributed] has only "a row option".
-2. **Spec l.100 ("Cell content comes from an instrument") and l.368 ("A cell's alignment is the padding side inside it")**:
-   their scenarios still say `floor(W / N)` [proposal.md "Requirements this change revises"] and become false for the
-   default; they must be modified or their fixtures must declare the option.
-3. **Empty cells and the absorber**: an empty content cell takes 0 columns and never absorbs while a non-empty one
-   exists (decision 4); the delta says "the last left-aligned cell, else the first".
-4. **The joint beside an absorber, beside a fill cell, and its all-or-nothing collapse** (decision 6); the delta's one
-   collapse scenario is the right-aligned pair.
+1. **The row option's values and rejection** (decision 5): [Spec: Cells are evenly distributed] has the requirement
+   sentence and the scenarios for `"content"`, `"equal"`, a bad value, and a top-level `distribution` beside `rows`.
+2. **Spec l.368 ("A cell's alignment is the padding side inside it")**: its wide-glyph scenario said the cell still
+   occupies `floor(W / N)`; the delta modifies that requirement and the scenario now says the columns its row gave it.
+   Living l.100 does not say `floor(W / N)` and is untouched.
+3. **Empty cells and the absorber**: an empty cell takes 0 columns and never absorbs while a non-empty one exists
+   (decision 4); a scenario in [Spec: Cells are evenly distributed].
+4. **The joint beside an absorber, beside a fill cell, and its collapse** (decision 6): the placement rule is in [Spec: Two
+   neighbouring instruments]; the scenarios are in [Spec: Cells are evenly distributed].
 
 ## Open Questions
 
-1. **Joel:** does ten need a new reason, or should the ceiling be raised or removed now that no geometry argues for it?
-   (Decision 10. Changes no scenario here.)
-2. **Michael:** should the repository's `devDependencies` follow the host to 1.5.0, or stay pinned at 1.4.0 with the
-   scratch-copy run? (Decision 11. I chose to stay; it is his call on provability.)
-3. **Joel:** should the joint also separate a content cell from a neighboring fill cell, so `[model, context]` does not abut?
-   The ruling names two content-sized cells; today's equal shares abut in the same case. (Decisions 3 and 6.)
-4. **Joel or Michael:** should an unknown row key warn once, as `containers` does, so a misspelled `distribution` is not
-   silent? Not designed in because no requirement asks. (Decision 5.)
-5. **Eleanor:** does the parsed format reach the point where an instrument is bound, so `fills` is a read of the parse and
-   not a second parse? The placement within `visuals/` follows her answer; the fact and its consumer do not change.
+None remains open. The conductor ruled on three (scope and routing are the conductor's; Joel is told) and Michael's is
+decided.
+
+1. **Ten as the ceiling.** Kept at ten, resting on Joel's earlier acceptance only. No new reason exists and none is
+   invented ("Don't invent what we don't have to" [R 2026-11-03]). Changes no scenario. (Decision 10.)
+2. **The `devDependencies`.** They stay at 1.4.0, with one scratch run on 1.5.0. Decided: the allocator files are
+   byte-identical in both versions [CA §1, §2]. (Decision 11.)
+3. **A joint beside a fill cell.** None. Joel's ruling is *"one system space"* between *content-sized* neighbors [R
+   2026-11-07], and a fill cell is not content-sized, so the ruling gives none there. (Decisions 3 and 6.)
+4. **An unknown row key.** Behavior unchanged: silent, as today [E §5]. A warning on unknown row keys is adjacent and
+   would be its own change. (Decision 5.)
+5. **Where `fills` is read.** At `instrumentBindings` in `visuals/instrument-binding.ts`, which already holds the parsed
+   `segments` at bind time; `fills` reads the parse and no second parse exists [Michael's gate run `f8bac3ce`].
    (Decision 3.)
