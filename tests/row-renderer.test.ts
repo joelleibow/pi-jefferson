@@ -35,6 +35,7 @@ const readings: Readings = { provider: undefined, model: undefined, thinkingLeve
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
     id: "row-0",
+    distribution: "equal",
     cells: Array.from({ length: count }, () => ({ instrument: { render: () => text }, align: "left" as const })),
   };
 }
@@ -81,6 +82,7 @@ test("content wider than its cell is truncated to one line", () => {
 test("an instrument resolving text wider than its cell is clipped and stays one line", () => {
   const row: Row = {
     id: "row-0",
+    distribution: "equal",
     cells: [
       { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
       { instrument: { render: () => "thinking: high" }, align: "left" },
@@ -111,7 +113,7 @@ test("a left-aligned cell pads to the right of its text", () => {
 
 test("a right-aligned cell pads to the left of its text", () => {
   const line = lineAt(
-    { id: "row-0", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "right" as const })) },
     20,
   );
   assert.equal(line, composed("     ab", "     ab", "    ab"));
@@ -121,7 +123,7 @@ test("a right-aligned cell pads to the left of its text", () => {
 
 test("a centred cell splits its pad across both sides", () => {
   const line = lineAt(
-    { id: "row-0", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "center" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "ab").cells.map((cell) => ({ ...cell, align: "center" as const })) },
     20,
   );
   assert.equal(line, composed("  ab   ", "  ab   ", "  ab  "));
@@ -131,7 +133,7 @@ test("a centred cell splits its pad across both sides", () => {
 
 test("a centred cell's odd pad puts its extra column on the right", () => {
   const line = lineAt(
-    { id: "row-0", cells: rowOf(3, "abé").cells.map((cell) => ({ ...cell, align: "center" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "abé").cells.map((cell) => ({ ...cell, align: "center" as const })) },
     20,
   );
   // Only the third cell has an odd pad now: 3 columns split 1 before and 2 after.
@@ -143,6 +145,7 @@ test("a centred cell's odd pad puts its extra column on the right", () => {
 test("text wider than its cell renders identically under any alignment", () => {
   const row: Row = {
     id: "row-0",
+    distribution: "equal",
     cells: [
       { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
       { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
@@ -173,7 +176,7 @@ test("a wide glyph dropped by the clip leaves a pad that keeps the cell's width"
   assert.equal(visible(line), "ab漢\x1b[0m...ab漢\x1b[0m...ab\x1b[0m...\x1b[0m ");
   assert.equal(visibleWidth(line), 20);
   const right = lineAt(
-    { id: "row-0", cells: rowOf(3, "ab漢字cd").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "ab漢字cd").cells.map((cell) => ({ ...cell, align: "right" as const })) },
     20,
   );
   // Right-aligned, the pad leads and each cell's text ends in "\x1b[0m" with no pad after it, so
@@ -188,7 +191,7 @@ test("an emoji clipped at the boundary leaves a one-column pad", () => {
   assert.equal(visible(line), "ab😀\x1b[0m...ab😀\x1b[0m...ab\x1b[0m...\x1b[0m ");
   assert.equal(visibleWidth(line), 20);
   const right = lineAt(
-    { id: "row-0", cells: rowOf(3, "ab😀cdef").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "ab😀cdef").cells.map((cell) => ({ ...cell, align: "right" as const })) },
     20,
   );
   // As in the wide-glyph case, only the third cell needs the leading pad.
@@ -202,7 +205,7 @@ test("a combining mark is measured in columns, not code units", () => {
   assert.equal(visible(line), "abé    abé    abé   ");
   assert.equal(visibleWidth(line), 20);
   const right = lineAt(
-    { id: "row-0", cells: rowOf(3, "abé").cells.map((cell) => ({ ...cell, align: "right" as const })) },
+    { id: "row-0", distribution: "equal", cells: rowOf(3, "abé").cells.map((cell) => ({ ...cell, align: "right" as const })) },
     20,
   );
   assert.equal(visible(right), "    abé    abé   abé");
@@ -214,6 +217,7 @@ test("an ANSI-styled cell's pad carries no styling", () => {
   // one open per cell, and none between the cell's close and its pad.
   const styled = (text: string): Row => ({
     id: "row-0",
+    distribution: "equal",
     cells: Array.from({ length: 3 }, () => ({ instrument: { render: () => text }, align: "left" as const })),
   });
   for (const text of ["\x1b[31mab\x1b[0m", "\x1b[4mab"]) {
@@ -230,6 +234,7 @@ test("an ANSI-styled cell's pad carries no styling", () => {
 test("the host closes an open style between cells", () => {
   const row: Row = {
     id: "row-0",
+    distribution: "equal",
     cells: [
       { instrument: { render: () => "\x1b[4mabcdefghij" }, align: "left" },
       { instrument: { render: () => "cd" }, align: "right" },
@@ -245,6 +250,7 @@ test("the host closes an open style between cells", () => {
 test("wide glyphs and ANSI escapes are measured in visible columns, not string length", () => {
   const row: Row = {
     id: "row-0",
+    distribution: "equal",
     // String.length would under-pad the styled cell mid-line; allocation cannot repair it.
     cells: [
       { instrument: { render: () => "\x1b[31mab\x1b[0m" }, align: "left" },
@@ -293,6 +299,7 @@ test("the built-once tree keeps its cell memo when two renders share sample and 
   let resolves = 0;
   const footer = createFooter([{
     id: "row-0",
+    distribution: "equal",
     cells: [{ instrument: { render: () => { resolves++; return "kept"; } }, align: "left" }],
   }], () => readings, fakeTheme());
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
@@ -337,8 +344,8 @@ test("an instrument resolves once per (sample, width) within a render, and again
   };
   const footer = createFooter(
     [
-      { id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }, { instrument: capture, align: "left" }] },
-      { id: "row-1", cells: [{ instrument: capture, align: "left" }] },
+      { id: "row-0", distribution: "equal", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }, { instrument: capture, align: "left" }] },
+      { id: "row-1", distribution: "equal", cells: [{ instrument: capture, align: "left" }] },
     ],
     // A fresh object per call: identity can only hold if the render sampled once.
     () => ({ ...readings }),
@@ -364,6 +371,7 @@ test("invalidation drops cell memos and keeps the footer's three lines", () => {
   const capture: Instrument = { render: () => { resolves++; return "text"; } };
   const footer = createFooter([0, 1, 2].map((index) => ({
     id: `row-${index}`,
+    distribution: "equal",
     cells: [{ instrument: capture, align: "left" }],
   })), () => readings, fakeTheme());
   footer.invalidate();
@@ -382,7 +390,7 @@ test("two cells holding the model instrument resolve identical text", () => {
   const model: Instrument = { render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
   const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
-    [{ id: "row-0", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
+    [{ id: "row-0", distribution: "equal", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
     () => live,
     fakeTheme(),
   );
@@ -405,7 +413,7 @@ test("a push between two renders shows up in the next render and not before", ()
     readEntries: () => [],
   });
   const footer = createFooter(
-    [{ id: "row-0", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
+    [{ id: "row-0", distribution: "equal", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],
     () => store.sample(),
     fakeTheme(),
   );

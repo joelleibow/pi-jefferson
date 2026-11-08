@@ -988,3 +988,79 @@ test("theme invalidation re-styles the same footer with no bytes cached from the
   assert.equal(footer.render(20)[0], resized);
   assert.equal(styles, 4, "even invalidation without a theme change re-resolves");
 });
+
+test("every row carries a distribution, content by default", () => {
+  // Absent, and each of the two values, side by side in one rows list.
+  const listed = readDocument({ rows: [{}, { distribution: "content" }, { distribution: "equal" }] });
+  assert.equal(listed.warning, undefined);
+  assert.deepEqual(listed.rows.map((row) => row.distribution), ["content", "content", "equal"]);
+
+  // A top-level row document is a row, so the option reads there the same way.
+  const topLevel = readDocument({ cells: [{ instrument: "model" }], distribution: "equal" });
+  assert.equal(topLevel.warning, undefined);
+  assert.deepEqual(topLevel.rows.map((row) => row.distribution), ["equal"]);
+
+  // Both rows the extension makes for itself: the absent file, and a rejection's default row.
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
+  const absent = readConfiguration({
+    agentPath: join(dir, "pi-jefferson.json"),
+    projectPath: join(dir, "missing.json"),
+    projectTrusted: false,
+    theme: fakeTheme(),
+  });
+  assert.equal(absent.warning, undefined);
+  assert.deepEqual(absent.rows.map((row) => row.distribution), ["content"]);
+
+  const rejected = readDocument({ rows: [{ cells: [] }] });
+  assert.ok(rejected.warning, "a rejected document warns");
+  assert.deepEqual(rejected.rows.map((row) => row.distribution), ["content"]);
+});
+
+test("a distribution that is not one of the two rejects the whole document", () => {
+  for (const value of ["equl", "Equal", 4, null]) {
+    const { rows, warning } = readDocument({ rows: [{ distribution: value, cells: [{ instrument: "model" }] }] });
+    assert.equal(rows.length, 1, `${JSON.stringify(value)} rejects the whole document`);
+    assert.deepEqual(rows.map((row) => row.distribution), ["content"], "the default row renders");
+    assert.deepEqual(rows.map((row) => row.cells.length), [10]);
+    assert.ok(warning, "a rejected document warns");
+    assert.match(warning, /distribution/);
+    assert.ok(warning.includes(JSON.stringify(value)), `the warning names the value ${JSON.stringify(value)}`);
+    assert.ok(warning.includes('"content"') && warning.includes('"equal"'), "the warning lists both valid values");
+  }
+});
+
+test("within a row the distribution is read before the cells list, and the envelope before any row", () => {
+  const malformedTwice = readDocument({ rows: [{ distribution: "equl", cells: [] }] });
+  assert.ok(malformedTwice.warning, "a rejected document warns");
+  assert.match(malformedTwice.warning, /distribution/, "the distribution is reported");
+  assert.doesNotMatch(malformedTwice.warning, /empty cells/, "not the empty list behind it");
+
+  const instrumentFirst = readDocument({
+    instruments: { model: { format: 42 } },
+    cells: [{ instrument: "model" }],
+    distribution: "equl",
+  });
+  assert.ok(instrumentFirst.warning, "a rejected document warns");
+  assert.match(instrumentFirst.warning, /has a format that is not a string/, "the instruments are read before the row");
+  assert.doesNotMatch(instrumentFirst.warning, /distribution/);
+});
+
+test("a distribution beside a rows list rejects like a top-level cells or id", () => {
+  const valid = readDocument({ distribution: "equal", rows: [{ cells: [{ instrument: "model" }] }] });
+  assert.ok(valid.warning, "a rejected document warns");
+  assert.match(valid.warning, /both a top-level row and a rows list/);
+  assert.deepEqual(valid.rows.map((row) => row.distribution), ["content"], "the default row renders");
+  assert.deepEqual(valid.rows.map((row) => row.cells.length), [10]);
+
+  // The envelope check runs before any row is read, so a bad value beside `rows` says the same thing.
+  const alsoBad = readDocument({ distribution: "equl", rows: [{}] });
+  assert.ok(alsoBad.warning, "a rejected document warns");
+  assert.match(alsoBad.warning, /both a top-level row and a rows list/);
+  assert.doesNotMatch(alsoBad.warning, /distribution/);
+
+  // And a row that would reject says nothing either: the envelope answers first.
+  const malformedRow = readDocument({ id: "footer", rows: [{ cells: [] }] });
+  assert.ok(malformedRow.warning, "a rejected document warns");
+  assert.match(malformedRow.warning, /both a top-level row and a rows list/);
+  assert.doesNotMatch(malformedRow.warning, /empty cells/);
+});

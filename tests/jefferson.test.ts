@@ -308,7 +308,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   );
 
   const row = await import("../extensions/jefferson/visuals/row.ts");
-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);
+  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS", "DISTRIBUTIONS"]);
 
   const binding = await import("../extensions/jefferson/visuals/instrument-binding.ts");
   assert.deepEqual(Object.keys(binding).sort(), ["instrumentBindings"]);

@@ -19,7 +19,7 @@ import {
 
 import { blank, instrumentNamed } from "./visuals/instrument.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
-import { ALIGNMENTS, type Cell, type CellAlign, type Row } from "./visuals/row.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./visuals/row.ts";
 import {
   instrumentBindings,
   type BindInstrument,
@@ -29,6 +29,17 @@ import {
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
   return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
+}
+
+/** Whether a configuration value is one of `DISTRIBUTIONS`. */
+function isDistribution(value: unknown): value is Distribution {
+  return typeof value === "string" && DISTRIBUTIONS.some((distribution) => distribution === value);
+}
+
+/** A tuple's values as a message spells them: `"content" or "equal"`. */
+function orList(values: readonly string[]): string {
+  const quoted = values.map((value) => `"${value}"`);
+  return quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
 }
 
 /** The two resolved document paths and the caller's trust decision. */
@@ -109,7 +120,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
 }
 
 function defaultRow(bind: BindInstrument): Row {
-  return { id: "row-0", cells: blankCells(DEFAULT_CELLS, bind) };
+  return { id: "row-0", distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
 }
 
 function blankCells(count: number, bind: BindInstrument): Cell[] {
@@ -145,9 +156,7 @@ function cellsFromNames(names: readonly unknown[], index: number, notices: Notic
       throw new RejectedConfiguration(`row ${index} has an instrument that is not a non-empty string`);
     }
     if (alignValue !== undefined && !isAlign(alignValue)) {
-      const quoted = ALIGNMENTS.map((value) => `"${value}"`);
-      const list = quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
-      throw new RejectedConfiguration(`row ${index} has an align that is not ${list}: ${JSON.stringify(alignValue)}`);
+      throw new RejectedConfiguration(`row ${index} has an align that is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
     const instrument = instrumentNamed(instrumentValue);
@@ -172,6 +181,15 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
   }
   const row = raw as Record<string, unknown>;
 
+  // Read before its siblings: a row malformed in more than one place reports the distribution.
+  let distribution: Distribution = DISTRIBUTIONS[0];
+  if ("distribution" in row) {
+    if (!isDistribution(row.distribution)) {
+      throw new RejectedConfiguration(`row ${index} has a distribution that is not ${orList(DISTRIBUTIONS)}: ${JSON.stringify(row.distribution)}`);
+    }
+    distribution = row.distribution;
+  }
+
   // The key is not read, so it cannot corrupt the render; the warning is the honest signal.
   if ("containers" in row) notices.containers = true;
 
@@ -193,7 +211,7 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
     id = row.id;
   }
 
-  return { id, cells };
+  return { id, distribution, cells };
 }
 
 /** Normalize the document: one top-level row, or a list under `rows`; never both. */
@@ -205,7 +223,7 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): R
 
   let rawRows: unknown[];
   if ("rows" in doc) {
-    if ("cells" in doc || "id" in doc) {
+    if ("cells" in doc || "id" in doc || "distribution" in doc) {
       throw new RejectedConfiguration(
         "the configuration carries both a top-level row and a rows list",
       );

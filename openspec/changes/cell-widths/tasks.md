@@ -57,7 +57,7 @@ green on the real tree by Eleanor, in a scratch copy [EA A1-A5].
 The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the read, the rejection. Files: `visuals/row.ts`,
 `configuration.ts`; tests in `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/jefferson.test.ts`.
 
-- [ ] 1.1 **Every row carries a `distribution`, `"content"` by default.** Test first (`tests/configuration.test.ts`, with
+- [x] 1.1 **Every row carries a `distribution`, `"content"` by default.** Test first (`tests/configuration.test.ts`, with
   the bound rows read through `readConfiguration`): a row that declares no `distribution` reads `"content"`; `"content"`
   reads `"content"`; `"equal"` reads `"equal"`; a top-level row document (no `rows` list) declaring `"equal"` reads
   `"equal"`; the default row (an absent file, and a rejected document) reads `"content"`. Boundaries: absent, both values,
@@ -68,7 +68,7 @@ The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the r
   Setup, before the first edit: Derek records `BASE=$(git rev-parse HEAD)` in his report; `git merge-base --is-ancestor
   <the commit the brief names> HEAD` succeeds; `git status --porcelain` prints nothing (a clean tree). Source: [Spec: The
   row option's values], [D5].
-- [ ] 1.2 **Test fixtures that build `Row` literals declare `distribution: "equal"`, expectations untouched.** This lands
+- [x] 1.2 **Test fixtures that build `Row` literals declare `distribution: "equal"`, expectations untouched.** This lands
   in the same commit as 1.1, because `Row` now has a required field and `pnpm typecheck` is red until it does [EA B5].
   Test first: `pnpm typecheck` fails on `tests/row-renderer.test.ts` (`rowOf` and the 17 `id: "row-…"` literals, all
   built there and nowhere else). Edit only fixture lines: `rowOf` and each inline row gain the field. The export pin in
@@ -86,21 +86,21 @@ The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the r
   Red because today the key is ignored and the document is accepted. Verify: the new test passes. Mutation: accept any
   string and `"equl"` turns red; treat `null` as absent and the `null` case turns red. Source: [Spec: A distribution
   that is not one of the two], [D5].
-- [ ] 1.4 **Within a row `distribution` is checked first, and the whole order is envelope, instruments, row.** Test first
+- [x] 1.4 **Within a row `distribution` is checked first, and the whole order is envelope, instruments, row.** Test first
   (`tests/configuration.test.ts`): a row with `distribution: "equl"` and an empty `cells` list reports the distribution
   warning, not the empty-cells one; a document with a bad instrument option and a bad `distribution` reports the
   instrument option. The existing precedence test (`configuration.test.ts` rejection precedence, "envelope → instruments
   → cells") passes unedited. Boundaries: two malformed things in one row; one in the instruments and one in the row.
   Red because the first case reports the empty-cells reason today. Mutation: read `distribution` after `cells` and the
   first case turns red. Source: [D5 "Validation"; E §7 `configuration.test.ts:864`].
-- [ ] 1.5 **A top-level `distribution` beside `rows` rejects like a top-level `cells` or `id`.** Test first
+- [x] 1.5 **A top-level `distribution` beside `rows` rejects like a top-level `cells` or `id`.** Test first
   (`tests/configuration.test.ts`): a document with `"distribution": "equal"` and a `rows` list is rejected, the default
   row renders, and the warning says the configuration carries both a top-level row and a rows list; the same document
   whose `distribution` is also bad (`"equl"`) gives that same warning, because the envelope check runs before any row is
   read. Boundaries: a valid value beside `rows`; an invalid one beside `rows`. Red because the key is ignored silently
   today [D5; E §5]. Mutation: move the envelope check after the row reads and the bad-value case reports the
   distribution instead (red). Source: [Spec: A distribution beside rows], [D5 "Beside `rows`"].
-- [ ] 1.6 **No cell key is added and the ceiling stays ten.** Characterization; no code. The existing tests pass without
+- [x] 1.6 **No cell key is added and the ceiling stays ten.** Characterization; no code. The existing tests pass without
   an edit: `configuration.test.ts` "unrecognised cell key" (still naming `"width"`), "every cell carries an instrument
   and an alignment" (exactly `["instrument", "align"]`), and the ceiling test (`DEFAULT_CELLS === 10`, `MAX_CELLS === 10`)
   [D3 "No per-cell override", D10, E §7]. Verify:
