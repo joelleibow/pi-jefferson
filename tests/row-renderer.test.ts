@@ -428,3 +428,131 @@ test("a push between two renders shows up in the next render and not before", ()
   assert.equal(second, composed(...Array<string>(2).fill("gpt-5".padEnd(13))), "both cells see the pushed value");
   assert.equal(handed[0]?.model, "claude-opus-4", "the first render's object kept its values");
 });
+
+/** A content-distribution row: one fake instrument per cell, holding the given text. */
+function contentRow(cells: Array<{ text: string; align?: "left" | "right" | "center" }>): Row {
+  return {
+    id: "row-0",
+    distribution: "content",
+    cells: cells.map(({ text, align = "left" }) => ({ instrument: { fills: false, render: () => text }, align })),
+  };
+}
+
+test("a content cell takes the width its text needs", () => {
+  // The left-aligned cell is the absorber, so its spare columns sit after its text and the
+  // right-aligned neighbour is exactly its text's width.
+  const line = lineAt(contentRow([{ text: "ab" }, { text: "cdef", align: "right" }]), 40);
+  assert.equal(line, composed("ab" + " ".repeat(34), "cdef"));
+  assert.equal(visibleWidth(line), 40);
+
+  const one = lineAt(contentRow([{ text: "ab" }]), 20);
+  assert.equal(one, composed("ab".padEnd(20)));
+  assert.equal(visibleWidth(one), 20);
+
+  // W equals the two texts' widths: nothing is left to absorb and nothing separates them.
+  const exact = lineAt(contentRow([{ text: "ab" }, { text: "cdef", align: "right" }]), 6);
+  assert.equal(exact, composed("ab", "cdef"));
+  assert.equal(visibleWidth(exact), 6);
+});
+
+test("content width is measured in columns, whatever the text holds", () => {
+  // Each payload with the columns it occupies: a wide emoji, a wide BMP glyph, a combining mark,
+  // and the same two letters wrapped in a style. None of them is its string length.
+  const payloads: Array<[string, number]> = [
+    ["🧠 ab", 5],
+    ["漢ab", 4],
+    ["e\u0301ab", 3],
+    ["\x1b[31mab\x1b[0m", 2],
+  ];
+  for (const [text, columns] of payloads) {
+    // The neighbour of a wide or styled text starts at the same column as of a plain one: the
+    // right-aligned cell is exactly its own two columns.
+    const line = lineAt(contentRow([{ text }, { text: "xy", align: "right" }]), 20);
+    assert.equal(line, composed(text + " ".repeat(18 - columns), "xy"), `${JSON.stringify(text)} is ${columns} columns`);
+    assert.equal(visibleWidth(line), 20);
+
+    // At W exactly the two texts' columns there is nothing to absorb and nothing is clipped: the
+    // first text is whole and the neighbour's two columns follow it, so S is 0.
+    const exact = lineAt(contentRow([{ text }, { text: "xy", align: "right" }]), columns + 2);
+    // The host's framing merges with a text's own closing reset, so this reads the line with every
+    // escape stripped: what a reader sees is the text, whole, then the neighbour's two columns.
+    const plain = (value: string): string => visible(value).replace(/\x1b\[[0-9;]*m/g, "");
+    assert.equal(visibleWidth(exact), columns + 2, `the line is ${columns + 2} columns at ${JSON.stringify(text)}`);
+    assert.equal(plain(exact), plain(text) + "xy", "the text is whole and the neighbour follows it with no pad");
+    assert.ok(!plain(exact).includes("..."), "no ellipsis when the text exactly fits");
+  }
+});
+
+test("the probe is taken at width 0, not at the row's width", () => {
+  // This text is 40 columns wide only when it is asked at 40, the row's own width: a probe at the
+  // row width would be the only render that carries the '#', and it would reach the line.
+  const spiky: Instrument = {
+    fills: false,
+    render: (_readings: Readings, width: number) => width === 40 ? "ab" + "#".repeat(38) : "ab",
+  };
+  const row: Row = {
+    id: "row-0",
+    distribution: "content",
+    cells: [{ instrument: spiky, align: "left" }, { instrument: { fills: false, render: () => "cd" }, align: "right" }],
+  };
+  const line = lineAt(row, 40);
+  // The final text is resolved at the cell's own allocated width (38), never at the row's.
+  assert.equal(line, composed("ab" + " ".repeat(36), "cd"));
+  assert.equal(visible(line).includes("#"), false, "the row's own width never reaches the measure");
+  assert.equal(visibleWidth(line), 40);
+});
+
+/** One cell of a content row, its fake instrument reporting whether it fills. */
+function cellOf(
+  text: string,
+  { fills = false, align = "left" }: { fills?: boolean; align?: "left" | "right" | "center" } = {},
+): Row["cells"][number] {
+  return { instrument: { fills, render: () => text }, align };
+}
+
+function rowOfCells(cells: Row["cells"]): Row {
+  return { id: "row-0", distribution: "content", cells };
+}
+
+test("blank and bar cells fill and share the rest, differing by at most one", () => {
+  // Joel's second row: three fill cells at 100 take 34, 33, 33 — the first takes the remainder.
+  const thirds = lineAt(rowOfCells([
+    cellOf("a", { fills: true }),
+    cellOf("b", { fills: true }),
+    cellOf("c", { fills: true }),
+  ]), 100);
+  assert.equal(visibleWidth(thirds), 100);
+  assert.equal(visible(thirds), "a".padEnd(34) + "b".padEnd(33) + "c".padEnd(33));
+
+  // A content cell at its text's width leaves the two fills the rest, the earlier one taking the
+  // remainder column: 30 + 31 + 29.
+  const mixed = lineAt(rowOfCells([
+    cellOf("a", { fills: true }),
+    cellOf("x".repeat(31)),
+    cellOf("b", { fills: true }),
+  ]), 90);
+  assert.equal(visibleWidth(mixed), 90);
+  assert.equal(visible(mixed), "a".padEnd(30) + "x".repeat(31) + "b".padEnd(29));
+
+  // A fill cell's own text is not its width: the row lays out as though it held nothing.
+  const longText = lineAt(rowOfCells([
+    cellOf("y".repeat(20), { fills: true }),
+    cellOf("b", { fills: true }),
+    cellOf("c", { fills: true }),
+  ]), 100);
+  assert.equal(visibleWidth(longText), 100);
+  assert.equal(visible(longText), "y".repeat(20).padEnd(34) + "b".padEnd(33) + "c".padEnd(33));
+});
+
+test("an empty cell takes no column and does not change where any text sits", () => {
+  const two = lineAt(rowOfCells([cellOf("path"), cellOf("model", { align: "right" })]), 80);
+  const three = lineAt(rowOfCells([cellOf("path"), cellOf("model", { align: "right" }), cellOf("")]), 80);
+  assert.equal(three, two, "a last empty cell adds no column and moves no text");
+  assert.equal(visibleWidth(three), 80);
+  assert.equal(visible(three), "path" + " ".repeat(71) + "model", "the left-aligned path cell absorbs");
+
+  // Nothing renders text at all: the first cell takes the row, though it holds nothing.
+  const allEmpty = lineAt(rowOfCells([cellOf("", { align: "right" }), cellOf("", { align: "right" })]), 80);
+  assert.equal(visibleWidth(allEmpty), 80);
+  assert.equal(visible(allEmpty), " ".repeat(80));
+});

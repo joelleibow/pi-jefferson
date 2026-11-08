@@ -217,7 +217,7 @@ The tests of 4.1, 4.5 and 4.6 are written together and are red together against 
 its red case); each ticks when its own behavior is green. 4.3 and 4.4 pin decisions 4.1's code makes and are
 characterization.
 
-- [ ] 4.0 **The end-to-end tests that pin equal shares declare `equal`, and the one that mixes a content cell and a bar
+- [x] 4.0 **The end-to-end tests that pin equal shares declare `equal`, and the one that mixes a content cell and a bar
   keeps its old string as a twin.** Test first: green already, because the footer still lays out equal shares; this is
   the step that keeps the suite green when 4.1 flips the default. In `tests/jefferson.test.ts` the documents of the three tests that pin per-cell equal strings (five assertions) gain `"distribution": "equal"`, expectations untouched: the `padEnd(40)` pair
   (`:587`, `:592`) and `padEnd(80)` (`:610`) in "a dispatched turn boundary…" and "an unchanged turn boundary before the
@@ -226,7 +226,7 @@ characterization.
   ruling that legitimises each: Joel's default and its opt-out [R 2026-11-07], and each of these tests' subject is repaint,
   the cache or session replacement, not geometry. Derek's report names the twin. Mutation: none
   here; the evidence is A1 printing only the pin line and the suite green.
-- [ ] 4.1 **A content cell takes the width its text needs, and the footer asks for it at width 0.** Test first
+- [x] 4.1 **A content cell takes the width its text needs, and the footer asks for it at width 0.** Test first
   (`tests/row-renderer.test.ts`, rows declaring `"content"`): `[L "ab", R "cdef"]` at 40 renders `ab`, 34 spaces,
   `cdef`; `[L "ab"]` at 20 renders `ab` and 18 spaces; at 6 the same two cells render `ab` and `cdef` with no space
   between (W equals the text widths). Plus the same flip in `tests/jefferson.test.ts`: the assertion at `:551` becomes
@@ -239,14 +239,14 @@ characterization.
   Boundaries: two cells, one cell, W equal to the text widths. Verify: the new tests pass; every test under `equal` still
   passes. Mutation: seat `floor(W / N)` for every row and the `[L "ab", R "cdef"]` test turns red. Source: [Spec: The
   default gives each cell what its content needs; Content narrower than the row], [R 2026-11-07 "The default"].
-- [ ] 4.2 **A row declaring `equal` is not probed and lays out as it always did.** Characterization: the existing
+- [x] 4.2 **A row declaring `equal` is not probed and lays out as it always did.** Characterization: the existing
   test "an instrument resolves once per (sample, width) within a render, and again in the next render" (base `:330`, widths
   `[30, 30, 30, 10, 10, 10, 30]`) and the equal-string tests of 1.2 stay green with their expectations untouched; the
   plan's `equal` branch seats `floor(W / N)` and `grow` 1. Verify: **A1** prints only the `:311` pin line, and the sequence test passes
   with its original array. Mutation: an `equal` row probes at width 0 and the sequence test turns red in its first
   entry; an `equal` row applies a joint and a right-aligned `equal` fixture string changes. Source: [Spec: A width that
   divides evenly… with the row option that restores equal shares], [D4 step 1; design guards table, "Equal distribution reproduces today"].
-- [ ] 4.3 **Content width is measured in columns, whatever the text holds.** Characterization of what 4.1 builds (the
+- [x] 4.3 **Content width is measured in columns, whatever the text holds.** Characterization of what 4.1 builds (the
   probe's measure is `visibleWidth`): the test passes on first run, and its failing side is the mutation. Test
   (`tests/row-renderer.test.ts`): `[L "🧠 ab", R "xy"]` at 20 puts `xy` at the last two columns and the first cell's text
   starts at column 0, whole, with no ellipsis; the same with `漢ab`, with `e` plus a combining mark (`é`), and with the
@@ -255,21 +255,21 @@ characterization.
   label, a wide BMP glyph, a combining mark, ANSI styling, S=0. Mutation: measure `.length` and the combining-mark, wide
   and styled cases turn red, by columns. Source: [Spec: Cell widths are measured in terminal columns, both scenarios],
   [D2], [E §1, M 2h].
-- [ ] 4.4 **The probe is taken at width 0, unpadded and unclipped, not at the row's width.** Characterization of 4.1,
+- [x] 4.4 **The probe is taken at width 0, unpadded and unclipped, not at the row's width.** Characterization of 4.1,
   same form. Test: a fake instrument not marked as filling that renders `ab` at every width except the row's own, 40,
   where it renders `ab` plus 38 `#` (40 columns), in `[L it, R "cd"]` at 40: the final text is resolved at the cell's
   allocated width, 38 [D8], so the line is `ab`, 36 spaces, `cd`, with `cd` at the last two columns and no `#` anywhere.
   A probe at 40 would be the only render that carries `#`. A second fake whose text at width 0 is 120 columns, in a row at 80, is measured whole,
   not clipped first: 6.1's three-cells-of-40 case covers the clip. Mutation: probe at the row's width and the cell
   claims the whole row, so `cd` is displaced (red). Source: [D2 "Why width 0"; M 2a; CA §1(d), §2].
-- [ ] 4.5 **`blank` and `$bar` cells fill and share the rest, differing by at most one.** Test first
+- [x] 4.5 **`blank` and `$bar` cells fill and share the rest, differing by at most one.** Test first
   (`tests/row-renderer.test.ts`, fakes marked as filling): `[F, F, F]` at 100 where the cells render `a`, `b`, `c` starts
   them at columns 0, 34 and 67 (34/33/33); `[F, L31, F]` at 90 lays out 30, 31 and 29 columns (the first fill takes the
   remainder), with the content cell at its text's width; `[F(n=20), F, F]` at 100 gives the same 34/33/33 as 3.4. The
   line is 100 and 90 columns wide. Boundaries: G=3 with a remainder of 1, G=2 with a remainder of 1, a fill with a long
   text. Red against the footer as 4.0 leaves it: `[F, L31, F]` at 90 gives three cells of 30, not 30, 31 and 29. Mutation: a fill keeps its natural width and the `n=20` case
   turns red. Source: [Spec: Joel's second row keeps its thirds; A blank cell and a bar cell fill], [D3, D4].
-- [ ] 4.6 **An empty cell takes no column and does not change where any text sits.** Test first
+- [x] 4.6 **An empty cell takes no column and does not change where any text sits.** Test first
   (`tests/row-renderer.test.ts`): the line of `[L "path", R "model", L ""]` at 80 equals the line of
   `[L "path", R "model"]` at 80, and the empty cell is allocated 0 columns; a row `[R "", R ""]` at 80 renders one line
   of 80 columns (the first cell, though empty, takes the spare columns). Red against the footer as 4.0 leaves it, where the empty cell takes a third of the row. The input that separates right from wrong:

@@ -551,6 +551,26 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
   const line = session.lines(80)[0] ?? "";
+  // The rule's arithmetic, not the output: the model cell takes its text's columns, the `$bar`
+  // cell takes the rest of the row, and the bar splits its cell's columns by the percent.
+  const model = "🧠: claude-opus-4 from anthropic";
+  const bar = 80 - visibleWidth(model) - visibleWidth("43.2% ");
+  const filled = Math.floor((43.2 / 100) * bar);
+  assert.equal(stripTerminalSequences(line), model + "43.2% " + "█".repeat(filled) + "░".repeat(bar - filled));
+  assert.equal(visibleWidth(line), 80);
+  assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
+  assert.deepEqual(session.notified, []);
+});
+
+test("configured formats, styles and a width-taking bar render end to end under equal distribution", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { model: { format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { format: "$percent $bar", style: { fg: "accent" } } },
+    distribution: "equal",
+    cells: [{ instrument: "model" }, { instrument: "context" }],
+  });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+  const line = session.lines(80)[0] ?? "";
   assert.equal(stripTerminalSequences(line), "🧠: claude-opus-4 from anthropic".padEnd(40) + "43.2% " + "█".repeat(14) + "░".repeat(20));
   assert.equal(visibleWidth(line), 80);
   assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
@@ -584,7 +604,7 @@ function usageEntry(input: number, cost: number): SessionEntry {
 
 test("a dispatched turn boundary repaints only changed totals and its scan is reused by the footer", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
+  writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
   const h = harness();
   const session = await h.start();
   assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(40) + "$0.000".padEnd(40));
@@ -604,7 +624,7 @@ test("a dispatched turn boundary repaints only changed totals and its scan is re
 
 test("an unchanged turn boundary before the first render leaves the install-time cache filled without repainting", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "tokens" }] });
+  writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }] });
   const h = harness();
   const session = await h.start();
   h.dispatch({ type: "turn_end" });
@@ -619,6 +639,7 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
     const agentDir = useTempAgentDir(t);
     writeAgentDocument(agentDir, {
       instruments: { model: { format: "$model" }, thinking: { format: "$level", label: "" } },
+      distribution: "equal",
       cells: Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] })),
     });
     const root = mkdtempSync(join(tmpdir(), "jefferson-replacement-"));
