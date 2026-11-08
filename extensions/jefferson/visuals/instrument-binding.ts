@@ -28,6 +28,8 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
       const labelled: FormatSegment[] = label === "" ? segments
         : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
       instrument = {
+        // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
+        fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),
         render: (readings, width, renderTheme) => resolveFormat(declaration, labelled, style, readings, width, renderTheme),
       };
       bound.set(declaration.name, instrument);

@@ -171,8 +171,8 @@ test("formats and data carrying controls keep three clipped footer rows at one l
   const declaration = named("model");
   const segments = parseFormat(declaration, "L\n$model");
   let readings = { ...seed, model: "a\r\t\x1bb" };
-  const instrument = { render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
-  const footer = createFooter([0, 1, 2].map(index => ({ id: `row-${index}`, cells: [{ instrument, align: "left" }] })), () => readings, fakeTheme());
+  const instrument = { fills: false, render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
+  const footer = createFooter([0, 1, 2].map(index => ({ id: `row-${index}`, distribution: "equal" as const, cells: [{ instrument, align: "left" }] })), () => readings, fakeTheme());
   const lines = footer.render(6);
   assert.equal(lines.length, 3);
   for (const line of lines) {

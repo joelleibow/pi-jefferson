@@ -1,0 +1,28 @@
+# Owner Rulings
+
+Joel's rulings for this change, quoted and dated. Binding, and newer than any other artifact in this change directory.
+
+## 2026-11-07 — What the change is
+
+- **The objective.** Shown his footer, where the model cell and the thinking cell each sit right-aligned inside their own equal share of the row and leave a gap between them, he asked for another conductor round: *"...a /skill:conductor-janet round that takes on the issues with equally distributed cells like in this screen cap."* And: *"Essentially a way to allow for cells to fill no more than the width they need to display their content and neighboring cells then appear butted against them. What that screen cap is showing the the change is hoping for is to have the 🧠 cell and the 🤔 cell to appear as if they're a single cell."* **The change is a way for a cell to take no more width than its content needs, so that neighboring cells sit against it; his target is the model cell and the thinking cell reading as one cell.**
+- **He wants the ideal solution and the range of flexibility, not a quick one.** *"I'm very curious what the ideal solution is for this and what flexibility we can provide."* **Options are weighed on what the ideal shape is and what flexibility it offers a user; the council brings him the options and their costs.**
+- **The same complaint, as first stated.** On 2026-11-06, of his top row: *"I can't figure out how to get the right 2 cells in my top row to not have all that space because of the right alignment. I want those two instruments to be right next to each other and right aligned so I can put the `cwd` on the far left of the row."* **Two right-aligned neighbors sit adjacent at the row's right edge, with the working directory at the far left.**
+- **This is the one card.** It is the cell-grouping card on the pi-jefferson board, run as its own change. The cards for default labels on every shipped instrument, an instrument for every datum pi provides, and thresholds on the context instrument are separate changes.
+
+## 2026-11-07 — The council's three calls
+
+Asked the joint, the default and the mechanism, with the council's options and costs in front of him, he ruled:
+
+- **The joint: one system space that collapses when narrow.** He chose *"One system space, collapses when narrow"*, shown as `🧠 claude-opus-5-5 via Anthropic 🤔 Max` with one system space between the two cells so the pair reads as one cell. **When two content-sized cells meet with no spare room between them, the system supplies one column between them; on a row too narrow for it, the column gives way before any content does.**
+- **The default: content-sized cells, with a row-level option to restore equal distribution.** *"The combination of 1 and 3 seems the most flexible. By default, it behaves as #1 and a config option on the row can allow for the cells to get equal distribution as we started with as the default. It's a breaking change but we're still pre 1.0.0 so this is acceptable for the time being."* (His 1 is every cell except `blank` and `$bar` sizing to its content; his 3 is a way to opt out.) **By default every cell except `blank` and `$bar` cells takes the width its content needs; a configuration option on the row restores the equal distribution that exists today. The break to existing rows is accepted.** He specified the option on the row; whether a per-cell override is also needed is for the design to show a requirement for.
+- **The mechanism: content-width cells.** *"Content-width cells is what I'd like to have."* **The council's option A is the mechanism; a cell holding several instruments (option B) is not taken.**
+- **Scope: content-width cells only, to start.** He added, of composing custom instruments from variables and visualizations such as `$bar`: *"Including the ability to create custom instruments from all variables and visualizations like $bar would be an added benefit. I tried the multi-instrument kind of way already and was surprised to hit a warning when I did an instrument called "llm" and set { "label": "🧠", "format": "$model via|dim $provider 🤔 $thinking|capitalize" }. That might be out of scope for what we're doing right now though. perhaps we start with just content-width cells?"* The conductor ruled it out of this change, per the conductor's scope authority: **this change is content-width cells; composing custom instruments is its own card on the board.** His observation of the warning is kept for that card.
+
+## Earlier rulings this change inherits (as quoted in the brain's pi-jefferson page, and in his words this session)
+
+- 2026-11-07: *"A user shouldn't have to configure any more than truly necessary."* A default that looks right beats a setting.
+- 2026-11-03: *"Don't invent what we don't have to."* And on the layout: *"That lets pi-tui do its thing and we are spared anything that risks us having bugs."*
+- 2026-11-05: *"Don't discourage folks from experimenting but also don't break the concepts the package aims to provide as features."* A row is one line whatever a format contains; that guarantee belongs to the cell.
+- 2026-11-03, the vocabulary: a row holds cells and a cell holds an instrument. *"`module` and `widget` are rejected words."* Where another system's name is useful to report, it is reported as theirs.
+- Breaks are cheap before 1.0 (0.2.0 and 0.3.0 each broke the shape of `cells` with no shim: *"that's okay since we're in pre release"*).
+- 2026-11-06: his `~/.pi/agent/pi-jefferson.json` is his preferred setup and is never edited by a task; a check that needs a configuration uses a scratch agent directory.

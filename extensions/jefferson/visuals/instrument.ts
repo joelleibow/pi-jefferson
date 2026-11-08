@@ -8,6 +8,8 @@ export const DEFAULT_CELL_TEXT =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor";
 
 export interface Instrument {
+  /** Whether the cell holding it fills the columns its row leaves, rather than taking its content's. */
+  readonly fills: boolean;
   render(readings: Readings, width: number, theme: Theme): string;
 }
 
@@ -15,6 +17,8 @@ export interface InstrumentDeclaration {
   readonly name: string;
   readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
   readonly bar?: (readings: Readings) => number | null;
+  /** A declaration that fills in every format. A `$bar` in the format fills without saying so. */
+  readonly fills?: boolean;
   readonly defaultFormat: string;
   readonly defaultLabel?: string;
   readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
@@ -39,6 +43,7 @@ export const blank: InstrumentDeclaration = {
   name: "blank",
   variables: {},
   defaultFormat: DEFAULT_CELL_TEXT,
+  fills: true,
   options: FOUNDATIONAL_OPTIONS,
 };
 
