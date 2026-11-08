@@ -32,15 +32,22 @@ export function createFooter(
   theme: Theme,
 ): Footer {
   let current: Readings = sampleReadings();
-  let lastWidth: number | undefined;
 
   const cellView = (cell: Cell, joint: () => boolean): CellView => {
-    let cached: { sample: Readings; width: number; text: string } | undefined;
+    // One text per width for the current sample: a frame asks for the probe's width, the host's
+    // measure and the cell's allocation, and a repeat render of the same sample asks for nothing.
+    let sample: Readings | undefined;
+    let texts = new Map<number, string>();
     const textAt = (width: number): string => {
-      if (cached?.sample !== current || cached?.width !== width) {
-        cached = { sample: current, width, text: cell.instrument.render(current, width, theme) };
+      if (sample !== current) {
+        sample = current;
+        texts = new Map();
       }
-      return cached.text;
+      const cached = texts.get(width);
+      if (cached !== undefined) return cached;
+      const text = cell.instrument.render(current, width, theme);
+      texts.set(width, text);
+      return text;
     };
     return {
       fills: cell.instrument.fills,
@@ -57,7 +64,8 @@ export function createFooter(
         return [leading + clipped + trailing];
       },
       invalidate() {
-        cached = undefined;
+        sample = undefined;
+        texts = new Map();
       },
     };
   };
@@ -83,6 +91,13 @@ export function createFooter(
           },
         })),
       ),
+      /** Whether the row is already seated with these entry options, column for column. */
+      seated(plan: PlannedCell[]): boolean {
+        return seats.length === plan.length && plan.every((cell, index) => {
+          const held = seats[index]!;
+          return cell.basis === held.basis && cell.grow === held.grow;
+        });
+      },
       seat(plan: PlannedCell[]): void {
         seats = plan;
         stack.clear();
@@ -99,9 +114,11 @@ export function createFooter(
   return {
     render(width) {
       current = sampleReadings();
-      if (width !== lastWidth) {
-        for (const view of rowViews) view.seat(view.plan(width));
-        lastWidth = width;
+      // Every render plans its rows, because a cell's content decides its columns: a row re-seats
+      // when the width or any cell's basis or grow differs from what it was last laid out with.
+      for (const view of rowViews) {
+        const plan = view.plan(width);
+        if (!view.seated(plan)) view.seat(plan);
       }
       return tree.render(width);
     },

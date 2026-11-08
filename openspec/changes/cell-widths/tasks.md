@@ -369,7 +369,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
 
 ## 7. The memo and the re-seat
 
-- [ ] 7.1 **A second render of the same sample asks for nothing new.** Test first (`tests/row-renderer.test.ts`):
+- [x] 7.1 **A second render of the same sample asks for nothing new.** Test first (`tests/row-renderer.test.ts`):
   Joel's top row at 100, `[L15, R32, R6]` (allocated 61, 32 and 7), three call-counting fake instruments; after the first
   render each instrument resolved once at each of three widths (0, 100 and its allocation); after a second render of the
   same sample each count is unchanged. The input that makes right and wrong differ: three cells whose allocated width
@@ -377,13 +377,13 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   Red against the one-slot memo (`[80, 80, 40, 40]` per frame [M 2b, CA §2]). Deliverable: each cell's memo holds the
   sample and a map from width to text; a new sample and `invalidate()` empty it [D8]. Mutation: restore the one slot and
   the second render's counts rise (red). Source: [Spec: Two renders; The footer's tree is built once…], [D8].
-- [ ] 7.2 **A new sample, or `invalidate()`, drops every cached width.** Test first: a fake whose text is `ab` for
+- [x] 7.2 **A new sample, or `invalidate()`, drops every cached width.** Test first: a fake whose text is `ab` for
   sample A and ten columns for sample B, rendered at the same W after a new sample: the second line shows the whole
   ten-column text; `invalidate()` followed by a render resolves once per width again. The existing tests "invalidation drops
   cell memos and keeps the footer's three lines" and "a push between two renders shows up in the next render and not
   before" stay green under their `equal` rows. Mutation: a map that survives a new sample shows `ab` (red). Source:
   [Spec: A push between two renders; The host invalidates the footer], [D8].
-- [ ] 7.3 **The row re-seats when a cell's basis changes, not only when the window does.** Test first: a footer rendered at
+- [x] 7.3 **The row re-seats when a cell's basis changes, not only when the window does.** Test first: a footer rendered at
   100 with `thinking` text of 7 columns and then, with a new sample, 6 columns (`High` to `Max`), over `[L15, R32, R7]` then `[L15, R32, R6]`:
   the second line equals a fresh footer's line for the 6-column text: the `thinking` text ends at column 100 and the
   `model` text ends exactly one column before it starts. The input that separates right from wrong: shorter text, so a stale
@@ -391,7 +391,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   compares each render's plan with the options it last seated and re-seats when the width or any `basis` or `grow`
   differs [D9]. Mutation: gate on the width only and the line has two spaces between the texts (red). Source: [Spec: A
   cell's content changes width], [D9, M 2i].
-- [ ] 7.4 **A resize re-seats the default row.** Test first: the default-distribution twin of "cell widths are recomputed
+- [x] 7.4 **A resize re-seats the default row.** Test first: the default-distribution twin of "cell widths are recomputed
   when the width changes": `[L15, R32, R6]` at 100, then at 90, equals a fresh footer's line at 90, and no cell keeps a
   width from 100. Boundary: a resize with the same content. Mutation: never re-seat and the 90-column line is 100
   wide (red). Source: [Spec: The terminal is resized (both)], [D9].

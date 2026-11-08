@@ -775,3 +775,96 @@ test("align in a content cell with no spare columns changes nothing", () => {
   assert.equal(lines[1], lines[0], "right renders the same columns as left");
   assert.equal(lines[2], lines[0], "center renders the same columns as left");
 });
+
+test("a second render of the same sample asks for nothing new", () => {
+  const calls: Record<string, number[]> = { a: [], b: [], c: [] };
+  const fake = (name: "a" | "b" | "c", text: string): Instrument => ({
+    fills: false,
+    render: (_readings: Readings, width: number) => {
+      calls[name]!.push(width);
+      return text;
+    },
+  });
+  const footer = createFooter([rowOfCells([
+    { instrument: fake("a", "a".repeat(15)), align: "left" },
+    { instrument: fake("b", "b".repeat(32)), align: "right" },
+    { instrument: fake("c", "c".repeat(6)), align: "right" },
+  ])], () => readings, fakeTheme());
+
+  footer.render(100);
+  // One resolve per width each: the probe, the host's measure, and the allocated width — and the
+  // allocated widths are not the row's, which is what the old one-slot memo could not hold.
+  assert.deepEqual(calls.a, [0, 100, 61]);
+  assert.deepEqual(calls.b, [0, 100, 32]);
+  assert.deepEqual(calls.c, [0, 100, 7]);
+
+  footer.render(100);
+  assert.deepEqual(calls.a, [0, 100, 61], "the same sample at the same width asks nothing new");
+  assert.deepEqual(calls.b, [0, 100, 32]);
+  assert.deepEqual(calls.c, [0, 100, 7]);
+});
+
+test("a new sample, or invalidate(), drops every cached width", () => {
+  let resolves = 0;
+  const fake: Instrument = {
+    fills: false,
+    render: (sample: Readings) => {
+      resolves += 1;
+      return sample.model === "second" ? "y".repeat(10) : "ab";
+    },
+  };
+  let current: Readings = { ...readings, model: "first" };
+  const footer = createFooter([rowOfCells([{ instrument: fake, align: "left" }])], () => current, fakeTheme());
+
+  assert.equal(visible(footer.render(20)[0] ?? ""), "ab".padEnd(20));
+  current = { ...readings, model: "second" };
+  assert.equal(
+    visible(footer.render(20)[0] ?? ""),
+    "y".repeat(10).padEnd(20),
+    "the new sample's text, whole: nothing cached from the sample before it survives",
+  );
+
+  const afterNewSample = resolves;
+  footer.render(20);
+  assert.equal(resolves, afterNewSample, "and a repeat render of that sample asks nothing new");
+
+  footer.invalidate();
+  footer.render(20);
+  assert.ok(resolves > afterNewSample, "invalidation drops the cached text, so the next render resolves again");
+  const afterInvalidate = resolves;
+  footer.render(20);
+  assert.equal(resolves, afterInvalidate, "and the cache fills again");
+});
+
+test("the row re-seats when a cell's basis changes, not only when the window does", () => {
+  let thinking = "t".repeat(7);
+  let current: Readings = readings;
+  const cells = (): Row["cells"] => [
+    { instrument: { fills: false, render: () => "a".repeat(15) }, align: "left" },
+    { instrument: { fills: false, render: () => "b".repeat(32) }, align: "right" },
+    { instrument: { fills: false, render: () => thinking }, align: "right" },
+  ];
+  const footer = createFooter([rowOfCells(cells())], () => current, fakeTheme());
+  // [60, 32, 8]: the path text absorbs 45 columns, the joint sits before the thinking text.
+  assert.equal(visible(footer.render(100)[0] ?? ""), "a".repeat(15) + " ".repeat(45) + "b".repeat(32) + " " + "t".repeat(7));
+
+  thinking = "t".repeat(6);
+  current = { ...readings };
+  const second = footer.render(100)[0] ?? "";
+  const fresh = createFooter([rowOfCells(cells())], () => current, fakeTheme()).render(100)[0] ?? "";
+  assert.equal(second, fresh, "the second render lays the row out for the shorter text");
+  // One column shorter's worth of breadth: [61, 32, 7], and the thinking text still ends at 100.
+  assert.equal(visible(second), "a".repeat(15) + " ".repeat(46) + "b".repeat(32) + " " + "t".repeat(6));
+  assert.equal(visibleWidth(second), 100);
+});
+
+test("a resize re-seats the default row", () => {
+  const footer = createFooter([topRow()], () => readings, fakeTheme());
+  assert.equal(visible(footer.render(100)[0] ?? ""), "a".repeat(15) + " ".repeat(46) + "b".repeat(32) + " " + "c".repeat(6));
+
+  const resized = footer.render(90)[0] ?? "";
+  const fresh = createFooter([topRow()], () => readings, fakeTheme()).render(90)[0] ?? "";
+  assert.equal(resized, fresh, "the resized row is the row a fresh footer draws at 90");
+  assert.equal(visible(resized), "a".repeat(15) + " ".repeat(36) + "b".repeat(32) + " " + "c".repeat(6), "no cell keeps a width from 100");
+  assert.equal(visibleWidth(resized), 90);
+});
