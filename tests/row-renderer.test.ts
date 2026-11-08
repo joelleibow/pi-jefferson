@@ -868,3 +868,25 @@ test("a resize re-seats the default row", () => {
   assert.equal(visible(resized), "a".repeat(15) + " ".repeat(36) + "b".repeat(32) + " " + "c".repeat(6), "no cell keeps a width from 100");
   assert.equal(visibleWidth(resized), 90);
 });
+
+test("the row re-seats when a cell's joint goes, not only when its basis changes", () => {
+  // At the margin the joint and a text column trade one for one: the second text grows by one
+  // column, C + J passes the row, and the plan's bases and grows are unchanged while the joint
+  // before that text goes. The cell must read the new flag, not the seat's old one.
+  let second = "b".repeat(8);
+  let current: Readings = readings;
+  const cells = (): Row["cells"] => [
+    { instrument: { fills: false, render: () => "a".repeat(8) }, align: "right" },
+    { instrument: { fills: false, render: () => second }, align: "right" },
+  ];
+  const footer = createFooter([rowOfCells(cells())], () => current, fakeTheme());
+  assert.equal(visible(footer.render(17)[0] ?? ""), "a".repeat(8) + " " + "b".repeat(8), "the joint sits before the second text");
+
+  second = "b".repeat(9);
+  current = { ...readings };
+  const again = footer.render(17)[0] ?? "";
+  const fresh = createFooter([rowOfCells(cells())], () => current, fakeTheme()).render(17)[0] ?? "";
+  assert.equal(again, fresh, "the second render lays the row out for the longer text");
+  assert.equal(visible(again), "a".repeat(8) + "b".repeat(9), "the joint is gone and the texts abut");
+  assert.ok(!visible(again).includes("..."), "and neither text is shortened");
+});

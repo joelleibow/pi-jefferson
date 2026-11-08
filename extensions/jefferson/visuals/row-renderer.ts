@@ -91,11 +91,13 @@ export function createFooter(
           },
         })),
       ),
-      /** Whether the row is already seated with these entry options, column for column. */
+      /** Whether the row is already seated as this plan draws it: every field a cell reads. */
       seated(plan: PlannedCell[]): boolean {
         return seats.length === plan.length && plan.every((cell, index) => {
           const held = seats[index]!;
-          return cell.basis === held.basis && cell.grow === held.grow;
+          // The joint is compared as well as the columns: at a row's margin a joint and a text
+          // column trade one for one, so a cell reads a new joint flag from an unchanged basis.
+          return cell.basis === held.basis && cell.grow === held.grow && cell.joint === held.joint;
         });
       },
       seat(plan: PlannedCell[]): void {
@@ -114,8 +116,8 @@ export function createFooter(
   return {
     render(width) {
       current = sampleReadings();
-      // Every render plans its rows, because a cell's content decides its columns: a row re-seats
-      // when the width or any cell's basis or grow differs from what it was last laid out with.
+      // Every render plans its rows, because a cell's content decides its columns and its joint: a
+      // row re-seats when the width or any cell's basis, grow or joint differs from its last seat.
       for (const view of rowViews) {
         const plan = view.plan(width);
         if (!view.seated(plan)) view.seat(plan);
