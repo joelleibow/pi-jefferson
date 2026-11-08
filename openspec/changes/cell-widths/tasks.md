@@ -262,8 +262,10 @@ characterization.
   same form. Test: a fake instrument not marked as filling that renders `ab` at every width except the row's own, 40,
   where it renders `ab` plus 38 `#` (40 columns), in `[L it, R "cd"]` at 40: the final text is resolved at the cell's
   allocated width, 38 [D8], so the line is `ab`, 36 spaces, `cd`, with `cd` at the last two columns and no `#` anywhere.
-  A probe at 40 would be the only render that carries `#`. A second fake whose text at width 0 is 120 columns, in a row at 80, is measured whole,
-  not clipped first: 6.1's three-cells-of-40 case covers the clip. Mutation: probe at the row's width and the cell
+  A probe at 40 would be the only render that carries `#`. *Not asserted:* a second fake whose text at width 0 is 120 columns, in a row at 80, would be "measured
+  whole, not clipped first", and that half is unobservable through the footer. Overflow distribution is the allocator's,
+  and the spec promises nothing about which cell loses columns [CA §1(c); Spec: Content that needs more than the row];
+  6.1 asserts the one line and the ellipsis. Only the `#` half above is asserted. Mutation: probe at the row's width and the cell
   claims the whole row, so `cd` is displaced (red). Source: [D2 "Why width 0"; M 2a; CA §1(d), §2].
 - [x] 4.5 **`blank` and `$bar` cells fill and share the rest, differing by at most one.** Test first
   (`tests/row-renderer.test.ts`, fakes marked as filling): `[F, F, F]` at 100 where the cells render `a`, `b`, `c` starts
@@ -412,6 +414,26 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   width from 100. Boundary: a resize with the same content. Mutation: never re-seat and the 90-column line is 100
   wide (red). Source: [Spec: The terminal is resized (both)], [D9].
 
+- [x] 7.5 **The row re-seats when a cell's joint goes, with every basis and grow equal.** Found by Michael at the
+  implementation gate (run `5d5a9438-04f1-41ff-9869-d297ddcbd0a0`): 7.3's gate compared `basis` and `grow` only, so a
+  content change that dropped or added a joint at the margin left a stale joint seated, and the cell clipped its text
+  (two right-aligned cells at 17 columns, texts 8 and 8, then 8 and 9). Test first (`tests/row-renderer.test.ts`, "the
+  row re-seats when a cell's joint goes, not only when its basis changes"): one footer at 17 over `[R "aaaaaaaa", R
+  "bbbbbbbb"]` renders `aaaaaaaa bbbbbbbb` (the joint), then a new sample with the second text `bbbbbbbbb`; the second
+  line equals a fresh footer's at the same state, with no ellipsis. Behavior only. Red on the pre-fix code at the line
+  comparison: actual `'\x1B[0m\x1B]8;;\x07aaaaaaaa\x1B[0m\x1B]8;;\x07 bbbbb\x1B[0m...\x1B[0m\x1B]8;;\x07'` (visible
+  `aaaaaaaa bbbbb...`, the joint kept and the second text clipped), expected
+  `'\x1B[0m\x1B]8;;\x07aaaaaaaa\x1B[0m\x1B]8;;\x07bbbbbbbbb\x1B[0m\x1B]8;;\x07'` (visible `aaaaaaaabbbbbbbbb`).
+  Deliverable: the gate compares every field of the plan the
+  cells read, `cell.basis === held.basis && cell.grow === held.grow && cell.joint === held.joint`, and `seats.length`
+  (`row-renderer.ts`, 986d8eb). Green: 296 tests, 296 pass. Mutation: the gate ignoring the joint flag again turns
+  this test red and no other (the actual line keeps ` bbbbb…...`; Derek's report prints it as `' bbbbb\x1B[0m...'`). Plan-field scan: `PlannedCell` has three fields, `joint`
+  (read by the cell on every render, between seats, so it was the defect), `basis` and `grow` (read only at a seat); all
+  three are compared, and nothing else reads the seated plan, so no other field can go stale (Derek's grep over
+  `seats|.basis|.grow|.joint`). No existing test was edited. Source: [Spec: The joint collapses before content does; A
+  row MUST re-lay out when a cell's width changes], [D9], Michael's finding. Not measured: a sweep of every width for
+  joint-only plan changes; the comparison is exhaustive over the plan's three fields, an argument and not a measurement.
+
 ## 8. End to end, through the fake host
 
 `tests/jefferson.test.ts` through `useTempAgentDir`, `writeAgentDocument` and `harness().start({ cwd })` [EA B3]; real
@@ -459,15 +481,17 @@ Each step produces evidence for Derek's report. No step changes the repository.
 
 - [x] 9.1 **The whole suite, types and the spec validate green.** `pnpm typecheck`; `pnpm test` (257 plus this change's
   tests, 0 fail, 0 skipped); `openspec validate "cell-widths" --strict`. Verify: Derek's report quotes the three results.
-- [x] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `BASE` and list the output. Measured by
-  Derek (`BASE` = `f6250ad0d6c5d99b52feac0c100a45e8e77638a2`, HEAD `0937c7b`):
-  **A1** prints only the pin assertion line, `-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);`
-  (`tests/jefferson.test.ts:311`, which 1.2 edits to add `DISTRIBUTIONS`). The `:551` expectation prints nothing: its text
-  survives byte-identically as 4.0's `equal` twin, so git matches it there and no assertion is removed on net.
-  **A2** prints 34 lines in Derek's report, all fixture, row-construction or pin lines and no assertion except the single
-  pin assertion A1 names. (Bambadjan re-ran A2 on HEAD: 33 lines, `jefferson.test.ts` 3, `format.test.ts` 2,
-  `instrument.test.ts` 2, `row-renderer.test.ts` 26; the one-line difference from 34 is in `row-renderer.test.ts`, where
-  every printed line is a row or instrument literal, none an assertion. The breakdown below is Derek's.)
+- [x] 9.2 **No other assertion was edited.** Run **A1**, **A2** and **A3** against `BASE` and list the output. Measured
+  by Derek at the final HEAD, `986d8eb` (`BASE` = `f6250ad0d6c5d99b52feac0c100a45e8e77638a2`), and unchanged since
+  `0937c7b`:
+  **A1** (`git diff -U0 $BASE -- tests/ | grep -E '^-.*assert'`) prints one line, the pin assertion,
+  `-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);` (`tests/jefferson.test.ts:311`, which 1.2 edits to add
+  `DISTRIBUTIONS`). The `:551` expectation prints nothing: its text survives byte-identically as 4.0's `equal` twin, so
+  git matches it there and no assertion is removed on net.
+  **A2** prints **33** lines, the count measured with `wc -l`; it has been 33 at `0937c7b`, `e7a4364` and `986d8eb`.
+  (Derek's earlier "34" was one too many.) All are fixture, row-construction or pin lines, and none is an assertion but
+  the single pin assertion A1 names. The breakdown is Derek's from the first measurement, summing to the one count:
+  `jefferson.test.ts` 3, `format.test.ts` 2, `instrument.test.ts` 2, `row-renderer.test.ts` 26.
   - the pin line (`tests/jefferson.test.ts:311`);
   - the two one-line `writeAgentDocument` document literals in `tests/jefferson.test.ts` (4.0);
   - 10 row-fixture lines in `tests/row-renderer.test.ts` that now carry `distribution: "equal"`;
@@ -478,11 +502,13 @@ Each step produces evidence for Derek's report. No step changes the repository.
   - `tests/row-renderer.test.ts`, 15 more: 10 fake `{ render }` literals gaining `fills: false` (2.1) and 5 lines of 6.4's row
     construction (`const line = lineAt(rowOf(3), 12);`, `[rowOf(2, "aa"), rowOf(4, "b"), rowOf(8, "c")],`,
     `const line = lineAt(rowOf(8), 4);`, and two instrument-literal lines shared with the `fills` edit).
-  Nothing in `configuration.test.ts` or `session-data-store.test.ts`. **A3** prints only
-  `openspec/changes/cell-widths/tasks.md`. `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing
-  (the `devDependencies` stay at 1.4.0 [D11]). Any line outside this list is a finding. Ticked on Derek's measured
-  output, the condition he set himself: his output equals this list, which now says exactly what the output is.
-  Mutation: none; the check is the evidence.
+  Nothing in `configuration.test.ts` or `session-data-store.test.ts`. **A3** (`git diff --name-only $BASE -- '*.md'`)
+  prints two paths, `openspec/changes/cell-widths/design.md` and `openspec/changes/cell-widths/tasks.md`. Both are change
+  artifacts, not stray Markdown files: `tasks.md` carries Derek's tick marks and the routed corrections, `design.md` the
+  conductor's correction commit `63aca91` and the routed corrections. No `README.md` or other project document appears.
+  `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing (the `devDependencies` stay at 1.4.0
+  [D11]). Any line outside this list is a finding. Ticked on the final measured output above. Mutation: none; the check
+  is the evidence.
 - [x] 9.3 **The suite against pi-tui 1.5.0, in a scratch copy outside the repository.** Evidence goes in Derek's report;
   nothing changes in the repository. Recipe [EA A5]: copy the repository without `.git`; `npm pack
   @earendil-works/pi-tui@1.5.0`, unpack, and replace `node_modules/@earendil-works/pi-tui` with it; also `npm pack` and

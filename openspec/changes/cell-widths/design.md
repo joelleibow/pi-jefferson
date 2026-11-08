@@ -249,8 +249,11 @@ they depend on the plan, not on the sample, so they never sit in the memo.
 ### 9. The row re-seats when a cell's entry options change, not only when the window does
 
 The footer computes each row's plan on every render (the probes are memoized), compares it with the options the row was
-last seated with, and re-seats through `clear()` and `addChild` when the width or any cell's `basis` or `grow` differs
-[E §3, Spec: The footer's tree is built once]. This replaces the width-only gate. A cell reads this render's joint flag
+last seated with, and re-seats through `clear()` and `addChild` when the width or any field of the plan the cells read differs: `basis`,
+`grow` and the joint flag [E §3, Spec: The footer's tree is built once]. The joint flag is in the set because a joint
+and a text column trade one for one at the margin: a content change can leave every `basis` and `grow` equal while the
+joint goes, and a stale joint then clips text (Michael's measured case, two right-aligned cells at 17, texts 8 and 8,
+then 8 and 9). This replaces the width-only gate. A cell reads this render's joint flag
 from the footer through a function handed to it when the tree is built, the same pattern as the sample slot it already
 reads [E §3], not a shared object.
 
