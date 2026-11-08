@@ -532,9 +532,15 @@ Each step produces evidence for Derek's report. No step changes the repository.
 
 ## 10. Joel's observation
 
-- [ ] 10.1 **(his)** In his own pi session, with `~/.pi/agent/pi-jefferson.json` as it is and no edit, Joel looks at the
+- [x] 10.1 **(his)** In his own pi session, with `~/.pi/agent/pi-jefferson.json` as it is and no edit, Joel looks at the
   footer: the top row has `path` at the far left and `model` and `thinking` side by side at the right edge with one space
   between them; the second row shows its thirds and the bar fills its cell; and, in that pi, the allocator is 1.5.0's
   (9.3 ran it on 1.5.0 in a scratch copy). Not ticked by the writer: Joel ticks it, in his own words, before the
   archive (the conductor's Validate order). No task edits his file. Source: [R 2026-11-06, 2026-11-07], [D11 "Evidence it
   holds on the version Joel runs", Migration Plan].
+  - **Observed 2026-11-07 (Joel, on the `cell-widths` branch, his own pi session, his `~/.pi/agent/pi-jefferson.json`
+    unedited; he sent a screenshot of the footer):** "This is looking great!!!" The screenshot shows the working
+    directory `pi-jefferson` far left on the top row; the model cell (`🧠 claude-sonnet-5-5 via Anthropic`) and the
+    thinking cell (`🤔 Max`) adjacent at the right edge with one space between them, reading as one cell; and the
+    second row's context bar filling its third at the right with `77.5%`, as before. He did not report the optional
+    `"distribution": "equal"` check, so it was not observed.
