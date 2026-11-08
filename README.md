@@ -11,8 +11,10 @@ Starship.
 
 ## Status
 
-The statusline is a footer of one line per configured row, with evenly divided cells spanning
-its full width. The [configuration table](#configuration) lists the available instruments, their
+The statusline is a footer of one line per configured row, each spanning the full width. By default
+a cell takes the width its content needs and its neighbours sit against it. `blank` cells and cells
+with a `$bar` fill whatever the row leaves, and a [row option](#configuration) restores evenly
+divided cells. The [configuration table](#configuration) lists the available instruments, their
 variables and default formats. With no configuration you get the default single row of
 placeholder cells.
 
@@ -53,6 +55,30 @@ cell that uses it:
   }
 }
 ```
+
+A row sizes its cells by its `distribution`, either `"content"` or `"equal"`. Without it a row is
+`"content"`:
+
+```json
+{ "distribution": "equal", "cells": [{ "instrument": "model" }, { "instrument": "path" }] }
+```
+
+With `"content"`, a cell takes the columns its text needs, label included, so neighbours sit against
+it. Cells that fill (`blank`, and any cell whose format holds `$bar`) share the columns the row leaves,
+the earliest taking any odd one. When no cell fills, the last left-aligned cell with text takes them,
+else the first cell with text, else the first cell. A cell with no text, because its data is unknown,
+takes no columns. Two neighbours that both have text get one column between them, and that column
+gives way before any text does when the row is too narrow. No column goes between them when a filling
+cell sits there, or when the row's spare columns do. A cell with no spare columns has nothing for
+`align` to pad, so `align` changes nothing in it.
+
+With `"equal"`, every cell gets the same share of the width, and the earliest cells take one extra
+column each when the width does not divide. A value that is neither rejects the document, like a bad
+`align`: the default row renders and the warning names the value. `distribution` belongs on a row; beside
+a `rows` list it rejects the document.
+
+Upgrading: earlier releases divided every row evenly. Set `"distribution": "equal"` on a row to keep
+that.
 
 `format` is plain text with the instrument's already-formatted `$variables`, not Markdown. `$` and
 `|` are its two special characters, escaped `\$` and `\|`. Control characters become spaces, then
@@ -120,9 +146,11 @@ That escape changed meaning in this release. A format written `\|` used to rende
 backslash before anything but `$` was a literal backslash; it now renders `|`.
 
 `$bar` is available on `context`: it takes the width the rest of the format leaves in the cell,
-and shrinks to nothing when none is left. Use at most one per format, and no modifier after it. Its
-filled portion changes to the theme's `warning` color above 70% and `error` above 90%; without an
-estimate from the host, it draws an unfilled, dim track.
+and shrinks to nothing when none is left. A cell with a `$bar` fills the row's spare columns, sharing
+them with any `blank` cell; drop the `$bar` from its format and the cell takes only its text's width.
+Use at most one per format, and no modifier after it. Its filled portion changes to the theme's
+`warning` color above 70% and `error` above 90%; without an estimate from the host, it draws an
+unfilled, dim track.
 
 `style` uses pi's `ThemeStyle`: `fg` accepts foreground theme color tokens, `bg` background
 tokens, or either slot can use a color pi's parser accepts. The six boolean attributes are
