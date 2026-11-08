@@ -34,7 +34,7 @@ export function createFooter(
   let current: Readings = sampleReadings();
   let lastWidth: number | undefined;
 
-  const cellView = (cell: Cell): CellView => {
+  const cellView = (cell: Cell, joint: () => boolean): CellView => {
     let cached: { sample: Readings; width: number; text: string } | undefined;
     const textAt = (width: number): string => {
       if (cached?.sample !== current || cached?.width !== width) {
@@ -46,7 +46,8 @@ export function createFooter(
       fills: cell.instrument.fills,
       contentWidth: () => cell.instrument.fills ? 0 : visibleWidth(textAt(0)),
       render(cellWidth) {
-        const clipped = truncateToWidth(textAt(cellWidth), cellWidth);
+        const lead = joint() ? " " : "";
+        const clipped = truncateToWidth(lead + textAt(cellWidth), cellWidth);
         const pad = Math.max(0, cellWidth - visibleWidth(clipped));
         const before = cell.align === "right" ? pad : cell.align === "center" ? Math.floor(pad / 2) : 0;
         const after = cell.align === "left" ? pad : cell.align === "center" ? pad - Math.floor(pad / 2) : 0;
@@ -62,10 +63,14 @@ export function createFooter(
   };
 
   const rowViews = rows.map((row) => {
-    const components = row.cells.map(cellView);
+    // The seats this row was last laid out with. A cell reads this render's joint flag from here,
+    // through the closure handed to it below, as it reads the sample from `current`.
+    let seats: PlannedCell[] = [];
+    const components = row.cells.map((cell, index) => cellView(cell, () => seats[index]?.joint ?? false));
+    const stack = new HStack([], { gap: GAP });
     return {
       components,
-      stack: new HStack([], { gap: GAP }),
+      stack,
       plan: (width: number): PlannedCell[] => planRow(
         width,
         row.distribution,
@@ -78,6 +83,14 @@ export function createFooter(
           },
         })),
       ),
+      seat(plan: PlannedCell[]): void {
+        seats = plan;
+        stack.clear();
+        for (const [index, component] of components.entries()) {
+          const cell = plan[index]!;
+          stack.addChild(component, { basis: cell.basis, grow: cell.grow, shrink: 0 });
+        }
+      },
     };
   });
   const tree = new VStack(rowViews.map(({ stack }) => stack), { gap: 0 });
@@ -86,14 +99,7 @@ export function createFooter(
     render(width) {
       current = sampleReadings();
       if (width !== lastWidth) {
-        for (const view of rowViews) {
-          const plan = view.plan(width);
-          view.stack.clear();
-          for (const [index, component] of view.components.entries()) {
-            const cell = plan[index]!;
-            view.stack.addChild(component, { basis: cell.basis, grow: cell.grow, shrink: 0 });
-          }
-        }
+        for (const view of rowViews) view.seat(view.plan(width));
         lastWidth = width;
       }
       return tree.render(width);

@@ -556,3 +556,123 @@ test("an empty cell takes no column and does not change where any text sits", ()
   assert.equal(visibleWidth(allEmpty), 80);
   assert.equal(visible(allEmpty), " ".repeat(80));
 });
+
+test("a joint sits ahead of a left-aligned or centred cell's text, plain and unstyled", () => {
+  // The plan is [5, 6, 9]: the joints sit before `b` and `c`, and `c` absorbs the slack to its
+  // right, so the line is text, space, text, space, text, and the rest.
+  const line = lineAt(rowOfCells([cellOf("aaaaa"), cellOf("bbbbb"), cellOf("ccccc")]), 20);
+  assert.equal(visible(line), "aaaaa bbbbb ccccc   ");
+  assert.equal(visibleWidth(line), 20);
+
+  // A styled neighbour's joint is a plain leading space, ahead of the cell's own escape.
+  const styled = lineAt(
+    rowOfCells([cellOf("a", { align: "right" }), cellOf("\x1b[4mbc", { align: "right" })]),
+    4,
+  );
+  assert.equal(styled, composed("a", " \x1b[4mbc"), "the space is outside the style, and the host closes the line");
+  assert.equal(visibleWidth(styled), 4);
+});
+
+/** Joel's top-row shape: 15, 32 and 6 columns, left, right and right. */
+function topRow(): Row {
+  return rowOfCells([
+    cellOf("a".repeat(15)),
+    cellOf("b".repeat(32), { align: "right" }),
+    cellOf("c".repeat(6), { align: "right" }),
+  ]);
+}
+
+test("two right-aligned instruments sit together at the right edge, whatever the width", () => {
+  for (const width of [132, 100, 80]) {
+    const line = lineAt(topRow(), width);
+    // Built from the fixture's text widths: the absorber's slack, then the two texts with one
+    // column between them, the last ending at the row's last column.
+    assert.equal(visible(line), "a".repeat(15) + " ".repeat(width - 54) + "b".repeat(32) + " " + "c".repeat(6), `at ${width}`);
+    assert.equal(visibleWidth(line), width);
+  }
+});
+
+test("no joint where room already exists beside an absorbing cell", () => {
+  const line = lineAt(rowOfCells([cellOf("a".repeat(15)), cellOf("b".repeat(32), { align: "right" })]), 80);
+  assert.equal(visible(line), "a".repeat(15) + " ".repeat(33) + "b".repeat(32), "only the slack separates the texts");
+  assert.equal(visibleWidth(line), 80);
+
+  // A right-aligned first cell absorbs: only its own spare columns sit before it, and the joint
+  // before the second cell is present.
+  const leading = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("b".repeat(7), { align: "right" })]), 80);
+  assert.equal(visible(leading), " ".repeat(67) + "a".repeat(5) + " " + "b".repeat(7));
+  assert.equal(visibleWidth(leading), 80);
+});
+
+test("no joint beside a fill cell, and none for an empty cell", () => {
+  const atExact = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("x", { fills: true }), cellOf("b".repeat(7), { align: "right" })]), 12);
+  assert.equal(visible(atExact), "a".repeat(5) + "b".repeat(7), "the texts abut, and neither is shortened");
+  assert.equal(visibleWidth(atExact), 12);
+
+  const oneShort = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("x", { fills: true }), cellOf("b".repeat(7), { align: "right" })]), 11);
+  assert.equal(visibleWidth(oneShort), 11, "one line, the row's width");
+  assert.ok(!visible(oneShort).includes("bbbbbbb"), "a text is clipped at its end");
+
+  const between = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf("x", { fills: true }), cellOf("b".repeat(7), { align: "right" })]), 30);
+  assert.equal(visible(between), "a".repeat(5) + "x".padEnd(18) + "b".repeat(7), "the fill cell sits between the texts");
+  assert.equal(visibleWidth(between), 30);
+
+  // An empty cell is not a neighbour: the joint goes to the text after it.
+  const acrossEmpty = lineAt(rowOfCells([cellOf("a".repeat(5), { align: "right" }), cellOf(""), cellOf("b".repeat(7), { align: "right" })]), 20);
+  assert.equal(visible(acrossEmpty), " ".repeat(7) + "a".repeat(5) + " " + "b".repeat(7));
+  assert.equal(visibleWidth(acrossEmpty), 20);
+
+  // Where the slack is smaller than the fill cells it would be shared between, a joint across a
+  // fill cell would take the fill's only column: the spare one goes to the fill, not to a joint.
+  const starved = lineAt(rowOfCells([
+    cellOf("a".repeat(5), { align: "right" }),
+    cellOf("x", { fills: true }),
+    cellOf("y", { fills: true }),
+    cellOf("b".repeat(7), { align: "right" }),
+  ]), 13);
+  assert.equal(visible(starved), "a".repeat(5) + "x" + "b".repeat(7));
+  assert.equal(visibleWidth(starved), 13);
+});
+
+test("the joint gives way before content: both right-aligned", () => {
+  const cells = (): Row => rowOfCells([cellOf("a".repeat(8), { align: "right" }), cellOf("b".repeat(8), { align: "right" })]);
+  const roomy = lineAt(cells(), 18);
+  assert.equal(visible(roomy), " " + "a".repeat(8) + " " + "b".repeat(8), "one spare column before the first text");
+
+  const atTheMargin = lineAt(cells(), 17);
+  assert.equal(visible(atTheMargin), "a".repeat(8) + " " + "b".repeat(8), "no spare column, and the joint stays");
+
+  const oneShort = lineAt(cells(), 16);
+  assert.equal(visible(oneShort), "a".repeat(8) + "b".repeat(8), "the joint is gone and both texts are whole");
+  for (const line of [roomy, atTheMargin, oneShort]) assert.equal(line.split("\n").length, 1);
+});
+
+test("the joints collapse together, and path abuts model at the margin", () => {
+  const atTheMargin = lineAt(topRow(), 54);
+  assert.equal(visible(atTheMargin), "a".repeat(15) + "b".repeat(32) + " " + "c".repeat(6), "path abuts model, the joint before thinking stays");
+
+  const collapsed = lineAt(topRow(), 53);
+  assert.equal(visible(collapsed), "a".repeat(15) + "b".repeat(32) + "c".repeat(6), "no joint remains, and no text is shortened");
+
+  const oneSpare = lineAt(topRow(), 55);
+  assert.equal(visible(oneSpare), "a".repeat(15) + " " + "b".repeat(32) + " " + "c".repeat(6), "the spare column goes to path");
+
+  // Two counted joints go together, never one.
+  const three = lineAt(rowOfCells([
+    cellOf("a".repeat(6), { align: "right" }),
+    cellOf("b".repeat(6), { align: "right" }),
+    cellOf("c".repeat(6), { align: "right" }),
+  ]), 19);
+  assert.equal(visible(three), " " + "a".repeat(6) + "b".repeat(6) + "c".repeat(6));
+});
+
+test("a centred absorber with one spare column puts it on the right", () => {
+  const line = lineAt(rowOfCells([
+    cellOf("a".repeat(5), { align: "center" }),
+    cellOf("b".repeat(3), { align: "right" }),
+    cellOf("c".repeat(3), { align: "right" }),
+  ]), 13);
+  assert.equal(visible(line), "a".repeat(5) + " " + "b".repeat(3) + " " + "c".repeat(3));
+  assert.equal(visibleWidth(line), 13);
+  assert.equal(line.split("\n").length, 1);
+});

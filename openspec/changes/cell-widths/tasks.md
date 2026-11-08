@@ -286,7 +286,7 @@ tests in `tests/row-renderer.test.ts`, texts of 15, 32 and 6 columns standing fo
 allocator at the boundaries of the design's guards table, so they are first-run green by construction; their failing side
 is the named mutation, and they are the boundary tests that D11 says would fail first against a different allocator.
 
-- [ ] 5.1 **A joint sits ahead of a left-aligned or centered cell's text, plain and unstyled.** Test first: `[L5, L5, L5]`
+- [x] 5.1 **A joint sits ahead of a left-aligned or centered cell's text, plain and unstyled.** Test first: `[L5, L5, L5]`
   at 20 renders `aaaaa`, a space, `bbbbb`, a space, `ccccc` and 3 spaces (the plan is `[5, 6, 9]`; the joints sit before `b` and `c`,
   and `c` absorbs the slack to its right); `[R "a", R "bc"-styled-open]` at 4 renders `a`, a space, then the style escape and `bc`, with the space
   before the escape (the joint carries no styling), and the host's line-end reset is untouched. Boundaries: a left-aligned
@@ -296,7 +296,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   text, and reads this render's joint flag through a function given when the tree is built, as it does the sample
   [D6, D9]. Mutation: place the joint after the text, or inside the styled region, and the named cases turn red. Source:
   [D6 "Pad and ADR 0006"], [E §1, §3 `:40`].
-- [ ] 5.2 **Two right-aligned instruments sit together at the right edge, whatever the width.** Characterization of 5.1
+- [x] 5.2 **Two right-aligned instruments sit together at the right edge, whatever the width.** Characterization of 5.1
   and the plan (a right-aligned cell's spare column is its joint), passing on first run; its failing side is the
   mutation. Test: `[L15, R32, R6]` at 132, 100 and 80: the first text starts at column 0, the last text ends at column W,
   the second ends one column before the third starts, and the gap between the first and the second texts is `W − 54`
@@ -304,27 +304,27 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   widths, all wider than `C + J = 54`. Mutation: a plan with no joint and the second text abuts the third (red); every
   boundary gets a joint and the first text is separated from the second by an extra column (red). Source: [Spec: Two
   neighbouring instruments, both scenarios], [R 2026-11-06, 2026-11-07], [D6].
-- [ ] 5.3 **No joint where room already exists beside an absorbing cell.** Test: `[L15, R32]` at 80 leaves
+- [x] 5.3 **No joint where room already exists beside an absorbing cell.** Test: `[L15, R32]` at 80 leaves
   exactly the spare columns between the two texts and the second cell occupies exactly 32 columns (no 33). Source:
   [Spec: No joint beside an absorbing cell], [D6]. Boundary: absorber on the left, and `[R5, R7]` where the right-aligned
   first cell absorbs: only its spare columns are before it, and the joint before the second cell is present. Mutation:
   give the absorber's boundary a joint and the second cell is 33 wide (red).
-- [ ] 5.4 **No joint beside a fill cell, and none for an empty cell.** Test: `[R5, F, R7]` at 12 (W equals the two
+- [x] 5.4 **No joint beside a fill cell, and none for an empty cell.** Test: `[R5, F, R7]` at 12 (W equals the two
   texts) renders the two texts abutting with neither shortened, at 11 renders one line with one text clipped at its end,
   and at 30 shows the fill cell between them; `[R5, R0, R7]` at 20 puts a one-column joint before the third text and none
   at the empty cell. Boundaries: S=0 and S<0 with a fill between; an empty between two content cells. Mutation: count the empty cell as a
   neighbor or give the fill boundary a joint and the third text moves a column (red). Source: [Spec: No joint beside a
   fill cell], [D6 "Reachable states"].
-- [ ] 5.5 **The joint gives way before content: both right-aligned.** Test: `[R8, R8]` at 18, 17 and 16 renders
+- [x] 5.5 **The joint gives way before content: both right-aligned.** Test: `[R8, R8]` at 18, 17 and 16 renders
   ` a8 b8` (1 spare column before the first text, the joint kept), `a8 b8` (no spare column, the joint kept; `a8` is the 8-column text) and `a8b8`
   (the joint gone, both texts whole), each one line W columns wide. Boundaries: C+J+1, C+J, C+J−1. Mutation: `>=`
   for `>` in the plan (3.7) and the 17-column line turns red here; a cell that clips its text before dropping the joint
   turns the 16-column line red. Source: [Spec: The joint collapses before content does], [D6 "It gives way first"].
-- [ ] 5.6 **The joints collapse together, and `path` abuts `model` at the margin.** Test: `[L15, R32, R6]` at 54
+- [x] 5.6 **The joints collapse together, and `path` abuts `model` at the margin.** Test: `[L15, R32, R6]` at 54
   (the joint kept) renders `path`, `model` abutting with a one-column joint before the third text and no text shortened;
   at 53 no joint remains anywhere; at 55 one spare column goes to `path`. Boundaries: C+J, C, C+J+1. Mutation: drop one
   joint, not all, in a row with two counted joints (`[R6, R6, R6]` at 19 renders no joint at either) and the 19-column line turns red. Source: [Spec: A joint beside an absorbing cell at the margin; The joints collapse together].
-- [ ] 5.7 **A centered absorber with one spare column puts it on the right.** Test: `[C5, R3, R3]` at 13 renders
+- [x] 5.7 **A centered absorber with one spare column puts it on the right.** Test: `[C5, R3, R3]` at 13 renders
   the first text at column 0, one pad column after it, then `R3`, a joint and `R3`; the line is one line of 13 columns.
   Characterization for the pad (the existing odd-pad test, "a centred cell's odd pad puts its extra column on the
   right", stays green under `equal`) and a first run for the plan's `[6, 3, 4]`. Boundary: S=1. Mutation: split the pad
