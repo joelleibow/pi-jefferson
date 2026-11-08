@@ -145,14 +145,14 @@ and its content width; it returns per cell a `basis`, a `grow` (0 or 1) and a jo
 `tests/`. The file imports nothing, not even pi-tui [D1]. The first run of each task's cases fails; for 3.1 it fails at
 the import because the file does not exist yet.
 
-- [ ] 3.1 **Equal distribution gives every cell `floor(W / N)` and `grow` 1, with no joint, whatever the content.** Test
+- [x] 3.1 **Equal distribution gives every cell `floor(W / N)` and `grow` 1, with no joint, whatever the content.** Test
   first: `(N, W)` of `(8, 80)`, `(3, 100)`, `(10, 132)`, `(8, 4)`, each with cell content widths 0 and 99 mixed and
   `L`/`R`/`C` alignments mixed: every output is `[floor(W/N)…]`, `grow` 1, no joint. The ones that matter: `(3, 100)`
   gives `[33, 33, 33]`, never 34 (the remainder is the allocator's [CA §1(a)]); `(8, 4)` gives `[0 × 8]`. Boundaries:
   W divisible, W with a remainder, W < N. Verify: the plan's test file passes. Mutation: the `equal` branch runs the
   joint rule and the `[R, R]` row gives a joint flag (red). Source: [Spec: A width that divides evenly / does not divide
   evenly / ten at 132], [D4 step 1, ADR 0002 via E §6].
-- [ ] 3.2 **With no fill cell, the last left-aligned non-empty cell absorbs the slack, else the first non-empty cell.**
+- [x] 3.2 **With no fill cell, the last left-aligned non-empty cell absorbs the slack, else the first non-empty cell.**
   Test first: `[L5, L5, L5]` at W=40 gives `[5, 6, 29]` (C=15, two joints, S=23); `[R7, R7]` at 30 gives `[22, 8]`
   (no left-aligned cell, so the first absorbs); `[L5, R7, L0]` at 40 gives `[33, 7, 0]` (the empty last-left cell does
   not absorb); `[L5]` at 40 gives `[40]`. Every `grow` is 0 here. The inputs that separate right from wrong: `[L5, L5, L5]`
@@ -161,13 +161,13 @@ the import because the file does not exist yet.
   (Michael's measurement). Boundaries: all-left, none-left, an empty last-left cell, a single cell. Mutation: pick the first cell
   and `[L5, L5, L5]` turns red; drop the emptiness test and `[L5, R7, L0]` turns red. Source: [Spec: Cells are evenly
   distributed, the absorber sentence], [council "Slack"], [D4 "Absorber"].
-- [ ] 3.3 **An empty content cell takes 0 columns; an all-empty row gives the slack to its first cell.** Test first:
+- [x] 3.3 **An empty content cell takes 0 columns; an all-empty row gives the slack to its first cell.** Test first:
   `[L0, R7]` at 30 gives `[0, 30]` (the empty cell is not the absorber while a non-empty one exists); `[L0, L0]` at 80
   gives `[80, 0]`; `[R0, R0, R0]` at 10 gives `[10, 0, 0]`; every empty cell's `basis` is 0 and `grow` 0 unless it is
   the all-empty row's first cell. Boundary: one empty, all empty, one cell. Mutation: an empty cell
   absorbs when it is the last left-aligned one and `[L5, R7, L0]` from 3.2 and `[L0, R7]` turn red. Source: [Spec: An
   empty cell takes no column; A row whose cells all render nothing], [D2 "Empty", D4].
-- [ ] 3.4 **Fill cells share the slack as `floor(S / G)` with `grow` 1, and a fill cell's own content width is ignored.**
+- [x] 3.4 **Fill cells share the slack as `floor(S / G)` with `grow` 1, and a fill cell's own content width is ignored.**
   Test first: `[F, F, F]` at 100 gives `[33, 33, 33]`, `grow` 1 each (Joel's second row; the allocator's 34/33/33 is the
   footer's, in 4.5); `[F, L31, F]` at 90 gives `[29, 31, 29]`, `grow` `[1, 0, 1]`; `[F, F]` at 80 gives `[40, 40]`;
   `[F, F, F]` at 99 and at 101 give `[33, 33, 33]` (`S mod G` 0 and G−1); and `[F(n=20), F, F]` at 100 gives the
@@ -175,13 +175,13 @@ the import because the file does not exist yet.
   give 34 each (102 columns), and the `n=20` fill makes "a fill cell keeps its natural width" give 20. Mutation: `ceil`
   for `floor`, and a fill that keeps its natural width, each turn this red. Source: [Spec: A blank cell and a bar cell
   fill; Joel's second row keeps its thirds], [D4 step 3, CA §1(a), §1(b)].
-- [ ] 3.5 **When the content needs W or more, nothing grows and nothing is negative.** Test first: `[L30, F, L30]` at 50
+- [x] 3.5 **When the content needs W or more, nothing grows and nothing is negative.** Test first: `[L30, F, L30]` at 50
   gives `[30, 0, 30]` (S=−10, the fill basis is `max(0, …)`, no joint across the fill cell); `[L30, F]` at 30 gives
   `[30, 0]`; `[L40, L40, L40]` at 80 gives `[40, 40, 40]` with every `grow` 0 and no joint (C+J=122 > 80, so the joints
   drop, and the absorber's `n + S` is not applied for S ≤ 0). The allocator, not the plan, takes the deficit [D7,
   CA §1(c)]. Boundaries: S=0, S<0 with a fill cell, S<0 without. Mutation: drop the `max(0, …)` and `[L30, F, L30]` turns
   red with a −10. Source: [D4 step 3 "S ≤ 0 and fills present", "The absorber (G = 0, S > 0)"].
-- [ ] 3.6 **A joint belongs to the right-hand cell of two non-empty content cells with no spare room between them.**
+- [x] 3.6 **A joint belongs to the right-hand cell of two non-empty content cells with no spare room between them.**
   Test first, each a plan input and the exact flags: `[L15, R32, R6]` at 100 gives `[61, 32, 7]`, joint `[no, no, yes]`
   (Joel's top row: `path` absorbs, so the joint sits before `thinking`, not before `model`); `[R5, R0, R7]` at 30 gives
   `[22, 0, 8]`, joint on the third (the joint skips the empty cell); `[R5, F, R7]` at 30 gives `[5, 18, 7]` with no joint,
@@ -202,7 +202,7 @@ the import because the file does not exist yet.
   Mutation: `>=` for `>`, and a drop of one joint at a time; each turns red at the named width. Source: [Spec: A joint
   beside an absorbing cell at the margin; The joints collapse together; The joint collapses before content does], [D6
   "It gives way first"], [R 2026-11-07 "on a row too narrow for it, the column gives way before any content does"].
-- [ ] 3.8 **The plan imports nothing, and its export is pinned.** Verify: **A4** on the plan's file is silent (no
+- [x] 3.8 **The plan imports nothing, and its export is pinned.** Verify: **A4** on the plan's file is silent (no
   `import`, no `from`), and the export pin in `tests/jefferson.test.ts` gains an entry for the file: a new key, not a
   reshaped assertion (the pin goes red when the file exports, then the entry is added). Red/green evidence for A4: it
   prints four lines on `visuals/row-renderer.ts` and is silent on an import-free file [EA A4]. Mutation: an `import`
