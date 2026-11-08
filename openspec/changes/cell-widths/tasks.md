@@ -78,7 +78,7 @@ The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the r
   `pnpm test` pass with the same 257 plus 1.1's tests; **A1 prints only that pin line (`:311`)** and no other removed
   assertion; **A2** prints only fixture lines and that pin line. Every row declares `"equal"` because that is what these expectations describe. Among them are the clip, wide-glyph, emoji, combining-mark and ANSI tests (base `:169`, `:185`, `:199`, `:212`, `:245`) and "the host closes an open style between cells" (`:230`): under `equal` a cell occupies `floor(W / N)` columns, so they are the evidence for the modified scenario of [Spec: A cell's alignment is the padding side inside it] ("the columns its row gave it"). The ruling that legitimises the edit is Joel's: *"a config option on the row can allow for the cells to get equal distribution as we
   started with"* [R 2026-11-07]. Mutation: none (an edit to fixtures; the evidence is A1 printing only the `:311` pin line).
-- [ ] 1.3 **A `distribution` that is not one of the two rejects the whole document.** Test first
+- [x] 1.3 **A `distribution` that is not one of the two rejects the whole document.** Test first
   (`tests/configuration.test.ts`): for each of `"equl"`, `"Equal"`, `4`, `null` the document is rejected, the default row
   renders (one row, `"content"`), and the warning names the key `distribution` and the value (as JSON) and lists both
   valid values, `"content"` and `"equal"`, in the form of the align message (`…has an align that is not "left", "right"
@@ -193,7 +193,7 @@ the import because the file does not exist yet.
   Mutation: give every boundary a joint, and count an empty cell as a neighbor; each turns the named case red. Source:
   [Spec: Two neighbouring instruments (the joint's placement); No joint beside an absorbing cell; No joint beside a fill
   cell], [D6 "Where it exists"], [R 2026-11-07 "The joint"].
-- [ ] 3.7 **Every counted joint drops together when C + J > W, and not before.** Test first: `[R8, R8]` at 18, 17 and 16
+- [x] 3.7 **Every counted joint drops together when C + J > W, and not before.** Test first: `[R8, R8]` at 18, 17 and 16
   gives `[9, 9]`, `[8, 9]` (joint kept at C+J=17) and `[8, 8]` (joint dropped at C+J−1); `[L15, R32, R6]` at 55, 54 and
   53 gives `[16, 32, 7]`, `[15, 32, 7]` (joint kept, S=0, `path` abuts `model`) and `[15, 32, 6]` (all joints gone, no
   text shortened); and `[R6, R6, R6]` at 20 and 19 (J=2: C+J=20) keeps both joints at 20 and drops both at 19, never one.
@@ -441,7 +441,7 @@ instruments. The expected lines are built from counts and from the fixture's own
 
 Each step produces evidence for Derek's report. No step changes the repository.
 
-- [ ] 9.1 **The whole suite, types and the spec validate green.** `pnpm typecheck`; `pnpm test` (257 plus this change's
+- [x] 9.1 **The whole suite, types and the spec validate green.** `pnpm typecheck`; `pnpm test` (257 plus this change's
   tests, 0 fail, 0 skipped); `openspec validate "cell-widths" --strict`. Verify: Derek's report quotes the three results.
 - [ ] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `BASE` and list the output. A1 prints only
   two lines: the export pin at `tests/jefferson.test.ts:311` (1.2 adds `DISTRIBUTIONS`) and the assertion at `:551` (the model half, flipped by 4.1 to the rule's arithmetic, with the old
@@ -453,7 +453,7 @@ Each step produces evidence for Derek's report. No step changes the repository.
   `openspec/changes/cell-widths/tasks.md`. `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing
   (the `devDependencies` stay at 1.4.0 [D11]; same command form as A3, red-by-edit not separately run). Any line outside this list is a
   finding. Mutation: none; the check is the evidence.
-- [ ] 9.3 **The suite against pi-tui 1.5.0, in a scratch copy outside the repository.** Evidence goes in Derek's report;
+- [x] 9.3 **The suite against pi-tui 1.5.0, in a scratch copy outside the repository.** Evidence goes in Derek's report;
   nothing changes in the repository. Recipe [EA A5]: copy the repository without `.git`; `npm pack
   @earendil-works/pi-tui@1.5.0`, unpack, and replace `node_modules/@earendil-works/pi-tui` with it; also `npm pack` and
   move in its three dependencies (`get-east-asian-width@1.6.0`, `marked@18.0.11`, `marked-cjk-friendly@0.1.2`), or the
@@ -462,11 +462,11 @@ Each step produces evidence for Derek's report. No step changes the repository.
   `pnpm test` in the scratch copy: all tests pass, including 6.2's every-width sweep and 3.x through the real
   allocator. This is the decision-4 simulation re-run against the real width plan, in both versions (1.4.0 is 9.1). Verify: version
   proof printed, result quoted. Source: [D11], [CA §1, §2, §3].
-- [ ] 9.4 **The width-0 probe holds over every shipped declaration, at the implementation gate.** Re-run 2.2: for each of
+- [x] 9.4 **The width-0 probe holds over every shipped declaration, at the implementation gate.** Re-run 2.2: for each of
   the seven shipped instruments a cell not marked as filling renders the same text at width 0 as at width 200, and the
   `$bar` instance is the one that differs. Derek's report prints the result per instrument. Mutation: `fills` constant
   false (from 2.2). Source: [D2 "Guard on the assumption"], [Michael's `later_gates`, rounds 2 and 3].
-- [ ] 9.5 **Nothing was added for logging.** Derek's report states that the width plan and the footer add no log line
+- [x] 9.5 **Nothing was added for logging.** Derek's report states that the width plan and the footer add no log line
   and that the only new warning is the `readConfiguration` text tested in 1.3 and 1.5. Verify: those two tests pass;
   Michael reads the diff for a log call. No command is claimed for the absence.
 
