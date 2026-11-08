@@ -664,3 +664,147 @@ test("a session without context usage renders its context cell empty", async (t)
   assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), " ".repeat(80));
   assert.deepEqual(session.notified, []);
 });
+
+test("Joel's top row puts the working directory at the left and two instruments together at the right", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: {
+      path: { label: "📁" },
+      model: { label: "🧠", format: "$model via $provider" },
+      thinking: { label: "🤔" },
+    },
+    cells: [
+      { instrument: "path" },
+      { instrument: "model", align: "right" },
+      { instrument: "thinking", align: "right" },
+    ],
+  });
+  const root = mkdtempSync(join(tmpdir(), "jefferson-top-row-"));
+  const cwd = join(root, "pi-jefferson");
+  mkdirSync(cwd);
+  const session = await harness().start({
+    cwd,
+    model: { provider: "Anthropic", id: "claude-opus-5-5" },
+    thinkingLevel: "max",
+  });
+
+  // The three texts, by their columns: a label is its glyph, its one gap and its content.
+  const pathText = "📁 pi-jefferson";
+  const modelText = "🧠 claude-opus-5-5 via Anthropic";
+  const thinkingText = "🤔 Max";
+  assert.deepEqual([pathText, modelText, thinkingText].map(visibleWidth), [15, 32, 6]);
+
+  // C = 53 and one joint: the path cell absorbs every column but the joint and the two texts.
+  for (const [width, slack] of [[100, 46], [132, 78], [80, 26]] as const) {
+    const line = session.lines(width)[0] ?? "";
+    const text = stripTerminalSequences(line);
+    assert.equal(visibleWidth(line), width, `one line of ${width} columns`);
+    assert.equal(text, pathText + " ".repeat(slack) + modelText + " " + thinkingText, `at ${width}`);
+    assert.ok(text.endsWith(thinkingText), "the thinking text ends at the row's last column");
+    assert.equal(text.indexOf(modelText), 15 + slack, "the model text starts where the slack ends");
+  }
+
+  // At the margin: path abuts model with no room between them, and the joint still holds.
+  assert.equal(
+    stripTerminalSequences(session.lines(54)[0] ?? ""),
+    pathText + modelText + " " + thinkingText,
+    "the path text abuts the model text, and the joint before thinking stays",
+  );
+  assert.equal(
+    stripTerminalSequences(session.lines(53)[0] ?? ""),
+    pathText + modelText + thinkingText,
+    "one column less and every joint is gone",
+  );
+});
+
+test("Joel's second row keeps its thirds, with a real bar", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { context: { format: "$percent $bar" } },
+    cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "context", align: "right" }],
+  });
+  const session = await harness().start({ contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+
+  // Three fill cells at 100: 34, 33 and 33, the first taking the remainder. The bar of the third
+  // is its own cell's columns less the rest of its format, split by the percent.
+  const third = 33;
+  const track = third - visibleWidth("43.2% ");
+  const filled = Math.floor((43.2 / 100) * track);
+  const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
+  const line = session.lines(100)[0] ?? "";
+  assert.equal(visibleWidth(line), 100);
+  assert.equal(
+    stripTerminalSequences(line),
+    clipped(34) + clipped(33) + "43.2% " + "█".repeat(filled) + "░".repeat(track - filled),
+  );
+});
+
+test("a bar takes only what its own cell leaves, and draws nothing with no room", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { context: { format: "$percent $bar" } },
+    cells: [{ instrument: "path" }, { instrument: "context" }],
+  });
+  const root = mkdtempSync(join(tmpdir(), "jefferson-bar-"));
+  const cwd = join(root, "pi-jefferson");
+  mkdirSync(cwd);
+  const session = await harness().start({ cwd, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+
+  // The path cell takes its text's twelve columns; the bar's cell takes the other 68, and the bar
+  // itself the 62 the rest of its format leaves.
+  const track = 80 - visibleWidth("pi-jefferson") - visibleWidth("43.2% ");
+  const filled = Math.floor((43.2 / 100) * track);
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(visibleWidth(line), 80);
+  assert.equal(stripTerminalSequences(line), "pi-jefferson" + "43.2% " + "█".repeat(filled) + "░".repeat(track - filled));
+
+  // A path text wider than the row leaves the bar's cell nothing, and the bar draws nothing.
+  const wide = join(root, "p".repeat(100));
+  mkdirSync(wide);
+  const squeezed = await harness().start({ cwd: wide, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
+  const squeezedLine = squeezed.lines(80)[0] ?? "";
+  assert.equal(visibleWidth(squeezedLine), 80, "one line of the row's width");
+  assert.ok(!stripTerminalSequences(squeezedLine).includes("█"), "no filled block");
+  assert.ok(!stripTerminalSequences(squeezedLine).includes("░"), "no empty track");
+});
+
+test("the default row of ten blank cells is unchanged", async (t) => {
+  useTempAgentDir(t);
+  const session = await harness().start();
+  // At 80 the existing assertion in "a rejected configuration warns and still installs the default
+  // row" holds; here the width with a remainder of two.
+  const line = session.lines(132)[0] ?? "";
+  assert.equal(visibleWidth(line), 132);
+  const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
+  assert.equal(
+    stripTerminalSequences(line),
+    clipped(14).repeat(2) + clipped(13).repeat(8),
+    "two cells of 14 columns and eight of 13",
+  );
+});
+
+test("distribution equal restores equal shares end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    distribution: "equal",
+    cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "thinking", align: "right" }],
+  });
+  const session = await harness().start({ thinkingLevel: "max" });
+  const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
+  const three = session.lines(100)[0] ?? "";
+  assert.equal(visibleWidth(three), 100);
+  assert.equal(
+    stripTerminalSequences(three),
+    clipped(34) + clipped(33) + "Thinking: Max".padStart(33),
+    "34, 33 and 33, whatever the content",
+  );
+
+  writeAgentDocument(agentDir, { distribution: "equal", cells: Array.from({ length: 10 }, () => ({ instrument: "thinking", align: "right" })) });
+  const ten = await harness().start({ thinkingLevel: "max" });
+  const line = ten.lines(132)[0] ?? "";
+  assert.equal(visibleWidth(line), 132);
+  const cells = line.split(FRAME).slice(1, -1);
+  assert.equal(cells.length, 10, "ten cells");
+  assert.equal(visibleWidth(cells.at(-1) ?? ""), 13, "the last cell occupies 13 columns");
+  assert.ok(stripTerminalSequences(line).endsWith("Thinking: Max"), "a right-aligned last cell's text ends at the window's edge");
+});

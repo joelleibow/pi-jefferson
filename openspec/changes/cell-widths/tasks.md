@@ -401,7 +401,7 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
 `tests/jefferson.test.ts` through `useTempAgentDir`, `writeAgentDocument` and `harness().start({ cwd })` [EA B3]; real
 instruments. The expected lines are built from counts and from the fixture's own text widths, not from the output.
 
-- [ ] 8.1 **Joel's top row, with no edit: `path` at the far left, `model` and `thinking` together at the right edge.**
+- [x] 8.1 **Joel's top row, with no edit: `path` at the far left, `model` and `thinking` together at the right edge.**
   Test first: a scratch agent directory holds `path`, then `model` and `thinking` both `right`, with labels and formats set so
   the three texts are the 15-column `path` text (a one-emoji label and the 12-character basename `pi-jefferson`, so
   `2 + 1 + 12`), `🧠 claude-opus-5-5 via Anthropic` (32) and `🤔 Max` (6), with the working directory set by
@@ -410,19 +410,19 @@ instruments. The expected lines are built from counts and from the fixture's own
   remains. The `thinking` text ends at the last column each time. This is the check that Joel's two rows keep rendering
   with no edit [R 2026-11-07; M 2k]; **Joel's own observation is 10.1, and his.** This is the end-to-end tie: its first run comes after groups 4 to 7 and is green; its failing side is the base commit's equal shares, which Derek shows by running this test against `BASE`'s sources in a scratch copy and reporting the failure. Mutation: none beyond 5.x's. Source: [Spec: A working directory
   at the left, two instruments together at the right; The row is narrower], [D "Joel's two rows, with no edit"].
-- [ ] 8.2 **Joel's second row keeps its thirds, with a real `$bar`.** Characterization: the thirds are the same under
+- [x] 8.2 **Joel's second row keeps its thirds, with a real `$bar`.** Characterization: the thirds are the same under
   the base commit's equal shares, so the test is green on first run and guards the fill rule. Test: `blank`, `blank` and
   `context` (`right`, format `$percent $bar`) at 100 occupy 34, 33 and 33 columns; the first two cells are
   `truncateToWidth(DEFAULT_CELL_TEXT, 34)` and `…, 33)`, the third is `43.2% ` and a bar of `floor(0.432 × 27)` = 11 `█` and
   16 `░`; the line is 100 columns [D "Joel's two rows"]. Boundary: G=3, remainder 1. Mutation: `context` not marked as
   filling (2.1's `$bar` read) and the third cell is content-sized, so the cells become 47, 47 and 6 (red). Source: [Spec:
   Joel's second row keeps its thirds; A bar in a row with other cells].
-- [ ] 8.3 **A bar takes only what its own cell leaves, and draws nothing with no room.** Test first: `[path L, context
+- [x] 8.3 **A bar takes only what its own cell leaves, and draws nothing with no room.** Test first: `[path L, context
   "$percent $bar"]` at 80 is one line of 80 columns, the `path` cell occupies its text's width, and the bar's blocks are
   `floor(0.432 × (80 − path − 6))` filled plus the rest dim; and a `path` text of 100 columns at W=80 renders one line of
   80 columns with no `█` or `░` (the bar cell allocated 0 columns). Boundaries: room, no room. The first case is red against the base commit (the `path` cell is 40 columns there). Mutation: derive the bar cell's width from the bar's own output and the first count changes (red). Source: [Spec: A bar in a row with other
   cells; A bar with no room], [D2 "`$bar` accounting"].
-- [ ] 8.4 **The default row of ten `blank` cells is unchanged: 8 each at 80, `[14, 14, 13 × 8]` at 132.**
+- [x] 8.4 **The default row of ten `blank` cells is unchanged: 8 each at 80, `[14, 14, 13 × 8]` at 132.**
   Characterization: both pass against the base commit too. The existing default-row assertion (in "a rejected
   configuration warns and still installs the default row", `truncateToWidth(DEFAULT_CELL_TEXT, 8).repeat(10)` at 80)
   passes with no edit [EA B1]; the new 132-column case lays out ten cells of 14, 14 and eight of 13 columns, the line
@@ -430,7 +430,7 @@ instruments. The expected lines are built from counts and from the fixture's own
   remainder 2. Mutation: `blank` not marked as filling and the 80-column line is not eight columns per cell (red;
   unmeasured). Source: [Spec: cells absent; A row of ten cells at a width that does not divide evenly], [D4 "What this
   gives"].
-- [ ] 8.5 **`distribution: "equal"` restores equal shares end to end.** Characterization: green on first run, since
+- [x] 8.5 **`distribution: "equal"` restores equal shares end to end.** Characterization: green on first run, since
   these are today's strings. Test: three cells of any content at 100 occupy 34, 33, 33; ten at 132 occupy 14, 14, 13 × 8;
   a right-aligned last cell at 132 ends at column 132. Boundaries: three at 100, ten at 132. The test at base `:281`
   ("a right-aligned cell ends at its cell's right edge end to end") passes under the default with no edit [D "Existing
