@@ -4,8 +4,8 @@ Citations: **[R]** `owner-rulings.md`; **[D n]** `design.md`, decision n (Michae
 `e9183da7-e5a9-4dbe-8209-1df945a98b3e`); **[Spec: name]** a requirement or scenario of this change's delta
 `specs/statusline/spec.md`; **[E §n]** `research-eleanor.md`; **[EA x]** its "Eleanor addendum 1" (measured answers,
 item x); **[CA §n]** `research-chidi.md`, "Chidi addendum 1"; **[M n]** `michael-orientation.md` item n; **[council]**
-`council.md`. Test line numbers are at the base commit `4b87494` (the commit the branch had when the plan was
-approved; `905b14c`'s parent line is not the base); the tests are cited by name.
+`council.md`. Test line numbers are those of the tree Derek starts from, `BASE` (task 1.1): no commit since the design's approval
+touches `tests/`, `extensions/`, `package.json` or `pnpm-lock.yaml` (the conductor's measured answer); the tests are cited by name.
 
 ## How to read the tasks
 
@@ -32,16 +32,22 @@ approved; `905b14c`'s parent line is not the base); the tests are cited by name.
 - **No task edits a spec.** The two MODIFIED paragraphs that sit at 496 characters are Bambadjan's and Michael's; any
   later wording change to the delta is re-measured by whoever makes it, and does not happen in this list.
 
-**Checks the tasks cite** (run from the repository root, `BASE=4b87494`). Each was run red and green on the real tree by
-Eleanor, in a scratch copy [EA A1-A5].
+**Checks the tasks cite** (run from the repository root). `BASE` is the HEAD Derek starts from, recorded in task 1.1 as
+`BASE=$(git rev-parse HEAD)`; the conductor commits the approved plan before handing over, so every `git diff $BASE`
+check is silent at the start. A base older than the plan's own commits is not silent: it prints files under
+`openspec/changes/cell-widths/` (Michael's gate run `cf833233-b180-4aa8-8d92-097b4e256db1`). Each check was run red and
+green on the real tree by Eleanor, in a scratch copy [EA A1-A5].
 
 - **A1** `git diff -U0 $BASE -- tests/ | grep -E '^-.*assert'`: silent on the unmodified tree; prints
   `-  assert.equal(visibleWidth(line), 80);` after one assertion is weakened; silent when only a fixture line
-  (`id: "row-0",`) gains `distribution: "equal"`. Any line it prints is a removed assertion.
+  (`id: "row-0",`) gains `distribution: "equal"`. Any line it prints is a removed assertion. After task 1.2 it prints
+  exactly one line, the export pin's (`tests/jefferson.test.ts:311`, `assert.deepEqual(Object.keys(row).sort(),
+  ["ALIGNMENTS"]);`), because 1.2 edits that single assertion line to add `DISTRIBUTIONS` (Michael's gate run). From then on
+  "A1 prints only the pin line" is the silent state, and `:551` joins it after 4.1.
 - **A2** `git diff -U0 $BASE -- tests/ | grep -E '^-[^-]'`: silent on the unmodified tree; prints every removed line,
   fixture lines included.
-- **A3** `git diff --name-only $BASE -- '*.md'`: silent on the unmodified tree; prints `README.md` after an edit. The
-  only path it may print at the end is `openspec/changes/cell-widths/tasks.md`.
+- **A3** `git diff --name-only $BASE -- '*.md'`: silent at the start (`BASE` is the HEAD Derek starts from); prints
+  `README.md` after an edit. The only path it may print at the end is `openspec/changes/cell-widths/tasks.md`.
 - **A4** `grep -nE " from [\"']|import\(" <file>`: prints lines on `visuals/row-renderer.ts`; silent (exit 1) on a file
   with no imports. It must be silent on the width plan's file.
 - **A5** The recipe for running the suite against pi-tui 1.5.0 in a scratch copy, in task 9.3.
@@ -59,16 +65,19 @@ The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the r
   `DISTRIBUTIONS = ["content", "equal"] as const` and `Row.distribution` in `visuals/row.ts` (mirroring `ALIGNMENTS`),
   the read beside `cells` and `id` in `normalizeRow`, and the default row carrying `"content"` [D5; E §5]. Verify:
   `pnpm test` shows the new test green. Mutation: the read defaults to `"equal"` and the absent case turns red.
-  Source: [Spec: The row option's values], [D5].
+  Setup, before the first edit: Derek records `BASE=$(git rev-parse HEAD)` in his report; `git merge-base --is-ancestor
+  <the commit the brief names> HEAD` succeeds; `git status --porcelain` prints nothing (a clean tree). Source: [Spec: The
+  row option's values], [D5].
 - [ ] 1.2 **Test fixtures that build `Row` literals declare `distribution: "equal"`, expectations untouched.** This lands
   in the same commit as 1.1, because `Row` now has a required field and `pnpm typecheck` is red until it does [EA B5].
   Test first: `pnpm typecheck` fails on `tests/row-renderer.test.ts` (`rowOf` and the 17 `id: "row-…"` literals, all
   built there and nowhere else). Edit only fixture lines: `rowOf` and each inline row gain the field. The export pin in
   `tests/jefferson.test.ts` ("the exported surface offers no way to supply or replace cell content") gains `DISTRIBUTIONS`
-  for `visuals/row.ts`: a new key, not a reshaped assertion. Verify: `pnpm typecheck` and `pnpm test` pass with the same
-  257 plus 1.1's tests; **A1 is silent** (no removed assertion line); **A2** prints only fixture lines and the export
-  pin's key line. Every row declares `"equal"` because that is what these expectations describe. Among them are the clip, wide-glyph, emoji, combining-mark and ANSI tests (base `:169`, `:185`, `:199`, `:212`, `:245`) and "the host closes an open style between cells" (`:230`): under `equal` a cell occupies `floor(W / N)` columns, so they are the evidence for the modified scenario of [Spec: A cell's alignment is the padding side inside it] ("the columns its row gave it"). The ruling that legitimises the edit is Joel's: *"a config option on the row can allow for the cells to get equal distribution as we
-  started with"* [R 2026-11-07]. Mutation: none (an edit to fixtures; the evidence is A1 silent).
+  for `visuals/row.ts`: a new key in one assertion line, `tests/jefferson.test.ts:311`
+  (`assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);`), which is edited in place. Verify: `pnpm typecheck` and
+  `pnpm test` pass with the same 257 plus 1.1's tests; **A1 prints only that pin line (`:311`)** and no other removed
+  assertion; **A2** prints only fixture lines and that pin line. Every row declares `"equal"` because that is what these expectations describe. Among them are the clip, wide-glyph, emoji, combining-mark and ANSI tests (base `:169`, `:185`, `:199`, `:212`, `:245`) and "the host closes an open style between cells" (`:230`): under `equal` a cell occupies `floor(W / N)` columns, so they are the evidence for the modified scenario of [Spec: A cell's alignment is the padding side inside it] ("the columns its row gave it"). The ruling that legitimises the edit is Joel's: *"a config option on the row can allow for the cells to get equal distribution as we
+  started with"* [R 2026-11-07]. Mutation: none (an edit to fixtures; the evidence is A1 printing only the `:311` pin line).
 - [ ] 1.3 **A `distribution` that is not one of the two rejects the whole document.** Test first
   (`tests/configuration.test.ts`): for each of `"equl"`, `"Equal"`, `4`, `null` the document is rejected, the default row
   renders (one row, `"content"`), and the warning names the key `distribution` and the value (as JSON) and lists both
@@ -95,7 +104,7 @@ The row option [R 2026-11-07 "The default"; D5]: its tuple, the row field, the r
   an edit: `configuration.test.ts` "unrecognised cell key" (still naming `"width"`), "every cell carries an instrument
   and an alignment" (exactly `["instrument", "align"]`), and the ceiling test (`DEFAULT_CELLS === 10`, `MAX_CELLS === 10`)
   [D3 "No per-cell override", D10, E §7]. Verify:
-  `git diff -U0 4b87494 -- tests/configuration.test.ts | grep -E '^-[^-]'` is silent (same command form as A2, narrowed to one file; the
+  `git diff -U0 $BASE -- tests/configuration.test.ts | grep -E '^-[^-]'` is silent (same command form as A2, narrowed to one file; the
   red-by-edit was shown on the whole-directory form). Mutation: none; a cell key added by mistake turns the exact-keys
   test red.
 
@@ -147,8 +156,9 @@ the import because the file does not exist yet.
   Test first: `[L5, L5, L5]` at W=40 gives `[5, 6, 29]` (C=15, two joints, S=23); `[R7, R7]` at 30 gives `[22, 8]`
   (no left-aligned cell, so the first absorbs); `[L5, R7, L0]` at 40 gives `[33, 7, 0]` (the empty last-left cell does
   not absorb); `[L5]` at 40 gives `[40]`. Every `grow` is 0 here. The inputs that separate right from wrong: `[L5, L5, L5]`
-  makes "the first cell absorbs" give `[28, 6, 6]`; `[L5, R7, L0]` makes "last left-aligned, empty or not" give
-  `[5, 7, 28]`. Boundaries: all-left, none-left, an empty last-left cell, a single cell. Mutation: pick the first cell
+  makes "the first cell absorbs" give `[29, 5, 6]` (the absorber's boundary loses its joint); `[L5, R7, L0]` makes
+  "last left-aligned, empty or not" give `[5, 8, 27]`; both are red against the correct `[5, 6, 29]` and `[33, 7, 0]`
+  (Michael's measurement). Boundaries: all-left, none-left, an empty last-left cell, a single cell. Mutation: pick the first cell
   and `[L5, L5, L5]` turns red; drop the emptiness test and `[L5, R7, L0]` turns red. Source: [Spec: Cells are evenly
   distributed, the absorber sentence], [council "Slack"], [D4 "Absorber"].
 - [ ] 3.3 **An empty content cell takes 0 columns; an all-empty row gives the slack to its first cell.** Test first:
@@ -202,7 +212,7 @@ the import because the file does not exist yet.
 
 `visuals/row-renderer.ts`, the one adapter that names pi-tui [D1]: it probes each content cell, calls the plan and seats
 the result. Tests in `tests/row-renderer.test.ts` and `tests/jefferson.test.ts`. In this group the seat keeps today's
-`shrink: 0`, the one-slot memo and the width-only re-seat; 6.2, 7.1 and 7.3 each start with a failing test and fix one.
+`shrink: 0`, the one-slot memo and the width-only re-seat; 6.1, 7.1 and 7.3 each start with a failing test and fix one.
 The tests of 4.1, 4.5 and 4.6 are written together and are red together against the footer as 4.0 leaves it (each names
 its red case); each ticks when its own behavior is green. 4.3 and 4.4 pin decisions 4.1's code makes and are
 characterization.
@@ -212,17 +222,18 @@ characterization.
   the step that keeps the suite green when 4.1 flips the default. In `tests/jefferson.test.ts` the documents of the three tests that pin per-cell equal strings (five assertions) gain `"distribution": "equal"`, expectations untouched: the `padEnd(40)` pair
   (`:587`, `:592`) and `padEnd(80)` (`:610`) in "a dispatched turn boundary…" and "an unchanged turn boundary before the
   first render…", and the `padEnd(8)` pair (`:626`, `:629`) in the `new/resume/fork/reload` replacement test [EA B1]. Derek's report names each of the three tests. "configured formats, styles and a width-taking bar render end to end" (`:543`, assertion `:551`) is copied to a new test,
-  "…under equal distribution", whose document carries the option and whose expectation is the old string. Verify: **A1** prints nothing; `pnpm test` passes. The
+  "…under equal distribution", whose document carries the option and whose expectation is the old string. Verify: **A1** prints only the `:311` pin line (1.2); `pnpm test` passes. The
   ruling that legitimises each: Joel's default and its opt-out [R 2026-11-07], and each of these tests' subject is repaint,
   the cache or session replacement, not geometry. Derek's report names the twin. Mutation: none
-  here; the evidence is A1 silent and the suite green.
+  here; the evidence is A1 printing only the pin line and the suite green.
 - [ ] 4.1 **A content cell takes the width its text needs, and the footer asks for it at width 0.** Test first
   (`tests/row-renderer.test.ts`, rows declaring `"content"`): `[L "ab", R "cdef"]` at 40 renders `ab`, 34 spaces,
   `cdef`; `[L "ab"]` at 20 renders `ab` and 18 spaces; at 6 the same two cells render `ab` and `cdef` with no space
   between (W equals the text widths). Plus the same flip in `tests/jefferson.test.ts`: the assertion at `:551` becomes
-  the rule's arithmetic, written in the test and not copied from output: the `model` cell takes its text's width (31
-  columns [EA B1]), the `$bar` cell takes the other 49 of the 80, so the line is the model text, `43.2% ` and
-  `floor(0.432 × 43)` = 18 `█` then 25 `░`; the old string is 4.0's twin. Red because every cell is `floor(W/N)` today (`[L "ab", R "cdef"]` at 40 gives two cells of 20).
+  the rule's arithmetic, written in the test and not copied from output: the `model` cell takes its text's width (32
+  columns by `visibleWidth`: `🧠: claude-opus-4 from anthropic`; addendum B1's 31 is off by one, Michael's measurement),
+  the `$bar` cell takes the other 48 of the 80, so the line is the model text, `43.2% ` and a bar of 42 columns,
+  `floor(0.432 × 42)` = 18 `█` then 24 `░`; the old string is 4.0's twin. Red because every cell is `floor(W/N)` today (`[L "ab", R "cdef"]` at 40 gives two cells of 20).
   Deliverable: the footer computes the plan each render (probes taken at width 0, memoized by the cell), seats `basis` and
   `grow` through `clear()` and `addChild` as today, and leaves a cell's own pad and clip as they are [D1, D2, D9].
   Boundaries: two cells, one cell, W equal to the text widths. Verify: the new tests pass; every test under `equal` still
@@ -231,7 +242,7 @@ characterization.
 - [ ] 4.2 **A row declaring `equal` is not probed and lays out as it always did.** Characterization: the existing
   test "an instrument resolves once per (sample, width) within a render, and again in the next render" (base `:330`, widths
   `[30, 30, 30, 10, 10, 10, 30]`) and the equal-string tests of 1.2 stay green with their expectations untouched; the
-  plan's `equal` branch seats `floor(W / N)` and `grow` 1. Verify: **A1** prints nothing, and the sequence test passes
+  plan's `equal` branch seats `floor(W / N)` and `grow` 1. Verify: **A1** prints only the `:311` pin line, and the sequence test passes
   with its original array. Mutation: an `equal` row probes at width 0 and the sequence test turns red in its first
   entry; an `equal` row applies a joint and a right-aligned `equal` fixture string changes. Source: [Spec: A width that
   divides evenly… with the row option that restores equal shares], [D4 step 1; design guards table, "Equal distribution reproduces today"].
@@ -245,11 +256,12 @@ characterization.
   and styled cases turn red, by columns. Source: [Spec: Cell widths are measured in terminal columns, both scenarios],
   [D2], [E §1, M 2h].
 - [ ] 4.4 **The probe is taken at width 0, unpadded and unclipped, not at the row's width.** Characterization of 4.1,
-  same form. Test: a fake instrument not marked as filling that renders `ab` at width 0 and `ab` plus a `#` for each
-  column of any other width, in `[L it, R "cd"]` at 40: the line is `ab`, 36 spaces, `cd`, with `cd` at the last two
-  columns and no `#` anywhere. A second fake whose text at width 0 is 120 columns, in a row at 80, is measured whole,
-  not clipped first: 6.2's three-cells-of-40 case covers the clip. Mutation: probe at the row's width and the cell
-  claims the whole row, so the line carries `#` and `cd` is displaced (red). Source: [D2 "Why width 0"; M 2a; CA §1(d), §2].
+  same form. Test: a fake instrument not marked as filling that renders `ab` at every width except the row's own, 40,
+  where it renders `ab` plus 38 `#` (40 columns), in `[L it, R "cd"]` at 40: the final text is resolved at the cell's
+  allocated width, 38 [D8], so the line is `ab`, 36 spaces, `cd`, with `cd` at the last two columns and no `#` anywhere.
+  A probe at 40 would be the only render that carries `#`. A second fake whose text at width 0 is 120 columns, in a row at 80, is measured whole,
+  not clipped first: 6.1's three-cells-of-40 case covers the clip. Mutation: probe at the row's width and the cell
+  claims the whole row, so `cd` is displaced (red). Source: [D2 "Why width 0"; M 2a; CA §1(d), §2].
 - [ ] 4.5 **`blank` and `$bar` cells fill and share the rest, differing by at most one.** Test first
   (`tests/row-renderer.test.ts`, fakes marked as filling): `[F, F, F]` at 100 where the cells render `a`, `b`, `c` starts
   them at columns 0, 34 and 67 (34/33/33); `[F, L31, F]` at 90 lays out 30, 31 and 29 columns (the first fill takes the
@@ -275,8 +287,8 @@ allocator at the boundaries of the design's guards table, so they are first-run 
 is the named mutation, and they are the boundary tests that D11 says would fail first against a different allocator.
 
 - [ ] 5.1 **A joint sits ahead of a left-aligned or centered cell's text, plain and unstyled.** Test first: `[L5, L5, L5]`
-  at 20 renders `aaaaa`, a space, `bbbbb`, a space, `ccccc` and 5 spaces (the joints sit before `b` and `c`, and `c`
-  absorbs the slack to its right); `[R "a", R "bc"-styled-open]` at 4 renders `a`, a space, then the style escape and `bc`, with the space
+  at 20 renders `aaaaa`, a space, `bbbbb`, a space, `ccccc` and 3 spaces (the plan is `[5, 6, 9]`; the joints sit before `b` and `c`,
+  and `c` absorbs the slack to its right); `[R "a", R "bc"-styled-open]` at 4 renders `a`, a space, then the style escape and `bc`, with the space
   before the escape (the joint carries no styling), and the host's line-end reset is untouched. Boundaries: a left-aligned
   cell with a joint, a styled right cell. Red because 4.1 counts the joint in the cell's basis but the cell puts the spare
   column after a left-aligned text, so the `[L5, L5, L5]` line has its spaces in the wrong place. Deliverable: the cell
@@ -320,22 +332,26 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
 
 ## 6. One line at every width, and overflow
 
-- [ ] 6.1 **Every column is allocated, at any width, with the composition the host's.** Characterization of the plan and
-  the footer through the real allocator (first-run green; its failing side is the mutation). Test
+- [ ] 6.1 **When the content needs more than the row, every cell can give up columns, and a row is still one line of
+  W.** Test first: three cells of 40 columns each at 80 render one line of 80 columns, no cell's text carries a line break,
+  and each of the three cells' text ends with the ellipsis (pi-tui allocates `[22, 27, 31]` [CA §1(c)]); the same three cells growing from 5 to 40 columns between two renders at 80 give the same one line of 80 columns on the second; a row whose
+  cells need 41 columns with `[L40, L1]` at 40 renders 40. The assertion names no column count for who lost. Red
+  because 4.1 keeps `shrink: 0`: the host's composite clips the line at W, so it is still one line of 80 (Michael
+  measured on pi-tui 1.4.0 an HStack of three 40-column children with `shrink: 0` at 80: one line of 80), but the later
+  cells are dropped by the clip and the earlier ones are not ellipsized, so the ellipsis assertion is the one that goes red. Deliverable: `shrink: 1`, `minSize: 0`, no `maxSize` seated on
+  every cell in both distributions [D4 step 4, D7]. Boundaries: totals over W by 40 and by 1. Mutation: `shrink: 0`, and the
+  later cells are dropped by the host's clip while the earlier ones are not ellipsized (red at the ellipsis assertion
+  only; the one-line assertions are not claimed red). Source: [Spec: Content that needs more than the row;
+  An instrument's text is wider than its cell; A cell's content grows], [R 2026-11-05], [D7, CA §1(c); design guards table, "One line when content grows"].
+- [ ] 6.2 **Every column is allocated, at any width, with the composition the host's.** Characterization of the plan and
+  the footer through the real allocator (first-run green; its failing side is the mutation). It follows 6.1 because
+  its overflow widths (W below C+J for `[L12, R20, R6]` and `[R6, R6, R6]`) rely on the `shrink: 1` that 6.1 seats. Test
   (`tests/row-renderer.test.ts`): for each W from 1 to 150, over the rows `[L12, R20, R6]`, `[F, L10, F, R7]`, `[L0, L0]`,
   ten `F`, `[R6, R6, R6]` and one `equal` row of seven cells, the footer's line is one line, `visibleWidth(line) === W`,
   and the line equals the existing helper's `composed(…)` of the cell strings (so any padding the extension added to the
   composed line would show) [E §7]. Fixed cases at S=0, S=1, `S mod G` = 0 and G−1, and W < N. Mutation: an absorber base of `n + S − 1` and `ceil` in place of `floor` each turn a fixed case red.
   Also run in both pi-tui versions in 9.3. Source: [Spec: A row spans the full width however its cells are sized], [D4,
   D11 conditions 1-3].
-- [ ] 6.2 **When the content needs more than the row, every cell can give up columns, and a row is still one line of
-  W.** Test first: three cells of 40 columns each at 80 render one line of 80 columns, no cell's text carries a line break,
-  and each of the three cells' text ends with the ellipsis (pi-tui allocates `[22, 27, 31]` [CA §1(c)]); the same three cells growing from 5 to 40 columns between two renders at 80 give the same one line of 80 columns on the second; a row whose
-  cells need 41 columns with `[L40, L1]` at 40 renders 40. The assertion names no column count for who lost. Red
-  because 4.1 keeps `shrink: 0`: the line is 120 columns. Deliverable: `shrink: 1`, `minSize: 0`, no `maxSize` seated on
-  every cell in both distributions [D4 step 4, D7]. Boundaries: totals over W by 40 and by 1. Mutation: `shrink: 0` or
-  `minSize` above 0 and the 80-column line becomes 120 (red). Source: [Spec: Content that needs more than the row;
-  An instrument's text is wider than its cell; A cell's content grows], [R 2026-11-05], [D7, CA §1(c); design guards table, "One line when content grows"].
 - [ ] 6.3 **`align` in a content cell with no spare columns changes nothing.** Characterization; the design adds no code
   for it [D7]. Test: `[X, L "yy"]` at 20, where `X` declares `left`, `right` and `center` in turn over text `abc`: the
   three lines are equal (the last cell is the left-aligned absorber each time; `X` has exactly its text's columns).
@@ -346,7 +362,9 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   truncated to one line", "an instrument resolving text wider than its cell is clipped and stays one line", "the footer
   renders one line per row, in order, each spanning the width", "more cells than columns still renders exactly one line
   of the width". A test that pins a per-cell string and cannot pass stays on `"equal"`, and Derek's report names it.
-  Verify: **A1** prints nothing. Mutation: `shrink: 0` and "more cells than columns" turns red (8 cells at 4 columns).
+  Verify: **A1** prints only the `:311` pin line. Mutation: none. These one-line tests do not catch `shrink: 0`: the host
+  clips at W, so eight 30-column children with `shrink: 0` at 4 render one line of 4 (Michael's measurement); 6.1's
+  ellipsis assertion is where `shrink: 0` is caught.
   Source: [D "Existing tests this change flips, held by the default"], [Spec: Instrument text is bound by the row's geometry].
 
 ## 7. The memo and the re-seat
@@ -390,7 +408,7 @@ instruments. The expected lines are built from counts and from the fixture's own
   `start({ cwd })`. At 100 the line is the `path` text, 46 spaces, the `model` text, one space, the `thinking` text; at
   132, 78 spaces; at 80, 26 spaces; at 54 the `path` text abuts the `model` text and the joint remains; at 53 no joint
   remains. The `thinking` text ends at the last column each time. This is the check that Joel's two rows keep rendering
-  with no edit [R 2026-11-07; M 2k]; **Joel's own observation is 10.1, and his.** This is the end-to-end tie: its first run comes after groups 4 to 7 and is green; its failing side is the base commit's equal shares, which Derek shows by running this test against `4b87494`'s sources in a scratch copy and reporting the failure. Mutation: none beyond 5.x's. Source: [Spec: A working directory
+  with no edit [R 2026-11-07; M 2k]; **Joel's own observation is 10.1, and his.** This is the end-to-end tie: its first run comes after groups 4 to 7 and is green; its failing side is the base commit's equal shares, which Derek shows by running this test against `BASE`'s sources in a scratch copy and reporting the failure. Mutation: none beyond 5.x's. Source: [Spec: A working directory
   at the left, two instruments together at the right; The row is narrower], [D "Joel's two rows, with no edit"].
 - [ ] 8.2 **Joel's second row keeps its thirds, with a real `$bar`.** Characterization: the thirds are the same under
   the base commit's equal shares, so the test is green on first run and guards the fill rule. Test: `blank`, `blank` and
@@ -425,13 +443,14 @@ Each step produces evidence for Derek's report. No step changes the repository.
 
 - [ ] 9.1 **The whole suite, types and the spec validate green.** `pnpm typecheck`; `pnpm test` (257 plus this change's
   tests, 0 fail, 0 skipped); `openspec validate "cell-widths" --strict`. Verify: Derek's report quotes the three results.
-- [ ] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `4b87494` and list the output. A1 prints only
-  the one assertion at `tests/jefferson.test.ts:551` (the model half, flipped by 4.1 to the rule's arithmetic, with the old
+- [ ] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `BASE` and list the output. A1 prints only
+  two lines: the export pin at `tests/jefferson.test.ts:311` (1.2 adds `DISTRIBUTIONS`) and the assertion at `:551` (the model half, flipped by 4.1 to the rule's arithmetic, with the old
   string kept as 4.0's `equal` twin; ruling: Joel's default [R 2026-11-07], derivation in the test). A2 prints only
-  fixture lines in `tests/row-renderer.test.ts` (each `distribution`), the export pin's keys, the five `distribution`
-  lines in `tests/jefferson.test.ts` and the `:551` line; nothing in `configuration.test.ts`, `format.test.ts`,
+  fixture lines in `tests/row-renderer.test.ts` (each `distribution`), the pin line `:311`, in `tests/jefferson.test.ts` the
+  two one-line document literals 4.0 rewrites (`:584` and `:604`; the third test's document is multi-line, so its
+  added `distribution` line prints nothing) and the `:551` line, as the conductor measured by reading; nothing in `configuration.test.ts`, `format.test.ts`,
   `instrument.test.ts` or `session-data-store.test.ts`. Run **A3**: it prints only
-  `openspec/changes/cell-widths/tasks.md`. `git diff --name-only 4b87494 -- package.json pnpm-lock.yaml` prints nothing
+  `openspec/changes/cell-widths/tasks.md`. `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing
   (the `devDependencies` stay at 1.4.0 [D11]; same command form as A3, red-by-edit not separately run). Any line outside this list is a
   finding. Mutation: none; the check is the evidence.
 - [ ] 9.3 **The suite against pi-tui 1.5.0, in a scratch copy outside the repository.** Evidence goes in Derek's report;
@@ -440,7 +459,7 @@ Each step produces evidence for Derek's report. No step changes the repository.
   move in its three dependencies (`get-east-asian-width@1.6.0`, `marked@18.0.11`, `marked-cjk-friendly@0.1.2`), or the
   suite fails to load (`ERR_MODULE_NOT_FOUND … 'marked'`). Proof of the version:
   `node -e "console.log(require('./node_modules/@earendil-works/pi-tui/package.json').version)"` prints `1.5.0`. Then
-  `pnpm test` in the scratch copy: all tests pass, including 6.1's every-width sweep and 3.x through the real
+  `pnpm test` in the scratch copy: all tests pass, including 6.2's every-width sweep and 3.x through the real
   allocator. This is the decision-4 simulation re-run against the real width plan, in both versions (1.4.0 is 9.1). Verify: version
   proof printed, result quoted. Source: [D11], [CA §1, §2, §3].
 - [ ] 9.4 **The width-0 probe holds over every shipped declaration, at the implementation gate.** Re-run 2.2: for each of
