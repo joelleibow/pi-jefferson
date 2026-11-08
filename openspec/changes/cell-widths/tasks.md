@@ -506,6 +506,10 @@ Each step produces evidence for Derek's report. No step changes the repository.
   prints two paths, `openspec/changes/cell-widths/design.md` and `openspec/changes/cell-widths/tasks.md`. Both are change
   artifacts, not stray Markdown files: `tasks.md` carries Derek's tick marks and the routed corrections, `design.md` the
   conductor's correction commit `63aca91` and the routed corrections. No `README.md` or other project document appears.
+  That two-path figure is as of `986d8eb`, the implementation gate's final code commit. The docs pass (commits `67ee53f`
+  through `7312f88`) came after it and adds `README.md`, `ARCHITECTURE.md`, `AGENTS.md` and
+  `docs/adr/0007-a-cell-takes-the-width-its-content-needs.md` by design, so at HEAD A3 prints six paths and those four are
+  not findings.
   `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing (the `devDependencies` stay at 1.4.0
   [D11]). Any line outside this list is a finding. Ticked on the final measured output above. Mutation: none; the check
   is the evidence.
