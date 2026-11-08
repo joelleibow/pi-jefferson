@@ -202,6 +202,9 @@ the import because the file does not exist yet.
   Mutation: `>=` for `>`, and a drop of one joint at a time; each turns red at the named width. Source: [Spec: A joint
   beside an absorbing cell at the margin; The joints collapse together; The joint collapses before content does], [D6
   "It gives way first"], [R 2026-11-07 "on a row too narrow for it, the column gives way before any content does"].
+  *Expectation corrected at implementation, never the code (Derek's report, call 7):* `[R6, R6, R6]` at 19 gives
+  `[7, 6, 6]`. Both joints are gone, the one freed column is the absorber's, and with every cell right-aligned the
+  absorber is the first non-empty cell (3.2).
 - [x] 3.8 **The plan imports nothing, and its export is pinned.** Verify: **A4** on the plan's file is silent (no
   `import`, no `from`), and the export pin in `tests/jefferson.test.ts` gains an entry for the file: a new key, not a
   reshaped assertion (the pin goes red when the file exports, then the entry is added). Red/green evidence for A4: it
@@ -309,12 +312,21 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   [Spec: No joint beside an absorbing cell], [D6]. Boundary: absorber on the left, and `[R5, R7]` where the right-aligned
   first cell absorbs: only its spare columns are before it, and the joint before the second cell is present. Mutation:
   give the absorber's boundary a joint and the second cell is 33 wide (red).
+  *Amended after measurement (Derek's report, "Findings a mutation exposed"):* this mutation is unobservable at the
+  footer. The joint and the slack trade one column one for one, so the composed line is byte-identical and the second
+  cell still occupies 32. The guard that catches it is the plan's unit test in 3.6 (`[L15, R32, R6]` gives
+  `[61, 32, 7]` with joints `[no, no, yes]`). 5.3's assertions stand as characterization; its mutation line is not a
+  claim.
 - [x] 5.4 **No joint beside a fill cell, and none for an empty cell.** Test: `[R5, F, R7]` at 12 (W equals the two
   texts) renders the two texts abutting with neither shortened, at 11 renders one line with one text clipped at its end,
   and at 30 shows the fill cell between them; `[R5, R0, R7]` at 20 puts a one-column joint before the third text and none
   at the empty cell. Boundaries: S=0 and S<0 with a fill between; an empty between two content cells. Mutation: count the empty cell as a
   neighbor or give the fill boundary a joint and the third text moves a column (red). Source: [Spec: No joint beside a
   fill cell], [D6 "Reachable states"].
+  *Recorded after measurement (Derek's report):* the fill-boundary mutation stayed invisible at the footer until Derek
+  added the `S < G` case, `[R5, F, F, R7]` at 13, where the only spare column belongs to a fill cell; that case now
+  turns it red. *Expectation corrected at implementation, never the code:* the stated "a text gave way" is not asserted
+  once 6.1 made `shrink: 1` real; which cell loses columns is the allocator's and is not promised.
 - [x] 5.5 **The joint gives way before content: both right-aligned.** Test: `[R8, R8]` at 18, 17 and 16 renders
   ` a8 b8` (1 spare column before the first text, the joint kept), `a8 b8` (no spare column, the joint kept; `a8` is the 8-column text) and `a8b8`
   (the joint gone, both texts whole), each one line W columns wide. Boundaries: C+J+1, C+J, C+J−1. Mutation: `>=`
@@ -357,6 +369,8 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   three lines are equal (the last cell is the left-aligned absorber each time; `X` has exactly its text's columns).
   Boundary: the three alignments. Mutation: give a non-absorbing content cell one extra column without a joint and the
   `right` and `center` lines differ from `left` (red). Source: [Spec: An align in a cell with no spare columns].
+  *Expectation corrected at implementation, never the code (Derek's report, call 7):* the joint sits before the
+  absorber, so each line is `abc yy` followed by 14 spaces (3 + 1 + 2 + 14 = 20).
 - [x] 6.4 **The tests that assert only one line of W columns hold under the default.** Characterization. These four
   declare `"content"` in place of `"equal"` and pass with their expectations untouched: "content wider than its cell is
   truncated to one line", "an instrument resolving text wider than its cell is clipped and stays one line", "the footer
@@ -391,6 +405,8 @@ is the named mutation, and they are the boundary tests that D11 says would fail 
   compares each render's plan with the options it last seated and re-seats when the width or any `basis` or `grow`
   differs [D9]. Mutation: gate on the width only and the line has two spaces between the texts (red). Source: [Spec: A
   cell's content changes width], [D9, M 2i].
+  *Expectation corrected at implementation, never the code (Derek's report, call 7):* the row's slack is 45 at the
+  7-column text and 46 at the 6-column text (100 less 15, 32, the text and the one joint), the rule's arithmetic.
 - [x] 7.4 **A resize re-seats the default row.** Test first: the default-distribution twin of "cell widths are recomputed
   when the width changes": `[L15, R32, R6]` at 100, then at 90, equals a fresh footer's line at 90, and no cell keeps a
   width from 100. Boundary: a resize with the same content. Mutation: never re-seat and the 90-column line is 100
@@ -443,16 +459,30 @@ Each step produces evidence for Derek's report. No step changes the repository.
 
 - [x] 9.1 **The whole suite, types and the spec validate green.** `pnpm typecheck`; `pnpm test` (257 plus this change's
   tests, 0 fail, 0 skipped); `openspec validate "cell-widths" --strict`. Verify: Derek's report quotes the three results.
-- [ ] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `BASE` and list the output. A1 prints only
-  two lines: the export pin at `tests/jefferson.test.ts:311` (1.2 adds `DISTRIBUTIONS`) and the assertion at `:551` (the model half, flipped by 4.1 to the rule's arithmetic, with the old
-  string kept as 4.0's `equal` twin; ruling: Joel's default [R 2026-11-07], derivation in the test). A2 prints only
-  fixture lines in `tests/row-renderer.test.ts` (each `distribution`), the pin line `:311`, in `tests/jefferson.test.ts` the
-  two one-line document literals 4.0 rewrites (`:584` and `:604`; the third test's document is multi-line, so its
-  added `distribution` line prints nothing) and the `:551` line, as the conductor measured by reading; nothing in `configuration.test.ts`, `format.test.ts`,
-  `instrument.test.ts` or `session-data-store.test.ts`. Run **A3**: it prints only
+- [x] 9.2 **No other assertion was edited.** Run **A1** and **A2** against `BASE` and list the output. Measured by
+  Derek (`BASE` = `f6250ad0d6c5d99b52feac0c100a45e8e77638a2`, HEAD `0937c7b`):
+  **A1** prints only the pin assertion line, `-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"]);`
+  (`tests/jefferson.test.ts:311`, which 1.2 edits to add `DISTRIBUTIONS`). The `:551` expectation prints nothing: its text
+  survives byte-identically as 4.0's `equal` twin, so git matches it there and no assertion is removed on net.
+  **A2** prints 34 lines in Derek's report, all fixture, row-construction or pin lines and no assertion except the single
+  pin assertion A1 names. (Bambadjan re-ran A2 on HEAD: 33 lines, `jefferson.test.ts` 3, `format.test.ts` 2,
+  `instrument.test.ts` 2, `row-renderer.test.ts` 26; the one-line difference from 34 is in `row-renderer.test.ts`, where
+  every printed line is a row or instrument literal, none an assertion. The breakdown below is Derek's.)
+  - the pin line (`tests/jefferson.test.ts:311`);
+  - the two one-line `writeAgentDocument` document literals in `tests/jefferson.test.ts` (4.0);
+  - 10 row-fixture lines in `tests/row-renderer.test.ts` that now carry `distribution: "equal"`;
+  - `tests/format.test.ts`, 2 lines: the instrument literal (`fills: false`) and the footer row literal
+    (`distribution: "equal"`; Eleanor's "Row literals are built nowhere else in tests/" was wrong, `:175` builds one);
+  - `tests/instrument.test.ts`, 2 lines: the footer test's document literal (`"distribution": "equal"`) and the
+    `fills: bound.fills` passthrough (both ruled by the conductor);
+  - `tests/row-renderer.test.ts`, 15 more: 10 fake `{ render }` literals gaining `fills: false` (2.1) and 5 lines of 6.4's row
+    construction (`const line = lineAt(rowOf(3), 12);`, `[rowOf(2, "aa"), rowOf(4, "b"), rowOf(8, "c")],`,
+    `const line = lineAt(rowOf(8), 4);`, and two instrument-literal lines shared with the `fills` edit).
+  Nothing in `configuration.test.ts` or `session-data-store.test.ts`. **A3** prints only
   `openspec/changes/cell-widths/tasks.md`. `git diff --name-only $BASE -- package.json pnpm-lock.yaml` prints nothing
-  (the `devDependencies` stay at 1.4.0 [D11]; same command form as A3, red-by-edit not separately run). Any line outside this list is a
-  finding. Mutation: none; the check is the evidence.
+  (the `devDependencies` stay at 1.4.0 [D11]). Any line outside this list is a finding. Ticked on Derek's measured
+  output, the condition he set himself: his output equals this list, which now says exactly what the output is.
+  Mutation: none; the check is the evidence.
 - [x] 9.3 **The suite against pi-tui 1.5.0, in a scratch copy outside the repository.** Evidence goes in Derek's report;
   nothing changes in the repository. Recipe [EA A5]: copy the repository without `.git`; `npm pack
   @earendil-works/pi-tui@1.5.0`, unpack, and replace `node_modules/@earendil-works/pi-tui` with it; also `npm pack` and

@@ -390,11 +390,20 @@ kept as a twin that runs with `distribution: "equal"`.
   cell takes the rest of the 80 columns, so its `padEnd(40)` expectation becomes the rule's arithmetic and the old string
   stays as the `equal` twin. The per-cell `padEnd(40)`, `padEnd(8)` and `padEnd(80)` expectations at :587, :592, :610 and
   :626 are the same: each either gains the option or flips to the derived string, and Derek's report names which and why.
-  The export pin (:297-312) gains `DISTRIBUTIONS` and the width plan's export: new exports, not a reshaped test.
+  The export pin (:297-312) gains `DISTRIBUTIONS` and the width plan's export: new exports, not a reshaped test. Its one
+  assertion line, `assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS"])`, is the single assertion line the diff
+  edits and prints (A1); the fixture lines the other files gain are listed below.
 - *Unchanged, because no per-cell key is added:* `configuration.test.ts` :139 (`width` still rejects, naming `"width"`), :441 (a
   cell's exact keys are `["instrument", "align"]`), :245 (the ceiling). Any test that deep-compares a `Row` gains the
-  field `distribution: "content"`; E §7 names none, and Derek reports any he finds.
-- `format.test.ts` and `instrument.test.ts` do not change: the bar's arithmetic is untouched.
+  field `distribution: "content"`; E §7 names none, and Derek reports any he finds. One was found, below.
+- `format.test.ts` and `instrument.test.ts` gain **fixture lines only; no assertion is edited**. The bar's arithmetic is
+  untouched, but `fills` is a required fact on `Instrument`, so a fixture that builds an instrument declares
+  `fills: false`, and a row literal declares `distribution: "equal"`. Eleanor's "Row literals are built nowhere else in
+  tests/" was wrong [E §7]: `tests/format.test.ts:175` builds one. By file: `format.test.ts` gains `fills: false` on its
+  instrument literal and `distribution: "equal"` on its footer row literal; `instrument.test.ts` gains
+  `"distribution": "equal"` in the footer test's document (the conductor ruled it that test's `equal` twin, since the
+  default would make `tokens` absorb and move its resolve count from 4 to 6) and the `fills: bound.fills` passthrough;
+  `row-renderer.test.ts` gains `fills: false` on its fake `{ render }` literals. Task 9.2 lists the measured lines.
 
 **Documents the change makes false** (the docs pass handles them; none is a task here):
 
