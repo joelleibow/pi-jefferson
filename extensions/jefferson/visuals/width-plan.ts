@@ -3,8 +3,8 @@
  * carry the joint. A pure function over columns, and the only geometry Jefferson decides: the
  * host still spends any remainder and takes any deficit.
  *
- * It imports nothing (decision 1), so the two value sets it reads are restated here; the footer's
- * call fails `tsc` if either ever drifts from `visuals/row.ts`.
+ * It imports nothing (ADR 0007), so the two value sets it reads are restated here; the footer's
+ * call fails `tsc` if `visuals/row.ts` adds a value to either.
  */
 
 type Distribution = "content" | "equal";
