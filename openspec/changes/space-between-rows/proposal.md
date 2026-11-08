@@ -4,8 +4,9 @@ Citations: **[R]** `owner-rulings.md`; **[E §n]** `research-eleanor.md` (**[E A
 addenda); **[C §n]** `research-chidi.md` (**[C A1 Qn]** its addendum); **[M n]** `michael-orientation.md`,
 by the numbered section (1 decisions on record, 2 traps, 3 calls that are Joel's, 4 strongest challenge).
 The orientation is a consult, not a ruling; each of its items points at the decision it cites.
-Nothing about the product shape is decided yet. This proposal states the problem, the evidence and the
-questions; the council and Joel's rulings answer them.
+This proposal states the problem, the evidence and the questions. The council and Joel's rulings answered
+them; each open question below ends with where it is settled. **[Co]** is `council.md`, **[J1]**, **[J2]**
+and **[CR]** its "Joel's rulings" section, **[D n]** `design.md`'s numbered decision.
 
 ## Why
 
@@ -95,7 +96,7 @@ the delta.
 
 ### Not in this change
 
-- A default, an amount, a key, a name or a mechanism: all are open below.
+- A per-row setting, a ceiling, a loud unknown-key rule or a `blank` row as the answer [Co, rejected].
 - Per-cell vertical alignment, a row's height above one line, or a cell returning two lines: a row stays
   one line [R].
 - The horizontal gap between cells, `GAP = 0` in the row renderer, and ADR 0002 and ADR 0007's "no gap",
@@ -122,22 +123,29 @@ list of the calls that are Joel's [M 3].
    necessary"* [R]; his *"The ideal as the default, plus an escape hatch for what a break removes"* [R]
    would then call for a way back to no space. Joel's own two-row document would become three lines with no
    edit [M 2].
+   **Settled:** yes, one line [J1, Co]; with a line above row one, four lines [J2, CR]; the way back is `rowGap: 0` [D 1, D 2].
 2. **How much**: one line, or a number? pi-tui accepts any non-negative integer; a ceiling, if any, is a
    product call [M 3].
+   **Settled:** one by default; any whole number of 0 or more, no ceiling [J1, Co; D 4].
 3. **Can a user set it at all, and where does it live**: once per document, or per row? A document-level
    value maps to a `VStack` `gap`, a per-row value to `Spacer` entries between `HStack`s [M 2 "VStack gap"].
    Which keys the "both shapes at once" rejection lists depends on the answer [M 2 "unknown keys"].
+   **Settled:** once per document, no per-row setting, accepted beside either envelope and not a conflict with `rows` [Co, J1; D 4].
 4. **What is the key called**, if there is one? `gap` already names three things here: the `HStack`'s
    inter-cell gap, the label's gap, and the `VStack` `{ gap: 0 }` [M 2 "The word gap"]. `row-gap` is
    CSS's term and `gap` pi-tui's [C §3]. The vocabulary rule rejects "module" and "widget" [R].
+   **Settled:** `rowGap` [J1].
 5. **Does "between rows" include space above row one**, between the editor and the footer? Today there is
    none, in Jefferson's footer or pi's [M 2]. A leading space is a `Spacer` first, not a `VStack` gap [M 2].
+   **Settled:** yes, always; `rowGap` governs both places [J2, CR]; the mechanism is a zero-line `Spacer` first [D 2].
 6. **Should a misspelled or unknown row or document key warn or reject?** Today it is silent [E A2 §2]. A
    loud rule is new mechanism with an interaction with `containers`, and Joel has not asked for it [M 2,
    M 3].
+   **Settled:** silent, recorded as a `shortcut:` [Co rejected Q6; D 7].
 7. **Is a `blank` row an acceptable answer** for anyone, since it works today [E A2 §1], or must the
    concept exist in its own right, without a row id, a count in `/jefferson` and a dependency on the
    `blank` format override? [M 2, M 4]
+   **Settled:** no; it is a configured row, not a default [Co rejected Q7].
 8. **The row above the footer.** Joel asked that it be considered [R]. What, if anything, does this change
    do about it? The evidence bears on the choices but does not make them:
    - pi adds no space between a `belowEditor` widget and the footer, and a footer cannot learn that the
@@ -152,6 +160,8 @@ list of the calls that are Joel's [M 3].
      otherwise.
    - Chidi did not run this live in pi, and did not audit `tui` for a public way to enumerate widget
      containers [C A1 Q1, Q3]. Both are unknowns, not findings.
+   - **Settled:** nothing is done to the fleet-status row; the footer's space above row one is unconditional,
+     which Joel chose knowing it shows in every session [J2; D 2]. `setStatus` stays out [R, "One card"].
 
 The strongest challenge to the card, from the orientation: the capability exists, so the change is a
 one-question product decision (a default, and if so the way back), not a spacing model [M 4]. If the council
@@ -166,9 +176,9 @@ None.
 ### Modified Capabilities
 
 - `statusline`: the delta modifies two requirements. "A row is one line tall" no longer says the footer's
-  height is the number of declared rows; it says any space between rows belongs to the footer's stack, never
-  a row's or a cell's line. "The statusline renders the declared rows" has one scenario reworded so it holds
-  with or without space between rows. It adds no requirement and decides no open question.
+  height is the number of declared rows; it says any space above row one or between rows belongs to the
+  footer's stack, never a row's or a cell's line. "The statusline renders the declared rows" has one scenario
+  reworded. It adds two requirements: the default space above row one and between rows, and `rowGap`.
 
 ## Impact
 

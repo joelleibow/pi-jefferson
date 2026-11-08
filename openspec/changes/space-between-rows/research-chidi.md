@@ -83,3 +83,66 @@ Evidence only. `$PI` = `~/.local/share/fnm/node-versions/v26.8.1/installation/li
 - In the regular (scrollback) renderer, nothing found trims empty lines (see main report, unaudited renderer caveat). In fullscreen, the layout path measures `render().length` for the footer (`layout.js` `measureHeight`), so a leading `""` counts as one row of height; `shrink: 1, minSize: 0` means that row can be squeezed away on a short terminal along with the rest.
 - **Not run.** I have not rendered this live in pi; this is read from source. Whether a leading blank row also appears when no widget is present (i.e. a blank above the footer under the editor) follows from the same code: there would be a blank row directly below the editor. `widgetContainerBelow` with no widgets renders zero lines.
 - pi-subagents context: `fleet-status.js:638` calls `ctx.ui.setWidget(FLEET_STATUS_WIDGET_KEY, (tui, theme) => …)` with no placement per the brief (line numbers 45/516 given by the conductor; I only confirmed 638, 1060, 1095 in the file). Per the brief it is `belowEditor`; I did not verify the placement argument in that file.
+
+## Addendum 2 — the space above row one
+
+Evidence only. Probe run against the repository's pinned pi-tui 1.4.0 (`node_modules/@earendil-works/pi-tui/dist`), in `/tmp/probe-g/` (outside the repo). Stand-in rows each render one line `[rowN]`. Shapes: (a) `VStack([Spacer(0), row1, row2], {gap:g})`; (b) `VStack([Spacer(g), row1, row2], {gap:g})`; (c) `VStack([Spacer(g), VStack([row1,row2],{gap:g})], {gap:0})`.
+
+### `render(80)` output, `JSON.stringify`
+
+```
+a 0 ["[row1]","[row2]"]
+a 1 ["","[row1]","","[row2]"]
+a 2 ["","","[row1]","","","[row2]"]
+b 0 ["[row1]","[row2]"]
+b 1 ["","","[row1]","","[row2]"]
+b 2 ["","","","","[row1]","","","[row2]"]
+c 0 ["[row1]","[row2]"]
+c 1 ["","[row1]","","[row2]"]
+c 2 ["","","[row1]","","","[row2]"]
+```
+
+- At g = 0 all three are `["[row1]","[row2]"]`, identical to a plain `[row1, row2]` footer.
+- (a) and (c) agree for every g: g blank lines above row one and g between rows. (b) puts 2g above row one (Spacer g plus the stack gap g) and g between rows.
+
+### From source (pi-tui 1.4.0; 1.5.0 files are identical — `stack.js`, `v-stack.js`, `layout-node.js` same; `layout.js` differs only in Kitty image cropping at 256-275)
+
+- **Does `Spacer(0)` change anything at g = 0?** In `VStack.render`, `Spacer(0)` is an entry (`v-stack.js:9-10`), renders `[]` (`spacer.js:15-21`), gets size 0 from `allocateStackSizes` (`stack.js:100`, `clampSize` 58-62), and pushes no lines (`v-stack.js:18-22`). A gap is pushed only for `index > 0` and `this.gap` times (`v-stack.js:13-17`), so with gap 0 the entry adds nothing. The render path calls `allocateStackSizes(..., undefined, gap)` (`v-stack.js:11`), where `availableSize === undefined` returns before the gap is used (`stack.js:101-102`). Confirmed by the probe (a, g = 0).
+- **With g ≥ 1, `Spacer(0)` as first entry is what produces the leading gap** in (a): it is entry 0, so row one is entry 1 and receives `gap` blank lines before it (`v-stack.js:13-17`). It counts as a visible entry even though it has zero lines (`visibleStackEntries`, `stack.js:55-57`).
+- **Layout path** (a stack that is itself a layout node, `stack.js:46-53`): `layoutComponent` counts every visible entry, zero-line or not, in `gapTotal = (entries.length - 1) * node.gap` (`layout.js:96-97`), natural height adds it (101), and `allocateStackSizes` subtracts `(entries.length-1)*gap` from available space (`stack.js:103`). A `Spacer(0)` raises `entries.length` by one, so it adds one more `gap` to `gapTotal` when g ≥ 1 and nothing when g = 0. A zero-size entry can only shrink if `sizes > minSize`, so it stays 0 (`stack.js:72`).
+- **Is the footer a layout node in pi's dock?** No. pi's footer is `footerContainer`, a plain `Container` (`interactive-mode.js:414`; `Container` has no `[LAYOUT_NODE]`, `tui.js:96-148`; only `Stack` defines it, `stack.js:46`). `chat-viewport.js:18` gives it `{shrink:1, minSize:0}` in the dock VStack. For a non-layout component, `layoutComponent` renders it to lines and measures `lines.length` (`layout.js:28-29, 50-53`); when the dock allocates fewer rows, `paintBox` paints only rows `< rect.y + rect.height` (`layout.js:226-231`), i.e. it **truncates from the bottom** (lines beyond the allocated height are not painted; `lineOffset` only moves for a cursor marker, 54-59). So the footer's inner VStack is flattened through `VStack.render`, and the nested layout path (97, 114) is not used for it.
+- **Do (a), (b), (c) differ when squeezed?** Probe, with the footer wrapped in a `Container` as pi does, dock = `[editor 3 lines (minSize 3), footer]` under a transcript, screen heights 5-8 (probe `probe-container.mjs`, rows shown are the last h−1 screen rows):
+  - (a) and (c) produce identical lines at every height tried (e.g. g=1, h=7: `["E1","E2","E3","","[row1]",""]`; h=6: `[...,"","[row1]"]`; h=5: `[...,""]`).
+  - (b) differs only because it carries 2g leading blanks (g=1, h=8: `["E1","E2","E3","","","[row1]",""]`; g=2, h=8: `["E1","E2","E3","","","",""]`, only blanks remain, row one already cut).
+  - In all three, squeezing drops lines **from the bottom**: row two goes first, then the blank between rows, then row one, and leading blanks are kept longest. So the leading blank row(s) are the last to be dropped, and row content goes before them.
+- **Contrast, if the footer stack were a direct layout node** (not how pi mounts it; probe `probe.mjs`, `fs` lines): the layout path shrinks entries by weight, so a squeezed (a) at g=1, h=7 gave `["E1","E2","E3","","","[row2]"]` (row one dropped, row two kept), and (c) at g=1, h=7 gave `["E1","E2","E3","[row1]","","[row2]"]`; (a), (b), (c) differ in that mode. The full set is in the probe output.
+
+### Probe source (`/tmp/probe-g/probe.mjs`)
+
+```js
+import { VStack, Spacer } from "/Users/joelleibow/Projects/pi-jefferson/node_modules/@earendil-works/pi-tui/dist/index.js";
+import { renderLayoutFrame } from "/Users/joelleibow/Projects/pi-jefferson/node_modules/@earendil-works/pi-tui/dist/layout.js";
+const row = (n) => ({ render: () => [`[row${n}]`], invalidate() {} });
+const shapes = {
+  a: (g) => new VStack([new Spacer(0), row(1), row(2)], { gap: g }),
+  b: (g) => new VStack([new Spacer(g), row(1), row(2)], { gap: g }),
+  c: (g) => new VStack([new Spacer(g), new VStack([row(1), row(2)], { gap: g })], { gap: 0 }),
+};
+for (const s of "abc") for (const g of [0, 1, 2])
+  console.log(s, g, JSON.stringify(shapes[s](g).render(80)));
+// fullscreen dock: footer entry { shrink:1, minSize:0 } under editor (minSize 3), like chat-viewport.js:12-25
+const editor = { render: () => ["E1", "E2", "E3"], invalidate() {} };
+const transcript = { render: () => ["T"], invalidate() {} };
+for (const s of "abc") for (const g of [0, 1, 2]) for (const h of [12, 8, 7, 6, 5, 4]) {
+  const dock = new VStack([{ component: editor, shrink: 1, minSize: 3 }, { component: shapes[s](g), shrink: 1, minSize: 0 }]);
+  const root = new VStack([{ component: transcript, basis: 0, grow: 1, shrink: 1, minSize: 1 }, { component: dock, basis: "auto", grow: 0, shrink: 1, minSize: 1 }]);
+  const f = renderLayoutFrame(root, 80, h, () => {});
+  console.log("fs", s, g, h, JSON.stringify(f.lines.slice(-Math.max(0,h-1))));
+}
+```
+
+`probe-container.mjs` is the same file with `Container` imported and the footer entry wrapped: `const wrap = (c) => { const k = new Container(); k.addChild(c); return k; };` and `component: wrap(shapes[s](g))`.
+
+### Limits
+
+Probe uses stand-in rows with a fixed height (1 line each) and a fixed editor (3 lines, minSize 3); real pi has pending/status/widget containers in the dock. Not run inside a live pi session. Bottom truncation of the Container-wrapped footer is read from `layout.js:226-231` and confirmed by the probe, not by a live terminal.

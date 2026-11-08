@@ -170,3 +170,26 @@ In each object `warning` is `undefined` (the JSON serializer omits it). No warni
 > “Ruled: `align` with `left` as the default and `right` available. **`width` and a `spacer` instrument are declined** — a relative share pool means deciding what the pool totals, what happens when shares overshoot, and how the remainder distributes, all to produce a gap that `align` already provides. Proportional layout is an addition to this shape if a real need appears later.”
 
 The same change's `council.md:22–24` records: “Both advisors approved the shape and the declined scope, independently. `align` supplies the gap the owner wanted, powerline is the only prior art with per-cell alignment, and declining a share pool avoids deciding what a pool totals and how a remainder distributes.” The historical “gap” there is a cell's alignment/padding gap; the configurable-instruments owner ruling explicitly sets row-level gaps aside.
+
+## Addendum 3 — where a document-level value enters
+
+### 1. `readConfiguration()` return type
+
+`extensions/jefferson/configuration.ts:53–60` declares `export interface Configuration { rows: Row[]; warning: string | undefined; }`. The named fields are `rows` (`Row[]`) and `warning` (`string | undefined`). `readConfiguration(source: ConfigurationSource): Configuration` is declared at `configuration.ts:286`.
+
+### 2. Result call chain to footer construction
+
+- `readConfiguration(source: ConfigurationSource): Configuration` — `extensions/jefferson/configuration.ts:286`. `source` carries `agentPath`, `projectPath`, `projectTrusted`, and `theme` (`:46–51`); the result has `rows` and `warning`.
+- `startUp(pi: ExtensionAPI): void` — `extensions/jefferson/startup.ts:11`. In the `session_start` handler it destructures `{ rows, warning }` from `readConfiguration(...)` at `startup.ts:49–53`; warns if `warning !== undefined` at `:54`; then passes `rows` as the `rows` field to `installFooter()` at `:57–63`. It also passes `sample: () => store.sample()`, `dispose: release`, and `receiveRepaint`.
+- `installFooter(ui: ExtensionUIContext, { rows, sample, dispose, receiveRepaint }: { rows: Row[]; sample: () => Readings; dispose: () => void; receiveRepaint: (requestRepaint: () => void) => void }): void` — `extensions/jefferson/footer-setup.ts:12–20`. Its `ui.setFooter` factory invokes `createFooter(rows, sample, theme)` at `:21–23`. `warning` is not passed to the footer; it is only handled by startup.
+- `createFooter(rows: Row[], sampleReadings: () => Readings, theme: Theme): Footer` — `extensions/jefferson/visuals/row-renderer.ts:29–33`. The `rows` field from `Configuration` is its first argument; `sample` from `installFooter` is its second; the live theme supplied to the UI factory is its third.
+
+### 3. Validation refusal path
+
+`readConfiguration()` catches `RejectedConfiguration` at `extensions/jefferson/configuration.ts:309–315`. At `:310–314`, that refusal returns exactly `{ rows: [defaultRow(bind)], warning: \`pi-jefferson: ${path} was rejected (${error.message}); rendering the default row\` }`. In words, its fields are `rows` containing one default row and `warning` containing the path/reason message. The acceptance path returns `{ rows, warning: acceptedWarning(path, notices) }` at `:305–308`. Read/parse errors use a separate path at `:295–300`.
+
+### 4. `distribution` precedent and top-level read site
+
+`normalizeRow(raw, index, notices, bind)` is at `extensions/jefferson/configuration.ts:178`. It initializes `distribution` to `DISTRIBUTIONS[0]` (`:185`), checks whether `distribution` is present (`:186`), validates it with `isDistribution(row.distribution)` (`:187`), and on failure throws `RejectedConfiguration` with the message assembled inline at `:188`: `row ${index} has a distribution that is not ${orList(DISTRIBUTIONS)}: ${JSON.stringify(row.distribution)}`. `isDistribution()` is at `:35–37`; `orList()` constructs the quoted alternatives at `:40–44`. A valid supplied value is assigned at `:190`, and the returned row includes `distribution` at `:214`.
+
+In `normalizeDocument(document, notices, theme)` (`:218`), the top-level envelope is narrowed as `doc` at `:222`; the `rows` envelope is checked at `:225`. Existing top-level row keys that conflict with `rows` are checked at `:226`; an explicit document-level value such as `distribution` would be read from `doc` in this function, after the envelope is known and before row normalization. Current implementation does not read a top-level `gap` key; the current normalization uses `doc.instruments` at `:242`, then maps row objects through `normalizeRow()` at `:245`.
