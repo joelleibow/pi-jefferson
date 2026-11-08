@@ -1064,3 +1064,23 @@ test("a distribution beside a rows list rejects like a top-level cells or id", (
   assert.match(malformedRow.warning, /both a top-level row and a rows list/);
   assert.doesNotMatch(malformedRow.warning, /empty cells/);
 });
+
+test("blank fills, and so does an instrument whose format takes the width", () => {
+  const defaults = readDocument({
+    rows: [{ cells: ["blank", "model", "thinking", "path", "tokens", "cost", "context"].map((instrument) => ({ instrument })) }],
+  });
+  assert.equal(defaults.warning, undefined);
+  assert.deepEqual(
+    defaults.rows[0]?.cells.map((cell) => cell.instrument.fills),
+    [true, false, false, false, false, false, false],
+    "blank fills; context's default $percent/$window has no bar",
+  );
+
+  const configured = readDocument({ instruments: { context: { format: "$percent $bar" } }, cells: [{ instrument: "context" }] });
+  assert.equal(configured.warning, undefined);
+  assert.deepEqual(configured.rows[0]?.cells.map((cell) => cell.instrument.fills), [true], "a configured bar fills");
+
+  const escaped = readDocument({ instruments: { context: { format: "\\$percent \\$bar" } }, cells: [{ instrument: "context" }] });
+  assert.equal(escaped.warning, undefined);
+  assert.deepEqual(escaped.rows[0]?.cells.map((cell) => cell.instrument.fills), [false], "an escaped \\$bar is plain text");
+});

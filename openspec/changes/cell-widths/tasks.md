@@ -114,7 +114,7 @@ A bound instrument says whether it fills [D3]. Files: `visuals/instrument.ts`, `
 `tests/configuration.test.ts` (bound instruments are exercised through `readConfiguration` and `cellText`) and
 `tests/instrument.test.ts` [EA B2].
 
-- [ ] 2.1 **`blank` fills, and an instrument fills when its format holds a `$bar` segment.** Test first
+- [x] 2.1 **`blank` fills, and an instrument fills when its format holds a `$bar` segment.** Test first
   (`tests/configuration.test.ts`): `blank` reports `fills`; `model`, `thinking`, `path`, `tokens`, `cost` and `context`
   at their default formats do not (`context`'s default `$percent/$window` has no `$bar` [EA B4]); `context` configured
   with format `$percent $bar` reports `fills`; `context` configured with the escaped `\$percent \$bar` does not (an
@@ -126,7 +126,7 @@ A bound instrument says whether it fills [D3]. Files: `visuals/instrument.ts`, `
   Mutation: derive `fills` by testing the format string for `"$bar"` (a substring) and the escaped case turns red;
   derive it from `bar` being declared and the default `context` case turns red. Source: [Spec: A blank cell and a bar
   cell fill], [R 2026-11-07 "The default"], [D3].
-- [ ] 2.2 **The probe assumption is a test: an instrument that does not fill renders the same text at width 0 and 200.**
+- [x] 2.2 **The probe assumption is a test: an instrument that does not fill renders the same text at width 0 and 200.**
   Test first (`tests/instrument.test.ts`, beside "every shipped default parses and renders its declared text"
   [EA B2]): bind each of the seven shipped instruments at its default format, plus `context` configured with
   `$percent $bar`, and render each with the all-known `seed` readings at width 0 and at width 200. Assert that wherever

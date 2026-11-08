@@ -208,7 +208,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
   const seen: Array<Readings["totals"]> = [];
   for (const cell of rows[0]?.cells ?? []) {
     const bound = cell.instrument;
-    cell.instrument = { render(readings, width, theme) {
+    cell.instrument = { fills: bound.fills, render(readings, width, theme) {
       seen.push(readings.totals);
       return bound.render(readings, width, theme);
     } };
@@ -220,4 +220,35 @@ test("a footer's bound cost and tokens read one identical totals object from one
   assert.equal(seen.length, 4);
   for (const totals of seen) assert.equal(totals, seen[0]);
   assert.deepEqual(seen[0], { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 });
+});
+
+test("an instrument that does not fill renders the same text at width 0 and at width 200", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/visuals/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/visuals/format.ts");
+  const theme = fakeTheme();
+  const bound = instrumentBindings();
+
+  // The probe's assumption: a width-0 render is the instrument's text, because nothing but `$bar`
+  // reads the width, and a bar declares that it fills.
+  const measured: string[] = [];
+  for (const [name] of shapes) {
+    const instrument = bound(named(name));
+    const atZero = instrument.render(seed, 0, theme);
+    if (instrument.fills) {
+      assert.equal(name, "blank", "blank is the only shipped default that fills");
+      assert.equal(atZero, DEFAULT_CELL_TEXT, "a fill cell's text is its own, whatever the width");
+      continue;
+    }
+    assert.equal(atZero, instrument.render(seed, 200, theme), `${name} does not fill, so the width cannot change its text`);
+    measured.push(name);
+  }
+  assert.deepEqual(measured, ["model", "thinking", "path", "context", "tokens", "cost"], "six of the seven are measured");
+
+  // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
+  const configured = instrumentBindings(new Map([
+    ["context", { segments: parseFormat(named("context"), "$percent $bar"), style: {} }],
+  ]));
+  const bar = configured(named("context"));
+  assert.equal(bar.fills, true, "a format holding $bar fills");
+  assert.notEqual(bar.render(seed, 0, theme), bar.render(seed, 200, theme), "and it is the one whose text the width changes");
 });

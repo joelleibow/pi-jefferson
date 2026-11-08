@@ -36,7 +36,7 @@ function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
     id: "row-0",
     distribution: "equal",
-    cells: Array.from({ length: count }, () => ({ instrument: { render: () => text }, align: "left" as const })),
+    cells: Array.from({ length: count }, () => ({ instrument: { fills: false, render: () => text }, align: "left" as const })),
   };
 }
 
@@ -84,8 +84,8 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
     id: "row-0",
     distribution: "equal",
     cells: [
-      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
-      { instrument: { render: () => "thinking: high" }, align: "left" },
+      { instrument: { fills: false, render: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { fills: false, render: () => "thinking: high" }, align: "left" },
     ],
   };
   const line = lineAt(row, 20);
@@ -147,8 +147,8 @@ test("text wider than its cell renders identically under any alignment", () => {
     id: "row-0",
     distribution: "equal",
     cells: [
-      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
-      { instrument: { render: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { fills: false, render: () => "provider: a-very-long-model-name" }, align: "left" },
+      { instrument: { fills: false, render: () => "provider: a-very-long-model-name" }, align: "left" },
     ],
   };
   const left = lineAt(row, 21);
@@ -218,7 +218,7 @@ test("an ANSI-styled cell's pad carries no styling", () => {
   const styled = (text: string): Row => ({
     id: "row-0",
     distribution: "equal",
-    cells: Array.from({ length: 3 }, () => ({ instrument: { render: () => text }, align: "left" as const })),
+    cells: Array.from({ length: 3 }, () => ({ instrument: { fills: false, render: () => text }, align: "left" as const })),
   });
   for (const text of ["\x1b[31mab\x1b[0m", "\x1b[4mab"]) {
     const line = lineAt(styled(text), 20);
@@ -236,8 +236,8 @@ test("the host closes an open style between cells", () => {
     id: "row-0",
     distribution: "equal",
     cells: [
-      { instrument: { render: () => "\x1b[4mabcdefghij" }, align: "left" },
-      { instrument: { render: () => "cd" }, align: "right" },
+      { instrument: { fills: false, render: () => "\x1b[4mabcdefghij" }, align: "left" },
+      { instrument: { fills: false, render: () => "cd" }, align: "right" },
     ],
   };
   const line = lineAt(row, 20);
@@ -253,8 +253,8 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
     distribution: "equal",
     // String.length would under-pad the styled cell mid-line; allocation cannot repair it.
     cells: [
-      { instrument: { render: () => "\x1b[31mab\x1b[0m" }, align: "left" },
-      { instrument: { render: () => "😀" }, align: "left" },
+      { instrument: { fills: false, render: () => "\x1b[31mab\x1b[0m" }, align: "left" },
+      { instrument: { fills: false, render: () => "😀" }, align: "left" },
     ],
   };
   const line = lineAt(row, 9);
@@ -300,7 +300,7 @@ test("the built-once tree keeps its cell memo when two renders share sample and 
   const footer = createFooter([{
     id: "row-0",
     distribution: "equal",
-    cells: [{ instrument: { render: () => { resolves++; return "kept"; } }, align: "left" }],
+    cells: [{ instrument: { fills: false, render: () => { resolves++; return "kept"; } }, align: "left" }],
   }], () => readings, fakeTheme());
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
@@ -337,6 +337,7 @@ test("one render samples the store exactly once, whatever the row and cell count
 test("an instrument resolves once per (sample, width) within a render, and again in the next render", () => {
   const handed: Array<{ readings: Readings; width: number }> = [];
   const capture: Instrument = {
+    fills: false,
     render(r, width) {
       handed.push({ readings: r, width });
       return "";
@@ -368,7 +369,7 @@ test("an instrument resolves once per (sample, width) within a render, and again
 
 test("invalidation drops cell memos and keeps the footer's three lines", () => {
   let resolves = 0;
-  const capture: Instrument = { render: () => { resolves++; return "text"; } };
+  const capture: Instrument = { fills: false, render: () => { resolves++; return "text"; } };
   const footer = createFooter([0, 1, 2].map((index) => ({
     id: `row-${index}`,
     distribution: "equal",
@@ -387,7 +388,7 @@ test("two cells holding the model instrument resolve identical text", () => {
   const declaration = instrumentNamed("model");
   assert.ok(declaration);
   const segments = parseFormat(declaration, declaration.defaultFormat);
-  const model: Instrument = { render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
+  const model: Instrument = { fills: false, render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
   const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
     [{ id: "row-0", distribution: "equal", cells: [{ instrument: model, align: "left" }, { instrument: model, align: "left" }] }],
@@ -401,6 +402,7 @@ test("two cells holding the model instrument resolve identical text", () => {
 test("a push between two renders shows up in the next render and not before", () => {
   const handed: Readings[] = [];
   const capture: Instrument = {
+    fills: false,
     render(r) {
       handed.push(r);
       return r.model ?? "";
