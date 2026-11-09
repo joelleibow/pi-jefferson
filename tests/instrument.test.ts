@@ -213,7 +213,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
       return bound.render(readings, width, theme);
     } };
   }
-  const footer = createFooter(rows, () => store.sample(), fakeTheme());
+  const footer = createFooter(rows, () => store.sample(), fakeTheme(), 0);
   const line = footer.render(80)[0] ?? "";
   assert.equal(stripTerminalSequences(line), "$0.123".padEnd(40) + "212".padEnd(40));
   assert.equal(scans, 1);

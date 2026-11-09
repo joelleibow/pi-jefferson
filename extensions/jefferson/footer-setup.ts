@@ -11,15 +11,16 @@ import type { Row } from "./visuals/row.ts";
 
 export function installFooter(
   ui: ExtensionUIContext,
-  { rows, sample, dispose, receiveRepaint }: {
+  { rows, rowGap, sample, dispose, receiveRepaint }: {
     rows: Row[];
+    rowGap: number;
     sample: () => Readings;
     dispose: () => void;
     receiveRepaint: (requestRepaint: () => void) => void;
   },
 ): void {
   ui.setFooter((tui, theme) => {
-    const footer = createFooter(rows, sample, theme);
+    const footer = createFooter(rows, sample, theme, rowGap);
     receiveRepaint(() => tui.requestRender());
     return {
       render: (width: number) => footer.render(width),

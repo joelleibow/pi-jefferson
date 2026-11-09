@@ -307,7 +307,7 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
     thinkingLevel: "high",
   });
 
-  const line = session.lines(80)[0] ?? "";
+  const line = session.lines(80)[1] ?? "";
   assert.equal(visibleWidth(line), 80);
   // Two frames of ten characters precede the text in the raw line, so the index is taken on
   // stripTerminalSequences(line): 66 in the stripped text, never the framing-shifted 86 raw.
@@ -380,7 +380,8 @@ test("an untrusted project's document is ignored end to end", async (t) => {
 
   const session = await harness().start({ cwd, trusted: false });
   assert.equal(session.footers.length, 1);
-  assert.equal(session.lines(80).length, 1, "the agent document's one row renders");
+  assert.equal(session.lines(80).length, 2, "the agent document's one row renders, with an empty line above it");
+  assert.equal(session.lines(80)[0], "");
 });
 
 for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
@@ -395,7 +396,7 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
       thinkingLevel: "high",
     });
 
-    const [line] = session.lines(80);
+    const [, line] = session.lines(80);
     assert.ok(visible(line ?? "").startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
     assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: High"), "the thinking cell renders the seed");
     assert.deepEqual(session.notified, []);
@@ -429,7 +430,7 @@ test("a model selection push changes the line and requests one repaint", async (
 
   h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5" } });
 
-  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("openai: gpt-5"));
+  assert.ok(visible(session.lines(80)[1] ?? "").startsWith("openai: gpt-5"));
   assert.equal(session.repaints(), 1);
 });
 
@@ -444,7 +445,7 @@ test("a thinking-level push changes the line and requests one repaint", async (t
 
   h.dispatch({ type: "thinking_level_select", level: "low" });
 
-  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: Low"));
+  assert.ok(stripTerminalSequences(session.lines(80)[1] ?? "").includes("Thinking: Low"));
   assert.equal(session.repaints(), 1);
 });
 
@@ -453,15 +454,15 @@ test("the thinking cell follows the host through the label path", async (t) => {
   writeAgentDocument(agentDir, { cells: [{ instrument: "thinking" }] });
   const h = harness();
   const session = await h.start({ reason: "startup", thinkingLevel: "high" });
-  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: High"));
+  assert.ok(stripTerminalSequences(session.lines(80)[1] ?? "").includes("Thinking: High"));
   h.dispatch({ type: "thinking_level_select", level: "low" });
-  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: Low"));
+  assert.ok(stripTerminalSequences(session.lines(80)[1] ?? "").includes("Thinking: Low"));
   assert.equal(session.repaints(), 1);
   h.dispatch({ type: "thinking_level_select", level: "low" });
   assert.equal(session.repaints(), 1, "a repeated level requests no extra repaint");
 
   const restored = await harness().start({ reason: "resume", thinkingLevel: "xhigh" });
-  assert.ok(stripTerminalSequences(restored.lines(80)[0] ?? "").includes("Thinking: Xhigh"), "a restored session shows the level it was seeded with");
+  assert.ok(stripTerminalSequences(restored.lines(80)[1] ?? "").includes("Thinking: Xhigh"), "a restored session shows the level it was seeded with");
 });
 
 test("a push carrying the values the store already holds requests no repaint", async (t) => {
@@ -477,7 +478,7 @@ test("a push carrying the values the store already holds requests no repaint", a
   h.dispatch({ type: "thinking_level_select", level: "high" });
 
   assert.equal(session.repaints(), 0);
-  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("anthropic: claude-opus-4"));
+  assert.ok(visible(session.lines(80)[1] ?? "").startsWith("anthropic: claude-opus-4"));
 });
 
 test("a second session_start releases the first install before installing its own", async (t) => {
@@ -509,7 +510,7 @@ test("a second session_start releases the first install before installing its ow
     "setFooter#2",
   ]);
 
-  const [line] = second.lines(80);
+  const [, line] = second.lines(80);
   assert.ok(visible(line ?? "").startsWith("openai: gpt-5"), "the second footer renders the second context");
   assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: Low"), "never the first install's values");
 
@@ -557,7 +558,7 @@ test("disposing a footer then replacing the session releases the first install o
   assert.equal(second.repaints(), 1);
 
   assert.equal(
-    visible(first.footers[0]?.render(80)[0] ?? ""),
+    visible(first.footers[0]?.render(80)[1] ?? ""),
     " ".repeat(80),
     "the disposed footer resolves empty cells rather than the old values",
   );
@@ -570,7 +571,7 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
     cells: [{ instrument: "model" }, { instrument: "context" }],
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
-  const line = session.lines(80)[0] ?? "";
+  const line = session.lines(80)[1] ?? "";
   // The rule's arithmetic, not the output: the model cell takes its text's columns, the `$bar`
   // cell takes the rest of the row, and the bar splits its cell's columns by the percent.
   const model = "🧠: claude-opus-4 from anthropic";
@@ -590,7 +591,7 @@ test("configured formats, styles and a width-taking bar render end to end under 
     cells: [{ instrument: "model" }, { instrument: "context" }],
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
-  const line = session.lines(80)[0] ?? "";
+  const line = session.lines(80)[1] ?? "";
   assert.equal(stripTerminalSequences(line), "🧠: claude-opus-4 from anthropic".padEnd(40) + "43.2% " + "█".repeat(14) + "░".repeat(20));
   assert.equal(visibleWidth(line), 80);
   assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
@@ -603,8 +604,9 @@ test("a rejected style warns with its exact envelope and installs the default fo
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
   assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
-  assert.equal(lines.length, 1);
-  assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));
+  assert.equal(lines.length, 2, "the default row, with an empty line above it");
+  assert.equal(lines[0], "");
+  assert.equal(stripTerminalSequences(lines[1] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));
 });
 
 test("a turn boundary after disposal repaints nothing and calls no captured reader", async (t) => {
@@ -627,12 +629,12 @@ test("a dispatched turn boundary repaints only changed totals and its scan is re
   writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
   const h = harness();
   const session = await h.start();
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(40) + "$0.000".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[1] ?? ""), "0".padEnd(40) + "$0.000".padEnd(40));
   session.host.entries.push(usageEntry(212, 0.125));
   session.host.leafId = "turn-1";
   h.dispatch({ type: "turn_end" });
   assert.equal(session.repaints(), 1);
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "212".padEnd(40) + "$0.125".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[1] ?? ""), "212".padEnd(40) + "$0.125".padEnd(40));
   assert.equal(session.reads.entries, 2, "the render reuses the boundary's scan");
   session.host.entries.push(usageEntry(0, 0));
   session.host.leafId = "turn-2";
@@ -650,7 +652,7 @@ test("an unchanged turn boundary before the first render leaves the install-time
   h.dispatch({ type: "turn_end" });
   assert.equal(session.repaints(), 0);
   assert.equal(session.reads.entries, 1, "createFooter's initial sample filled the cache");
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(80));
+  assert.equal(stripTerminalSequences(session.lines(80)[1] ?? ""), "0".padEnd(80));
   assert.equal(session.reads.entries, 1);
 });
 
@@ -667,11 +669,11 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
     mkdirSync(oldCwd); mkdirSync(newCwd);
     const h = harness();
     const first = await h.start({ cwd: oldCwd, model: { provider: "old-provider", id: "old-id" }, thinkingLevel: "high", entries: [usageEntry(17, 0.125)] });
-    assert.equal(stripTerminalSequences(first.lines(80)[0] ?? ""), ["old", "old-id", "17", "$0.125", "high"].map(text => text.padEnd(8)).join("").repeat(2));
+    assert.equal(stripTerminalSequences(first.lines(80)[1] ?? ""), ["old", "old-id", "17", "$0.125", "high"].map(text => text.padEnd(8)).join("").repeat(2));
     const oldReads = { ...first.reads };
     const second = await h.start({ reason, cwd: newCwd, model: { provider: "new-provider", id: "new-id" }, thinkingLevel: "low", entries: [usageEntry(212, 0.25)] });
-    assert.equal(stripTerminalSequences(second.lines(80)[0] ?? ""), ["new", "new-id", "212", "$0.250", "low"].map(text => text.padEnd(8)).join("").repeat(2));
-    assert.equal(stripTerminalSequences(first.footers[0]?.render(80)[0] ?? ""), " ".repeat(80));
+    assert.equal(stripTerminalSequences(second.lines(80)[1] ?? ""), ["new", "new-id", "212", "$0.250", "low"].map(text => text.padEnd(8)).join("").repeat(2));
+    assert.equal(stripTerminalSequences(first.footers[0]?.render(80)[1] ?? ""), " ".repeat(80));
     assert.deepEqual(first.reads, oldReads, "nothing reads the old context again after release");
     assert.equal(second.reads.entries, 1, "the new install owns a new scan");
   });
@@ -681,7 +683,7 @@ test("a session without context usage renders its context cell empty", async (t)
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, { cells: [{ instrument: "context" }] });
   const session = await harness().start();
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), " ".repeat(80));
+  assert.equal(stripTerminalSequences(session.lines(80)[1] ?? ""), " ".repeat(80));
   assert.deepEqual(session.notified, []);
 });
 
@@ -716,7 +718,7 @@ test("Joel's top row puts the working directory at the left and two instruments 
 
   // C = 53 and one joint: the path cell absorbs every column but the joint and the two texts.
   for (const [width, slack] of [[100, 46], [132, 78], [80, 26]] as const) {
-    const line = session.lines(width)[0] ?? "";
+    const line = session.lines(width)[1] ?? "";
     const text = stripTerminalSequences(line);
     assert.equal(visibleWidth(line), width, `one line of ${width} columns`);
     assert.equal(text, pathText + " ".repeat(slack) + modelText + " " + thinkingText, `at ${width}`);
@@ -726,12 +728,12 @@ test("Joel's top row puts the working directory at the left and two instruments 
 
   // At the margin: path abuts model with no room between them, and the joint still holds.
   assert.equal(
-    stripTerminalSequences(session.lines(54)[0] ?? ""),
+    stripTerminalSequences(session.lines(54)[1] ?? ""),
     pathText + modelText + " " + thinkingText,
     "the path text abuts the model text, and the joint before thinking stays",
   );
   assert.equal(
-    stripTerminalSequences(session.lines(53)[0] ?? ""),
+    stripTerminalSequences(session.lines(53)[1] ?? ""),
     pathText + modelText + thinkingText,
     "one column less and every joint is gone",
   );
@@ -751,7 +753,7 @@ test("Joel's second row keeps its thirds, with a real bar", async (t) => {
   const track = third - visibleWidth("43.2% ");
   const filled = Math.floor((43.2 / 100) * track);
   const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
-  const line = session.lines(100)[0] ?? "";
+  const line = session.lines(100)[1] ?? "";
   assert.equal(visibleWidth(line), 100);
   assert.equal(
     stripTerminalSequences(line),
@@ -774,7 +776,7 @@ test("a bar takes only what its own cell leaves, and draws nothing with no room"
   // itself the 62 the rest of its format leaves.
   const track = 80 - visibleWidth("pi-jefferson") - visibleWidth("43.2% ");
   const filled = Math.floor((43.2 / 100) * track);
-  const line = session.lines(80)[0] ?? "";
+  const line = session.lines(80)[1] ?? "";
   assert.equal(visibleWidth(line), 80);
   assert.equal(stripTerminalSequences(line), "pi-jefferson" + "43.2% " + "█".repeat(filled) + "░".repeat(track - filled));
 
@@ -782,7 +784,7 @@ test("a bar takes only what its own cell leaves, and draws nothing with no room"
   const wide = join(root, "p".repeat(100));
   mkdirSync(wide);
   const squeezed = await harness().start({ cwd: wide, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
-  const squeezedLine = squeezed.lines(80)[0] ?? "";
+  const squeezedLine = squeezed.lines(80)[1] ?? "";
   assert.equal(visibleWidth(squeezedLine), 80, "one line of the row's width");
   assert.ok(!stripTerminalSequences(squeezedLine).includes("█"), "no filled block");
   assert.ok(!stripTerminalSequences(squeezedLine).includes("░"), "no empty track");
@@ -793,7 +795,7 @@ test("the default row of ten blank cells is unchanged", async (t) => {
   const session = await harness().start();
   // At 80 the existing assertion in "a rejected configuration warns and still installs the default
   // row" holds; here the width with a remainder of two.
-  const line = session.lines(132)[0] ?? "";
+  const line = session.lines(132)[1] ?? "";
   assert.equal(visibleWidth(line), 132);
   const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
   assert.equal(
@@ -811,7 +813,7 @@ test("distribution equal restores equal shares end to end", async (t) => {
   });
   const session = await harness().start({ thinkingLevel: "max" });
   const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
-  const three = session.lines(100)[0] ?? "";
+  const three = session.lines(100)[1] ?? "";
   assert.equal(visibleWidth(three), 100);
   assert.equal(
     stripTerminalSequences(three),
@@ -821,7 +823,7 @@ test("distribution equal restores equal shares end to end", async (t) => {
 
   writeAgentDocument(agentDir, { distribution: "equal", cells: Array.from({ length: 10 }, () => ({ instrument: "thinking", align: "right" })) });
   const ten = await harness().start({ thinkingLevel: "max" });
-  const line = ten.lines(132)[0] ?? "";
+  const line = ten.lines(132)[1] ?? "";
   assert.equal(visibleWidth(line), 132);
   const cells = line.split(FRAME).slice(1, -1);
   assert.equal(cells.length, 10, "ten cells");
