@@ -327,3 +327,99 @@ Code comments I corrected in `extensions/jefferson/configuration.ts:55,221` (the
 - The fullscreen truncation and the blank line under the editor are unobserved, as before.
 - The absent-file return's `rowGap: 0` is only observable through the `Configuration` value, not through a single-row footer (bite (v) shows one red, not three).
 - `tasks.md` still describes the spacer build; I did not tick or rewrite it — it is the conductor's artifact and its statements are now false.
+
+## Fourth run: three open items from the tasks redraft
+
+Derek run `4201f2f0-8b36-4afa-817d-24d2c5f91b0f`, spike at `1732a55`, reverts measured and restored. Transcribed verbatim.
+
+All three items measured and restored; the tree is clean at `1732a55`.
+
+## Report
+
+Three items answered with the runs that show them. No new commit: each item was a revert I measured and restored, and `git status` is clean at `1732a55` (`space-between-rows-spike`).
+
+### 1. The gap-0 guard's bite — `{ gap: rowGap + 1 }`
+
+`extensions/jefferson/visuals/row-renderer.ts:115` → `new VStack(rowViews.map(({ stack }) => stack), { gap: rowGap + 1 })`. `pnpm typecheck` → `$ tsc --noEmit`, clean. `pnpm test`:
+
+```
+ℹ tests 309
+ℹ pass 294
+ℹ fail 15
+```
+
+**The guard goes red.** Its failing line is `tests/row-renderer.test.ts:320:10` — the two-row assertion (`assert.deepEqual(two.render(6), [composed("aa    "), composed("bb    ")])`), whose actual is `[row, '', row]`. Its first assertion at `:318` (one row) **passes**, because `rowGap + 1` at gap 0 is 1 and a one-row footer is one line at any gap; only the two-row call can see the extra gap line. That is the concrete bite Michael's gate asks for.
+
+The 15 red, by file:line → assertion line:
+
+| test | failing assertion |
+|---|---|
+| `configuration.test.ts:487` an absent rowGap | `:491` |
+| `configuration.test.ts:506` rowGap 3 | `:510` |
+| `configuration.test.ts:525` misspelt rowgap | `:530` |
+| `format.test.ts:170` formats carrying controls | `:177` |
+| `jefferson.test.ts:257` trusted project's document | `:266` |
+| `jefferson.test.ts:270` rowGap reaches the footer | `:276` |
+| `row-renderer.test.ts:266` one line per row with a gap | `:274` |
+| `row-renderer.test.ts:291` two rows | `:293` |
+| `row-renderer.test.ts:296` three rows | `:303` |
+| `row-renderer.test.ts:306` gap of two | `:308` |
+| `row-renderer.test.ts:311` gap of three | `:313` |
+| **`row-renderer.test.ts:316` the gap-0 guard** | **`:320`** |
+| `row-renderer.test.ts:352` each row seats its own basis | `:354` |
+| `row-renderer.test.ts:412` invalidation | `:421` |
+| `row-renderer.test.ts:764` every column allocated | `:778` |
+
+Because the first bite worked, the hardcoded variant was not required. I ran it anyway as a second data point: `{ gap: 1 }` → `ℹ tests 309 / ℹ pass 303 / ℹ fail 6`, the guard still red at `:320`, and the red set narrower — `configuration.test.ts:506`, `jefferson.test.ts:270`, and `row-renderer.test.ts:306, :311, :316, :352` (the gap-0 checks; the gap-1 checks pass because 1 is their value). Restored.
+
+### 2. 28 or 27? — **28 is right**
+
+The third run's list named **27 sites**, and all 27 are correct. The 28th is the five-reason loop's destructure, which a list of `[1]` reads misses because it is not written as a `[1]` read:
+
+- **`tests/jefferson.test.ts:399`** (pre-rewrite) → **`:396`** (now): `const [, line] = session.lines(80);` → `const [line] = session.lines(80);`, in `for (const reason of ["startup", "new", "resume", "fork", "reload"])`.
+
+The 28 = 26 `[1]` reads + 2 destructures. The 26 `[1]` reads: `:310, :433, :448, :457, :459, :465, :481, :561, :574, :594, :632, :637, :655, :672, :675, :676, :686, :721, :731, :736, :756, :779, :787, :798, :816, :826` (pre-rewrite; the list's `:308 … :822` map one-to-one). The 2 destructures: `:399` and `:513` (the second `session_start`), and only `:513` was in the list. The five line-count reads in that file — `:240, :278, :297, :298, :609` — are the line-count rewrites, not part of the 28. Counts: `grep -c "\[1\]"` on `e9eae2c:tests/jefferson.test.ts` gives 31 lines, of which 5 are line-count and 26 are the moved reads; plus 2 destructures = 28.
+
+### 3. Check 1.6 — `rowGap` beside `rows` and beside a single top-level row
+
+Bite **D2**: `extensions/jefferson/configuration.ts:236` → `if ("cells" in doc || "id" in doc || "distribution" in doc || "rowGap" in doc)`. `pnpm typecheck` clean; `pnpm test`:
+
+```
+ℹ tests 309
+ℹ pass 304
+ℹ fail 5
+```
+
+**The check itself goes red at `tests/configuration.test.ts:517:10`** — `assert.equal(listed.warning, undefined, "rowGap beside rows is not a conflict like a top-level cells")`, whose actual is `pi-jefferson: … was rejected (the configuration carries both a top-level row and a rows list); rendering the default row`.
+
+The five red:
+
+| test | failing assertion | why |
+|---|---|---|
+| **`configuration.test.ts:515`** the check itself | `:517` | `rows` + `rowGap` is now the envelope conflict |
+| `configuration.test.ts:494` non-whole/out-of-range refused | `:496` | the envelope conflict fires before the value check, so the warning names the wrong thing |
+| `configuration.test.ts:506` rowGap 3 accepted | `:508` | `read.warning` is no longer `undefined` |
+| `configuration.test.ts:934` error precedence | `:939` | envelope conflict wins over the `rowGap` reason |
+| `jefferson.test.ts:270` rowGap reaches the footer | `:276` | the document is rejected, so the default row renders one line, not four |
+
+The task's 1.6 says D2 "turns three checks red"; on this shape it turns **five** red. Restored.
+
+**Its red-on-`e9eae2c` status: it passes.** Run against `e9eae2c`'s production code with the current test file:
+
+```
+✔ rowGap sits beside a rows list and beside a single top-level row (1.807917ms)
+ℹ tests 1
+ℹ pass 1
+ℹ fail 0
+```
+
+Why: `e9eae2c` already carries the whole `rowGap` read and its validation — the pre-ruling build reads `rowGap` from the document and leaves it beside either envelope. The check asserts only the read (`warning === undefined` and `rowGap === 2` on both shapes), and the read is already there, so the check is satisfied on `e9eae2c`. Its red in the task's 1.6 (`:519` `actual undefined expected 2`) was against `16da136`, before the read existed. So 1.6, like the gap-0 guard, is a regression guard on the read, not a red for the ruling's change; its only bite is D2.
+
+### Final state
+
+`pnpm typecheck` → `$ tsc --noEmit`, no diagnostics. `pnpm test` → `ℹ tests 309 / ℹ pass 309 / ℹ fail 0`. `openspec validate space-between-rows --strict` → `Change 'space-between-rows' is valid`. `git status` → clean, nothing staged, HEAD `1732a55`.
+
+### Not verified
+
+- The `{ gap: 1 }` totals are a second measurement I added beyond the brief's condition; nothing was left applied.
+- Nothing ran in a live pi; the fullscreen and under-editor observations remain Joel's (7.1).
