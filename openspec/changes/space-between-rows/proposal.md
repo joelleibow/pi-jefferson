@@ -123,7 +123,7 @@ list of the calls that are Joel's [M 3].
    necessary"* [R]; his *"The ideal as the default, plus an escape hatch for what a break removes"* [R]
    would then call for a way back to no space. Joel's own two-row document would become three lines with no
    edit [M 2].
-   **Settled:** yes, one line [J1, Co]; with a line above row one, four lines [J2, CR]; the way back is `rowGap: 0` [D 1, D 2].
+   **Settled:** yes, one line between rows [J1, Co], none above row one (rulings 4 and 5 in Co); the way back is `rowGap: 0` [D 1].
 2. **How much**: one line, or a number? pi-tui accepts any non-negative integer; a ceiling, if any, is a
    product call [M 3].
    **Settled:** one by default; a whole number from 0 to 3, a ceiling Joel ruled after the design gate because a huge value hangs pi [J1, J3, Co; D 4].
@@ -137,7 +137,7 @@ list of the calls that are Joel's [M 3].
    **Settled:** `rowGap` [J1].
 5. **Does "between rows" include space above row one**, between the editor and the footer? Today there is
    none, in Jefferson's footer or pi's [M 2]. A leading space is a `Spacer` first, not a `VStack` gap [M 2].
-   **Settled:** yes, always; `rowGap` governs both places [J2, CR]; the mechanism is a zero-line `Spacer` first [D 2].
+   **Settled:** no. Joel ruled yes at first [J2, CR], then removed it on watching the default live: no space above row one, and `rowGap` sets only the space between rows [rulings 4 and 5 in Co; D 2].
 6. **Should a misspelled or unknown row or document key warn or reject?** Today it is silent [E A2 §2]. A
    loud rule is new mechanism with an interaction with `containers`, and Joel has not asked for it [M 2,
    M 3].
@@ -160,8 +160,9 @@ list of the calls that are Joel's [M 3].
      otherwise.
    - Chidi did not run this live in pi, and did not audit `tui` for a public way to enumerate widget
      containers [C A1 Q1, Q3]. Both are unknowns, not findings.
-   - **Settled:** nothing is done to the fleet-status row; the footer's space above row one is unconditional,
-     which Joel chose knowing it shows in every session [J2; D 2]. `setStatus` stays out [R, "One card"].
+   - **Settled:** nothing is done to the fleet-status row, and the footer adds no space above row one, by
+     Joel's rulings 4 and 5 in [Co] after he watched the default live (superseding [J2]; D 2). `setStatus`
+     stays out [R, "One card"].
 
 The strongest challenge to the card, from the orientation: the capability exists, so the change is a
 one-question product decision (a default, and if so the way back), not a spacing model [M 4]. If the council
@@ -176,9 +177,9 @@ None.
 ### Modified Capabilities
 
 - `statusline`: the delta modifies two requirements. "A row is one line tall" no longer says the footer's
-  height is the number of declared rows; it says any space above row one or between rows belongs to the
+  height is the number of declared rows; it says any space between rows belongs to the
   footer's stack, never a row's or a cell's line. "The statusline renders the declared rows" has one scenario
-  reworded. It adds two requirements: the default space above row one and between rows, and `rowGap`.
+  reworded. It adds two requirements: the default space between rows, and `rowGap`.
 
 ## Impact
 

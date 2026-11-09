@@ -10,7 +10,7 @@ mode it MUST NOT install a footer, and loading MUST NOT fail.
 
 - **WHEN** the extension loads in TUI mode and the configuration declares two rows
 - **THEN** the footer renders those two rows, one line each, in the declared order, each built from
-  that row's cells, with the space the footer's space requirements give
+  that row's cells, with the space between them that the footer's space requirements give
 
 #### Scenario: A mode without terminal rendering
 
@@ -22,7 +22,7 @@ mode it MUST NOT install a footer, and loading MUST NOT fail.
 Each row MUST render as exactly one line: whatever an instrument returns, its cell MUST keep one
 line and clip it to the cell's width, so each declared row adds one line to the footer. Any vertical
 space between rows MUST come from the footer's stack, never from a row's or a cell's line, and the
-footer's height is its rows' lines plus that space. The one-line guarantee MUST belong to the cell:
+footer's height is its rows' lines plus the space between them. The one-line guarantee MUST belong to the cell:
 configuration validation MUST NOT police a format's text to keep it.
 
 #### Scenario: Content wider than its cell
@@ -40,53 +40,53 @@ configuration validation MUST NOT police a format's text to keep it.
 #### Scenario: The footer's height
 
 - **WHEN** a configuration declares three rows and sets no `rowGap`
-- **THEN** the footer renders three row lines with the default space above the first and between
-  each pair of rows, and no line other than those three is a row's
+- **THEN** the footer renders five lines: three row lines with one empty line between each pair, and
+  no line other than those three is a row's
 
 #### Scenario: Space between rows is not a row's line
 
-- **WHEN** the footer renders with space above or between its rows
-- **THEN** each row, taken alone, is one line, and the space lies in the footer's stack, above row
-  one and between row lines, not in any row or cell
+- **WHEN** the footer renders with space between its rows
+- **THEN** each row, taken alone, is one line, and the space lies in the footer's stack, between row
+  lines, not in any row or cell
 
 ## ADDED Requirements
 
-### Requirement: The footer has space above its first row and between its rows
+### Requirement: The footer has space between its rows and none above the first
 
-By default the footer MUST render one empty line above its first row and one between each pair of
-rows, whether or not anything sits above the footer. Each empty line MUST be an unstyled empty string,
-in the footer's stack and in no row or cell. A footer of one row MUST render that space above it, so
-two lines.
+By default the footer MUST render one empty line between each pair of rows and none above its first
+row. Each empty line MUST be an unstyled empty string, in the footer's stack and in no row or cell. A
+footer of one row MUST render that row alone, one line.
 
 #### Scenario: Two rows
 
 - **WHEN** the configuration declares two rows and sets no `rowGap`
-- **THEN** the footer renders an empty line, row one, an empty line, row two, and each empty line is
+- **THEN** the footer renders row one, an empty line, row two, three lines, and the empty line is
   `""` with none of a row's framing
 
 #### Scenario: One row
 
 - **WHEN** the configuration declares one row, or none and the default row renders, and sets no
   `rowGap`
-- **THEN** the footer renders an empty line and then that row, two lines
+- **THEN** the footer renders that row alone, one line, with no empty line above it
 
-### Requirement: rowGap sets the space above row one and between rows
+### Requirement: rowGap sets the space between rows
 
 The configuration document MAY carry a top-level `rowGap`, beside either envelope, whose value MUST be
-a whole number from 0 to 3 and sets the empty lines above row one and between each pair of rows;
-absent leaves the default space. `rowGap: 0` MUST render the footer as it rendered before this change. Any other
-value MUST reject the document, name `rowGap` and the value in the warning, and render the default row.
+a whole number from 0 to 3 and sets the empty lines between each pair of rows and nothing above row
+one; absent leaves the default space. `rowGap: 0` MUST render the footer as it rendered before this
+change. Any other value MUST reject the document, name `rowGap` and the value in the warning, and
+render the default row.
 
 #### Scenario: A larger gap
 
 - **WHEN** the document sets `rowGap` to `2` and declares two rows
-- **THEN** the footer renders two empty lines, row one, two empty lines, row two
+- **THEN** the footer renders row one, two empty lines, row two, four lines
 
 #### Scenario: The largest gap
 
 - **WHEN** the document sets `rowGap` to `3` and declares two rows
-- **THEN** the configuration is accepted and the footer renders three empty lines above row one and
-  between the rows
+- **THEN** the configuration is accepted and the footer renders three empty lines between the rows
+  and none above row one
 
 #### Scenario: A gap of zero
 
@@ -103,7 +103,7 @@ value MUST reject the document, name `rowGap` and the value in the warning, and 
 #### Scenario: A gap that is not a whole number from 0 to 3
 
 - **WHEN** the document sets `rowGap` to `-1`, `1.5`, `"1"`, `null`, `4` or `1e21`
-- **THEN** the configuration is rejected, the default row renders with the default space, and the
+- **THEN** the configuration is rejected, the default row renders, and the
   warning names `rowGap` and the value
 
 #### Scenario: A misspelt key

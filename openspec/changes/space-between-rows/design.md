@@ -1,13 +1,13 @@
 # Design
 
-Citations: **[R]** `owner-rulings.md`; **[J1]**, **[J2]**, **[CR]**, **[J3]** Joel's rulings (J3 the ceiling, ruled after the design gate) and the conductor's binding reading in `council.md`; **[Co]** the rest of `council.md`; **[C §n]**, **[C A1]**, **[C A2]** `research-chidi.md` and its addenda; **[E §n]**, **[E A1–A3]** `research-eleanor.md` and its addenda; **[M n]** `michael-orientation.md`. Requirement names are those of `specs/statusline/spec.md`.
+Citations: **[R]** `owner-rulings.md`; **[J1]**, **[J2]**, **[CR]**, **[J3]**, **[J4]**, **[J5]** Joel's rulings and the conductor's reading in `council.md` (J3 the ceiling, ruled after the design gate; J4 and J5 rulings 4 and 5, his live observation, which supersede J2 and CR); **[Co]** the rest of `council.md`; **[C §n]**, **[C A1]**, **[C A2]** `research-chidi.md` and its addenda; **[E §n]**, **[E A1–A3]** `research-eleanor.md` and its addenda; **[M n]** `michael-orientation.md`. Requirement names are those of `specs/statusline/spec.md`.
 
 ## Context
 
-The footer is one `VStack` of one `HStack` per row, built once in `createFooter`, with the `VStack`'s `gap` at `0` [E §1]. Rows sit on adjacent lines and row one sits directly under the editor [E A1; M 2]. Why the change exists is in `proposal.md`; Joel's rulings fix what it does [J1, J2, CR]:
+The footer is one `VStack` of one `HStack` per row, built once in `createFooter`, with the `VStack`'s `gap` at `0` [E §1]. Rows sit on adjacent lines and row one sits directly under the editor [E A1; M 2]. Why the change exists is in `proposal.md`; Joel's rulings fix what it does [J1, J4, J5]:
 
-- One blank line above row one and between rows by default.
-- One document-level key, `rowGap`, a whole number from 0 to 3, sets both. `rowGap: 0` renders exactly today's footer.
+- One blank line between rows by default, and none above row one [J1, J4, J5].
+- One document-level key, `rowGap`, a whole number from 0 to 3, sets the space between rows. `rowGap: 0` renders exactly today's footer. A one-row footer is one line.
 - The fleet-status row is not changed, and a `blank` row is not the answer [Co, rejected Q7].
 
 The path a document-level value travels today: `readConfiguration()` returns `{ rows, warning }` (`configuration.ts:53–60, 286`); `startUp` destructures it in the `session_start` handler (`startup.ts:49–57`) and passes `rows` to `installFooter` (`footer-setup.ts:12–20`), whose factory calls `createFooter(rows, sample, theme)` (`:21–23`, `row-renderer.ts:29–33`) [E A3 §1–2]. A validation failure throws `RejectedConfiguration`, caught at `configuration.ts:309–315`, which returns the default row and the warning `pi-jefferson: <path> was rejected (<reason>); rendering the default row` [E A3 §3]. A read or parse error takes a separate path that also returns the default row (`:295–300`) [E A3 §3].
@@ -16,13 +16,13 @@ The path a document-level value travels today: `readConfiguration()` returns `{ 
 
 **Goals:**
 
-- The footer renders `rowGap` empty lines above row one and between each pair of rows, `1` by default [J1, J2, CR].
+- The footer renders `rowGap` empty lines between each pair of rows and none above row one, `1` by default [J1, J4, J5].
 - `rowGap: 0` is byte-identical to today's footer [CR; C A2].
 - An invalid `rowGap` is refused where the document is read, with a specific warning, on the refusal path that exists.
 
 **Non-Goals:**
 
-- Any change to the fleet-status row, which is pi-subagents' [R; Co]. A footer cannot learn that a `belowEditor` widget exists [C A1 Q1], which is why the space above row one is unconditional [J2].
+- Any change to the fleet-status row, which is pi-subagents' [R; Co]. A footer cannot learn that a `belowEditor` widget exists [C A1 Q1], so the footer adds no space above row one [J5].
 - A per-row setting, a `blank` row as the answer [Co, rejected].
 - A loud rule for unknown keys [Co, rejected Q6]; see decision 7.
 - The horizontal gaps (ADRs 0002, 0006, 0007), which are the `HStack`'s and are untouched [M 1].
@@ -34,21 +34,15 @@ The path a document-level value travels today: `readConfiguration()` returns `{ 
 
 `createFooter` builds its `VStack` with `{ gap: rowGap }` instead of `{ gap: 0 }`. `VStack` inserts `gap` empty unstyled lines only between children [C §1; M 2]. Chosen by the council as *"That lets pi-tui do its thing"* [Co; R, 2026-11-03]. Rejected: a `Spacer` between every pair of rows (a second child list to keep in step with the rows), and padding lines of Jefferson's own, which break *"Don't invent what we don't have to"* [R]. The row stays one line, and the gap lines are the stack's, never a row's or a cell's [M 1, M 2]; that is the modified "A row is one line tall".
 
-### 2. Space above row one is a zero-line `Spacer` as the stack's first child
+### 2. No space above row one: the `Spacer(0)` was built, then removed
 
-`VStack` adds no gap before its first child [C §1; M 2], so the gap does nothing above row one. The evidence offers three shapes, each run at `rowGap` 0, 1 and 2 on the pinned pi-tui 1.4.0 [C A2]:
+`VStack` adds no gap before its first child [C §1; M 2], so the stack's `gap` alone puts nothing above row one. Joel first ruled a blank line above row one [J2], and the conductor read `rowGap` as governing it [CR]. That shape was built as `VStack([Spacer(0), row1, …], { gap })`, the first of three shapes run at `rowGap` 0, 1 and 2 on pi-tui 1.4.0 [C A2], chosen over `Spacer(gap)` first (doubled space) and a nested stack (a second stack for the same lines). On watching the default live he found it "way too much space" and asked for the spacer above the first line to come out [J4]. On the preview without it, he ruled: *"This is the way. What we have now. … Too spacious is better than too cramped"* [J5]. **The `Spacer(0)` is removed.** No shape for space above row one is built, and `rowGap` sets only the space between rows. The mechanism is decision 1 alone, with no `Spacer`.
 
-- **(a)** `VStack([Spacer(0), row1, …], { gap })`. Renders `gap` lines above row one and `gap` between rows.
-- **(b)** `VStack([Spacer(gap), row1, …], { gap })`. Renders `2 × gap` above row one, because the stack's gap also lands between the `Spacer` and row one.
-- **(c)** `VStack([Spacer(gap), VStack([row1, …], { gap })], { gap: 0 })`. Same lines as (a), one more stack.
-
-All three render today's footer at `gap` 0 [C A2]. **Chosen: (a).** One `gap` value governs both places, which is the conductor's binding reading that `rowGap` sets both and there is no second setting [CR]. (b) is rejected for its doubled space. (c) is rejected as a second stack for the same lines. (a) rests on a zero-line visible child still contributing gap [C §1 "nuance"; C A2: `v-stack.js:13–22`, `stack.js:55–57`]; a `Spacer(0)` adds nothing at gap 0 [C A2: `v-stack.js:9–10, 13–22`, `spacer.js:15–21`]. A short comment at the `Spacer(0)` says why it is there. Rejected: Jefferson prepending empty lines to the footer's output (padding of its own, as in decision 1).
-
-The footer is mounted in pi as a plain `Container`, not a layout node [C A2], so the nested layout path is not used, and `Spacer(0)` changes no allocation [C A2].
+The user-visible result: row one sits directly under the editor, as today [E A1; M 2]; one blank line separates rows by default; a one-row footer is one line. Rejected: any space above row one, now Joel's ruling and not only the council's recommendation [Co; J5].
 
 ### 3. The default lives in one named constant, `DEFAULT_ROW_GAP = 1`
 
-Declared in `configuration.ts` beside `DEFAULT_CELLS` and `MAX_CELLS` (`:62–63`) [E §2], with the ceiling `MAX_ROW_GAP = 3` (decision 4). Unlike those two, neither is exported: nothing outside the reader uses them, and exporting would force an edit to the exported-surface guard (`tests/jefferson.test.ts:313`), which pins the export list [Derek red/green; conductor ruling], because the configuration reader is where every default (the default row, the default `distribution`) is already decided [E §2]. `createFooter` has no default of its own; the value always arrives from the configuration (decision 5). Nothing else states `1`. One answer to "what changes the default": that constant. The spec's requirement "The footer has space above its first row and between its rows" is the one normative place that states the default; the `rowGap` requirement says only that absent leaves it.
+Declared in `configuration.ts` beside `DEFAULT_CELLS` and `MAX_CELLS` (`:62–63`) [E §2], with the ceiling `MAX_ROW_GAP = 3` (decision 4). Unlike those two, neither is exported: nothing outside the reader uses them, and exporting would force an edit to the exported-surface guard (`tests/jefferson.test.ts:313`), which pins the export list [Derek red/green; conductor ruling], because the configuration reader is where every default (the default row, the default `distribution`) is already decided [E §2]. `createFooter` has no default of its own; the value always arrives from the configuration (decision 5). Nothing else states `1`. One answer to "what changes the default": that constant. The spec's requirement "The footer has space between its rows and none above the first" is the one normative place that states the default; the `rowGap` requirement says only that absent leaves it.
 
 ### 4. `rowGap` is read and validated in `normalizeDocument`
 
@@ -70,18 +64,18 @@ The refusal return (`configuration.ts:310–314`), the read-or-parse-error retur
 
 ### 7. Unknown keys stay silent: a `shortcut:`
 
-`rowgap` or `row_gap` is ignored without a warning, because every unknown row and document key is today [E A2 §2; M 2], and a general rule interacts with the legacy `containers` key [Co, rejected Q6]. This is a `shortcut:` recorded in the comment beside the `rowGap` read: *the reader warns on no unknown row or document key, so a misspelt `rowGap` renders the default space without a word; upgrade by adding an unknown-key rule when a second misspelling hurts, as its own change.* The spec states it in "rowGap sets the space above row one and between rows" (scenario "A misspelt key").
+`rowgap` or `row_gap` is ignored without a warning, because every unknown row and document key is today [E A2 §2; M 2], and a general rule interacts with the legacy `containers` key [Co, rejected Q6]. This is a `shortcut:` recorded in the comment beside the `rowGap` read: *the reader warns on no unknown row or document key, so a misspelt `rowGap` renders the default space without a word; upgrade by adding an unknown-key rule when a second misspelling hurts, as its own change.* The spec states it in "rowGap sets the space between rows" (scenario "A misspelt key").
 
 ### 8. The tests
 
-Seven assertions equate the footer's line count with its row count and go red; they are rewritten for the new behavior, not loosened [M 1; Co; Derek red/green]. The run found the seventh, `tests/format.test.ts:170`, which design 8 did not name; `tasks.md` lists the sites from Derek's table. Beyond them, 28 end-to-end reads in `tests/jefferson.test.ts` take their row at `lines(w)[0]`, which is now the gap line. The conductor ruled that each is pointed at the row line's new index and keeps its subject, so it is rewritten, not loosened. The 20 `createFooter` call sites whose assertions concern horizontal geometry (18 in `tests/row-renderer.test.ts`, `footerFor` in `tests/configuration.test.ts`, one in `tests/instrument.test.ts`) pass `rowGap` 0 explicitly, so line 0 stays the row line there. The gap line is a bare `""`, not the host's per-child frame, so a test must not reuse the framing helper for it [M 2]. The `rowGap: 0` check cannot go red on today's code, because today's footer is gap 0: it is a regression guard, and its bite is replacing the leading `Spacer(0)` with `Spacer(1)` (revert A2 in the run). New tests, each stated as the exact list of lines so removing the behavior turns it red:
+Seven assertions equate the footer's line count with its row count and go red; they are rewritten for the new behavior, not loosened [M 1; Co; Derek red/green]. The run found the seventh, `tests/format.test.ts:170`, which design 8 did not name; `tasks.md` lists the sites from Derek's table. Beyond them, 28 end-to-end reads in `tests/jefferson.test.ts` take their row at `lines(w)[0]`. With no leading line, row one is still line 0, so a read of row one needs no new index and only a read of a later row moves; each keeps its subject, rewritten and not loosened. The 20 `createFooter` call sites whose assertions concern horizontal geometry (18 in `tests/row-renderer.test.ts`, `footerFor` in `tests/configuration.test.ts`, one in `tests/instrument.test.ts`) pass `rowGap` 0 explicitly, so line 0 stays the row line there. The gap line is a bare `""`, not the host's per-child frame, so a test must not reuse the framing helper for it [M 2]. The `rowGap: 0` check cannot go red on today's code, because today's footer is gap 0: it is a regression guard, and its bite is any code that adds a line when the gap is 0. New tests, each stated as the exact list of lines so removing the behavior turns it red:
 
-- Two rows render `["", row, "", row]`; one row renders `["", row]`; three rows render six lines.
-- `rowGap: 2` renders two empty lines above row one and between rows.
+- Two rows render `[row, "", row]`; one row renders `[row]`; three rows render five lines, `[row, "", row, "", row]`.
+- `rowGap: 2` renders `[row, "", "", row]`, two empty lines between the rows and none above row one.
 - `rowGap: 0` renders exactly the lines the footer rendered before this change, for one and two rows. Compared against the literal lines, not against a second derivation.
-- `-1`, `1.5`, `"1"`, `null`, `4` and `1e21` are each refused with the warning of decision 4, and the default row renders with one empty line above it; `3` is accepted and renders three empty lines in each place.
+- `-1`, `1.5`, `"1"`, `null`, `4` and `1e21` are each refused with the warning of decision 4, and the default row renders as one line; `3` is accepted and renders three empty lines between the rows.
 - `rowGap` sits beside `rows` and beside a single top-level row, and is accepted in both.
-- A misspelt `rowgap` is ignored with no warning and the default space renders.
+- A misspelt `rowgap` is ignored with no warning and the default space between rows renders.
 - A document refused for another reason, and an unreadable file, render the default `rowGap`.
 - The value is threaded: a `rowGap` read from a document reaches the footer `startUp` installs.
 
@@ -89,22 +83,19 @@ Tasks, the checks' red-to-green runs [R] and their verification belong to `tasks
 
 ### 9. What the docs pass touches
 
-The README's description of footer rows and its configuration section (a `rowGap` entry beside `distribution`) [E §6], and `README.md:77`, which says `distribution` rejects a document beside `rows` and must name `rowGap` as the one key allowed beside either envelope [Derek red/green]; `ARCHITECTURE.md`'s opening sentence "one footer line per configured row" and the row renderer section's "`gap: 0`" [M 1; E §3]. **One ADR is warranted:** the choice between the stack's `gap` with a leading `Spacer(0)`, a `Spacer` per row, Jefferson's own padding lines and a `blank` row is a structural choice with rejected alternatives, and a reader who meets a zero-line `Spacer` would otherwise "fix" it [C A2]. ADRs 0002, 0006 and 0007 are accepted and untouched; their "no gap" is horizontal [M 1].
+The README's description of footer rows and its configuration section (a `rowGap` entry beside `distribution`) [E §6], and `README.md:77`, which says `distribution` rejects a document beside `rows` and must name `rowGap` as the one key allowed beside either envelope [Derek red/green]; `ARCHITECTURE.md`'s opening sentence "one footer line per configured row" and the row renderer section's "`gap: 0`" [M 1; E §3]. **One ADR is warranted:** the choice to leave space between rows to the stack's own `gap` alone, over a `Spacer` per row, Jefferson's own padding lines and a `blank` row, is a structural choice with rejected alternatives. The ADR also records why no space sits above row one: the `Spacer(0)` was built and removed on Joel's live observation [J4, J5], and a reader who wonders why the footer sits flush on the editor should find the ruling there. ADRs 0002, 0006 and 0007 are accepted and untouched; their "no gap" is horizontal [M 1].
 
 ## Risks / Trade-offs
 
-- **[Fullscreen cost, accepted by Joel [J2]]** Every footer line costs the transcript one line: one line above row one and one per gap by default, `rowGap` lines per place beyond [M 2]. Mitigation: `rowGap: 0`.
-- **[A short terminal cuts rows before blank lines]** A footer in fullscreen is truncated from the bottom, so leading blank lines are kept longest and row content goes before them: at `rowGap` 1 and a very short terminal the footer can show only blank lines [C A2; M 2]. Not run in a live pi [C A2]. Mitigation: `rowGap: 0`; no automatic shrink of the gap, which would be per-render change [C §1].
-- **[A blank line under the editor in every session [J2]]** Accepted by Joel; it appears with no widget above.
-- **[A zero-line child's gap is pi-tui behavior, not a documented contract]** Decision 2 rests on it, run on 1.4.0, with 1.5.0's stack files identical [C A2; M 2]. Mitigation: the suite pins the behavior at the devDependency version (1.4.0) only; the host runs whatever pi ships. Detection on a newer host is Joel's observation or a pin bump. The fallback is shape (c) or a prepended line list, both one-line changes at the same site. No code change now.
+- **[Fullscreen cost, accepted by Joel [J5]]** Every footer line costs the transcript one line: one per gap by default, `rowGap` per gap beyond [M 2]. Nothing is added above row one. Mitigation: `rowGap: 0`.
 - **[A misspelt key is silent]** Decision 7.
 - **[A bad `rowGap` costs the whole layout]** The existing refusal path every key shares, so changing it is not this card [Co, set aside].
 - **[Large `rowGap` can hang pi]** Unbounded, `rowGap` 1e5 renders in 1 ms, 1e6 in 16 ms, 1e7 in 141 ms producing 20,000,002 lines, 1e9 would take about 14 s and allocate 2e9 strings, and `1e21` passes `Number.isInteger` and never returns [Michael PL4, finding 1]. Mitigation: Joel bounded it at `MAX_ROW_GAP = 3` [J3]; a larger value is refused like any invalid value. Raising the ceiling is one constant.
 
 ## Migration Plan
 
-A breaking change to every existing footer's height, accepted before 1.0 [R]. Joel's own two-row document becomes four lines with no edit [M 2]. The way back is `"rowGap": 0` in the document. Joel's `~/.pi/agent/pi-jefferson.json` is not edited by a task; his observation in his own pi session precedes the archive [R].
+A breaking change to every existing footer's height, accepted before 1.0 [R]. Joel's own two-row document becomes three lines with no edit [M 2, J5]. The way back is `"rowGap": 0` in the document. Joel's `~/.pi/agent/pi-jefferson.json` is not edited by a task; his observation in his own pi session precedes the archive [R].
 
 ## Open Questions
 
-None that change the specs, the approach or the tasks. Not run in a live pi: the leading blank line under the editor and the fullscreen truncation [C A1 Q3, C A2]; Joel's own observation covers them [R].
+None that change the specs, the approach or the tasks. Joel watched the default live and ruled the shape [J4, J5]; nothing else is open.
