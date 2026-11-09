@@ -1,0 +1,25 @@
+{
+  "verdict": "approve",
+  "requirements": [
+    {"requirement": "Second-pass major: seventh scenario \"A bar in a cell with room\" and Decision 7's search", "evidence": "Delta now carries the requirement \"$bar takes the width the rest of the format leaves\" as MODIFIED: diffed against the living spec with node, identical in all 46 lines except the WHEN at living 879, which gains `label: \"\"`. design.md Decision 7 now says seven, names the search (every living WHEN configuring a labelled instrument with a format and no label, keeping those that pin an exact text or width), lists the seven lines (741, 774, 786, 879, 925, 930, 937) and the four that stay true (702, 747, 967, 1270), matching the search I ran in the second pass; names the three MODIFIED requirements; and says the `$bar` test is among the fixtures that gain `label: \"\"`.", "status": "met"},
+    {"requirement": "Second-pass minor: duplicate scenario title", "evidence": "Delta line 17 reads \"An empty format leaves the default label alone\"; the living title at openspec/specs/statusline/spec.md:1118 is now unique. Checked all scenario titles in the delta: the only repeated title is \"A fresh session\" under tokens and cost, which the living spec already repeats (646, 663) and this change copies unchanged; not introduced here.", "status": "met"},
+    {"requirement": "Joel's process ruling: each requirement paragraph under 500 characters", "evidence": "Counted with node, wrapped lines joined: 443, 497, 336, 485, 497, 345, 477, 371, 446. Bambadjan's nine figures verified.", "status": "met"},
+    {"requirement": "openspec validate --strict", "evidence": "Ran `openspec validate default-labels --strict` at 3fa0192: valid.", "status": "met"},
+    {"requirement": "The edits add no mechanism and revise no settled decision", "evidence": "The diff cf1fdf2..3fa0192 touches two Decision 7 bullets, one scenario title and one copied requirement with one WHEN changed. Nothing else in design.md or the delta moved; repository working tree clean.", "status": "met"}
+  ],
+  "findings": [],
+  "later_gates": [
+    "Tasks gate: the flip list comes from a fresh failing run after the six declaration lines land (38 at 60c647b), each test with file and line, and each marked flipped (unlabelled default text), fixture `label: \"\"` (the seven format-language and `$bar` tests, Decision 7), or rewritten (instrument.test.ts:60; configuration.test.ts:580-588).",
+    "Tasks gate: every new test is red before its declaration and green after: five default renders, configured label replaces, `label: \"\"` removes, unknown datum renders nothing, blank pinned (placeholder and `format: \"\"`), `path` with `$path!` and `context` with `format: \"\"` (Decision 7 scenarios), and the 80-column path/model/thinking row test with its stated failure input.",
+    "Tasks gate: the `$bar` test whose fixture gains `label: \"\"` (configuration.test.ts:1017 region) and the `$percent $bar` 20-column scenario land in the same task.",
+    "Tasks gate: a task for Joel's live observation in his own pi session, marked as his, before the archive; no task edits ~/.pi/agent/pi-jefferson.json; checks use a scratch agent directory.",
+    "Tasks gate: no Markdown documentation task; README table, line 128 and the upgrading note (model format; configured-format case) go to the docs pass.",
+    "Tasks gate: the nine delta paragraphs re-measured under 500 before sync.",
+    "Implementation gate: the diff is six declaration lines in instrument.ts plus tests; any change to binding, format or layout goes back to design."
+  ],
+  "not_covered": [
+    "Only the cf1fdf2..3fa0192 edits were judged; Decisions 1-6 and the earlier delta blocks were settled in the first two passes and not re-derived.",
+    "The living spec's pre-existing repeated scenario title \"A fresh session\" (tokens and cost) is outside this change.",
+    "No code or test was run beyond `openspec validate`; the measurements this verdict relies on are the earlier passes'."
+  ]
+}
