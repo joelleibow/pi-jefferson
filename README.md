@@ -130,13 +130,12 @@ and `thinking` reads `Thinking: High`. A configured `label` replaces the default
 removes it. When an instrument's data is unknown the cell renders nothing, label included. With known
 data and `"format": ""`, the cell is the label alone.
 
-Upgrading: a default label now fronts a format you configured, too, on `model`, `path`, `context`,
-`tokens` and `cost` as well as `thinking`. If that format has no `label`, the cell starts with the
-label and one space, and `"format": ""` renders the label alone. Set `label: ""` to get the previous
-text back. `model` also changed its default format to `$provider/$model`. To
-restore `anthropic: claude-opus-4`, set both `label: ""` and `format: "$provider: $model"`. A space you
-wrote at the front or back of a label or a format is now removed, and a label's one space comes from
-the gap.
+Upgrading: a default label now appears in front of a format you configured, too, on `model`, `path`,
+`context`, `tokens` and `cost` as well as `thinking`. If that format has no `label`, the cell starts
+with the label and one space, and `"format": ""` renders the label alone. Set `label: ""` to get the
+previous text back. `model` also changed its default format to `$provider/$model`, so to restore
+`anthropic: claude-opus-4`, set both `label: ""` and `format: "$provider: $model"`. A space you wrote
+at the front or back of a label or a format is now removed, and a label's one space comes from the gap.
 
 A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
 each applying in the order the format writes them. On plain text a modifier covers the run of
