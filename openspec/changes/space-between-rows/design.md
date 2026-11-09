@@ -1,13 +1,13 @@
 # Design
 
-Citations: **[R]** `owner-rulings.md`; **[J1]**, **[J2]**, **[CR]** Joel's two rulings and the conductor's binding reading at the end of `council.md`; **[Co]** the rest of `council.md`; **[C §n]**, **[C A1]**, **[C A2]** `research-chidi.md` and its addenda; **[E §n]**, **[E A1–A3]** `research-eleanor.md` and its addenda; **[M n]** `michael-orientation.md`. Requirement names are those of `specs/statusline/spec.md`.
+Citations: **[R]** `owner-rulings.md`; **[J1]**, **[J2]**, **[CR]**, **[J3]** Joel's rulings (J3 the ceiling, ruled after the design gate) and the conductor's binding reading in `council.md`; **[Co]** the rest of `council.md`; **[C §n]**, **[C A1]**, **[C A2]** `research-chidi.md` and its addenda; **[E §n]**, **[E A1–A3]** `research-eleanor.md` and its addenda; **[M n]** `michael-orientation.md`. Requirement names are those of `specs/statusline/spec.md`.
 
 ## Context
 
 The footer is one `VStack` of one `HStack` per row, built once in `createFooter`, with the `VStack`'s `gap` at `0` [E §1]. Rows sit on adjacent lines and row one sits directly under the editor [E A1; M 2]. Why the change exists is in `proposal.md`; Joel's rulings fix what it does [J1, J2, CR]:
 
 - One blank line above row one and between rows by default.
-- One document-level key, `rowGap`, a whole number of 0 or more, sets both. `rowGap: 0` renders exactly today's footer.
+- One document-level key, `rowGap`, a whole number from 0 to 3, sets both. `rowGap: 0` renders exactly today's footer.
 - The fleet-status row is not changed, and a `blank` row is not the answer [Co, rejected Q7].
 
 The path a document-level value travels today: `readConfiguration()` returns `{ rows, warning }` (`configuration.ts:53–60, 286`); `startUp` destructures it in the `session_start` handler (`startup.ts:49–57`) and passes `rows` to `installFooter` (`footer-setup.ts:12–20`), whose factory calls `createFooter(rows, sample, theme)` (`:21–23`, `row-renderer.ts:29–33`) [E A3 §1–2]. A validation failure throws `RejectedConfiguration`, caught at `configuration.ts:309–315`, which returns the default row and the warning `pi-jefferson: <path> was rejected (<reason>); rendering the default row` [E A3 §3]. A read or parse error takes a separate path that also returns the default row (`:295–300`) [E A3 §3].
@@ -23,7 +23,7 @@ The path a document-level value travels today: `readConfiguration()` returns `{ 
 **Non-Goals:**
 
 - Any change to the fleet-status row, which is pi-subagents' [R; Co]. A footer cannot learn that a `belowEditor` widget exists [C A1 Q1], which is why the space above row one is unconditional [J2].
-- A per-row setting, a ceiling, a `blank` row as the answer [Co, rejected].
+- A per-row setting, a `blank` row as the answer [Co, rejected].
 - A loud rule for unknown keys [Co, rejected Q6]; see decision 7.
 - The horizontal gaps (ADRs 0002, 0006, 0007), which are the `HStack`'s and are untouched [M 1].
 - Rendering `setStatus` text [R, "One card"].
@@ -48,17 +48,17 @@ The footer is mounted in pi as a plain `Container`, not a layout node [C A2], so
 
 ### 3. The default lives in one named constant, `DEFAULT_ROW_GAP = 1`
 
-Declared in `configuration.ts` beside `DEFAULT_CELLS` and `MAX_CELLS` (`:62–63`) [E §2], because the configuration reader is where every default (the default row, the default `distribution`) is already decided [E §2]. `createFooter` has no default of its own; the value always arrives from the configuration (decision 5). Nothing else states `1`. One answer to "what changes the default": that constant.
+Declared in `configuration.ts` beside `DEFAULT_CELLS` and `MAX_CELLS` (`:62–63`) [E §2], with the ceiling `MAX_ROW_GAP = 3` (decision 4), because the configuration reader is where every default (the default row, the default `distribution`) is already decided [E §2]. `createFooter` has no default of its own; the value always arrives from the configuration (decision 5). Nothing else states `1`. One answer to "what changes the default": that constant. The spec's requirement "The footer has space above its first row and between its rows" is the one normative place that states the default; the `rowGap` requirement says only that absent leaves it.
 
 ### 4. `rowGap` is read and validated in `normalizeDocument`
 
-`normalizeDocument(document, notices, theme)` (`configuration.ts:218`) already narrows the top-level envelope and checks keys beside `rows` (`:222–226`) [E A3 §4]; `rowGap` is read there from `doc`, beside either envelope, after the envelope is known and before rows are normalized, following the `distribution` precedent (`normalizeRow`, `:185–190`) [E A3 §4]. It is not one of the keys that conflict with `rows` (`cells`, `id`, `distribution`) [E A3 §4]. Check: `"rowGap" in doc` and `Number.isInteger(value) && value >= 0`. Absent gives `DEFAULT_ROW_GAP`. Anything else (`-1`, `1.5`, `"1"`, `null`) throws `RejectedConfiguration` with the reason
+`normalizeDocument(document, notices, theme)` (`configuration.ts:218`) already narrows the top-level envelope and checks keys beside `rows` (`:222–226`) [E A3 §4]; `rowGap` is read there from `doc`, beside either envelope, after the envelope is known and before rows are normalized, following the `distribution` precedent (`normalizeRow`, `:185–190`) [E A3 §4]. It is not one of the keys that conflict with `rows` (`cells`, `id`, `distribution`) [E A3 §4]. Check: `"rowGap" in doc` and `Number.isInteger(value) && value >= 0 && value <= MAX_ROW_GAP`, where `MAX_ROW_GAP = 3` is the one named ceiling constant, beside `DEFAULT_ROW_GAP`. Absent gives `DEFAULT_ROW_GAP`. Anything else (`-1`, `1.5`, `"1"`, `null`, `4`, `1e21`) throws `RejectedConfiguration` with the reason
 
 ```
-rowGap must be a whole number of 0 or more: ${JSON.stringify(value)}
+rowGap must be a whole number from 0 to 3: ${JSON.stringify(value)}
 ```
 
-so the warning reads `pi-jefferson: <path> was rejected (rowGap must be a whole number of 0 or more: 1.5); rendering the default row`, in the form every refusal already has [E A3 §3]. The reader is the guard because pi-tui floors `1.5` to `1` and clamps `-1` to `0` without a word [M 2; Co]. The guard reads the document's own value, not a number computed before it, and has no other site.
+so the warning reads `pi-jefferson: <path> was rejected (rowGap must be a whole number from 0 to 3: 1.5); rendering the default row`, in the form every refusal already has [E A3 §3]. The reader is the guard because pi-tui floors `1.5` to `1` and clamps `-1` to `0` without a word [M 2; Co]. The ceiling is Joel's ruling after the design gate [J3]: a value above 3 takes the same path and warning shape as any other invalid value. Without it, `1e7` renders 20 million lines and `1e21` never returns [Michael PL4, finding 1]. The guard reads the document's own value, not a number computed before it, and has no other site.
 
 ### 5. The value reaches the footer once, at install
 
@@ -79,7 +79,7 @@ The six assertions that equate the footer's line count with its row count go red
 - Two rows render `["", row, "", row]`; one row renders `["", row]`; three rows render six lines.
 - `rowGap: 2` renders two empty lines above row one and between rows.
 - `rowGap: 0` renders exactly the lines the footer rendered before this change, for one and two rows. Compared against the literal lines, not against a second derivation.
-- `-1`, `1.5`, `"1"` and `null` are each refused with the warning of decision 4, and the default row renders with one empty line above it.
+- `-1`, `1.5`, `"1"`, `null`, `4` and `1e21` are each refused with the warning of decision 4, and the default row renders with one empty line above it; `3` is accepted and renders three empty lines in each place.
 - `rowGap` sits beside `rows` and beside a single top-level row, and is accepted in both.
 - A misspelt `rowgap` is ignored with no warning and the default space renders.
 - A document refused for another reason, and an unreadable file, render the default `rowGap`.
@@ -96,10 +96,10 @@ The README's description of footer rows and its configuration section (a `rowGap
 - **[Fullscreen cost, accepted by Joel [J2]]** Every footer line costs the transcript one line: one line above row one and one per gap by default, `rowGap` lines per place beyond [M 2]. Mitigation: `rowGap: 0`.
 - **[A short terminal cuts rows before blank lines]** A footer in fullscreen is truncated from the bottom, so leading blank lines are kept longest and row content goes before them: at `rowGap` 1 and a very short terminal the footer can show only blank lines [C A2; M 2]. Not run in a live pi [C A2]. Mitigation: `rowGap: 0`; no automatic shrink of the gap, which would be per-render change [C §1].
 - **[A blank line under the editor in every session [J2]]** Accepted by Joel; it appears with no widget above.
-- **[A zero-line child's gap is pi-tui behavior, not a documented contract]** Decision 2 rests on it, run on 1.4.0, with 1.5.0's stack files identical [C A2; M 2]. Mitigation: the tests of decision 8 pin the exact lines at `rowGap` 1 and 2, so a pi-tui change turns them red.
+- **[A zero-line child's gap is pi-tui behavior, not a documented contract]** Decision 2 rests on it, run on 1.4.0, with 1.5.0's stack files identical [C A2; M 2]. Mitigation: the suite pins the behavior at the devDependency version (1.4.0) only; the host runs whatever pi ships. Detection on a newer host is Joel's observation or a pin bump. The fallback is shape (c) or a prepended line list, both one-line changes at the same site. No code change now.
 - **[A misspelt key is silent]** Decision 7.
 - **[A bad `rowGap` costs the whole layout]** The existing refusal path every key shares, so changing it is not this card [Co, set aside].
-- **[No ceiling]** A very large `rowGap` is accepted, as the council chose [Co]. The user asked for it.
+- **[Large `rowGap` can hang pi]** Unbounded, `rowGap` 1e5 renders in 1 ms, 1e6 in 16 ms, 1e7 in 141 ms producing 20,000,002 lines, 1e9 would take about 14 s and allocate 2e9 strings, and `1e21` passes `Number.isInteger` and never returns [Michael PL4, finding 1]. Mitigation: Joel bounded it at `MAX_ROW_GAP = 3` [J3]; a larger value is refused like any invalid value. Raising the ceiling is one constant.
 
 ## Migration Plan
 

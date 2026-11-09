@@ -96,7 +96,7 @@ the delta.
 
 ### Not in this change
 
-- A per-row setting, a ceiling, a loud unknown-key rule or a `blank` row as the answer [Co, rejected].
+- A per-row setting, a loud unknown-key rule or a `blank` row as the answer [Co, rejected].
 - Per-cell vertical alignment, a row's height above one line, or a cell returning two lines: a row stays
   one line [R].
 - The horizontal gap between cells, `GAP = 0` in the row renderer, and ADR 0002 and ADR 0007's "no gap",
@@ -126,7 +126,7 @@ list of the calls that are Joel's [M 3].
    **Settled:** yes, one line [J1, Co]; with a line above row one, four lines [J2, CR]; the way back is `rowGap: 0` [D 1, D 2].
 2. **How much**: one line, or a number? pi-tui accepts any non-negative integer; a ceiling, if any, is a
    product call [M 3].
-   **Settled:** one by default; any whole number of 0 or more, no ceiling [J1, Co; D 4].
+   **Settled:** one by default; a whole number from 0 to 3, a ceiling Joel ruled after the design gate because a huge value hangs pi [J1, J3, Co; D 4].
 3. **Can a user set it at all, and where does it live**: once per document, or per row? A document-level
    value maps to a `VStack` `gap`, a per-row value to `Spacer` entries between `HStack`s [M 2 "VStack gap"].
    Which keys the "both shapes at once" rejection lists depends on the answer [M 2 "unknown keys"].

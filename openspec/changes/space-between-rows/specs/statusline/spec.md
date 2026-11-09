@@ -40,8 +40,8 @@ configuration validation MUST NOT police a format's text to keep it.
 #### Scenario: The footer's height
 
 - **WHEN** a configuration declares three rows and sets no `rowGap`
-- **THEN** the footer renders three row lines, one empty line above the first and one between each
-  pair of rows, six lines in all, and no line other than those three is a row's
+- **THEN** the footer renders three row lines with the default space above the first and between
+  each pair of rows, and no line other than those three is a row's
 
 #### Scenario: Space between rows is not a row's line
 
@@ -73,14 +73,20 @@ two lines.
 ### Requirement: rowGap sets the space above row one and between rows
 
 The configuration document MAY carry a top-level `rowGap`, beside either envelope, whose value MUST be
-a whole number of 0 or more and sets the empty lines above row one and between each pair of rows;
-absent means one. `rowGap: 0` MUST render the footer as it rendered before this change. Any other
+a whole number from 0 to 3 and sets the empty lines above row one and between each pair of rows;
+absent leaves the default space. `rowGap: 0` MUST render the footer as it rendered before this change. Any other
 value MUST reject the document, name `rowGap` and the value in the warning, and render the default row.
 
 #### Scenario: A larger gap
 
 - **WHEN** the document sets `rowGap` to `2` and declares two rows
 - **THEN** the footer renders two empty lines, row one, two empty lines, row two
+
+#### Scenario: The largest gap
+
+- **WHEN** the document sets `rowGap` to `3` and declares two rows
+- **THEN** the configuration is accepted and the footer renders three empty lines above row one and
+  between the rows
 
 #### Scenario: A gap of zero
 
@@ -94,9 +100,9 @@ value MUST reject the document, name `rowGap` and the value in the warning, and 
 - **THEN** the document is accepted and the gap applies, and `rowGap` beside `rows` is not a conflict
   like a top-level `cells`
 
-#### Scenario: A gap that is not a whole number of 0 or more
+#### Scenario: A gap that is not a whole number from 0 to 3
 
-- **WHEN** the document sets `rowGap` to `-1`, `1.5`, `"1"` or `null`
+- **WHEN** the document sets `rowGap` to `-1`, `1.5`, `"1"`, `null`, `4` or `1e21`
 - **THEN** the configuration is rejected, the default row renders with the default space, and the
   warning names `rowGap` and the value
 
