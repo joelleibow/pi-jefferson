@@ -8,19 +8,19 @@ Status: Accepted. Leaves [ADR 0002](0002-rows-span-the-full-width.md), [ADR 0006
 The footer's rows sat on adjacent lines, and row one sat directly under the editor. Joel asked for
 space between the rows, with a document-level key, `rowGap`, to change it. He first ruled that the
 footer also always has a blank line above row one. A zero-line `Spacer` as the stack's first child
-built that: the stack puts its `gap` between children only, so the gap landed between the `Spacer` and
-row one. `rowGap` governed both places.
+built that. The stack puts its `gap` between children only, so the gap landed between the `Spacer` and
+row one, and `rowGap` governed both places.
 
-Joel then looked at it live. Of the default: *"this is the default. It's way too much space"*. Asked
+Then Joel ran it live. Of the default: *"this is the default. It's way too much space"*. Asked
 which line to remove, he asked whether the gap could be padding on the `VStack`, and then ruled: *"Can
 we take out that spacer that's above our first line? This might be acceptable without that."* He kept
-the verdict for the preview without the spacer. Seeing it: *"Better. It's still an awful lot of space
+the verdict for the preview without the spacer. Of that preview: *"Better. It's still an awful lot of space
 between rows. Maybe nothing I can really do about it though, huh?"* Offered one line between rows by
 default or none, he ruled: *"This is the way. What we have now. It's visually better than them seeming
 too cramped. Too spacious is better than too cramped,"*. After the design gate he also bounded the value
 at 3, because pi-tui renders a huge one as millions of lines.
 
-The constraints that held throughout: pi-tui lays out the footer (*"That lets pi-tui do its thing"*,
+Two constraints held throughout. pi-tui lays out the footer (*"That lets pi-tui do its thing"*,
 2026-11-03), and *"Don't invent what we don't have to"*.
 
 ## Decision
@@ -33,8 +33,8 @@ editor. At `rowGap` 0 the footer is the old one.
 the footer once, at install. Anything else refuses the document by the path every other invalid value
 takes.
 
-The `Spacer(0)` was built and then removed on Joel's live observation. If someone asks why the footer
-sits flush on the editor, that ruling is the answer; do not put a spacer back to add space above row one.
+The `Spacer(0)` was built and then removed on Joel's live observation. A reader who asks why the footer
+sits flush on the editor finds the answer in that ruling. Do not put a spacer back to add space above row one.
 
 Alternatives weighed and not taken:
 
@@ -47,7 +47,7 @@ Alternatives weighed and not taken:
   already does.
 - **A `blank` row.** Joel's council rejected it as the answer: it makes a row of what is not one, and
   the user would write it into every document.
-- **No space by default.** Joel was offered it and chose one line: too spacious beats too cramped.
+- **No space between rows by default.** Joel was offered it and chose one line: too spacious beats too cramped.
 
 ## Consequences
 
