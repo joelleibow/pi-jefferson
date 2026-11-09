@@ -29,13 +29,19 @@ function unreadable(known: Partial<Readings> = {}): Readings {
 
 const shapes = [
   ["blank", [], DEFAULT_CELL_TEXT],
-  ["model", ["provider", "model"], "$provider: $model"],
+  ["model", ["provider", "model"], "$provider/$model"],
   ["thinking", ["level"], "$level|capitalize"],
   ["path", ["path"], "$path"],
   ["context", ["tokens", "window", "percent"], "$percent/$window"],
   ["tokens", ["input", "output", "cacheRead", "cacheWrite", "totalTokens"], "$totalTokens"],
   ["cost", ["cost"], "$cost"],
 ] as const;
+
+/** Every shipped declaration's default label: the six texts, and `blank`'s deliberate absence [D3]. */
+const labels = {
+  blank: undefined, model: "Model:", thinking: "Thinking:", path: "Path:", context: "Context:",
+  tokens: "Tokens:", cost: "Cost:",
+} as const;
 
 function named(name: string): InstrumentDeclaration {
   const declaration = instrumentNamed(name);
@@ -51,17 +57,19 @@ async function render(name: string, readings: Readings, format?: string): Promis
 }
 
 test("the seven shipped declarations own their names, variables, defaults and foundational options", () => {
+  const declared: Record<string, string | undefined> = {};
   const declarations = shapes.map(([name, variables, format]) => {
     const declaration = named(name);
     assert.deepEqual(Object.keys(declaration.variables), variables);
     assert.equal(declaration.defaultFormat, format);
     assert.deepEqual(declaration.options, ["format", "style", "label"]);
-    assert.equal(declaration.defaultLabel, name === "thinking" ? "Thinking:" : undefined);
+    declared[name] = declaration.defaultLabel;
     assert.equal(Object.isFrozen(declaration.options), true);
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
   });
   assert.equal(declarations.length, 7);
+  assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
   for (const declaration of declarations) assert.equal(declaration.options, blank.options);
   assert.equal(instrumentNamed("blank"), blank);
 });
@@ -74,7 +82,7 @@ test("unimplemented and inherited names stay unresolved however often asked", ()
 });
 
 test("every shipped default parses and renders its declared text", async () => {
-  const expected = [DEFAULT_CELL_TEXT, "anthropic: claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson", "43.2%/200k", "0", "$0.000"];
+  const expected = [DEFAULT_CELL_TEXT, "anthropic/claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson", "43.2%/200k", "0", "$0.000"];
   for (const [index, [name]] of shapes.entries()) {
     assert.equal(await render(name, seed), expected[index], name);
   }
@@ -86,8 +94,8 @@ test("blank resolves its placeholder without reading any datum", async () => {
   assert.equal(await render("blank", unreadable()), DEFAULT_CELL_TEXT);
 });
 
-test("model and thinking default formats keep their original text shapes", async () => {
-  assert.equal(await render("model", seed), "anthropic: claude-opus-4");
+test("model and thinking default formats render their declared text", async () => {
+  assert.equal(await render("model", seed), "anthropic/claude-opus-4");
   assert.equal(await render("thinking", seed), fakeTheme().style("High", { fg: "thinkingHigh" }));
   assert.equal(await render("thinking", { ...seed, thinkingLevel: "off" }), fakeTheme().style("Off", { fg: "thinkingOff" }));
 });
@@ -108,7 +116,7 @@ test("every thinking level renders its level text in that level's own thinking f
 });
 
 test("each declaration reads only the datums its variables display", async () => {
-  assert.equal(await render("model", unreadable({ provider: "anthropic", model: "claude-opus-4" })), "anthropic: claude-opus-4");
+  assert.equal(await render("model", unreadable({ provider: "anthropic", model: "claude-opus-4" })), "anthropic/claude-opus-4");
   assert.equal(await render("thinking", unreadable({ thinkingLevel: "high" })), fakeTheme().style("High", { fg: "thinkingHigh" }));
   assert.equal(await render("path", unreadable({ cwd: seed.cwd })), "pi-jefferson");
   assert.equal(await render("context", unreadable({ contextUsage: seed.contextUsage })), "43.2%/200k");
@@ -215,7 +223,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
   }
   const footer = createFooter(rows, () => store.sample(), fakeTheme(), 0);
   const line = footer.render(80)[0] ?? "";
-  assert.equal(stripTerminalSequences(line), "$0.123".padEnd(40) + "212".padEnd(40));
+  assert.equal(stripTerminalSequences(line), "Cost: $0.123".padEnd(40) + "Tokens: 212".padEnd(40));
   assert.equal(scans, 1);
   assert.equal(seen.length, 4);
   for (const totals of seen) assert.equal(totals, seen[0]);

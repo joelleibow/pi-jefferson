@@ -50,7 +50,8 @@ export const blank: InstrumentDeclaration = {
 const model: InstrumentDeclaration = {
   name: "model",
   variables: { provider: r => r.provider, model: r => r.model },
-  defaultFormat: "$provider: $model",
+  defaultFormat: "$provider/$model",
+  defaultLabel: "Model:",
   options: FOUNDATIONAL_OPTIONS,
 };
 
@@ -73,6 +74,7 @@ const path: InstrumentDeclaration = {
   name: "path",
   variables: { path: r => r.cwd === undefined ? undefined : basename(r.cwd) },
   defaultFormat: "$path",
+  defaultLabel: "Path:",
   options: FOUNDATIONAL_OPTIONS,
 };
 
@@ -85,6 +87,7 @@ const context: InstrumentDeclaration = {
   },
   bar: r => r.contextUsage?.percent ?? null,
   defaultFormat: "$percent/$window",
+  defaultLabel: "Context:",
   options: FOUNDATIONAL_OPTIONS,
 };
 
@@ -98,6 +101,7 @@ const tokens: InstrumentDeclaration = {
     totalTokens: ({ totals }) => totals === undefined ? undefined : compactCount(totals.input + totals.output + totals.cacheRead + totals.cacheWrite),
   },
   defaultFormat: "$totalTokens",
+  defaultLabel: "Tokens:",
   options: FOUNDATIONAL_OPTIONS,
 };
 
@@ -105,6 +109,7 @@ const cost: InstrumentDeclaration = {
   name: "cost",
   variables: { cost: ({ totals }) => totals === undefined ? undefined : `$${totals.cost.toFixed(3)}` },
   defaultFormat: "$cost",
+  defaultLabel: "Cost:",
   options: FOUNDATIONAL_OPTIONS,
 };
 
