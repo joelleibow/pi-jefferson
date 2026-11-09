@@ -57,6 +57,6 @@ Test lines are those of the spike and may shift by a few lines on the branch. Te
 
 ## 8. Sync and archive
 
-- [ ] 8.1 Re-measure each requirement paragraph in the delta spec under 500 characters (owner ruling), before the sync. Michael measured 254, 477, 257 and 424 on `4093e08`. Verified by: a character count of each paragraph, reported; any over 500 goes back to the spec's writer, not trimmed here.
-- [ ] 8.2 Sync the delta into `openspec/specs/`. Verified by: the living `statusline` spec carries the modified and added requirements; `openspec validate --strict` is green.
-- [ ] 8.3 Archive the change on the branch. The merge waits for Joel's go and for 7.1 ticked.
+- [x] 8.1 Re-measure each requirement paragraph in the delta spec under 500 characters (owner ruling), before the sync. Michael measured 254, 477, 257 and 424 on `4093e08`. Verified by: a character count of each paragraph, reported; any over 500 goes back to the spec's writer, not trimmed here. Evidence: Measured on the delta spec before the sync: 250, 477, 257, 424 characters, all under 500.
+- [x] 8.2 Sync the delta into `openspec/specs/`. Verified by: the living `statusline` spec carries the modified and added requirements; `openspec validate --strict` is green. Evidence: Merged the two modified and two added requirements into `openspec/specs/statusline/spec.md`; `openspec validate --all --strict` printed 4 passed, 0 failed. Living-spec paragraphs measure 250, 477, 257, 424.
+- [x] 8.3 Archive the change on the branch. The merge waits for Joel's go and for 7.1 ticked. Evidence: `openspec archive space-between-rows --yes` archived it as `2026-11-08-space-between-rows`; `openspec list` printed "No active changes found."
