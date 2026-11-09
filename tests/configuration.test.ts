@@ -72,9 +72,9 @@ test("both shapes at once is rejected", () => {
   assert.ok(warning, "a rejected document warns");
 });
 
-test("an absent configuration yields the default row with no warning", () => {
+test("an absent configuration yields the default row and the default gap, with no warning", () => {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
-  const { rows, warning } = readConfiguration({
+  const { rows, rowGap, warning } = readConfiguration({
     agentPath: join(dir, "missing-agent.json"),
     projectPath: join(dir, "missing-project.json"),
     projectTrusted: true,
@@ -82,6 +82,7 @@ test("an absent configuration yields the default row with no warning", () => {
   });
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.cells.length, 10);
+  assert.equal(rowGap, 1, "no document to set a gap, so the default one");
   assert.equal(warning, undefined);
 });
 
@@ -473,6 +474,74 @@ test("an unparseable document is rejected", () => {
   assert.ok(warning, "an unparseable document warns");
 });
 
+/** One row holding one model cell: a line whose text the seed fixes, for the line-list assertions. */
+const MODEL_ROW = { cells: [{ instrument: "model" }] };
+const MODEL_LINE = "anthropic: claude-opus-4".padEnd(40);
+
+/** The lines a document renders at `width`, its escapes stripped: what a reader sees. */
+function documentLines(document: unknown, width: number): string[] {
+  const { rows, rowGap } = readDocument(document);
+  return createFooter(rows, () => seed, fakeTheme(), rowGap).render(width).map(stripTerminalSequences);
+}
+
+test("an absent rowGap renders one empty line above row one and between the rows", () => {
+  const read = readDocument({ rows: [MODEL_ROW, MODEL_ROW] });
+  assert.equal(read.warning, undefined);
+  assert.equal(read.rowGap, 1, "absent leaves the default");
+  assert.deepEqual(documentLines({ rows: [MODEL_ROW, MODEL_ROW] }, 40), ["", MODEL_LINE, "", MODEL_LINE]);
+});
+
+test("a rowGap that is not a whole number from 0 to 3 is refused, and the default row renders with the default space", () => {
+  for (const value of [-1, 1.5, "1", null, 4, 1e21]) {
+    rejected({ rows: [{}, {}], rowGap: value }, `rowGap must be a whole number from 0 to 3: ${JSON.stringify(value)}`);
+  }
+
+  const refused = readDocument({ rows: [{}, {}], rowGap: 4 });
+  assert.equal(refused.rowGap, 1, "a refusal carries the default gap");
+  const lines = createFooter(refused.rows, () => seed, fakeTheme(), refused.rowGap).render(20);
+  assert.equal(lines.length, 2, "the default row, with one empty line above it");
+  assert.equal(lines[0], "");
+  assert.equal(visibleWidth(lines[1] ?? ""), 20);
+});
+
+test("rowGap 3, the ceiling, is accepted and renders three empty lines in each place", () => {
+  const read = readDocument({ rows: [MODEL_ROW, MODEL_ROW], rowGap: 3 });
+  assert.equal(read.warning, undefined);
+  assert.equal(read.rowGap, 3);
+  assert.deepEqual(documentLines({ rows: [MODEL_ROW, MODEL_ROW], rowGap: 3 }, 40), [
+    "", "", "", MODEL_LINE, "", "", "", MODEL_LINE,
+  ]);
+});
+
+test("rowGap sits beside a rows list and beside a single top-level row", () => {
+  const listed = readDocument({ rows: [MODEL_ROW, MODEL_ROW], rowGap: 2 });
+  assert.equal(listed.warning, undefined, "rowGap beside rows is not a conflict like a top-level cells");
+  assert.equal(listed.rowGap, 2);
+
+  const single = readDocument({ ...MODEL_ROW, rowGap: 2 });
+  assert.equal(single.warning, undefined);
+  assert.equal(single.rowGap, 2);
+});
+
+test("a misspelt rowgap is ignored without a warning and the default space renders", () => {
+  const misspelt = { rows: [MODEL_ROW, MODEL_ROW], rowgap: 0 };
+  const read = readDocument(misspelt);
+  assert.equal(read.warning, undefined, "an unknown document key stays silent");
+  assert.equal(read.rowGap, 1);
+  assert.deepEqual(documentLines(misspelt, 40), ["", MODEL_LINE, "", MODEL_LINE]);
+});
+
+test("a document refused for another reason, and an unparseable one, render the default gap", () => {
+  const refused = readDocument({ cells: [{ instrument: "model" }], rows: [{}] });
+  assert.ok(refused.warning, "a rejected document warns");
+  assert.equal(refused.rowGap, 1);
+  assert.equal(createFooter(refused.rows, () => seed, fakeTheme(), refused.rowGap).render(40)[0], "");
+
+  const unparseable = readDocument("{ not json");
+  assert.ok(unparseable.warning, "an unparseable document warns");
+  assert.equal(unparseable.rowGap, 1);
+});
+
 test("containers beside a rows list warns once rather than passing silently", () => {
   const { rows, warning } = readDocument({ containers: 3, rows: [{}, {}] });
   assert.equal(rows.length, 2, "the document's rows still render");
@@ -861,10 +930,12 @@ test("all six attributes accept boolean values and empty styles preserve unstyle
   assert.deepEqual(empty.rows[0]?.cells.map(cellText), absent.rows[0]?.cells.map(cellText));
 });
 
-test("error precedence reads the envelope before instruments and instruments before cells", () => {
+test("error precedence reads the envelope and the rowGap before instruments and instruments before cells", () => {
   rejected({ instruments: { model: { format: 42 } }, cells: [{ instrument: "model", align: "middle" }] }, 'instrument "model" has a format that is not a string');
   rejected({ instruments: 42, rows: [{}], cells: [{ instrument: "model" }] }, "the configuration carries both a top-level row and a rows list");
   rejected({ instruments: { model: { format: 42 } }, rows: [{ cells: [{ instrument: "model", align: "middle" }] }] }, 'instrument "model" has a format that is not a string');
+  // The gap is a document-level key, read before any row and before the instruments section.
+  rejected({ instruments: { model: { format: 42 } }, rows: [{}], rowGap: 1.5 }, "rowGap must be a whole number from 0 to 3: 1.5");
 });
 
 const FRAME = "\x1b[0m\x1b]8;;\x07";
@@ -873,7 +944,8 @@ const RESET = "\x1b[0m";
 function footerFor(document: unknown, theme: Theme = fakeTheme()) {
   const result = readDocument(document, theme);
   assert.equal(result.warning, undefined);
-  return createFooter(result.rows, () => seed, theme);
+  // These tests read a row's line, so the vertical gap is 0 and line 0 is that row.
+  return createFooter(result.rows, () => seed, theme, 0);
 }
 
 test("configured styled cells reset before every trailing pad, including attribute-only styles", () => {
