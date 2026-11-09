@@ -1,6 +1,6 @@
 # Proposal
 
-Citations: [R] `owner-rulings.md` (Joel, binding); [C Qn] `research-chidi.md`, question n; [E heading] `research-eleanor.md`, the named section; [M n] `michael-orientation.md` section n (a consult, not a ruling).
+Citations: [R] `owner-rulings.md` (Joel, binding); [C Qn] `research-chidi.md`, question n; [E heading] `research-eleanor.md`, the named section; [M n] `michael-orientation.md` section n (a consult, not a ruling). Test line numbers are the locations from Derek's run at `a8af447`; on the branch, find each again by its title.
 
 ## Why
 

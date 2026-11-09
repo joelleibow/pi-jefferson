@@ -377,26 +377,22 @@ instrument.
 
 ### Requirement: The model instrument
 
-The extension MUST implement a `model` instrument declaring the variables `$provider` and `$model`,
-whose default format `$provider: $model` renders the text it renders today. Configuration MUST be
-able to place it in a row's cell and to configure its format and style, and the footer MUST render
-it. Its text MUST already be correct when a session is restored, MUST change when the host reports
-a model selection, and MUST be nothing when either datum is unknown.
+The extension MUST implement a `model` instrument declaring the variables `$provider` and `$model`, with the default label `Model:` and the default format `$provider/$model`, rendering `Model: anthropic/claude-opus-4`. Configuration MUST be able to place it in a cell and configure its label, format and style, and the footer MUST render it. Its text MUST be correct when a session is restored, MUST change when the host reports a model selection, and MUST be nothing when either datum is unknown.
 
 #### Scenario: The model changes
 
-- **WHEN** the host reports a new active model
-- **THEN** the cell holding `model` renders that model's provider and model id
+- **WHEN** the host reports the provider `anthropic` and the model `claude-opus-4` and nothing configures `model`
+- **THEN** the cell holding `model` renders `Model: anthropic/claude-opus-4`
 
 #### Scenario: A session is restored
 
 - **WHEN** a session is restored and the host reports no selection
-- **THEN** the cell holding `model` renders the restored session's provider and model
+- **THEN** the cell holding `model` renders the label, then the restored session's provider and model joined by `/`
 
 #### Scenario: A model the host has not supplied
 
 - **WHEN** the store reads the provider or the model as unknown
-- **THEN** the cell holding `model` renders nothing, rather than its format with a hole in it
+- **THEN** the cell holding `model` renders nothing, rather than its label or its format with a hole in it
 
 ### Requirement: The thinking instrument
 
@@ -574,16 +570,12 @@ Cached text MUST NOT survive into a later render, and MUST be dropped on `invali
 
 ### Requirement: The path instrument
 
-The extension MUST implement a `path` instrument declaring the variable `$path` — the basename of
-the working directory the host reports — with `$path` as its default format. It MUST read that
-directory from the store, and MUST NOT render the whole directory, read the terminal, or run a
-command to get it.
+The extension MUST implement a `path` instrument declaring the variable `$path` — the basename of the working directory the host reports — with the default label `Path:` and `$path` as its default format. It MUST read that directory from the store, and MUST NOT render the whole directory, read the terminal, or run a command to get it.
 
 #### Scenario: The session's directory
 
-- **WHEN** a cell holds `path` in a session whose working directory is
-  `/Users/joelleibow/Projects/pi-jefferson`
-- **THEN** it renders `pi-jefferson`
+- **WHEN** a cell holds `path` in a session whose working directory is `/Users/joelleibow/Projects/pi-jefferson` and nothing configures it
+- **THEN** it renders `Path: pi-jefferson`
 
 #### Scenario: A directory the host has not supplied
 
@@ -592,24 +584,17 @@ command to get it.
 
 ### Requirement: The context instrument
 
-The extension MUST implement a `context` instrument declaring `$tokens`, `$window`, `$percent` and
-`$bar`, read from the context usage the host reports, with `$percent/$window` as its default format.
-Each variable MUST arrive already formatted — a compact token count, a percentage — and a null
-estimate MUST hand out `?`, as the host's own footer does, and leave `$bar` unfilled and `dim`. When
-the host reports no usage at all it MUST render nothing.
+The extension MUST implement a `context` instrument declaring `$tokens`, `$window`, `$percent` and `$bar`, read from the context usage the host reports, with the default label `Context:` and `$percent/$window` as its default format. Each variable MUST arrive already formatted — a compact token count, a percentage — and a null estimate MUST hand out `?`, as the host's own footer does, and leave `$bar` unfilled and `dim`. When the host reports no usage at all it MUST render nothing.
 
 #### Scenario: A session with a known estimate
 
 - **WHEN** the host reports 86,400 estimated tokens of a 200,000-token window
-- **THEN** `$percent` hands out `43.2%`, `$window` `200k` and `$tokens` `86.4k`, and a cell holding
-  `context` renders `43.2%/200k`
+- **THEN** `$percent` hands out `43.2%`, `$window` `200k` and `$tokens` `86.4k`, and a cell holding `context` with nothing configured renders `Context: 43.2%/200k`
 
 #### Scenario: An estimate the host has not made yet
 
-- **WHEN** the host reports a context usage whose token estimate is null, as it does after a
-  compaction and before the next response
-- **THEN** `$percent` and `$tokens` hand out `?` and the cell renders `?/200k`, never `0%` and never
-  a zero it was not given, and a `$bar` in the format draws its whole track unfilled in `dim`
+- **WHEN** the host reports a context usage whose token estimate is null, as it does after a compaction and before the next response
+- **THEN** `$percent` and `$tokens` hand out `?` and the cell renders `Context: ?/200k`, never `0%` and never a zero it was not given, and a `$bar` in the format draws its whole track unfilled in `dim`
 
 #### Scenario: No usage the host can report
 
@@ -618,17 +603,12 @@ the host reports no usage at all it MUST render nothing.
 
 ### Requirement: The tokens instrument
 
-The extension MUST implement a `tokens` instrument declaring `$input`, `$output`, `$cacheRead`,
-`$cacheWrite` and `$totalTokens`, summed from the session's usage-bearing entries as the host's
-footer sums them, with `$totalTokens` as its default format. `$totalTokens` MUST be
-`input + output + cacheRead + cacheWrite`, because the host's accumulation never reads
-`usage.totalTokens`. The sum MUST cover the whole session, not one branch, and each variable MUST
-arrive formatted as a compact count.
+The extension MUST implement a `tokens` instrument declaring `$input`, `$output`, `$cacheRead`, `$cacheWrite` and `$totalTokens`, summed from the session's usage-bearing entries as the host's footer sums them, with the default label `Tokens:` and `$totalTokens` as its default format. `$totalTokens` MUST be `input + output + cacheRead + cacheWrite`, because the host never reads `usage.totalTokens`. The sum MUST cover the whole session, not one branch, and each variable MUST be a compact count.
 
 #### Scenario: A session's totals
 
-- **WHEN** a cell holds `tokens` in a session whose entries carry usage
-- **THEN** it renders the total tokens of those entries, formatted compactly
+- **WHEN** a cell holds `tokens` in a session whose entries carry usage and nothing configures it
+- **THEN** it renders `Tokens:`, one gap, then the total tokens of those entries, formatted compactly
 
 #### Scenario: What `$totalTokens` adds
 
@@ -637,32 +617,27 @@ arrive formatted as a compact count.
 
 #### Scenario: The categories the host counts
 
-- **WHEN** a session holds usage entries, assistant messages, tool-result messages carrying usage,
-  and compaction or branch-summary entries carrying usage
-- **THEN** all four are summed, because the host's own footer sums all four and the numbers are
-  meant to match
+- **WHEN** a session holds usage entries, assistant messages, tool-result messages carrying usage, and compaction or branch-summary entries carrying usage
+- **THEN** all four are summed, because the host's own footer sums all four and the numbers are meant to match
 
 #### Scenario: A fresh session
 
 - **WHEN** a session holds no usage at all
-- **THEN** `$totalTokens` hands out `0` and the cell renders `0`
+- **THEN** `$totalTokens` hands out `0` and the cell renders `Tokens: 0`
 
 ### Requirement: The cost instrument
 
-The extension MUST implement a `cost` instrument declaring `$cost`, the session's total cost summed
-from the same entries `tokens` sums, with `$cost` as its default format. It MUST arrive already
-formatted as the host's own footer formats cost, and MUST NOT be summed a second way that could
-disagree with `tokens`.
+The extension MUST implement a `cost` instrument declaring `$cost`, the session's total cost summed from the same entries `tokens` sums, with the default label `Cost:` and `$cost` as its default format. It MUST arrive already formatted as the host's own footer formats cost, and MUST NOT be summed a second way that could disagree with `tokens`.
 
 #### Scenario: A session with cost
 
-- **WHEN** a cell holds `cost` in a session whose usage carries a total cost of 0.123
-- **THEN** it renders `$0.123`
+- **WHEN** a cell holds `cost` in a session whose usage carries a total cost of 0.123 and nothing configures it
+- **THEN** it renders `Cost: $0.123`
 
 #### Scenario: A fresh session
 
 - **WHEN** a session holds no usage at all
-- **THEN** the cell holding `cost` renders `$0.000`
+- **THEN** the cell holding `cost` renders `Cost: $0.000`
 
 #### Scenario: Cost and tokens in one render
 
@@ -738,7 +713,7 @@ and back of a format MUST be removed, after control characters collapse to space
 
 #### Scenario: Literal text among variables
 
-- **WHEN** `model` is configured with the format `🧠: $model from $provider` and the store holds
+- **WHEN** `model` is configured with `label: ""`, the format `🧠: $model from $provider` and the store holds
   `anthropic` and `claude-opus-4`
 - **THEN** the cell renders `🧠: claude-opus-4 from anthropic`
 
@@ -771,7 +746,7 @@ and back of a format MUST be removed, after control characters collapse to space
 
 #### Scenario: A pipe no name follows
 
-- **WHEN** `model` is configured with the format `$model | $provider` and the store holds
+- **WHEN** `model` is configured with `label: ""`, the format `$model | $provider` and the store holds
   `anthropic` and `claude-opus-4`
 - **THEN** the cell renders `claude-opus-4 | anthropic`, because the `|` is followed by a space and
   not by a name, so it is the character it is
@@ -783,7 +758,7 @@ and back of a format MUST be removed, after control characters collapse to space
 
 #### Scenario: Space at the front or back of a format
 
-- **WHEN** `model` is configured with the format `  $model  ` and the store holds `claude-opus-4`
+- **WHEN** `model` is configured with `label: ""`, the format `  $model  ` and the store holds `claude-opus-4`
 - **THEN** the cell renders `claude-opus-4`, as if the format had no leading or trailing space
 
 #### Scenario: Control characters at the edge of a format
@@ -876,7 +851,7 @@ estimate to show it MUST draw its whole track unfilled in `dim`.
 
 #### Scenario: A bar in a cell with room
 
-- **WHEN** `context` is configured with the format `$percent $bar` in a cell 20 columns wide, and
+- **WHEN** `context` is configured with `label: ""` and the format `$percent $bar` in a cell 20 columns wide, and
   the rest of the format takes 6 of them
 - **THEN** the bar occupies the 14 columns the format left
 
@@ -922,19 +897,19 @@ non-whitespace text immediately before it. `$bar` MUST NOT carry a modifier.
 
 #### Scenario: A modifier on a variable
 
-- **WHEN** `model` is configured with the format `$model|bold` and the store holds `claude-opus-4`
+- **WHEN** `model` is configured with `label: ""`, the format `$model|bold` and the store holds `claude-opus-4`
 - **THEN** the cell renders `claude-opus-4` bold, and the format looks up a variable named `model`
 
 #### Scenario: A modifier on literal text
 
-- **WHEN** `model` is configured with the format `🧠 $model via|dim $provider` and the store holds
+- **WHEN** `model` is configured with `label: ""`, the format `🧠 $model via|dim $provider` and the store holds
   `anthropic` and `claude-opus-4`
 - **THEN** the cell renders `🧠 claude-opus-4 via anthropic`, with `dim` applied to `via` and to no
   other text
 
 #### Scenario: A chain on literal text
 
-- **WHEN** `model` is configured with the format `$model via|dim|bold $provider` and the store holds
+- **WHEN** `model` is configured with `label: ""`, the format `$model via|dim|bold $provider` and the store holds
   `anthropic` and `claude-opus-4`
 - **THEN** the cell renders `claude-opus-4 via anthropic` with `via` both dim and bold, and no other
   text carrying either attribute
@@ -1173,6 +1148,40 @@ after the trim MUST replace the default label with none, and no gap renders.
 - **WHEN** an instrument's `label` is a number or an object
 - **THEN** the document is rejected, the default row renders, and the warning names the instrument and
   the option
+
+### Requirement: A shipped instrument's default label renders as a configured label does
+
+A shipped instrument that declares a default label MUST render it as literal text in front of the format that binds, configured or default, with the one gap, so `format: ""` renders the label alone. It MUST NOT render when the store reads a datum the instrument declares as unknown. `blank` MUST declare no default label. A configured `label` replaces it and `""` removes it, as "An instrument's label is placed in front of its format" states.
+
+#### Scenario: The default label in front of the default format
+
+- **WHEN** a shipped instrument declares a default label, nothing configures it, and its data are known
+- **THEN** the cell renders the default label, one gap, then the default format's text
+
+#### Scenario: The default label in front of a configured format
+
+- **WHEN** `path` is configured with the format `$path!` and no label, and its data are known
+- **THEN** the cell renders `Path:`, one gap, then `pi-jefferson!`
+
+#### Scenario: An empty format leaves the default label alone
+
+- **WHEN** `context` is configured with `format: ""` and no label, and its data are known
+- **THEN** the cell renders `Context:` and nothing else
+
+#### Scenario: No label over an absent datum
+
+- **WHEN** an instrument declares a default label and a datum, and the store reads that datum as unknown
+- **THEN** the cell renders nothing, with no default label and no gap
+
+#### Scenario: The thinking default is the template
+
+- **WHEN** `thinking` is configured with nothing and the level is `high`
+- **THEN** the cell renders `Thinking: High`, the default label `Thinking:`, one gap, then the level
+
+#### Scenario: blank has no default label
+
+- **WHEN** a cell holds `blank` and nothing configures its label
+- **THEN** the cell renders `blank`'s placeholder text with no label, and `blank` configured with the format `""` and no label renders nothing, not a lone label
 
 ### Requirement: The thinking level takes the color of the input box's thinking rules
 

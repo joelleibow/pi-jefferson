@@ -1,6 +1,6 @@
 # Design
 
-Citations: [R] `owner-rulings.md`; [J1], [J2] Joel's two PL2 rulings in `council.md` "Joel's rulings"; [C] `council.md` (synthesis and accepted feedback); [E heading] `research-eleanor.md`; [M n] `michael-orientation.md` section n (a consult, not a ruling). Motivation is in `proposal.md`.
+Citations: [R] `owner-rulings.md`; [J1], [J2] Joel's two PL2 rulings in `council.md` "Joel's rulings"; [C] `council.md` (synthesis and accepted feedback); [E heading] `research-eleanor.md`; [M n] `michael-orientation.md` section n (a consult, not a ruling). Test line numbers are the locations from Derek's run at `a8af447`; on the branch, find each again by its title. Motivation is in `proposal.md`.
 
 ## Context
 
@@ -64,6 +64,11 @@ All through the bindings, because the `render()` helper in `instrument.test.ts` 
 - **New, through bindings**: for each of the five, a default renders `Label content`; a configured label replaces it; `label: ""` removes it with no gap; an unknown datum renders nothing. `blank` renders no label with nothing configured and renders nothing under `format: ""`. One row test renders `path`, `model` and `thinking` at 80 columns with no labels configured and asserts the texts' columns: it fails if `path` stops absorbing the growth, or if any label is missing or doubled. Each new test must be red before its declaration is added.
 - The `render()` helper tests of default formats stay as they are; the format change in Decision 2 still flips its `anthropic: claude-opus-4` lines [M 2].
 
+### 6. Docs pass, and no ADR
+
+Not tasks. The README instruments table (README.md:103-111, no label column) gets a default-label column or text, and README.md:128, "Only `thinking` has a default label", is corrected. Its upgrading note pattern (README.md:133-136, set `label: ""` for the previous text) gets `model`'s format as well, and the configured-format case of Decision 7: a format with no label now shows the default label, `format: ""` shows it alone, `label: ""` restores the old text [M 1 J, 2].
+- No ADR is warranted. The change picks a text for each declaration; it adds no structure, pattern or dependency, and the mechanism is the decision ADR 0006 already records. `blank` excluded and `model`'s format change are product choices, recorded here and in the spec. If the docs pass reads this differently, that is its call under the architecture-docs rules.
+
 ### 7. A default label precedes a configured format; format-language scenarios set `label: ""`
 
 Binding puts the default label in front of whatever format binds when no `label` is configured [Joel, 2026-11-06, cited in Context]. So a document that sets `format` and no `label` on `model`, `path`, `context`, `tokens` or `cost` now shows the label; `format: ""` on one of them renders the label alone; `label: ""` is the way back.
@@ -71,11 +76,6 @@ Binding puts the default label in front of whatever format binds when no `label`
 - **The rule** [conductor's call]: a test or scenario whose subject is the format language sets `label: ""` in its WHEN. The fixture isolates the format from the default label, and the expectation stays the format's own text. The rule widens to a test whose subject is not the label and whose assertion a default label would mask [conductor's ruling during the red/green run; redgreen-derek.md]. The case is the four replacement tests at jefferson.test.ts:656: at 80 columns and 8 per cell, every labelled text clips to the same ellipsis for old and new, so the test could no longer tell a dropped context from a kept one. `path`, `model`, `tokens` and `cost` take `label: ""` there (`thinking` already had it).
 - Applied to seven living scenarios. The search: every living WHEN that configures `model`, `path`, `context`, `tokens` or `cost` with a format and no label, keeping those that pin an exact text or width (statusline spec 741, 774, 786, 879, 925, 930, 937). Four other hits state no exact text or width and stay true (702, 747, 967, 1270) [michael-pl4-2.json]. The seven: "Literal text among variables", "A pipe no name follows", "Space at the front or back of a format", "A bar in a cell with room", "A modifier on a variable", "A modifier on literal text" and "A chain on literal text". The delta MODIFIES their three requirements ("An instrument's format is plain text and variables", "$bar takes the width the rest of the format leaves", "A modifier follows a variable or literal text"), copying each whole and adding `label: ""` to those seven WHENs.
 - Applied to the matching tests in the 38 (Decision 5), the `$bar` test among them: their fixtures gain `label: ""`; expectations do not change. The fixture class is 9 tests: five format-language or bar tests and the four replacement tests.
-
-### 6. Docs pass, and no ADR
-
-Not tasks. The README instruments table (README.md:103-111, no label column) gets a default-label column or text, and README.md:128, "Only `thinking` has a default label", is corrected. Its upgrading note pattern (README.md:133-136, set `label: ""` for the previous text) gets `model`'s format as well, and the configured-format case of Decision 7: a format with no label now shows the default label, `format: ""` shows it alone, `label: ""` restores the old text [M 1 J, 2].
-- No ADR is warranted. The change picks a text for each declaration; it adds no structure, pattern or dependency, and the mechanism is the decision ADR 0006 already records. `blank` excluded and `model`'s format change are product choices, recorded here and in the spec. If the docs pass reads this differently, that is its call under the architecture-docs rules.
 
 ## Risks / Trade-offs
 

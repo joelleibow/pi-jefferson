@@ -50,6 +50,6 @@ His own footer does not change: all four of his instruments set a label, and `to
 
 ## 7. Sync and archive
 
-- [ ] 7.1 Re-measure each requirement paragraph in the delta spec under `specs/` and confirm every one is under 500 characters (nine paragraphs, wrapped lines joined; Michael measured 443, 497, 336, 485, 497, 345, 477, 371, 446). Verify with a character count of each.
-- [ ] 7.2 Sync the delta into `openspec/specs/` with the `openspec-sync-specs` skill. Verify: `openspec validate --specs --strict` passes, and the MODIFIED requirements match the delta.
-- [ ] 7.3 Archive the change on the branch with `openspec-archive-change`, after 6.1 is ticked. The merge waits for Joel's go.
+- [x] 7.1 Re-measure each requirement paragraph in the delta spec under `specs/` and confirm every one is under 500 characters (nine paragraphs, wrapped lines joined; Michael measured 443, 497, 336, 485, 497, 345, 477, 371, 446). Verify with a character count of each. **Run:** counts 443, 497, 336, 485, 497, 345, 477, 371, 446 (max 497, all under 500; the delta unchanged since Michael's measure).
+- [x] 7.2 Sync the delta into `openspec/specs/` with the `openspec-sync-specs` skill. Verify: `openspec validate --specs --strict` passes, and the MODIFIED requirements match the delta. **Run:** synced; `openspec validate --specs --strict` 3 passed, `--all --strict` 4 passed; the same nine paragraphs measure 443-497 in the living spec.
+- [x] 7.3 Archive the change on the branch with `openspec-archive-change`, after 6.1 is ticked. The merge waits for Joel's go. **Run:** 6.1 ticked; `openspec archive default-labels --yes` (output in the commit report).
