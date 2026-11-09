@@ -1,5 +1,5 @@
 /** A once-built footer tree; the host allocates columns, each cell owns its clip and pad. */
-import { HStack, Spacer, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
+import { HStack, VStack, truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { Cell, Row } from "./row.ts";
@@ -112,9 +112,7 @@ export function createFooter(
       },
     };
   });
-  // A stack's gap lands only between its children, so a zero-line Spacer first gives the gap above
-  // row one too. One value governs both places; the spacer adds nothing at gap 0.
-  const tree = new VStack([new Spacer(0), ...rowViews.map(({ stack }) => stack)], { gap: rowGap });
+  const tree = new VStack(rowViews.map(({ stack }) => stack), { gap: rowGap });
 
   return {
     render(width) {

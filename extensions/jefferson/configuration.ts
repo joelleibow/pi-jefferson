@@ -52,7 +52,7 @@ export interface ConfigurationSource {
 
 export interface Configuration {
   rows: Row[];
-  /** The empty lines the footer renders above row one and between each pair of rows. */
+  /** The empty lines the footer renders between each pair of rows. */
   rowGap: number;
   /**
    * Set when a present document was rejected, and also when an accepted document has
@@ -218,7 +218,7 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
   return { id, distribution, cells };
 }
 
-/** A document's rows, and the empty lines its footer renders above and between them. */
+/** A document's rows, and the empty lines its footer renders between them. */
 interface NormalizedDocument {
   rows: Row[];
   rowGap: number;
