@@ -727,6 +727,99 @@ test("a label narrower than the cell shrinks the bar by its columns and the gap'
   assert.equal(visibleWidth(text), 20);
 });
 
+/** Nothing configured: the cell's text with each datum known, and the message that names a failing row. */
+const DEFAULT_LABEL_TEXTS = [
+  ["path", seed, "Path: pi-jefferson", "path"],
+  ["context", seed, "Context: 43.2%/200k", "context"],
+  ["tokens", seed, "Tokens: 3.0k", "tokens"],
+  ["cost", seed, "Cost: $0.123", "cost"],
+  ["model", seed, "Model: anthropic/claude-opus-4", "model"],
+  ["context", { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } }, "Context: ?/200k", "context with a null token estimate"],
+] as const;
+
+test("each of the five shipped default labels renders in front of its default format", () => {
+  for (const [instrument, readings, text, message] of DEFAULT_LABEL_TEXTS) {
+    const { rows, warning } = readDocument({ cells: [{ instrument }] });
+    assert.equal(warning, undefined, message);
+    assert.equal(rows[0]?.cells[0]?.instrument.render(readings, 80, fakeTheme()), text, message);
+  }
+});
+
+test("a configured label replaces a shipped default and keeps the one gap", () => {
+  for (const name of ["path", "context", "tokens", "cost", "model"]) {
+    const labelled = readDocument({ instruments: { [name]: { label: "L" } }, cells: [{ instrument: name }] });
+    assert.equal(labelled.warning, undefined, name);
+    const bare = readDocument({ instruments: { [name]: { label: "" } }, cells: [{ instrument: name }] });
+    assert.equal(bare.warning, undefined, name);
+    const [labelledText = ""] = labelled.rows[0]?.cells.map(cellText) ?? [];
+    const [bareText = ""] = bare.rows[0]?.cells.map(cellText) ?? [];
+    assert.equal(labelledText, "L " + bareText, `${name} renders its configured label, one gap and its content, and no default label`);
+  }
+});
+
+test("an empty configured label removes a shipped default and its gap", () => {
+  for (const name of ["path", "context", "tokens", "cost", "model"]) {
+    const { rows, warning } = readDocument({ instruments: { [name]: { label: "", format: "x" } }, cells: [{ instrument: name }] });
+    assert.equal(warning, undefined, name);
+    assert.deepEqual(rows[0]?.cells.map(cellText), ["x"], `${name} configured with label "" renders its format alone, with no label and no gap`);
+  }
+});
+
+test("a shipped default label does not render over an unknown datum", () => {
+  const unknown: Readings = {
+    provider: undefined, model: undefined, thinkingLevel: undefined,
+    cwd: undefined, contextUsage: undefined, totals: undefined,
+  };
+  for (const name of ["path", "context", "tokens", "cost", "model"]) {
+    const { rows, warning } = readDocument({ cells: [{ instrument: name }] });
+    assert.equal(warning, undefined, name);
+    assert.deepEqual(
+      rows[0]?.cells.map((cell) => cell.instrument.render(unknown, 80, fakeTheme())),
+      [""],
+      `${name} renders nothing over an unknown datum, with no default label and no gap`,
+    );
+  }
+});
+
+test("blank declares no default label, so its placeholder and its empty format carry none", () => {
+  const placeholder = readDocument({ cells: [{ instrument: "blank" }] });
+  assert.equal(placeholder.warning, undefined);
+  assert.deepEqual(placeholder.rows[0]?.cells.map(cellText), [DEFAULT_CELL_TEXT], "nothing configured, and no label in front of the placeholder");
+  const emptied = readDocument({ instruments: { blank: { format: "" } }, cells: [{ instrument: "blank" }] });
+  assert.equal(emptied.warning, undefined);
+  assert.deepEqual(emptied.rows[0]?.cells.map(cellText), [""], 'a format of "" renders nothing, not a lone label');
+});
+
+test("a shipped default label precedes a configured format", () => {
+  const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, cells: [{ instrument: "path" }] });
+  assert.equal(warning, undefined);
+  assert.deepEqual(rows[0]?.cells.map(cellText), ["Path: pi-jefferson!"], "no label configured, so the default label comes first");
+});
+
+test("an empty format on a shipped instrument leaves its default label alone", () => {
+  const { rows, warning } = readDocument({ instruments: { context: { format: "" } }, cells: [{ instrument: "context" }] });
+  assert.equal(warning, undefined);
+  assert.deepEqual(rows[0]?.cells.map(cellText), ["Context:"], 'a format of "" renders the default label alone');
+});
+
+test("a path, model and thinking row at 80 columns keeps every text in its columns", () => {
+  const { rows, warning } = readDocument({
+    cells: [
+      { instrument: "path" },
+      { instrument: "model", align: "right" },
+      { instrument: "thinking", align: "right" },
+    ],
+  });
+  assert.equal(warning, undefined);
+  const [line = ""] = createFooter(rows, () => seed, fakeTheme(), 0).render(80);
+  assert.equal(visibleWidth(line), 80, "one line of the row's width");
+  assert.equal(
+    stripTerminalSequences(line),
+    "Path: pi-jefferson" + " ".repeat(17) + "Model: anthropic/claude-opus-4 Thinking: High",
+    "path absorbs the slack, the model text ends at column 65 and the thinking text at 80",
+  );
+});
+
 test("a configured foreground does not beat the level's color", () => {
   const theme = fakeTheme();
   const { rows, warning } = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, cells: [{ instrument: "thinking" }] }, theme);
