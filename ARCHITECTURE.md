@@ -1,7 +1,6 @@
 # Architecture
 
-pi-jefferson draws one footer line per configured row, with empty lines above the first row and
-between rows. This file describes the parts and the
+pi-jefferson draws one footer line per configured row, with empty lines between rows. This file describes the parts and the
 direction they depend in. It is deliberately short: everything here is a decision a change can break,
 so it is worth reading before one.
 
@@ -69,10 +68,9 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
-**Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are a
-leading `Spacer(0)` and one `HStack` per row, and its `gap` is the configuration's `rowGap`. The stack
-puts `gap` empty lines between children only, so the zero-line `Spacer` is what gives row one its space
-above; see [ADR 0008](docs/adr/0008-row-gap-is-the-stacks-gap-behind-a-zero-line-spacer.md). `rowGap`
+**Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
+`HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
+empty lines between its children, so row one sits flush on the editor; see [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md). `rowGap`
 reaches the renderer once, at install. The vertical gap is that `gap`; the horizontal one below is the `HStack`'s.
 On each render the renderer asks every cell for the width of its text at width 0 and gives those to the width
 plan in `visuals/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`

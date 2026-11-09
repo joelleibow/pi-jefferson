@@ -34,10 +34,10 @@ extension.
 
 ## Testing the footer's height
 
-The footer's first line is an empty line, and so is every line between rows. A test of a row's
-horizontal geometry passes `rowGap` 0 to `createFooter` so line 0 is the row; a test of the gap reads
+The footer's first line is row one; only the lines between rows are empty. A test of a row's
+horizontal geometry passes `rowGap` 0 to `createFooter` so every line is a row; a test of the gap reads
 the exact list of lines. The gap line is a bare `""`, so the helper that frames a row's line does not apply
-to it. Do not remove the `Spacer(0)` in `createFooter`; [ADR 0008](docs/adr/0008-row-gap-is-the-stacks-gap-behind-a-zero-line-spacer.md) says why.
+to it. [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md) says why the first row sits flush on the editor.
 
 ## Two traps this repository has already paid for
 

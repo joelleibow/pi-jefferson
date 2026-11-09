@@ -80,15 +80,15 @@ a `rows` list it rejects the document. `rowGap`, below, is the one key that sits
 Upgrading: earlier releases divided every row evenly. Set `"distribution": "equal"` on a row to keep
 that.
 
-The footer leaves empty lines above its first row and between rows. `rowGap` sets how many, at the top
+The footer leaves empty lines between rows. `rowGap` sets how many, at the top
 level of the document, beside `rows` or beside a single top-level row:
 
 ```json
 { "rowGap": 0, "rows": [{ "cells": [{ "instrument": "model" }] }] }
 ```
 
-It is a whole number from 0 to 3. Without it, one empty line sits above row one and one between each
-pair of rows. `0` renders the footer without that space. Any other value, such as `-1`, `1.5`, `"1"` or
+It is a whole number from 0 to 3. Without it, one empty line sits between each
+pair of rows and none before the first. `0` renders the footer without that space. Any other value, such as `-1`, `1.5`, `"1"` or
 `4`, rejects the document: the default row renders and the warning names the value. A misspelt key
 such as `rowgap` is ignored, and the default space renders. The empty lines belong to the footer, not
 to a row; each row stays one line.

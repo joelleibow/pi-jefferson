@@ -49,7 +49,7 @@ Test lines are those of the spike and may shift by a few lines on the branch. Te
 
 ## 6. Docs pass
 
-- [ ] 6.1 Markdown documentation is Bambadjan's after the implementation gate, not Implement's; the seven false sites and the in-place rewrite of ADR 0008 are in design decision 9.
+- [x] 6.1 Markdown documentation is Bambadjan's after the implementation gate, not Implement's; the seven false sites and the in-place rewrite of ADR 0008 are in design decision 9.
 
 ## 7. Joel's observation (Joel's; the conductor ticks it with his words)
 
