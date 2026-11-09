@@ -14,7 +14,7 @@ A shipped instrument that declares a default label MUST render it as literal tex
 - **WHEN** `path` is configured with the format `$path!` and no label, and its data are known
 - **THEN** the cell renders `Path:`, one gap, then `pi-jefferson!`
 
-#### Scenario: An empty format leaves the label alone
+#### Scenario: An empty format leaves the default label alone
 
 - **WHEN** `context` is configured with `format: ""` and no label, and its data are known
 - **THEN** the cell renders `Context:` and nothing else
@@ -256,3 +256,50 @@ non-whitespace text immediately before it. `$bar` MUST NOT carry a modifier.
   `claude-opus-4`
 - **THEN** the document is rejected, the default row renders, and the warning names the instrument
   and the modifier, because no variable and no non-whitespace text precedes the pipe
+
+### Requirement: $bar takes the width the rest of the format leaves
+
+An instrument MAY declare `$bar`. It MUST take the columns the rest of the format leaves in the
+cell, MUST shrink to nothing when nothing is left, and a format MUST hold at most one width-taking
+variable — a second MUST reject the document, naming it. The bar MUST be drawn from block
+characters in theme colors, with no dependency the package does not already declare, and with no
+estimate to show it MUST draw its whole track unfilled in `dim`.
+
+#### Scenario: A bar in a cell with room
+
+- **WHEN** `context` is configured with `label: ""` and the format `$percent $bar` in a cell 20 columns wide, and
+  the rest of the format takes 6 of them
+- **THEN** the bar occupies the 14 columns the format left
+
+#### Scenario: A bar with no room
+
+- **WHEN** the rest of the format fills the cell
+- **THEN** the bar occupies nothing, and the format's own text is what the cell clips
+
+#### Scenario: A bar among prose
+
+- **WHEN** a format places `$bar` between literal text and a variable
+- **THEN** the bar sits where the format put it and takes the width the rest of the format leaves
+
+#### Scenario: Two width-taking variables
+
+- **WHEN** a format names two width-taking variables
+- **THEN** the document is rejected, the default row renders, and the warning names the second
+
+#### Scenario: The pressure a bar shows
+
+- **WHEN** the fraction `context`'s bar shows is above the thresholds the host's own footer colors
+  context pressure by
+- **THEN** the filled portion takes the theme's `warning` and then `error` color, and the empty
+  portion is drawn `dim`
+
+#### Scenario: A bar with no estimate to show
+
+- **WHEN** the instrument holding `$bar` has a null estimate, so there is no fraction to fill
+- **THEN** the bar draws its whole track unfilled in `dim`, and the cell still shows `?/<window>`
+
+#### Scenario: No new dependency
+
+- **WHEN** a cell renders a bar
+- **THEN** it is drawn from block characters and theme colors, and the package's declared
+  dependencies are unchanged
