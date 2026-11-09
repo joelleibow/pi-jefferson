@@ -439,7 +439,7 @@ test("two cells holding the model instrument resolve identical text", () => {
     0,
   );
   const [line] = footer.render(48);
-  assert.equal(line, composed("anthropic: claude-opus-4", "anthropic: claude-opus-4"));
+  assert.equal(line, composed("anthropic/claude-opus-4 ", "anthropic/claude-opus-4 "));
 });
 
 test("a push between two renders shows up in the next render and not before", () => {

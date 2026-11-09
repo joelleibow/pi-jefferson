@@ -394,7 +394,7 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
     });
 
     const [line] = session.lines(80);
-    assert.ok(visible(line ?? "").startsWith("anthropic: claude-opus-4"), "the model cell renders the seed");
+    assert.ok(visible(line ?? "").startsWith("Model: anthropic/claude-opus-4"), "the model cell renders the seed");
     assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: High"), "the thinking cell renders the seed");
     assert.deepEqual(session.notified, []);
   });
@@ -427,7 +427,7 @@ test("a model selection push changes the line and requests one repaint", async (
 
   h.dispatch({ type: "model_select", model: { provider: "openai", id: "gpt-5" } });
 
-  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("openai: gpt-5"));
+  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("Model: openai/gpt-5"));
   assert.equal(session.repaints(), 1);
 });
 
@@ -475,7 +475,7 @@ test("a push carrying the values the store already holds requests no repaint", a
   h.dispatch({ type: "thinking_level_select", level: "high" });
 
   assert.equal(session.repaints(), 0);
-  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("anthropic: claude-opus-4"));
+  assert.ok(visible(session.lines(80)[0] ?? "").startsWith("Model: anthropic/claude-opus-4"));
 });
 
 test("a second session_start releases the first install before installing its own", async (t) => {
@@ -508,7 +508,7 @@ test("a second session_start releases the first install before installing its ow
   ]);
 
   const [line] = second.lines(80);
-  assert.ok(visible(line ?? "").startsWith("openai: gpt-5"), "the second footer renders the second context");
+  assert.ok(visible(line ?? "").startsWith("Model: openai/gpt-5"), "the second footer renders the second context");
   assert.ok(stripTerminalSequences(line ?? "").includes("Thinking: Low"), "never the first install's values");
 
   h.dispatch({ type: "model_select", model: { provider: "google", id: "gemini-3" } });
@@ -564,7 +564,7 @@ test("disposing a footer then replacing the session releases the first install o
 test("configured formats, styles and a width-taking bar render end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
-    instruments: { model: { format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { format: "$percent $bar", style: { fg: "accent" } } },
+    instruments: { model: { label: "", format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { label: "", format: "$percent $bar", style: { fg: "accent" } } },
     cells: [{ instrument: "model" }, { instrument: "context" }],
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
@@ -583,7 +583,7 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
 test("configured formats, styles and a width-taking bar render end to end under equal distribution", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
-    instruments: { model: { format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { format: "$percent $bar", style: { fg: "accent" } } },
+    instruments: { model: { label: "", format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { label: "", format: "$percent $bar", style: { fg: "accent" } } },
     distribution: "equal",
     cells: [{ instrument: "model" }, { instrument: "context" }],
   });
@@ -625,12 +625,12 @@ test("a dispatched turn boundary repaints only changed totals and its scan is re
   writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
   const h = harness();
   const session = await h.start();
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(40) + "$0.000".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 0".padEnd(40) + "Cost: $0.000".padEnd(40));
   session.host.entries.push(usageEntry(212, 0.125));
   session.host.leafId = "turn-1";
   h.dispatch({ type: "turn_end" });
   assert.equal(session.repaints(), 1);
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "212".padEnd(40) + "$0.125".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 212".padEnd(40) + "Cost: $0.125".padEnd(40));
   assert.equal(session.reads.entries, 2, "the render reuses the boundary's scan");
   session.host.entries.push(usageEntry(0, 0));
   session.host.leafId = "turn-2";
@@ -648,7 +648,7 @@ test("an unchanged turn boundary before the first render leaves the install-time
   h.dispatch({ type: "turn_end" });
   assert.equal(session.repaints(), 0);
   assert.equal(session.reads.entries, 1, "createFooter's initial sample filled the cache");
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "0".padEnd(80));
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 0".padEnd(80));
   assert.equal(session.reads.entries, 1);
 });
 
@@ -656,7 +656,10 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
   test(`a ${reason} replacement drops the old cwd, model, totals and captured readers`, async (t) => {
     const agentDir = useTempAgentDir(t);
     writeAgentDocument(agentDir, {
-      instruments: { model: { format: "$model" }, thinking: { format: "$level", label: "" } },
+      instruments: {
+        path: { label: "" }, model: { label: "", format: "$model" },
+        tokens: { label: "" }, cost: { label: "" }, thinking: { format: "$level", label: "" },
+      },
       distribution: "equal",
       cells: Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] })),
     });
@@ -738,7 +741,7 @@ test("Joel's top row puts the working directory at the left and two instruments 
 test("Joel's second row keeps its thirds, with a real bar", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
-    instruments: { context: { format: "$percent $bar" } },
+    instruments: { context: { label: "", format: "$percent $bar" } },
     cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "context", align: "right" }],
   });
   const session = await harness().start({ contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
@@ -760,7 +763,7 @@ test("Joel's second row keeps its thirds, with a real bar", async (t) => {
 test("a bar takes only what its own cell leaves, and draws nothing with no room", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
-    instruments: { context: { format: "$percent $bar" } },
+    instruments: { path: { label: "" }, context: { label: "", format: "$percent $bar" } },
     cells: [{ instrument: "path" }, { instrument: "context" }],
   });
   const root = mkdtempSync(join(tmpdir(), "jefferson-bar-"));

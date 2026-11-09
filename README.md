@@ -100,15 +100,15 @@ Upgrading: earlier releases drew no empty lines. Set `"rowGap": 0` to keep that.
 whitespace at the front and back of a format is removed; whitespace inside it is text. Omit `format`
 to use its default:
 
-| Instrument | Variables | Default format |
-| --- | --- | --- |
-| `blank` | None | `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor` |
-| `model` | `$provider`, `$model` | `$provider: $model` |
-| `thinking` | `$level` | `$level\|capitalize` |
-| `path` | `$path` | `$path` |
-| `context` | `$tokens`, `$window`, `$percent`, `$bar` | `$percent/$window` |
-| `tokens` | `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens` | `$totalTokens` |
-| `cost` | `$cost` | `$cost` |
+| Instrument | Variables | Default label | Default format |
+| --- | --- | --- | --- |
+| `blank` | None | None | `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor` |
+| `model` | `$provider`, `$model` | `Model:` | `$provider/$model` |
+| `thinking` | `$level` | `Thinking:` | `$level\|capitalize` |
+| `path` | `$path` | `Path:` | `$path` |
+| `context` | `$tokens`, `$window`, `$percent`, `$bar` | `Context:` | `$percent/$window` |
+| `tokens` | `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens` | `Tokens:` | `$totalTokens` |
+| `cost` | `$cost` | `Cost:` | `$cost` |
 
 Every instrument also accepts `label`, a string placed in front of its format, whether the format
 is configured or the default. It is literal text: `$` means nothing in it, and `$label` is not a
@@ -125,15 +125,17 @@ write it yourself. The space takes the label's `style`, counts toward the cell's
 of what `$bar` has left. A label that is empty after the trim, `label: ""` included, shows no label
 and no space. A format that is empty or only whitespace leaves the label alone, with no space after it.
 
-Only `thinking` has a default label, `Thinking:`, so its default cell reads `Thinking: High`. A
-configured `label` replaces the default, and `label: ""` removes it. When an instrument's data is
-unknown the cell renders nothing, label included. With known data and `"format": ""`, the cell is the
-label alone.
+Every instrument except `blank` has a default label, so `model` reads `Model: anthropic/claude-opus-4`
+and `thinking` reads `Thinking: High`. A configured `label` replaces the default, and `label: ""`
+removes it. When an instrument's data is unknown the cell renders nothing, label included. With known
+data and `"format": ""`, the cell is the label alone.
 
-Upgrading: the default label also applies to a `thinking` format you had already configured. If that
-format has no `label`, the cell now starts with `Thinking:` and one space. Set `label: ""` to get the
-previous text back. A space you wrote at the front or back of a label or a format is now removed, and a
-label's one space comes from the gap.
+Upgrading: a default label now appears in front of a format you configured, too, on `model`, `path`,
+`context`, `tokens` and `cost` as well as `thinking`. If that format has no `label`, the cell starts
+with the label and one space, and `"format": ""` renders the label alone. Set `label: ""` to get the
+previous text back. `model` also changed its default format to `$provider/$model`, so to restore
+`anthropic: claude-opus-4`, set both `label: ""` and `format: "$provider: $model"`. A space you wrote
+at the front or back of a label or a format is now removed, and a label's one space comes from the gap.
 
 A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
 each applying in the order the format writes them. On plain text a modifier covers the run of

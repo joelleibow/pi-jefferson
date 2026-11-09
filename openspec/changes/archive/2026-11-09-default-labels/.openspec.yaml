@@ -1,0 +1,16 @@
+schema: marbleization
+created: 2026-11-08
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "b1a7288b-5310-4c4d-8df4-34f3f23e98cf"
+    chidi: "d13f796b-ee6c-415f-9fb3-9865da3629e1"
+    eleanor: "754fc9a6-4444-4cf0-8c2a-2b624af2b0c9"
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+  routing:
+    - "2026-11-08 bambadjan: routed per run to anthropic/claude-sonnet-5.5. His pinned localllm-omlx/flint-oQ4e was aborted twice by the oMLX memory guard mid-prefill in this session's previous change (space-between-rows). Agent file pin unchanged; a repin is Joel's."
