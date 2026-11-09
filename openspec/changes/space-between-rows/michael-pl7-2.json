@@ -1,0 +1,27 @@
+{
+  "verdict": "approve",
+  "requirements": [
+    {"requirement": "PL7 finding 1 (precedence unchecked) resolved", "evidence": "tasks.md 2.2 now names the assertion at configuration.test.ts:938 inside the existing precedence test (:933); design 4 says the assertion pins it. Reproduced in a temp copy of spike 6b9bf1d: on 16da136's extensions the line fails at :938:3 via `rejected` (:828); at 6b9bf1d 308/308; moving the rowGap read below `readInstruments` → 1 fail at :938. Ran it myself.", "status": "met"},
+    {"requirement": "PL7 finding 2 (no-document path unchecked) resolved", "evidence": "tasks.md 1.8a names configuration.test.ts:85 (rowGap === 1 on the absent-file return) and jefferson.test.ts:238-241 (no-document TUI session renders two lines, '' first, 80-column row second). Design 6 now lists the absent-file return (:290) as the third return. Reproduced: red on 16da136 at :85:10 and :238:10; green at 6b9bf1d; bite `rowGap: 0` at that return → 3 fail at configuration.test.ts:85, jefferson.test.ts:238 and :799, exactly as recorded.", "status": "met"},
+    {"requirement": "PL7 finding 3 (task 7.1 scratch agent directory) resolved", "evidence": "7.1 now runs in Joel's own session on the branch with his unedited document, lists the blank line under the editor with and without the fleet-status row, the line between rows and fullscreen; the optional rowGap: 0 check uses a scratch trusted project's `.pi/pi-jefferson.json` (CONFIG_DIR_NAME is `.pi`, config.js:473; configuration.ts reads it when the project is trusted and the file exists), which keeps his packages loaded. Marked Joel's.", "status": "met"},
+    {"requirement": "PL7 finding 4 (red-run count) resolved", "evidence": "1.11 states 16 failures (11 new red + 5 rewritten; the gap-0 guard passes), that 1.8a and 2.2 raise the count on the real branch, and that format.test.ts's red was the inverse pair. Matches my first-pass measurement of 4d3aa7a (292/16). The assertion lines quoted are 6b9bf1d's (shifted by the added assertions at :85 and :238-241), which tasks.md:3 already allows for.", "status": "met"},
+    {"requirement": "PL7 finding 5 (documentation listed as tasks) resolved", "evidence": "Section 6 is one line deferring to design decision 9 for Bambadjan's docs pass.", "status": "met"},
+    {"requirement": "Both directions still hold after the edits: every spec scenario and design decision has a task, every task traces back", "evidence": "New tasks 1.8a and 2.2 trace to spec 'One row … or none and the default row renders' and design 4/6. No task was removed except the docs items, whose home is design 9. 5.2's 308 is correct: the second run extended three existing tests and added none (measured at 6b9bf1d: tests 308, pass 308).", "status": "met"},
+    {"requirement": "Each new check is a failing behavioral test with boundaries named, dependencies faked at the boundary", "evidence": "1.8a: boundary 'no document at all'; configuration.test.ts:85 drives the real reader against a missing path, jefferson.test.ts:238 drives the real startUp through the harness. 2.2: the one document with two faults; asserts the warning text. Neither mocks the thing under test.", "status": "met"},
+    {"requirement": "Design amendments consistent with the tests they cite", "evidence": "Design 4 cites configuration.test.ts:938 — present at 6b9bf1d with the exact `rejected(...)` call. Design 6 cites `:290` for the absent-file return — configuration.ts:290 on the real branch today. `openspec validate space-between-rows --strict`: valid.", "status": "met"}
+  ],
+  "findings": [
+    {"severity": "minor", "location": "tasks.md task 2.1, 'both the validation-refusal return and the read-or-parse-error return carry DEFAULT_ROW_GAP (design 6)'", "finding": "Design 6 now names three returns that carry DEFAULT_ROW_GAP; the green task that builds them still names two. The third (the absent-file return, configuration.ts:290) is named only in the red task 1.8a, so the one task an implementer follows to write the reader omits a return its own check pins.", "required_change": "In 2.1, say 'all three returns — the absent-file return, the read-or-parse-error return and the validation-refusal return — carry DEFAULT_ROW_GAP (design 6)', and add 1.8a to the list of checks 2.1 turns green.", "required_change_ran": false}
+  ],
+  "later_gates": [
+    "Implementation gate: the real-branch red run shows 19 failures (the 16 at their lines plus configuration.test.ts:85, :938 and jefferson.test.ts:238, line numbers reconciled on the branch), then 308/308 and tsc clean; nothing cherry-picked from the spike.",
+    "Implementation gate: re-run the bites on the real branch — rowGap 0 at the absent-file return (3 red incl. jefferson.test.ts:799) and the rowGap read moved below readInstruments (1 red) — in addition to A, A2, B, C, D, D2, E.",
+    "Implementation gate: all three readConfiguration returns carry DEFAULT_ROW_GAP; the constants unexported; comments for the Spacer(0) and the shortcut present; the precedence comment at configuration.test.ts:937 kept.",
+    "Owner observation (7.1) in Joel's own session before archive; 8.1 re-measured before sync; docs pass per design 9."
+  ],
+  "not_covered": [
+    "What the first pass settled (test shape of 1.1-1.10, 3.x, 4.x; paragraph lengths; design amendments 1 and 2) was not re-derived.",
+    "Reverts A, B, D, D2 and E were not re-run in this pass.",
+    "No live pi run."
+  ]
+}
