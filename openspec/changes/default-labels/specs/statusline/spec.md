@@ -2,22 +2,22 @@
 
 ### Requirement: A shipped instrument's default label renders as a configured label does
 
-A shipped instrument that declares a default label MUST render it as literal text in front of its default format, with the one gap. A configured `label` MUST replace the default, and a configured `""` MUST remove it with no gap. The default label MUST NOT render when the store reads a datum the instrument declares as unknown. `blank` MUST declare no default label.
+A shipped instrument that declares a default label MUST render it as literal text in front of the format that binds, configured or default, with the one gap, so `format: ""` renders the label alone. It MUST NOT render when the store reads a datum the instrument declares as unknown. `blank` MUST declare no default label. A configured `label` replaces it and `""` removes it, as "An instrument's label is placed in front of its format" states.
 
 #### Scenario: The default label in front of the default format
 
 - **WHEN** a shipped instrument declares a default label, nothing configures it, and its data are known
 - **THEN** the cell renders the default label, one gap, then the default format's text
 
-#### Scenario: A configured label replaces the default
+#### Scenario: The default label in front of a configured format
 
-- **WHEN** an instrument that declares a default label is configured with the label `Q`
-- **THEN** the cell renders `Q`, one gap, then the content, and the default label's text does not render
+- **WHEN** `path` is configured with the format `$path!` and no label, and its data are known
+- **THEN** the cell renders `Path:`, one gap, then `pi-jefferson!`
 
-#### Scenario: An empty label removes the default
+#### Scenario: An empty format leaves the label alone
 
-- **WHEN** an instrument that declares a default label is configured with `label: ""` and its data are known
-- **THEN** the cell renders only its content, with no default label and no leading gap
+- **WHEN** `context` is configured with `format: ""` and no label, and its data are known
+- **THEN** the cell renders `Context:` and nothing else
 
 #### Scenario: No label over an absent datum
 
@@ -130,3 +130,129 @@ The extension MUST implement a `cost` instrument declaring `$cost`, the session'
 
 - **WHEN** one render lays out a cell holding `cost` and a cell holding `tokens`
 - **THEN** both read the same scan of the session's entries, taken from that render's sample
+
+### Requirement: An instrument's format is plain text and variables
+
+A `format` MUST be plain text: literal characters render verbatim, and `$name` substitutes the value
+the instrument hands out. The format language MUST NOT format a number or parse Markdown. `$` starts a
+variable and `|` a modifier when a name follows it; `\$` and `\|` escape them. Whitespace at the front
+and back of a format MUST be removed, after control characters collapse to spaces. An undeclared
+`$name` MUST reject the document, naming the instrument and the variable.
+
+#### Scenario: Literal text among variables
+
+- **WHEN** `model` is configured with `label: ""`, the format `🧠: $model from $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `🧠: claude-opus-4 from anthropic`
+
+#### Scenario: A number the format does not format
+
+- **WHEN** `tokens` is configured with the format `↑$input ↓$output`
+- **THEN** each variable renders exactly as the instrument formatted it, and the format adds no
+  digit, group separator or unit of its own
+
+#### Scenario: A literal dollar sign
+
+- **WHEN** a format carries `\$`
+- **THEN** the cell renders a literal `$` and names no variable
+
+#### Scenario: Brackets are text
+
+- **WHEN** a format carries `[a](b)`
+- **THEN** the cell renders `[a](b)`, because the extension parses no group syntax
+
+#### Scenario: Markdown is text
+
+- **WHEN** a format, or a value substituted into it, carries `**bold**`
+- **THEN** the cell renders the characters `**bold**` and no Markdown is parsed
+
+#### Scenario: A variable the instrument does not declare
+
+- **WHEN** an instrument's format names a variable its declaration does not have
+- **THEN** the document is rejected, the default row renders, and the warning names the instrument
+  and the variable
+
+#### Scenario: A pipe no name follows
+
+- **WHEN** `model` is configured with `label: ""`, the format `$model | $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4 | anthropic`, because the `|` is followed by a space and
+  not by a name, so it is the character it is
+
+#### Scenario: A literal pipe beside a name
+
+- **WHEN** a format writes `\|` where the next character is one a name may hold
+- **THEN** the cell renders a `|` and starts no modifier
+
+#### Scenario: Space at the front or back of a format
+
+- **WHEN** `model` is configured with `label: ""`, the format `  $model  ` and the store holds `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4`, as if the format had no leading or trailing space
+
+#### Scenario: Control characters at the edge of a format
+
+- **WHEN** a format ends in a newline, which collapses to a space
+- **THEN** that space is removed with the rest of the trailing whitespace, and the cell renders on one
+  line
+
+#### Scenario: Space inside a format
+
+- **WHEN** a format is `$percent $bar`
+- **THEN** the space between the two variables renders as written; only the format's front and back are
+  trimmed
+
+### Requirement: A modifier follows a variable or literal text
+
+A modifier MUST be written `|name` directly after the text it applies to — a variable or literal
+text — where a name is a run of the characters a variable name may hold. Modifiers MUST chain, each
+applying in the order the format writes them. A modifier on literal text MUST apply to the run of
+non-whitespace text immediately before it. `$bar` MUST NOT carry a modifier.
+
+#### Scenario: A modifier on a variable
+
+- **WHEN** `model` is configured with `label: ""`, the format `$model|bold` and the store holds `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4` bold, and the format looks up a variable named `model`
+
+#### Scenario: A modifier on literal text
+
+- **WHEN** `model` is configured with `label: ""`, the format `🧠 $model via|dim $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `🧠 claude-opus-4 via anthropic`, with `dim` applied to `via` and to no
+  other text
+
+#### Scenario: A chain on literal text
+
+- **WHEN** `model` is configured with `label: ""`, the format `$model via|dim|bold $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4 via anthropic` with `via` both dim and bold, and no other
+  text carrying either attribute
+
+#### Scenario: Chained modifiers
+
+- **WHEN** a format carries `$provider|bold|underline`
+- **THEN** the value renders bold and underlined, and each modifier applied in the order written
+
+#### Scenario: A modifier on a value the store does not know
+
+- **WHEN** `thinking` is configured with the format `$level|capitalize` and the level is unknown
+- **THEN** the cell renders nothing, exactly as it does with no modifier, because a modifier cannot
+  turn an unknown value into text
+
+#### Scenario: A name carried in two places
+
+- **WHEN** the shipped source is inspected
+- **THEN** the modifier names that parsing, validation and rendering read come from one table, and
+  none of the three carries its own copy
+
+#### Scenario: A modifier on the width-taking variable
+
+- **WHEN** an instrument's format writes a modifier directly after `$bar`
+- **THEN** the document is rejected, the default row renders, and the warning names the instrument
+  and the modifier
+
+#### Scenario: A modifier with nothing before it
+
+- **WHEN** `model` is configured with the format `🧠 |dim $model` and the store holds
+  `claude-opus-4`
+- **THEN** the document is rejected, the default row renders, and the warning names the instrument
+  and the modifier, because no variable and no non-whitespace text precedes the pipe

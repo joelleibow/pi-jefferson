@@ -7,6 +7,7 @@ Citations: [R] `owner-rulings.md`; [J1], [J2] Joel's two PL2 rulings in `council
 - A declaration may carry a `defaultLabel`. Binding puts it in front of the format with one gap, a configured `label` (`""` included) beats it, and an unknown datum returns `""` before the label is reached. `thinking` alone declares one, `Thinking:`, without a trailing space [E Label path; M 1 B–E].
 - The shape of the change was ruled at PL2: `Path:`, `Context:`, `Tokens:`, `Cost:` and `Model:` are added, `Thinking:` stays, `blank` gets none, the shape is a word with a colon [J1, J2].
 - `model` carries one more ruling: its default format moves from `$provider: $model` to `$provider/$model` [J2]. That overrides both advisors, who rejected a format change [C "Rejected"].
+- A default label precedes whatever format binds, configured or default, when no `label` is configured. Joel ruled it for every instrument on 2026-11-06: "Always in front of format, including its default" (`archive/2026-11-06-default-thinking-instrument/owner-rulings.md:27`); README.md:133-134 already warns of it for `thinking`. It is settled, not decided here.
 - Joel's own footer sets emoji labels on `path`, `model`, `thinking` and `context`, and a `blank` with `format: ""` and no label. His file is never edited [R 2026-11-06; E Joel's live configuration].
 
 ## Goals / Non-Goals
@@ -35,7 +36,7 @@ Citations: [R] `owner-rulings.md`; [J1], [J2] Joel's two PL2 rulings in `council
 
 The format changes with its label, so the cell renders `Model: anthropic/claude-opus-4` [J2].
 - It revises the living requirement "The model instrument", which says the default format `$provider: $model` "renders the text it renders today". The delta MODIFIES that requirement to state the label and the new format.
-- It flips the assertions that pin `anthropic: claude-opus-4` through the default: configuration.test.ts, row-renderer.test.ts, jefferson.test.ts and instrument.test.ts, about 20 lines [M 2, "`model`'s ... next to a colon label"]. Tests that set their own `format` are not affected.
+- It flips the assertions that pin `anthropic: claude-opus-4` through the default: configuration.test.ts, row-renderer.test.ts, jefferson.test.ts and instrument.test.ts, about 20 lines [M 2, "`model`'s ... next to a colon label"]. The default label also precedes a *configured* format (Decision 7); that is separate from the format change here.
 - `label: ""` removes only the label. Whoever wants `anthropic: claude-opus-4` back sets `format: "$provider: $model"` too.
 - Alternatives beaten: keep the format and get `Model: anthropic: claude-opus-4`, two colons, 31 columns (Neil [C]); no label (Matt [C]). Both lost to Joel's ruling [J2].
 
@@ -49,7 +50,7 @@ Source: [J1]. Reasons, in the council's and Michael's terms:
 
 ### 4. Widths each label adds
 
-Content-sized cells grow by label plus gap. Measured widths, no label to label [M 2]: path 12→18, tokens 1→9, cost 6→12, context 10→19, thinking 14→14. Michael measured `model` at 24→31 under the old format. With `$provider/$model` the format is one column shorter (the `: ` is replaced by `/`), so `Model: anthropic/claude-opus-4` is 30 columns. That 30 is derived from his 31, not measured; the cell-width test measures it.
+Content-sized cells grow by label plus gap. Measured widths, no label to label [M 2]: path 12→18, tokens 1→9, cost 6→12, context 10→19, thinking 14→14. Michael measured `model` at 24→31 under the old format. With `$provider/$model` the format is one column shorter (the `: ` is replaced by `/`), so `Model: anthropic/claude-opus-4` is 30 columns. Michael measured 30 through `instrumentBindings` at width 0 with the ruled declaration, and 23 for `anthropic/claude-opus-4` under `label: ""` [Michael's PL4 verdict, `michael-pl4.json`].
 - In a `path, model, thinking` row at 80 columns, `path` absorbs the growth and loses about 13 columns of slack [M 2]. Michael found the "path text still fits" scenario holds; with model one column shorter than he measured, the margin is one column larger.
 - With a `$bar`, the label and gap come out of the bar, so `Context: ██░░░ 43.2%` fills exactly 20 columns [M 2]. At 8 columns the bar is 0 and the cell's clip handles the overflow, as before [M 2].
 - No arithmetic changes: a label counts toward a content-sized cell already (ADR 0007).
@@ -57,24 +58,35 @@ Content-sized cells grow by label plus gap. Measured widths, no label to label [
 ### 5. Tests
 
 All through the bindings, because the `render()` helper in `instrument.test.ts` bypasses labels and stays green with the label deleted [C "Tests must render through the bindings"; M 2].
-- **Retired or rewritten, not re-pinned** [C "Accepted"]: the test asserting that only `thinking` has a default label (instrument.test.ts:60 [M 2]), rewritten to assert the five declared texts and `blank` and `thinking`'s; and the test titled "no label and no default label renders as before" (configuration.test.ts:449 region [M 2]), whose premise this change retires, rewritten around what an unlabelled configuration now renders.
-- **Flipped**: the through-binding assertions that pin unlabelled `pi-jefferson`, `43.2%/200k`, `0`, `$0.123` or `anthropic: claude-opus-4` — about 36 lines across configuration.test.ts, row-renderer.test.ts and jefferson.test.ts [M 2, "Tests that pin unlabelled output"]. The tasks list them from a fresh grep; Michael's count is from grep, not from a failing run.
-- **New, through bindings**: for each of the five, a default renders `Label content`; a configured label replaces it; `label: ""` removes it with no gap; an unknown datum renders nothing. `blank` renders no label with nothing configured and renders nothing under `format: ""`. A cell-width test pins the Decision 4 widths. Each new test must be red before its declaration is added.
+- **Retired or rewritten, not re-pinned** [C "Accepted"]: the test asserting that only `thinking` has a default label (instrument.test.ts:60 [M 2]), rewritten to assert the five declared texts and `blank` and `thinking`'s; and the assertion "no label and no default label renders as before" (configuration.test.ts:580-588, in the test starting at :580), whose premise this change retires, rewritten around what an unlabelled configuration now renders.
+- **Flipped**: the 38 of 309 tests that fail once the six declaration lines land, measured by Michael in a scratch copy at 60c647b [Michael's PL4 verdict]. The count comes from a failing run, not grep. They pin unlabelled `pi-jefferson`, `43.2%/200k`, `0`, `$0.123` or `anthropic: claude-opus-4`, or configure a format with no label (Decision 7). The tasks list each with its file and line from a fresh failing run.
+- **Format-language tests set `label: ""`** in their fixture (Decision 7); they are not given the label in their expectation.
+- **New, through bindings**: for each of the five, a default renders `Label content`; a configured label replaces it; `label: ""` removes it with no gap; an unknown datum renders nothing. `blank` renders no label with nothing configured and renders nothing under `format: ""`. One row test renders `path`, `model` and `thinking` at 80 columns with no labels configured and asserts the texts' columns: it fails if `path` stops absorbing the growth, or if any label is missing or doubled. Each new test must be red before its declaration is added.
 - The `render()` helper tests of default formats stay as they are; the format change in Decision 2 still flips its `anthropic: claude-opus-4` lines [M 2].
+
+### 7. A default label precedes a configured format; format-language scenarios set `label: ""`
+
+Binding puts the default label in front of whatever format binds when no `label` is configured [Joel, 2026-11-06, cited in Context]. So a document that sets `format` and no `label` on `model`, `path`, `context`, `tokens` or `cost` now shows the label; `format: ""` on one of them renders the label alone; `label: ""` is the way back.
+- The delta's ADDED requirement states it with two scenarios, one for a configured format and one for `format: ""`. It leaves replacement and `""` to the living requirement "An instrument's label is placed in front of its format" (one fact, one place).
+- **The rule** [conductor's call]: a test or scenario whose subject is the format language sets `label: ""` in its WHEN. The fixture isolates the format from the default label, and the expectation stays the format's own text.
+- Applied to the six living scenarios Michael names (statusline spec 741-743, 776, 787, 926, 932-933, 939): "Literal text among variables", "A pipe no name follows", "Space at the front or back of a format", "A modifier on a variable", "A modifier on literal text" and "A chain on literal text". The delta MODIFIES their two requirements ("An instrument's format is plain text and variables", "A modifier follows a variable or literal text"), copying each whole and adding `label: ""` to those six WHENs.
+- Applied to the matching tests in the 38 (Decision 5): their fixtures gain `label: ""`; expectations do not change.
 
 ### 6. Docs pass, and no ADR
 
-Not tasks. The README instruments table (README.md:103-111, no label column) gets a default-label column or text, and README.md:128, "Only `thinking` has a default label", is corrected. Its upgrading note pattern (README.md:133-136, set `label: ""` for the previous text) gets `model`'s format as well [M 1 J, 2].
+Not tasks. The README instruments table (README.md:103-111, no label column) gets a default-label column or text, and README.md:128, "Only `thinking` has a default label", is corrected. Its upgrading note pattern (README.md:133-136, set `label: ""` for the previous text) gets `model`'s format as well, and the configured-format case of Decision 7: a format with no label now shows the default label, `format: ""` shows it alone, `label: ""` restores the old text [M 1 J, 2].
 - No ADR is warranted. The change picks a text for each declaration; it adds no structure, pattern or dependency, and the mechanism is the decision ADR 0006 already records. `blank` excluded and `model`'s format change are product choices, recorded here and in the spec. If the docs pass reads this differently, that is its call under the architecture-docs rules.
 
 ## Risks / Trade-offs
 
-- **A config that relied on unlabelled defaults now shows labels** → this is the break [R "Breaks are cheap before 1.0"]. `label: ""` is the way back for each, and README's upgrading note says so. Joel's footer is unaffected except `tokens` and `cost`, which his document does not configure [E Joel's live configuration].
+- **A config that relied on unlabelled defaults now shows labels** → this is the break [R "Breaks are cheap before 1.0"]. `label: ""` is the way back for each, and README's upgrading note says so.
+- **A configured format with no label now shows the label** → on `model`, `path`, `context`, `tokens` and `cost`, a document with a `format` and no `label` renders the label before it, and `format: ""` renders the label alone. Already ruled [Joel, 2026-11-06]; `label: ""` restores the old text. Named in the upgrading note (Decision 6).
+- **Joel's footer is unaffected** → his four configured labels replace the defaults, `blank` has none, and `tokens` and `cost` are in none of his cells [E Joel's live configuration; C].
 - **`model`'s old text is not one `label: ""` away** → a user who wants `anthropic: claude-opus-4` sets the format too. Named in the README note (Decision 6).
-- **Wider cells** → content-sized rows shift slack from the absorbing cell (Decision 4). No width test exists for the new totals until Decision 5 adds one.
+- **Wider cells** → content-sized rows shift slack from the absorbing cell (Decision 4). The row test in Decision 5 pins the 80-column case.
 - **A misspelt instrument name still renders as `blank`** → unchanged, and with no label it stays quiet [M 2].
 - **A future unlabelled instrument** → nothing forces a label on a new instrument. The spec states only that a declared label behaves; it does not require one. Deliberate: "every shipped" is a statement about today, and `blank` shows a rule would need an exception.
-- **Test count rests on grep** → the tasks start from a failing run after the declarations change, not from the list here.
+- **The flip set is a measurement at 60c647b** → the tasks start from a fresh failing run after the declarations change and list every flipped test with file and line.
 
 ## Migration Plan
 
@@ -82,4 +94,4 @@ One commit's worth of declarations and test flips; no data, no config schema, no
 
 ## Open Questions
 
-- Exact `model` width under the new format is derived (Decision 4), not measured; the width test settles it and changes nothing else.
+- None. The `model` width, the one open question, is closed by measurement (Decision 4).
