@@ -1,26 +1,40 @@
-# PR #16 review: space between footer rows
+# Judge Gen — PR review of #16 (`space-between-rows` into `main`)
 
-Head commit reviewed: `031c51af088cb1faa1aa21b7525e46622a44cf41` (`gh pr view` confirmed it did not move).
-Read: the PR description and diff, `proposal.md`, `specs/statusline/spec.md`, the changed code, its callers, and pi-tui's `stack.js` and `spacer.js`. I ran `pnpm typecheck` (clean) and `pnpm test` (308 pass, 0 fail).
-Load assumed: one person running pi in a terminal. The footer renders a few lines per repaint, so there is no scale concern.
+**Head commit reviewed:** `59d64d0a2a6836584c7b4ac99e096de393e5a1d4` (confirmed with `gh pr view --json headRefOid`; local checkout is the same commit).
+
+**Blindness note:** `gh pr diff` printed the whole diff, including the change directory's non-allowed files (the tail of `owner-rulings.md` and `redgreen-derek.md` scrolled past in the output). I did not open any of them on purpose and did not use them for this review. Every finding below rests on `proposal.md`, `specs/`, the PR description and the code. I did not read `design.md`, `tasks.md` or `council.md`.
 
 What this change does:
-The footer now draws an empty line above row one and one between each pair of rows. A new top-level `rowGap` key in the config (a whole number 0–3, default 1) sets how many; `0` gives back the old footer. The gap is the footer's `VStack` `gap`, plus a zero-line `Spacer(0)` as the first child so the gap also lands above row one. Any other `rowGap` value rejects the whole document.
+The footer now puts one empty line between each pair of rows. It puts nothing above row one. A new top-level `rowGap` key in the configuration document (a whole number from 0 to 3) changes the count, and `0` gives back the old footer. The space is made by pi-tui's own `VStack` `gap` option. A row stays one line.
 
 ## Findings
 
-None in Must fix, Should fix or Nice to have.
+No Must fix. No Should fix. No Lean findings.
 
-## What I checked
+### Nice to have
 
-- **Spacer trick is correct.** In `stack.js` the gap is only added between children, and `Spacer(0).render()` returns `[]`. So `[Spacer(0), row1, row2]` with gap N renders N empty lines, row1, N empty lines, row2. At N=0 nothing is added. `-0` is safe, since `Math.max(0, Math.floor(-0))` is `0`. A footer always has at least one row, because the default row fills in when there are none.
-- **Validation matches the spec.** `-1`, `1.5`, `"1"`, `null`, `4` and `1e21` all fail the `typeof` / `isInteger` / range test, and the error message names `rowGap` and the value. `1e21` is a "safe integer" in `Number.isInteger` but is caught by the `> 3` test, so the hang case is closed. `rowGap` is read after the "both shapes" check and before the instruments, which matches the claimed order. `"rowGap" in doc` cannot be fooled by the prototype chain, because `doc` comes from `JSON.parse`.
-- **Every path carries `rowGap`.** The paths are: absent file, unparseable file, rejected document, accepted document. Each returns `rowGap`, with the default of 1 on the first three. The only callers of `readConfiguration`, `installFooter` and `createFooter` are `startup.ts`, `footer-setup.ts` and tests, and all were updated. A test (`jefferson.test.ts:271`) proves the value reaches the installed footer.
-- **Spec coverage.** Each scenario in the delta has a test: two rows, one row, gap 2, gap 3, gap 0, a gap beside either shape, the bad values, and the misspelt key. The `shortcut:` comment on the silent unknown key names its limit, so I treat it as a decision.
-- **Tests.** The 35 moved expectations either pass `rowGap` 0 to keep line 0 as the row, or assert the exact new line list. They assert exact values, not looser ones.
-- **Docs.** README, `ARCHITECTURE.md`, `AGENTS.md` and ADR 0008 agree with the code. The ADR states the reliance on pi-tui's undocumented behavior. `peerDependencies` is `*`, so a future pi-tui could change that behavior. The ADR names this risk and its fallback, so it is a recorded decision and not a finding.
-- **Scope.** Nothing in the code goes beyond the proposal: no per-row setting, no unknown-key rule, no `setStatus` work.
+1. **Two over-long lines in `ARCHITECTURE.md`** (`ARCHITECTURE.md:3-4`, and the "Row renderer" paragraph around L71-75)
+   - **What this is:** The docs pass edited two paragraphs that the rest of the file keeps wrapped at about 100 columns.
+   - **Problem:** The new text runs past that on several lines (for example the sentence ending "…so row one sits flush on the editor; see [ADR 0008]… `rowGap` reaches the renderer once, at install. The vertical gap is that `gap`; the horizontal one below is the `HStack`'s."). It reads fine, but it makes the next diff on those lines noisy.
+   - **Fix:** Re-wrap the two paragraphs. Nothing else changes.
+   - **If we skip it:** Nothing breaks. A later edit shows a bigger diff than needed.
+
+## What I checked, and why I found nothing more
+
+- **Spec against code.**
+  - Default of one line between rows, none above row one: `row-renderer.ts` builds `new VStack(stacks, { gap: rowGap })` with only the row `HStack`s as children. the tests (which run the real pi-tui `VStack`) show the gap lands only between children, so a one-row footer is one line and row one has nothing above it. This matches "The footer has space between its rows and none above the first".
+  - `rowGap: 0` renders the old lines: the gap-zero test pins both the one-row and two-row output.
+  - `rowGap` is accepted beside `rows` and beside a single top-level row. It is read after the `rows`/top-level-row conflict check, and that check does not list `rowGap`, so it is not a conflict.
+  - A bad value (`-1`, `1.5`, `"1"`, `null`, `4`, `1e21`) throws `RejectedConfiguration`. `Number.isInteger` catches `1.5` and `1e21` is caught by the `> 3` test. The warning names `rowGap` and the value (`JSON.stringify`). The default row renders.
+  - A misspelt key is ignored with no warning. The code carries the `shortcut:` comment that names its limit, which makes it a decision and not a finding.
+- **Every path that returns a `Configuration` carries `rowGap`.** The no-file, unparseable-file, rejected-document and accepted-document returns all set it. TypeScript makes the field required, and `pnpm typecheck` is clean.
+- **Callers.** `createFooter` has one production caller (`footer-setup.ts`), and `installFooter` has one (`startup.ts`). Both are updated. The new `rowGap` parameter has no default, so a missed caller would fail to compile.
+- **Hang and load guard.** The ceiling of 3 stops a huge `rowGap` from becoming millions of empty lines. The check runs before the value reaches pi-tui. Load is one person's terminal, rendered per repaint. The extra work is at most 3 × (rows − 1) empty strings.
+- **`/jefferson` row count** (`footerRows = rows.length`) still reports rows, not lines. That is correct.
+- **Tests.** `pnpm typecheck` clean. `pnpm test`: 309 tests, 309 pass. The new tests cover the default, the gaps of 0, 2 and 3, each bad value, both envelopes, the misspelt key, the three fallback paths, and the threading through `startUp`. Old line-count assertions were rewritten to exact lines and not loosened.
+- **Docs.** README, `ARCHITECTURE.md`, `AGENTS.md` and ADR 0008 agree with the code and spec. The README says that `rowGap` is the one key allowed beside `rows`. ADR 0008 explains why there is no `Spacer`. Older ADRs are left alone, and the ADR says why: their "no gap" is horizontal.
+- **Requirement scope.** Nothing in the diff goes beyond the spec: no per-row setting, no unknown-key rule, no change to the horizontal gap.
 
 Verdict: Ship.
 
-Not checked: how the gap lines behave in a live pi, in fullscreen mode on a short terminal, or against pi-tui 1.5.0. I only read the allocator and ran the pinned 1.4.0. The PR and ADR already say this is unrun and that Joel's observation (task 7.1) covers it.
+Not checked: pi-tui's `VStack` in a live pi, and the fullscreen footer shrinking on a short terminal. I did not run pi. I trusted the tests (which run the real `VStack`) and the ADR for the fullscreen behavior; I did not read pi-tui's source myself.
