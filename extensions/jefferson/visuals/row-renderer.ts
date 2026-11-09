@@ -30,6 +30,7 @@ export function createFooter(
   rows: Row[],
   sampleReadings: () => Readings,
   theme: Theme,
+  rowGap: number,
 ): Footer {
   let current: Readings = sampleReadings();
 
@@ -111,7 +112,7 @@ export function createFooter(
       },
     };
   });
-  const tree = new VStack(rowViews.map(({ stack }) => stack), { gap: 0 });
+  const tree = new VStack(rowViews.map(({ stack }) => stack), { gap: rowGap });
 
   return {
     render(width) {

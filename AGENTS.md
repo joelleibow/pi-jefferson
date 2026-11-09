@@ -32,6 +32,13 @@ extension.
    200 across the shipped instruments fails when one breaks this.
 5. Add a test that proves the cell renders it, and one that proves alignment still applies.
 
+## Testing the footer's height
+
+The footer's first line is row one; only the lines between rows are empty. A test of a row's
+horizontal geometry passes `rowGap` 0 to `createFooter` so every line is a row; a test of the gap reads
+the exact list of lines. The gap line is a bare `""`, so the helper that frames a row's line does not apply
+to it. [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md) says why the first row sits flush on the editor.
+
 ## Two traps this repository has already paid for
 
 **A pad needs a reset.** A cell's text may end with an open SGR. Spaces appended after it inherit the

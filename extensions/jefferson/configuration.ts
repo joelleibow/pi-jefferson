@@ -52,6 +52,8 @@ export interface ConfigurationSource {
 
 export interface Configuration {
   rows: Row[];
+  /** The empty lines the footer renders between each pair of rows. */
+  rowGap: number;
   /**
    * Set when a present document was rejected, and also when an accepted document has
    * something to report: instruments the extension does not implement, or a `containers` key.
@@ -61,6 +63,8 @@ export interface Configuration {
 
 export const DEFAULT_CELLS = 10;
 export const MAX_CELLS = 10;
+const DEFAULT_ROW_GAP = 1;
+const MAX_ROW_GAP = 3;
 
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
@@ -214,8 +218,14 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
   return { id, distribution, cells };
 }
 
+/** A document's rows, and the empty lines its footer renders between them. */
+interface NormalizedDocument {
+  rows: Row[];
+  rowGap: number;
+}
+
 /** Normalize the document: one top-level row, or a list under `rows`; never both. */
-function normalizeDocument(document: unknown, notices: Notices, theme: Theme): Row[] {
+function normalizeDocument(document: unknown, notices: Notices, theme: Theme): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -239,8 +249,22 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): R
     rawRows = [doc];
   }
 
+  // Read beside either envelope, before any row: a value the reader cannot use refuses the whole
+  // document, as a bad `distribution` does. pi-tui would floor `1.5` and clamp `-1` in silence.
+  // shortcut: no unknown row or document key is warned on, so a misspelt `rowGap` renders the
+  // default space without a word; upgrade by adding an unknown-key rule when a second misspelling
+  // hurts, as its own change.
+  let rowGap = DEFAULT_ROW_GAP;
+  if ("rowGap" in doc) {
+    const value = doc.rowGap;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > MAX_ROW_GAP) {
+      throw new RejectedConfiguration(`rowGap must be a whole number from 0 to ${MAX_ROW_GAP}: ${JSON.stringify(value)}`);
+    }
+    rowGap = value;
+  }
+
   const bind = instrumentBindings(readInstruments(doc.instruments, theme, notices));
-  if (rawRows.length === 0) return [defaultRow(bind)];
+  if (rawRows.length === 0) return { rows: [defaultRow(bind)], rowGap };
 
   const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
   const seen = new Set<string>();
@@ -250,7 +274,7 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): R
     }
     seen.add(row.id);
   }
-  return rows;
+  return { rows, rowGap };
 }
 
 /** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
@@ -287,7 +311,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   const bind = instrumentBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
-  if (!existsSync(path)) return { rows: [defaultRow(bind)], warning: undefined };
+  if (!existsSync(path)) return { rows: [defaultRow(bind)], rowGap: DEFAULT_ROW_GAP, warning: undefined };
 
   let document: unknown;
   try {
@@ -295,21 +319,24 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   } catch {
     return {
       rows: [defaultRow(bind)],
+      rowGap: DEFAULT_ROW_GAP,
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
     };
   }
 
   try {
     const notices: Notices = { containers: false, unknownInstruments: new Set() };
-    const rows = normalizeDocument(document, notices, source.theme);
+    const { rows, rowGap } = normalizeDocument(document, notices, source.theme);
     return {
       rows,
+      rowGap,
       warning: acceptedWarning(path, notices),
     };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {
         rows: [defaultRow(bind)],
+        rowGap: DEFAULT_ROW_GAP,
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,
       };
     }

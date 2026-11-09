@@ -1,7 +1,7 @@
 # Architecture
 
-pi-jefferson draws one footer line per configured row. This file describes the parts and the
-direction they depend in. It is deliberately short: everything here is a decision a change can break,
+pi-jefferson draws one footer line per configured row, with empty lines between rows. This file
+describes the parts and the direction they depend in. It is deliberately short: everything here is a decision a change can break,
 so it is worth reading before one.
 
 ## The parts
@@ -68,12 +68,15 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
-**Row renderer.** Builds one `VStack` of `HStack` rows at install, retaining every cell component.
+**Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
+`HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
+empty lines between its children, so row one sits flush on the editor; see
+[ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md). `rowGap` reaches the renderer once, at install. The vertical gap is that `gap`; the horizontal one below is the `HStack`'s.
 On each render the renderer asks every cell for the width of its text at width 0 and gives those to the width
 plan in `visuals/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
 cells fill. The joint is one column owned by the right-hand cell, drawn as a leading space inside it.
 Every cell is `shrink: 1` with `minSize: 0`, so a row over its width loses columns to the host's
-allocator and stays one line; the allocator also spends any remainder (`gap: 0`). A row with
+allocator and stays one line; the allocator also spends any remainder (the `HStack`'s `gap: 0`). A row with
 `distribution: "equal"` skips the probe: every cell gets `floor(W / N)` and `grow: 1`, as
 [ADR 0002](docs/adr/0002-rows-span-the-full-width.md) recorded. The same components are re-seated with
 `clear()` plus `addChild` when the width changes or any plan field the cells read does: the basis, the

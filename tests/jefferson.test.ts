@@ -229,10 +229,14 @@ test("outside TUI mode the jefferson command reports that no footer is installed
 });
 
 test("the session_start handler installs the footer in TUI mode", async (t) => {
+  // No document at all: the default row, one row of one line and nothing above it.
   useTempAgentDir(t);
   const session = await harness().start();
   assert.equal(session.footers.length, 1);
   assert.deepEqual(session.notified, []);
+  const lines = session.lines(80);
+  assert.equal(lines.length, 1, "the default row renders as one line");
+  assert.equal(visibleWidth(lines[0] ?? ""), 80);
 });
 
 test("the session_start handler does not install a footer outside TUI mode", async (t) => {
@@ -258,7 +262,21 @@ test("a trusted project's document wins end to end", async (t) => {
 
   const session = await harness().start({ cwd, trusted: true });
   assert.equal(session.footers.length, 1);
-  assert.equal(session.lines(80).length, 2, "the project's two rows render");
+  const lines = session.lines(80);
+  assert.equal(lines.length, 3, "the project's two rows render, with an empty line between them");
+  assert.equal(lines[1], "", "the gap line is a bare empty line");
+});
+
+test("a rowGap read from the document reaches the footer startUp installs", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [{}, {}], rowGap: 2 });
+
+  const session = await harness().start();
+  const lines = session.lines(80);
+  assert.equal(lines.length, 4, "two rows and two empty lines between them");
+  assert.deepEqual([lines[1], lines[2]], ["", ""], "the gap lines are bare empty lines");
+  assert.equal(visibleWidth(lines[0] ?? ""), 80);
+  assert.equal(visibleWidth(lines[3] ?? ""), 80);
 });
 
 test("a rejected configuration warns and still installs the default row", async (t) => {
@@ -269,7 +287,7 @@ test("a rejected configuration warns and still installs the default row", async 
   assert.equal(session.notified.length, 1);
   assert.equal(session.notified[0]?.type, "warning");
   const lines = session.lines(80);
-  assert.equal(lines.length, 1, "the default row renders");
+  assert.equal(lines.length, 1, "the default row renders as one line");
   // One row of 10 cells at 80 columns: 8 columns each of the truncated placeholder.
   // Ten 8-column cells of the placeholder; the host's framing between cells is covered by
   // tests/row-renderer.test.ts, so this asserts what a reader sees.
@@ -360,7 +378,7 @@ test("an untrusted project's document is ignored end to end", async (t) => {
 
   const session = await harness().start({ cwd, trusted: false });
   assert.equal(session.footers.length, 1);
-  assert.equal(session.lines(80).length, 1, "the agent document's one row renders");
+  assert.equal(session.lines(80).length, 1, "the agent document's one row renders as one line");
 });
 
 for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
@@ -583,7 +601,7 @@ test("a rejected style warns with its exact envelope and installs the default fo
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
   assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
-  assert.equal(lines.length, 1);
+  assert.equal(lines.length, 1, "the default row renders as one line");
   assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));
 });
 

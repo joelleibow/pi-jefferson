@@ -1,0 +1,20 @@
+schema: marbleization
+created: 2026-11-08
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    michael: "0f6be733-c4ba-4ea2-bc5d-c6cbb442ff1e"
+    chidi: "012d8af7-e4d3-4f98-9268-7a86298b8511"
+    eleanor: "47779d20-f671-4168-a5b4-a99f357a6cd1"
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+  routing:
+    - "2026-11-08 bambadjan proposal+specs: run 00a44c02 aborted by the oMLX memory guard mid-prefill (25.1 GB over the 24.8 GB hard watermark) on localllm-omlx/flint-oQ4e; this run routed to anthropic/claude-sonnet-5.5. Agent file pin unchanged."
+    - "2026-11-08 bambadjan design: run f10beb8c aborted by the same oMLX memory guard mid-prefill (25.5 GB over 25.1 GB). Routed to anthropic/claude-sonnet-5.5, and Bambadjan's remaining runs in this change go there too after two identical failures. Agent file pin unchanged."
+  amendments:
+    - "post-PL4: Joel's ruling 3 (bound rowGap, ceiling 3) and Michael's three PL4 minors, applied by Bambadjan; Michael confirms them at PL7"
+    - "2026-11-08 Joel's rulings 4 and 5 at his live observation: the spacer above row one comes out; one line between rows only. Design, tasks, implementation and validate gates reopened."

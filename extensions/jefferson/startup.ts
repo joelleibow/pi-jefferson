@@ -46,7 +46,7 @@ export function startUp(pi: ExtensionAPI): void {
     const { store, release } = feedSessionData(pi, ctx, () => requestRepaint?.());
     releasePrevious = release;
 
-    const { rows, warning } = readConfiguration({
+    const { rows, rowGap, warning } = readConfiguration({
       ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
@@ -56,6 +56,7 @@ export function startUp(pi: ExtensionAPI): void {
     footerRows = rows.length;
     installFooter(ctx.ui, {
       rows,
+      rowGap,
       sample: () => store.sample(),
       dispose: release,
       receiveRepaint: (repaint) => {
