@@ -8,10 +8,10 @@ Only `thinking` ships a default label, `Thinking:`. The other shipped instrument
 
 ## What Changes
 
-- Shipped instruments gain a default label, declared the way `thinking` declares its own (a `defaultLabel` field on its declaration) [E Label path; M 3 closing paragraph]. Which instruments, and which texts, are open (see Open questions).
+- Shipped instruments gain a default label, declared the way `thinking` declares its own (a `defaultLabel` field on its declaration) [E Label path; M 3 closing paragraph]. Which instruments and texts: settled by Joel's PL2 rulings (see Open questions, each marked settled). `Path:`, `Context:`, `Tokens:`, `Cost:` are added, `Thinking:` stays, `Model:` is added with a changed default format, and `blank` gets none [council.md "Joel's rulings"].
 - Nothing about the mechanism changes. A label already renders in front of the default format, takes the one gap, is trimmed, is removed by `""`, and is suppressed over an unknown datum [E Label path; M 1 B–E]. This change adds one requirement saying a *default* label obeys those rules.
-- Tests that pin unlabelled default output change with the defaults: the one test asserting that only `thinking` has a default label, plus roughly 36 assertion lines that go through binding [M 2, last bullet; E Exact-text tests]. Which of them flip depends on the answers below.
-- **BREAKING**, pre-1.0 and accepted: a default-configured cell gets wider by its label and gap [R "Breaks are cheap before 1.0"; M 2 widths bullet]. A user who wants the old text sets `label: ""` [M 1 J].
+- Tests that pin unlabelled default output change with the defaults: the one test asserting that only `thinking` has a default label, plus roughly 36 assertion lines that go through binding [M 2, last bullet; E Exact-text tests]. Which of them flip follows the rulings below; the design names them.
+- **BREAKING**, pre-1.0 and accepted: a default-configured cell gets wider by its label and gap [R "Breaks are cheap before 1.0"; M 2 widths bullet]. A user who wants the old text sets `label: ""` [M 1 J]. `model`'s default format also changes, `$provider: $model` to `$provider/$model` [council.md "Joel's rulings" 2]; `label: ""` does not bring back the old format, only a configured `format` does.
 
 Deliberately not done, per [R "One card"]: instruments for new data, thresholds on `context`, custom instruments, renaming `path`, the OpenSpec `context:` block. No label variable [R, archived 2026-11-06 ruling quoted at E README and archived rulings]. Joel's own `~/.pi/agent/pi-jefferson.json` is never edited [R 2026-11-06].
 
@@ -42,21 +42,21 @@ None.
 
 ### Modified Capabilities
 
-- `statusline`: adds one requirement, that a shipped instrument's default label renders as a configured label does (in front of the default format, one gap, replaced by a configured label, removed by `""`, absent over an unknown datum). It states nothing that depends on an open question. Per-instrument requirements that pin default text (`model`, `path`, `context`, `tokens`, `cost` [M 1 G]) are not touched here; if a ruling labels one, the design modifies that requirement.
+- `statusline`: adds one requirement, that a shipped instrument's default label renders as a configured label does (in front of the default format, one gap, replaced by a configured label, removed by `""`, absent over an unknown datum). It states nothing that depends on an open question. Settled at PL2: the per-instrument requirements that pin default text (`model`, `path`, `context`, `tokens`, `cost` [M 1 G]) are MODIFIED, each stating its labelled text, and `model` states the new `$provider/$model` format [council.md "Accepted & Rejected Feedback" and "Joel's rulings"]. The added requirement also says `blank` declares no default label.
 
 ## Open questions
 
-Each is Joel's to answer [M 3]; none is settled here.
+Each was Joel's to answer [M 3]. All five are settled by his rulings at PL2, 2026-11-08 [council.md "Joel's rulings"]; the original questions stay for the record.
 
-1. Is `blank` in "every shipped instrument"? It displays no datum, and a default on it changes what his own blank cells and the default row show.
-2. What are the label texts for `model`, `tokens` and `cost`? [R: not ruled]
-3. What happens to `model`: a colon label beside `$provider: $model`, a different shape, a changed default format, or no label?
-4. Are `Thinking:`, `Context:` and `Path:` the texts, or only the shape? [R: "examples"]
-5. Is the label a word with a colon (Joel's examples), an icon, or a bare word? Chidi found no convention for any of the three [C Q3]; Joel's examples are the only word-and-colon evidence that bears on this repository.
+1. SETTLED: no. `blank` gets no default label [ruling 1]. Is `blank` in "every shipped instrument"? It displays no datum, and a default on it changes what his own blank cells and the default row show.
+2. SETTLED: `Model:`, `Tokens:`, `Cost:` [rulings 1, 2]. What are the label texts for `model`, `tokens` and `cost`? [R: not ruled]
+3. SETTLED: label `Model:` and the default format changes to `$provider/$model`, rendering `Model: anthropic/claude-opus-4` [ruling 2]. What happens to `model`: a colon label beside `$provider: $model`, a different shape, a changed default format, or no label?
+4. SETTLED: yes, the texts are `Thinking:`, `Context:`, `Path:` [ruling 1]. Are `Thinking:`, `Context:` and `Path:` the texts, or only the shape? [R: "examples"]
+5. SETTLED: a word with a colon [ruling 1]. Is the label a word with a colon (Joel's examples), an icon, or a bare word? Chidi found no convention for any of the three [C Q3]; Joel's examples are the only word-and-colon evidence that bears on this repository.
 
 ## Impact
 
-- Code: the instrument declarations (one field per labelled instrument) [E Label path]. No change to binding, format or layout.
-- Tests: those pinning unlabelled default output [E Exact-text tests; M 2]; the exact set follows the rulings.
+- Code: the instrument declarations (one `defaultLabel` field per labelled instrument, plus `model`'s default format) [E Label path]. No change to binding, format or layout.
+- Tests: those pinning unlabelled default output [E Exact-text tests; M 2]; the exact set is in design.md.
 - Docs (docs pass, not a task): the README's "Only `thinking` has a default label" sentence and its instruments table [M 2].
 - Dependencies: none.
