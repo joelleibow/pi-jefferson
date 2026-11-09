@@ -66,7 +66,7 @@ so the warning reads `pi-jefferson: <path> was rejected (rowGap must be a whole 
 
 ### 6. A refusal carries the default `rowGap`
 
-The refusal return (`configuration.ts:310–314`) and the read-or-parse-error return (`:295–300`) render the default row with every default [E A3 §3], so both carry `DEFAULT_ROW_GAP`. A document refused for another reason therefore still gets the default space, and a refused `rowGap` does not mean no space. This is a decision, not a research finding; Michael judges it at PL4.
+The refusal return (`configuration.ts:310–314`), the read-or-parse-error return (`:295–300`) and the absent-file return (`:290`, no document) render the default row with every default [E A3 §3; Michael PL7, finding 2], so all three carry `DEFAULT_ROW_GAP`. A document refused for another reason therefore still gets the default space, and a refused `rowGap` does not mean no space. This is a decision, not a research finding; Michael judges it at PL4.
 
 ### 7. Unknown keys stay silent: a `shortcut:`
 
