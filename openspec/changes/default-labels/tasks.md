@@ -46,7 +46,7 @@ Not a task for Implement. The docs pass writes them after the implementation gat
 
 His own footer does not change: all four of his instruments set a label, and `tokens` and `cost` are in none of his rows. So the new defaults are invisible in his live setup. In the last change, a default ruled from a description was reversed once Joel saw it live; this task exists for that reason.
 
-- [ ] 6.1 **Joel's.** In a scratch trusted project directory, write `.pi/pi-jefferson.json` with rows holding `path`, `model`, `thinking`, `context`, `tokens` and `cost` and no `instruments` section, then open pi there. Never edit `~/.pi/agent/pi-jefferson.json`. Look for `Path:`, `Model: anthropic/…`, `Thinking:`, `Context:`, `Tokens:` and `Cost:`, and confirm in his own project that his footer is unchanged. Joel ticks this; the writer does not.
+- [x] 6.1 **Joel's.** In a scratch trusted project directory, write `.pi/pi-jefferson.json` with rows holding `path`, `model`, `thinking`, `context`, `tokens` and `cost` and no `instruments` section, then open pi there. Never edit `~/.pi/agent/pi-jefferson.json`. Look for `Path:`, `Model: anthropic/…`, `Thinking:`, `Context:`, `Tokens:` and `Cost:`, and confirm in his own project that his footer is unchanged. Joel ticks this; the writer does not. **Observed 2026-11-08 by Joel**, in pi on this branch in the scratch trusted project `/tmp/dl-observe` (screenshot `pi-clipboard-1b391c75…png`): row one `Path: dl-observe` left, `Model: openrouter/deepseek/deepseek-v4.1-flash Thinking: High` right; row two `Context: 0.0%/1.0M` left, `Tokens: 0 Cost: $0.000` right. In his words: *"Worked liked a charm and my current settings weren't effected at all. Ship it!!!"*
 
 ## 7. Sync and archive
 
