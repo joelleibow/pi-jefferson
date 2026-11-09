@@ -83,11 +83,22 @@ Tasks, the checks' red-to-green runs [R] and their verification belong to `tasks
 
 ### 9. What the docs pass touches
 
-The README's description of footer rows and its configuration section (a `rowGap` entry beside `distribution`) [E §6], and `README.md:77`, which says `distribution` rejects a document beside `rows` and must name `rowGap` as the one key allowed beside either envelope [Derek red/green]; `ARCHITECTURE.md`'s opening sentence "one footer line per configured row" and the row renderer section's "`gap: 0`" [M 1; E §3]. **One ADR is warranted:** the choice to leave space between rows to the stack's own `gap` alone, over a `Spacer` per row, Jefferson's own padding lines and a `blank` row, is a structural choice with rejected alternatives. The ADR also records why no space sits above row one: the `Spacer(0)` was built and removed on Joel's live observation [J4, J5], and a reader who wonders why the footer sits flush on the editor should find the ruling there. ADRs 0002, 0006 and 0007 are accepted and untouched; their "no gap" is horizontal [M 1].
+The README's configuration section gains a `rowGap` entry beside `distribution` [E §6], and `README.md:77`, which says `distribution` rejects a document beside `rows`, must name `rowGap` as the one key allowed beside either envelope [Derek red/green]. Seven Markdown items are false after rulings 4 and 5 and are corrected, not left [Derek red/green, third run]:
+
+- `AGENTS.md:37`: "The footer's first line is an empty line…"; the first line is row one, and only the lines between rows are empty.
+- `AGENTS.md:40`: "Do not remove the `Spacer(0)` in `createFooter`"; there is no `Spacer(0)`.
+- `ARCHITECTURE.md:3`: "empty lines above the first row and between rows"; between rows only.
+- `ARCHITECTURE.md:73–75`: "a leading `Spacer(0)` and one `HStack` per row"; the children are the `HStack`s alone, and the `gap: 0` description there becomes the `rowGap`.
+- `README.md:83`: "empty lines above its first row and between rows"; between rows only.
+- `README.md:90`: "one empty line sits above row one and one between each pair"; one between each pair only.
+- `docs/adr/0008-…`: **rewritten in place, not superseded.** It is new in this unmerged PR, so no accepted record exists to preserve. It records the choice to leave the space between rows to the stack's own `gap` alone, over a `Spacer` per row, Jefferson's own padding lines and a `blank` row, and why no space sits above row one: the `Spacer(0)` was built, then removed on Joel's live observation [J4, J5], so a reader who wonders why the footer sits flush on the editor finds the ruling there. The file name and title, which say "behind a zero-line Spacer", are corrected with it, and the `AGENTS.md` pointer follows.
+
+ADRs 0002, 0006 and 0007 are accepted and untouched; their "no gap" is horizontal [M 1].
 
 ## Risks / Trade-offs
 
 - **[Fullscreen cost, accepted by Joel [J5]]** Every footer line costs the transcript one line: one per gap by default, `rowGap` per gap beyond [M 2]. Nothing is added above row one. Mitigation: `rowGap: 0`.
+- **[Fullscreen truncation of a squeezed footer]** A footer in fullscreen is truncated from the bottom [C A2], so a squeezed footer keeps row one and the gap line and loses row two before the gap. Not run in a live pi [Michael PL4-2, finding 1]. Mitigation: `rowGap: 0`.
 - **[A misspelt key is silent]** Decision 7.
 - **[A bad `rowGap` costs the whole layout]** The existing refusal path every key shares, so changing it is not this card [Co, set aside].
 - **[Large `rowGap` can hang pi]** Unbounded, `rowGap` 1e5 renders in 1 ms, 1e6 in 16 ms, 1e7 in 141 ms producing 20,000,002 lines, 1e9 would take about 14 s and allocate 2e9 strings, and `1e21` passes `Number.isInteger` and never returns [Michael PL4, finding 1]. Mitigation: Joel bounded it at `MAX_ROW_GAP = 3` [J3]; a larger value is refused like any invalid value. Raising the ceiling is one constant.
