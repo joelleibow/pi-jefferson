@@ -484,11 +484,11 @@ function documentLines(document: unknown, width: number): string[] {
   return createFooter(rows, () => seed, fakeTheme(), rowGap).render(width).map(stripTerminalSequences);
 }
 
-test("an absent rowGap renders one empty line above row one and between the rows", () => {
+test("an absent rowGap renders one empty line between the rows", () => {
   const read = readDocument({ rows: [MODEL_ROW, MODEL_ROW] });
   assert.equal(read.warning, undefined);
   assert.equal(read.rowGap, 1, "absent leaves the default");
-  assert.deepEqual(documentLines({ rows: [MODEL_ROW, MODEL_ROW] }, 40), ["", MODEL_LINE, "", MODEL_LINE]);
+  assert.deepEqual(documentLines({ rows: [MODEL_ROW, MODEL_ROW] }, 40), [MODEL_LINE, "", MODEL_LINE]);
 });
 
 test("a rowGap that is not a whole number from 0 to 3 is refused, and the default row renders with the default space", () => {
@@ -499,17 +499,16 @@ test("a rowGap that is not a whole number from 0 to 3 is refused, and the defaul
   const refused = readDocument({ rows: [{}, {}], rowGap: 4 });
   assert.equal(refused.rowGap, 1, "a refusal carries the default gap");
   const lines = createFooter(refused.rows, () => seed, fakeTheme(), refused.rowGap).render(20);
-  assert.equal(lines.length, 2, "the default row, with one empty line above it");
-  assert.equal(lines[0], "");
-  assert.equal(visibleWidth(lines[1] ?? ""), 20);
+  assert.equal(lines.length, 1, "the default row renders as one line");
+  assert.equal(visibleWidth(lines[0] ?? ""), 20);
 });
 
-test("rowGap 3, the ceiling, is accepted and renders three empty lines in each place", () => {
+test("rowGap 3, the ceiling, is accepted and renders three empty lines between the rows", () => {
   const read = readDocument({ rows: [MODEL_ROW, MODEL_ROW], rowGap: 3 });
   assert.equal(read.warning, undefined);
   assert.equal(read.rowGap, 3);
   assert.deepEqual(documentLines({ rows: [MODEL_ROW, MODEL_ROW], rowGap: 3 }, 40), [
-    "", "", "", MODEL_LINE, "", "", "", MODEL_LINE,
+    MODEL_LINE, "", "", "", MODEL_LINE,
   ]);
 });
 
@@ -528,14 +527,16 @@ test("a misspelt rowgap is ignored without a warning and the default space rende
   const read = readDocument(misspelt);
   assert.equal(read.warning, undefined, "an unknown document key stays silent");
   assert.equal(read.rowGap, 1);
-  assert.deepEqual(documentLines(misspelt, 40), ["", MODEL_LINE, "", MODEL_LINE]);
+  assert.deepEqual(documentLines(misspelt, 40), [MODEL_LINE, "", MODEL_LINE]);
 });
 
 test("a document refused for another reason, and an unparseable one, render the default gap", () => {
   const refused = readDocument({ cells: [{ instrument: "model" }], rows: [{}] });
   assert.ok(refused.warning, "a rejected document warns");
   assert.equal(refused.rowGap, 1);
-  assert.equal(createFooter(refused.rows, () => seed, fakeTheme(), refused.rowGap).render(40)[0], "");
+  const lines = createFooter(refused.rows, () => seed, fakeTheme(), refused.rowGap).render(40);
+  assert.equal(lines.length, 1, "the default row renders as one line");
+  assert.equal(visibleWidth(lines[0] ?? ""), 40);
 
   const unparseable = readDocument("{ not json");
   assert.ok(unparseable.warning, "an unparseable document warns");

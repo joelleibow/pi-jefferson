@@ -263,7 +263,7 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
   assert.ok(!line.includes("\n"));
 });
 
-test("the footer renders an empty line, then one line per row, in order, each spanning the width", () => {
+test("the footer renders one line per row, in order, each spanning the width, with an empty line between rows", () => {
   const footer = createFooter(
     [contentRowOf(2, "aa"), contentRowOf(4, "b"), contentRowOf(8, "c")],
     () => readings,
@@ -271,9 +271,9 @@ test("the footer renders an empty line, then one line per row, in order, each sp
     1,
   );
   const lines = footer.render(80);
-  assert.equal(lines.length, 6);
-  assert.deepEqual([lines[0], lines[2], lines[4]], ["", "", ""], "the gap lines are bare empty lines");
-  const rows = [lines[1], lines[3], lines[5]];
+  assert.equal(lines.length, 5);
+  assert.deepEqual([lines[1], lines[3]], ["", ""], "the gap lines are bare empty lines");
+  const rows = [lines[0], lines[2], lines[4]];
   assert.deepEqual(
     rows.map((line) => visibleWidth(line ?? "")),
     [80, 80, 80],
@@ -283,29 +283,34 @@ test("the footer renders an empty line, then one line per row, in order, each sp
   assert.ok(visible(rows[2] ?? "").startsWith("c"));
 });
 
-test("one row renders an empty line above it", () => {
+test("one row renders one line", () => {
   const footer = createFooter([contentRowOf(1, "aa")], () => readings, fakeTheme(), 1);
-  assert.deepEqual(footer.render(6), ["", composed("aa    ")]);
+  assert.deepEqual(footer.render(6), [composed("aa    ")]);
 });
 
-test("two rows render an empty line above row one and between them", () => {
+test("two rows render one empty line between them", () => {
   const footer = createFooter([contentRowOf(1, "aa"), contentRowOf(1, "bb")], () => readings, fakeTheme(), 1);
-  assert.deepEqual(footer.render(6), ["", composed("aa    "), "", composed("bb    ")]);
+  assert.deepEqual(footer.render(6), [composed("aa    "), "", composed("bb    ")]);
 });
 
-test("three rows render six lines", () => {
+test("three rows render five lines", () => {
   const footer = createFooter(
     [contentRowOf(1, "aa"), contentRowOf(1, "bb"), contentRowOf(1, "cc")],
     () => readings,
     fakeTheme(),
     1,
   );
-  assert.deepEqual(footer.render(6), ["", composed("aa    "), "", composed("bb    "), "", composed("cc    ")]);
+  assert.deepEqual(footer.render(6), [composed("aa    "), "", composed("bb    "), "", composed("cc    ")]);
 });
 
-test("a gap of two renders two empty lines above row one and between the rows", () => {
+test("a gap of two renders two empty lines between the rows", () => {
   const footer = createFooter([contentRowOf(1, "aa"), contentRowOf(1, "bb")], () => readings, fakeTheme(), 2);
-  assert.deepEqual(footer.render(6), ["", "", composed("aa    "), "", "", composed("bb    ")]);
+  assert.deepEqual(footer.render(6), [composed("aa    "), "", "", composed("bb    ")]);
+});
+
+test("a gap of three renders three empty lines between the rows", () => {
+  const footer = createFooter([contentRowOf(1, "aa"), contentRowOf(1, "bb")], () => readings, fakeTheme(), 3);
+  assert.deepEqual(footer.render(6), [composed("aa    "), "", "", "", composed("bb    ")]);
 });
 
 test("a gap of zero renders the lines the footer rendered before the space existed", () => {
@@ -413,11 +418,11 @@ test("invalidation drops cell memos and keeps the footer's three rows and their 
     cells: [{ instrument: capture, align: "left" }],
   })), () => readings, fakeTheme(), 1);
   footer.invalidate();
-  assert.equal(footer.render(20).length, 6, "three rows, an empty line above row one and between each pair");
+  assert.equal(footer.render(20).length, 5, "three rows, an empty line between each pair");
   assert.equal(resolves, 3);
   footer.invalidate();
   footer.invalidate();
-  assert.equal(footer.render(20).length, 6);
+  assert.equal(footer.render(20).length, 5);
   assert.equal(resolves, 6);
 });
 
@@ -770,9 +775,9 @@ test("every column is allocated, at any width, with the composition the host's",
 
   for (let width = 1; width <= 150; width++) {
     const lines = footer.render(width);
-    assert.equal(lines.length, 12, `six rows and six gaps at ${width}`);
+    assert.equal(lines.length, 11, `six rows and five gaps at ${width}`);
     for (const [index, line] of lines.entries()) {
-      if (index % 2 === 0) {
+      if (index % 2 === 1) {
         assert.equal(line, "", `a bare gap line at ${width}`);
         continue;
       }

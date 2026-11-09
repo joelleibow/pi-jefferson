@@ -174,9 +174,9 @@ test("formats and data carrying controls keep three clipped footer rows at one l
   const instrument = { fills: false, render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
   const footer = createFooter([0, 1, 2].map(index => ({ id: `row-${index}`, distribution: "equal" as const, cells: [{ instrument, align: "left" }] })), () => readings, fakeTheme(), 1);
   const lines = footer.render(6);
-  assert.equal(lines.length, 6, "three rows, an empty line above row one and between each pair");
+  assert.equal(lines.length, 5, "three rows, an empty line between each pair");
   for (const [index, line] of lines.entries()) {
-    if (index % 2 === 0) {
+    if (index % 2 === 1) {
       assert.equal(line, "", "a bare gap line");
       continue;
     }
@@ -185,7 +185,7 @@ test("formats and data carrying controls keep three clipped footer rows at one l
     assert.equal(line.includes("\n"), false);
   }
   readings = { ...seed, model: "\r\n\t\u007f\u009b" };
-  for (const line of footer.render(3).filter((_, index) => index % 2 === 1)) {
+  for (const line of footer.render(3).filter((_, index) => index % 2 === 0)) {
     assert.equal(stripTerminalSequences(line), "...");
     assert.equal(visibleWidth(line), 3);
   }
