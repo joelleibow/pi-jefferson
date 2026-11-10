@@ -11,7 +11,7 @@ Sources: [D n] `design.md`; [RG] `redgreen-derek.md`, the red/green run of every
 - tarball: `./tarball.sh R`; lodash: `./lodash.sh R`
 - renames: `./renames.sh <base> <head> R`
 
-Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typecheck` clean) before the next starts. No Markdown other than this file changes in the diff. Logging and error handling: none added, because no task adds a use case, adapter or entry point.
+Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typecheck` clean) before the next starts. In commits 1-5 no Markdown other than this file changes; the docs pass (6.2) and the gate records follow. Logging and error handling: none added, because no task adds a use case, adapter or entry point.
 
 ## 1. Commit 1: the moves and specifiers [D2, D9]
 
@@ -60,5 +60,6 @@ Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typ
 
 ## 8. Sync and archive
 
-- [ ] 8.1 Re-measure every requirement paragraph in the delta spec under 500 characters before the sync (the PL4 measure was 400, 447, 441, 436, 290, 307 for the added six and 491 and 389 for the modified two). Verify: the awk count per paragraph, all under 500.
-- [ ] 8.2 Sync the delta spec into `openspec/specs/`, then archive the change on the branch. Verify: `openspec validate --strict` green before the sync, and the archived directory exists after. The merge waits for Joel's go. The release is a patch, unlabelled [D, Migration Plan].
+- [x] 8.1 Re-measure every requirement paragraph in the delta spec under 500 characters before the sync (the PL4 measure was 400, 447, 441, 436, 290, 307 for the added six and 491 and 389 for the modified two). Verify: the awk count per paragraph, all under 500. **Measured:** 400, 447, 441, 436, 290, 307 (added six), 491, 389 (modified two); all under 500.
+- [x] 8.2 Sync the delta spec into `openspec/specs/extension-source-layout/spec.md`. Verify: `openspec validate --strict` green before the sync. **Printed:** "Change 'intuitive-source-layout' is valid". The synced spec has 17 requirements before and 23 after; the two modified paragraphs measure 491 and 389 and the six added 400, 447, 441, 436, 290, 307, all under 500 (unmodified ones 88 to 404). `openspec validate --specs --strict`: 3 passed, 0 failed. `openspec validate --all --strict`: 4 passed, 0 failed.
+- [x] 8.3 Archive the change on the branch. Verify: the archived directory exists, `openspec list` shows no active change, `openspec validate --archived` is green. The merge waits for Joel's go. The release is a patch, unlabelled [D, Migration Plan].
