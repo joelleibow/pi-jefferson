@@ -343,31 +343,57 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const startup = await import("../extensions/jefferson/startup.ts");
   assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
 
-  const instrument = await import("../extensions/jefferson/components/instruments/instrument.ts");
+  const contract = await import("../extensions/jefferson/components/instruments/instrument.ts");
+  assert.deepEqual(Object.keys(contract).sort(), ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]);
+
+  const compactCounts = await import("../extensions/jefferson/components/instruments/compact-count.ts");
+  assert.deepEqual(Object.keys(compactCounts).sort(), ["compactCount"]);
+
+  const blank = await import("../extensions/jefferson/components/instruments/blank.ts");
+  assert.deepEqual(Object.keys(blank).sort(), ["blank"]);
+
+  const model = await import("../extensions/jefferson/components/instruments/model.ts");
+  assert.deepEqual(Object.keys(model).sort(), ["model"]);
+
+  const thinking = await import("../extensions/jefferson/components/instruments/thinking.ts");
+  assert.deepEqual(Object.keys(thinking).sort(), ["thinking"]);
+
+  const path = await import("../extensions/jefferson/components/instruments/path.ts");
+  assert.deepEqual(Object.keys(path).sort(), ["path"]);
+
+  const context = await import("../extensions/jefferson/components/instruments/context.ts");
+  assert.deepEqual(Object.keys(context).sort(), ["context"]);
+
+  const tokens = await import("../extensions/jefferson/components/instruments/tokens.ts");
+  assert.deepEqual(Object.keys(tokens).sort(), ["tokens"]);
+
+  const cost = await import("../extensions/jefferson/components/instruments/cost.ts");
+  assert.deepEqual(Object.keys(cost).sort(), ["cost"]);
+
+  const shipped = await import("../extensions/jefferson/shipped.ts");
+  assert.deepEqual(Object.keys(shipped).sort(), ["instrumentNamed"]);
+
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/format.ts");
-  for (const key of [
-    ...Object.keys(instrument),
-    ...Object.keys(store),
-    ...Object.keys(format),
-    ...Object.keys(row),
-    ...Object.keys(binding),
-    ...Object.keys(feed),
-    ...Object.keys(footerSetup),
-    ...Object.keys(startup),
-  ]) {
-    assert.ok(
-      !/register|supply|contribute/i.test(key),
-      `${key} looks like a contribution interface`,
-    );
+  const scanned = [
+    contract, compactCounts, blank, model, thinking, path, context, tokens, cost, shipped,
+    store, format, row, binding, feed, footerSetup, startup,
+  ];
+  for (const module of scanned) {
+    for (const key of Object.keys(module)) {
+      assert.ok(
+        !/register|supply|contribute/i.test(key),
+        `${key} looks like a contribution interface`,
+      );
+    }
   }
 
   // `instrumentNamed` is a lookup, not a registration path: an unimplemented name stays
   // unimplemented, and asking for it changes neither file's exported surface.
-  const surface = [Object.keys(instrument).sort(), Object.keys(store).sort()];
-  assert.equal(instrument.instrumentNamed("nope"), undefined);
-  assert.equal(instrument.instrumentNamed("nope"), undefined);
-  assert.deepEqual([Object.keys(instrument).sort(), Object.keys(store).sort()], surface);
+  const surface = [Object.keys(shipped).sort(), Object.keys(store).sort()];
+  assert.equal(shipped.instrumentNamed("nope"), undefined);
+  assert.equal(shipped.instrumentNamed("nope"), undefined);
+  assert.deepEqual([Object.keys(shipped).sort(), Object.keys(store).sort()], surface);
 });
 
 test("an untrusted project's document is ignored end to end", async (t) => {

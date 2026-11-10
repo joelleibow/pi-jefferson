@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DEFAULT_CELL_TEXT, blank, instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { DEFAULT_CELL_TEXT, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { blank } from "../extensions/jefferson/components/instruments/blank.ts";
+import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 

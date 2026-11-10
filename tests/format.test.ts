@@ -5,7 +5,8 @@ import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
 import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/format.ts";
-import { instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
 import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";

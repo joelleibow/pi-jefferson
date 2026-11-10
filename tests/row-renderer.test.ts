@@ -4,7 +4,8 @@ import { test } from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/components/row/row.ts";
-import { type Instrument, instrumentNamed } from "../extensions/jefferson/components/instruments/instrument.ts";
+import type { Instrument } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
 import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import {

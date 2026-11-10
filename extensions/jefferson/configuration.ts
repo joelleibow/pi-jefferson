@@ -17,7 +17,8 @@ import {
   type ThemeStyle,
 } from "@earendil-works/pi-coding-agent";
 
-import { blank, instrumentNamed } from "./components/instruments/instrument.ts";
+import { blank } from "./components/instruments/blank.ts";
+import { instrumentNamed } from "./shipped.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./components/row/row.ts";
 import {
