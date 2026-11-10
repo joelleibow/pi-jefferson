@@ -95,3 +95,44 @@ Raw image URL checked with the requested curl status format: `https://raw.github
 - Repository inspection cannot establish every datum the pi host offers to extensions, nor whether any values are omitted beyond what the feed visibly reads. Chidi's host-side inventory is required for the full comparison and completeness claim.
 - The README image's exact placement is explicitly left to the conductor; the suggested location above is an observed fit before the current `## Status`, not a design recommendation.
 - Live configuration was inspected only; it was not changed.
+
+## Addendum 1 — format modifiers and the path datum
+
+### Modifier mechanism today
+
+`extensions/jefferson/visuals/format.ts:48-115` parses the format. A segment stores its modifier chain (`:12-15`); `MODIFIERS` declares the recognized names at `:23-35`: six style booleans (`bold`, `dim`, `italic`, `underline`, `inverse`, `strikethrough`) and three string mutations (`capitalize`, `upper`, `lower`). `capitalize` uses lodash `upperFirst`, while `upper`/`lower` use `toUpper`/`toLower`.
+
+Unknown names are rejected in `format.ts:91-94`, with exact error template: `"<instrument>"'s format names a modifier it does not implement: "|<name>"`. For example, the tested `$model|bd` error is `"model"'s format names a modifier it does not implement: "|bd"` (`tests/format.test.ts:255-259`).
+
+At render time, variable resolvers run first and values are collapsed into strings (`format.ts:185-190`); `resolveFormat` then chooses each literal or already-resolved variable string and reduces that segment's modifier list over it (`:191-195`). Thus string mutations act on a variable's resolved string, not the raw datum. Modifiers chain in written order; the reducer at `:194` applies each in sequence. The test `$level|lower|capitalize` with `HIGH` gives `High` (`tests/format.test.ts:421-423`). Style modifiers are accumulated and applied when styling the piece (`:170-174`, `:207-212`); variable foreground tokens are selected from the pre-mutation value (`:210-212`), also pinned by `tests/format.test.ts:413-419` and `tests/instrument.test.ts:134-135`.
+
+### Variable-specific modifiers and literal subjects
+
+No current mechanism binds a modifier's validity to one variable: `MODIFIERS` is a global name-to-operation map (`format.ts:23-35`), and parse validation only checks that global map (`:91-94`). Variables are checked against the declaration separately (`:65-73`); `FormatSegment` stores a name plus generic `Modifier[]` (`:12-15`).
+
+A recognized modifier after literal text applies to the final non-whitespace run of that literal, not a variable: `parseFormat` takes `literal` and extracts `text.match(/\S+$/)` (`format.ts:100-109`). Therefore `hello|capitalize` is a valid format and capitalizes the literal `hello` (same mechanism covered by `tests/format.test.ts:337-351`, which pins literal modifier scoping). A `|base` after literal text would currently be rejected before subject processing because `base` is absent from the global modifier table; the probe `hello|base` returns the unknown-modifier error above. Likewise `$model|base` currently errors as unknown (`tests` pin this generic unknown path, not a special path-specific case).
+
+For a new modifier to work after `$model`, current parsing would attach it to the `model` variable segment; after literal text it would be attached to a literal segment's trailing non-whitespace run. The current data model has no conditional “only if subject variable is path” test. The desired path-only behavior would therefore require a new validation rule/mechanism distinguishing variable subjects from literals and other variables; that is not present today. This is an observation, not a design proposal.
+
+### Path datum
+
+The store's `Readings.cwd` is the full working-directory string (`extensions/jefferson/data/session-data-store.ts:15-23`). The feed seeds it from `ctx.cwd` (`extensions/jefferson/data/session-data-feed.ts:16-22`). The `path` variable resolver returns `basename(r.cwd)` (`extensions/jefferson/visuals/instrument.ts:73-79`), and the living statusline spec requires `$path` be the basename and prohibits rendering the whole directory (`openspec/specs/statusline/spec.md:573-580`).
+
+AGENTS.md says variable resolvers “read the store and return already-formatted strings” (`AGENTS.md:20-22`), and instruments must not reach for host state (`:23-24`). To return different path forms according to a modifier, the resolver would need access to the modifier context or a raw full-path value from which a separate formatting operation can derive the requested form. Today it receives only `Readings`; its existing path resolver has only cwd and always applies basename. There is no variable modifier hook in the current format path.
+
+### Home directory and environment
+
+The home directory is not part of `Readings` (`session-data-store.ts:15-23`) and is not supplied by the feed, which seeds cwd and the other session values only (`session-data-feed.ts:16-30`). A repository search found no `os.homedir()` or `process.env.HOME` usage. `process.env` appears in `tests/jefferson.test.ts:172-178` for test setup (`PI_CODING_AGENT_DIR`); the application source does not otherwise read environment variables in the searched TypeScript files. Standard Node `os.homedir()` or `process.env.HOME` would be mechanisms to consult outside this store, but neither is currently used here; this report does not recommend choosing one.
+
+### Tests and living-spec requirements
+
+- All known modifiers and all six style attributes parse: `tests/format.test.ts:245-253`.
+- Unknown modifier exact error: `tests/format.test.ts:255-260`; configuration-level propagation also tested at `tests/configuration.test.ts:970-975`.
+- Literal modifier scope (trailing non-whitespace run): `tests/format.test.ts:337-351`; no-subject rejection: `:376-380`.
+- String mutation behavior and order: `tests/format.test.ts:383-399`, `:421-423`.
+- Basename edge cases: `tests/instrument.test.ts`, test “path renders only the basename including trailing-separator and root boundaries” (test begins near lines 180-200; exact body assertion should be verified against the current file if needed).
+- Living spec: thinking's default `$level|capitalize` is required (`openspec/specs/statusline/spec.md:399`); path must be basename (`:573-580`); format syntax defines `|modifier`, escaped `\|`, and already formatted variable substitution (`:706-714`); variable datum is delivered already formatted (`:349-359`). The spec does not currently name `base`, `absolute`, or `relative` as supported modifiers.
+
+### Probe
+
+Ran a direct Node TypeScript-stripping probe against `parseFormat`: `hello|capitalize` parsed as a literal segment with a modifier; both `hello|base` and `$model|base` threw `"model"'s format names a modifier it does not implement: "|base"`.

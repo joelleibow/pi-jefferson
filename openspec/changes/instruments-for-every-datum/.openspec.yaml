@@ -5,7 +5,7 @@ x-marbleization:
   runs:
     michael: "76c74064-3bba-43f0-a470-615e9c635b5f"
     chidi: "b479ca01-e1db-4899-bfc6-d6f1c53260ab"
-    eleanor: "3fe16eb1-d9e3-4c3b-b97b-af0e0db33767"
+    eleanor: "fce1107b-602d-4ec1-8e06-eb39552f5e02"
   gates:
     council_owner: approved
     design: pending
