@@ -5,8 +5,9 @@ import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration, type VariableForm } f
 
 /**
  * pi's own rule for the directory, copied: `~` for home itself and `~/sub` below it, the path as
- * the host gave it anywhere else. Both paths are resolved first, so a trailing separator on the
- * home directory and a sibling that only shares its prefix both come out right.
+ * the host gave it anywhere else. `path.relative` resolves its own arguments and answers `..` for
+ * a sibling, which is what makes a trailing separator on home and a shared prefix come out right;
+ * the explicit resolves copy pi's shape and are not the reason.
  */
 const relativeToHome: VariableForm = (readings) => {
   const cwd = readings.cwd;

@@ -204,7 +204,7 @@ test("path's relative form is pi's rule: ~ at home, ~/ below it, the path outsid
   assert.equal(await render("path", { ...seed, cwd: "/opt/work" }, "$path|relative"), "/opt/work");
 });
 
-test("path's relative form resolves both paths, so a trailing separator and a sibling prefix both hold", async () => {
+test("path's relative form holds for a trailing separator on home and for a sibling that only shares its prefix", async () => {
   assert.equal(
     await render("path", { ...seed, home: "/Users/joelleibow/", cwd: "/Users/joelleibow/Projects" }, "$path|relative"),
     "~/Projects",
