@@ -75,9 +75,10 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
-**Bar.** Lives in `components/visuals/bar.ts` and stands alone: it imports no file of this package, so
-a change to the format language or to an instrument cannot reach it. The format language only places
-it: `format.ts` parses `$bar` and gives it the columns the row left, and `bar.ts` draws it.
+**Bar.** The bar lives in `components/visuals/bar.ts` and stands alone. It imports no file of this
+package, so a change to the format language or to an instrument cannot reach it. The format language
+only places the bar: `format.ts` parses `$bar` and gives it the columns the row left, and `bar.ts`
+draws it.
 
 **Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
 `HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
@@ -105,11 +106,13 @@ installs. No file imports the entry. Within `extensions/jefferson/`:
 - `data/` holds the files that keep session data and take it from the host. It imports host packages
   and its own files, and no file outside `data/`.
 - `components/` holds the parts. Its files import host packages, their own directory, the types of
-  `data/` and `format.ts`, and never startup, footer setup, configuration or `shipped.ts`. The
-  directories differ in what else they reach: `row/` imports only the type of the instrument contract,
-  `instruments/` imports `format.ts` only in the binding, and `components/visuals/bar.ts` imports no local file.
+  `data/` and `format.ts`. They never import startup, footer setup, configuration or `shipped.ts`.
+  - `row/` imports only the type of the instrument contract.
+  - `instruments/` imports `format.ts` only in the binding.
+  - `components/visuals/bar.ts` imports no local file.
 - `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
-  `data/`. `shipped.ts` imports the instrument files.
+  `data/`.
+- `shipped.ts` imports the instrument files.
 - Everything above those directories may import any of their files.
 
 Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never

@@ -80,7 +80,7 @@ Each row answers: what did a reader look for, where did they look, where is it n
 | the instruments in `visuals/instrument.ts` | one file each, and `shipped.ts`, `compact-count.ts` | "Where does `cost` get its text?" `components/instruments/cost.ts` (D3). |
 | `jefferson.ts`, `startup.ts`, `configuration.ts`, `footer-setup.ts`, `data/*` | unchanged | Moving them buys no sentence for the reader [CN, "Rejected"] and Joel's tree leaves them [CN, ruling 2]. |
 
-The one comment that named a moved path, `width-plan.ts:7` [M §2], is updated in commit 1. The comments at `extensions/jefferson.ts:5-7` and `startup.ts:3` name paths that did not move [Michael, `michael-implement.json` finding 2]. Comments are outside the line multiset in D7. The stale comment at `tests/jefferson.test.ts:18-20` is not touched [M §2].
+Commit 1 updates the one comment that named a moved path, `width-plan.ts:7` [M §2]. The comments at `extensions/jefferson.ts:5-7` and `startup.ts:3` name paths that did not move [Michael, `michael-implement.json` finding 2]. Comments are outside the line multiset in D7. The stale comment at `tests/jefferson.test.ts:18-20` is not touched [M §2].
 
 ### D3. The instrument split
 

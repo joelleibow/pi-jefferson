@@ -8,7 +8,7 @@ and its import sentence; the rest of ADR 0005 stays in force. Restates a sentenc
 ## Context
 
 ADR 0005 gave `visuals/` the files that decide what a cell shows and how rows are laid out and drawn.
-That name held a format language that draws nothing, a width plan, the row, the renderer, the binding
+`visuals/` held a format language that draws nothing, a width plan, the row, the renderer, the binding
 and every instrument. Joel's frame separates logic many parts share, and the process flow, from logic
 that belongs to one part. `visuals/` mixed them.
 
@@ -21,7 +21,7 @@ A bit more granularity and not as generalized."*
 
 ## Decision
 
-`visuals/` as a top-level directory is gone. Joel's tree is the layout:
+The top-level `visuals/` directory is gone. Joel's tree is the layout:
 
 ```text
 extensions/jefferson/
@@ -53,14 +53,14 @@ extensions/jefferson/
   process flow. A file inside a directory of `components/` is that part's own logic.
 - **The import rule replaces ADR 0005's sentence** that `visuals/` imports only itself and the types of
   `data/`. `components/` files import host packages, their own directory, the types of `data/` and
-  `format.ts`, and never startup, footer setup, configuration or `shipped.ts`. `format.ts` imports
-  `components/visuals/bar.ts` and types. `data/` is unchanged.
+  `format.ts`. They never import startup, footer setup, configuration or `shipped.ts`. `format.ts`
+  imports `components/visuals/bar.ts` and types. The rule for `data/` is unchanged.
 - **The bar stands alone.** Its drawing, filled portion and threshold colors live in
   `components/visuals/bar.ts`, which imports no file of this package. `format.ts` still parses `$bar`,
   because the format is how a user places the bar among prose, and Joel confirmed that purpose: *"$bar
   in a format was solely for users to be able to use it themselves if they see fit."*
 - **`components/visuals/` holds one file.** That breaks ADR 0005's rule that a directory owning a single
-  file does not exist. It is Joel's call, made because he expects more visualizations.
+  file does not exist. Joel made the call because he expects more visualizations.
 - **ADR 0007's width plan.** Its sentence "a pure function under `visuals/`, the width plan" now reads
   `components/row/`. The width plan still imports nothing, so ADR 0007 stays true.
 
