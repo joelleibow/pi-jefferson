@@ -3,7 +3,7 @@ created: 2026-11-10
 x-marbleization:
   working_dir_state: existing_project
   runs:
-    michael: "f555aa5a-c00a-4d81-8c36-4ca0880ac23a"
+    michael: "2405c276-971c-40e7-b706-1f15641a1073"
     chidi: "812fa0dd-a61c-4144-b5f2-cb50d527d681"
     eleanor: "961704fe-8f77-4de6-bc8e-9703b76d69ae"
     judge_audit: "958bd7dd-5222-4d00-98b5-a3ee42e073ae"
@@ -12,6 +12,6 @@ x-marbleization:
     design: approved
     tasks: approved
     implement: approved
-    validate: pending
+    validate: approved
   routing:
     - "2026-11-10 bambadjan: routed per run to anthropic/claude-sonnet-5.5, as in the three prior changes, after two oMLX memory-guard aborts on his pinned localllm-omlx/flint-oQ4e. Agent file pin unchanged; a repin is Joel's."
