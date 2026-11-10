@@ -3,13 +3,13 @@ import { test } from "node:test";
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 
-import type { Row } from "../extensions/jefferson/visuals/row.ts";
-import { type Instrument, instrumentNamed } from "../extensions/jefferson/visuals/instrument.ts";
-import { parseFormat, resolveFormat } from "../extensions/jefferson/visuals/format.ts";
+import type { Row } from "../extensions/jefferson/components/row/row.ts";
+import { type Instrument, instrumentNamed } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import {
   createFooter,
-} from "../extensions/jefferson/visuals/row-renderer.ts";
+} from "../extensions/jefferson/components/row/row-renderer.ts";
 import {
   createSessionDataStore,
   type Readings,

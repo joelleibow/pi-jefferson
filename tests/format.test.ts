@@ -4,9 +4,9 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/visuals/format.ts";
-import { instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/visuals/instrument.ts";
-import { createFooter } from "../extensions/jefferson/visuals/row-renderer.ts";
+import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/format.ts";
+import { instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 

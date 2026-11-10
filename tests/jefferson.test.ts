@@ -8,7 +8,7 @@ import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } fro
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -316,7 +316,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const entry = await import("../extensions/jefferson.ts");
   assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
 
-  const renderer = await import("../extensions/jefferson/visuals/row-renderer.ts");
+  const renderer = await import("../extensions/jefferson/components/row/row-renderer.ts");
   assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
 
   const configuration = await import("../extensions/jefferson/configuration.ts");
@@ -325,13 +325,13 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
   );
 
-  const row = await import("../extensions/jefferson/visuals/row.ts");
+  const row = await import("../extensions/jefferson/components/row/row.ts");
   assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS", "DISTRIBUTIONS"]);
 
-  const widthPlan = await import("../extensions/jefferson/visuals/width-plan.ts");
+  const widthPlan = await import("../extensions/jefferson/components/row/width-plan.ts");
   assert.deepEqual(Object.keys(widthPlan).sort(), ["planRow"]);
 
-  const binding = await import("../extensions/jefferson/visuals/instrument-binding.ts");
+  const binding = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   assert.deepEqual(Object.keys(binding).sort(), ["instrumentBindings"]);
 
   const feed = await import("../extensions/jefferson/data/session-data-feed.ts");
@@ -343,9 +343,9 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const startup = await import("../extensions/jefferson/startup.ts");
   assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
 
-  const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
+  const instrument = await import("../extensions/jefferson/components/instruments/instrument.ts");
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
-  const format = await import("../extensions/jefferson/visuals/format.ts");
+  const format = await import("../extensions/jefferson/format.ts");
   for (const key of [
     ...Object.keys(instrument),
     ...Object.keys(store),

@@ -6,8 +6,8 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 
 import type { Readings } from "./data/session-data-store.ts";
-import { createFooter } from "./visuals/row-renderer.ts";
-import type { Row } from "./visuals/row.ts";
+import { createFooter } from "./components/row/row-renderer.ts";
+import type { Row } from "./components/row/row.ts";
 
 export function installFooter(
   ui: ExtensionUIContext,

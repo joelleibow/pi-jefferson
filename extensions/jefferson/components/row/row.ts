@@ -1,5 +1,5 @@
 /** A row's shape, and the alignments a cell's padding may take. */
-import type { Instrument } from "./instrument.ts";
+import type { Instrument } from "../instruments/instrument.ts";
 
 /** The values a cell's `align` may take. The type and every message derive from this tuple. */
 export const ALIGNMENTS = ["left", "right", "center"] as const;

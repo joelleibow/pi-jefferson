@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DEFAULT_CELL_TEXT, blank, instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/visuals/instrument.ts";
+import { DEFAULT_CELL_TEXT, blank, instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -52,7 +52,7 @@ function named(name: string): InstrumentDeclaration {
 
 async function render(name: string, readings: Readings, format?: string): Promise<string> {
   const declaration = named(name);
-  const { parseFormat, resolveFormat } = await import("../extensions/jefferson/visuals/format.ts");
+  const { parseFormat, resolveFormat } = await import("../extensions/jefferson/format.ts");
   return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
 }
 
@@ -194,7 +194,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   const { readConfiguration } = await import("../extensions/jefferson/configuration.ts");
-  const { createFooter } = await import("../extensions/jefferson/visuals/row-renderer.ts");
+  const { createFooter } = await import("../extensions/jefferson/components/row/row-renderer.ts");
   const { createSessionDataStore } = await import("../extensions/jefferson/data/session-data-store.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const { fakeTheme } = await import("./fake-theme.ts");
@@ -231,8 +231,8 @@ test("a footer's bound cost and tokens read one identical totals object from one
 });
 
 test("an instrument that does not fill renders the same text at width 0 and at width 200", async () => {
-  const { instrumentBindings } = await import("../extensions/jefferson/visuals/instrument-binding.ts");
-  const { parseFormat } = await import("../extensions/jefferson/visuals/format.ts");
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const theme = fakeTheme();
   const bound = instrumentBindings();
 

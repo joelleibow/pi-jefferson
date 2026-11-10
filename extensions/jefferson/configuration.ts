@@ -17,14 +17,14 @@ import {
   type ThemeStyle,
 } from "@earendil-works/pi-coding-agent";
 
-import { blank, instrumentNamed } from "./visuals/instrument.ts";
-import { parseFormat, validateStyle, type FormatSegment } from "./visuals/format.ts";
-import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./visuals/row.ts";
+import { blank, instrumentNamed } from "./components/instruments/instrument.ts";
+import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./components/row/row.ts";
 import {
   instrumentBindings,
   type BindInstrument,
   type ConfiguredInstrument,
-} from "./visuals/instrument-binding.ts";
+} from "./components/instruments/instrument-binding.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {

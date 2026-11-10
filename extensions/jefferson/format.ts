@@ -5,7 +5,7 @@ import toLower from "lodash-es/toLower.js";
 import toUpper from "lodash-es/toUpper.js";
 import upperFirst from "lodash-es/upperFirst.js";
 
-import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
+import type { Instrument, InstrumentDeclaration } from "./components/instruments/instrument.ts";
 
 type Readings = Parameters<Instrument["render"]>[0];
 

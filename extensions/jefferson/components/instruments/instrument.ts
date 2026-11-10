@@ -2,7 +2,7 @@
 import { basename } from "node:path";
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 
-import type { Readings } from "../data/session-data-store.ts";
+import type { Readings } from "../../data/session-data-store.ts";
 
 export const DEFAULT_CELL_TEXT =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor";
