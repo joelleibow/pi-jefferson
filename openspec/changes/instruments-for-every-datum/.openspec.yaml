@@ -14,3 +14,5 @@ x-marbleization:
     validate: pending
   routing:
     - "2026-11-09 bambadjan: routed per run to anthropic/claude-sonnet-5.5, as in the two prior changes, after two oMLX memory-guard aborts on his pinned localllm-omlx/flint-oQ4e. Agent file pin unchanged; a repin is Joel's."
+  paused:
+    - "2026-11-10: paused after the design gate (PL4) approved, before the red/green spike and tasks.md. Joel: \"Let's do that restructure first since we're introducing potentially more things that need a logical grouping. We'll pause this instruments change for the restructure and then we'll come back to it.\" Resume on top of the restructure's merge: rebase this branch on main, and Bambadjan updates the file paths in design.md and the delta specs."
