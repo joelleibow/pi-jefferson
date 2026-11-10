@@ -4,7 +4,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { Cell, Row } from "./row.ts";
 import { planRow, type PlannedCell } from "./width-plan.ts";
-import type { Readings } from "../data/session-data-store.ts";
+import type { Readings } from "../../data/session-data-store.ts";
 
 export interface Footer {
   render(width: number): string[];

@@ -9,6 +9,8 @@ place in a row's cells, a real layout, and per-instrument formatting.
 The name is a nod to the lineage — Jefferson Airplane became Jefferson Starship became
 Starship.
 
+![Jefferson's footer in a cosmic star-dragon theme](https://raw.githubusercontent.com/joelleibow/pi-jefferson/main/docs/images/jefferson-cosmic-star-dragon.png)
+
 ## Status
 
 The statusline is a footer of one line per configured row, each spanning the full width. By default
@@ -109,6 +111,9 @@ to use its default:
 | `context` | `$tokens`, `$window`, `$percent`, `$bar` | `Context:` | `$percent/$window` |
 | `tokens` | `$input`, `$output`, `$cacheRead`, `$cacheWrite`, `$totalTokens` | `Tokens:` | `$totalTokens` |
 | `cost` | `$cost` | `Cost:` | `$cost` |
+| `branch` | `$branch` | `Branch:` | `$branch` |
+| `session` | `$name` | `Session:` | `$name` |
+| `status` | `$status` | `Status:` | `$status` |
 
 Every instrument also accepts `label`, a string placed in front of its format, whether the format
 is configured or the default. It is literal text: `$` means nothing in it, and `$label` is not a
@@ -153,6 +158,22 @@ Here `via` renders dim and the provider's value is capitalized.
 | `upper` | Upper-cases the whole value: `high` becomes `HIGH` |
 | `lower` | Lower-cases the whole value: `HIGH` becomes `high` |
 
+`$path` renders the directory's own name, `pi-jefferson`. Three forms give you the whole directory
+or the part of it under your home directory, and a form comes directly after the variable, before any
+modifier:
+
+| Path form | Renders |
+| --- | --- |
+| `$path` or `$path\|base` | The directory's own name: `pi-jefferson` |
+| `$path\|absolute` | The whole directory: `/Users/joelleibow/Projects/pi-jefferson` |
+| `$path\|relative` | The directory under your home directory: `~` for home itself and `~/Projects/pi-jefferson` below it, and the whole directory anywhere outside home |
+
+A form is not a string modifier: it picks which text arrives. A form applies before the modifiers
+after it, so `$path\|relative\|capitalize` capitalizes the relative text and `$path\|bold` renders the
+basename bold. Write a form anywhere else and the document is rejected, as it is for an unknown
+modifier. A form may follow only the variable that declares it, once, and before anything else.
+`$model\|base` is one of those rejections, because `model` declares no form.
+
 A `|` begins a modifier only when a name follows it directly. A name is a run of letters, digits
 and underscores, so `10|20` and `$model|_x` start a modifier and an unknown one rejects the
 document. Followed by anything else (a space, the end of the format, `$`, `|` or other
@@ -184,7 +205,8 @@ text keep the instrument's `fg`.
 
 If the extension cannot read a document's style or format, it rejects the whole document, renders
 the default row, and warns with a message naming the offender. The offenders include a modifier it
-does not implement, a modifier on `$bar`, and a modifier with nothing before it.
+does not implement, a form on an instrument or in a position that has none, a modifier on `$bar`,
+and a modifier with nothing before it.
 
 ## Why another statusline
 

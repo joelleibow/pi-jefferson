@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { planRow, type CellMeasure, type PlannedCell } from "../extensions/jefferson/visuals/width-plan.ts";
+import { planRow, type CellMeasure, type PlannedCell } from "../extensions/jefferson/components/row/width-plan.ts";
 
 /** The task list's cell notation: `L15` is a left-aligned content cell of 15 columns, `F` fills, `L0` is empty. */
 function aligned(align: CellMeasure["align"], content: number): CellMeasure {

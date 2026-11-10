@@ -3,13 +3,14 @@ import { test } from "node:test";
 
 import { visibleWidth } from "@earendil-works/pi-tui";
 
-import type { Row } from "../extensions/jefferson/visuals/row.ts";
-import { type Instrument, instrumentNamed } from "../extensions/jefferson/visuals/instrument.ts";
-import { parseFormat, resolveFormat } from "../extensions/jefferson/visuals/format.ts";
+import type { Row } from "../extensions/jefferson/components/row/row.ts";
+import type { Instrument } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
+import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import {
   createFooter,
-} from "../extensions/jefferson/visuals/row-renderer.ts";
+} from "../extensions/jefferson/components/row/row-renderer.ts";
 import {
   createSessionDataStore,
   type Readings,
@@ -30,7 +31,10 @@ function visible(line: string): string {
 }
 
 /** The readings a geometry fixture's instrument ignores: these tests are about width, not data. */
-const readings: Readings = { provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, contextUsage: undefined, totals: undefined };
+const readings: Readings = {
+  provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, home: undefined,
+  branch: undefined, sessionName: undefined, statuses: undefined, contextUsage: undefined, totals: undefined,
+};
 
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
@@ -452,7 +456,10 @@ test("a push between two renders shows up in the next render and not before", ()
     },
   };
   const store = createSessionDataStore({
-    seed: { provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: undefined },
+    seed: {
+      provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
+      cwd: undefined, home: undefined, sessionName: undefined,
+    },
     requestRender: () => {},
     readUsage: () => ({ contextUsage: undefined, sessionId: "session-1", leafId: null }),
     readEntries: () => [],

@@ -4,7 +4,7 @@
  * host still spends any remainder and takes any deficit.
  *
  * It imports nothing (ADR 0007), so the two value sets it reads are restated here; the footer's
- * call fails `tsc` if `visuals/row.ts` adds a value to either.
+ * call fails `tsc` if `components/row/row.ts` adds a value to either.
  */
 
 type Distribution = "content" | "equal";

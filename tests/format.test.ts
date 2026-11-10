@@ -4,15 +4,17 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/visuals/format.ts";
-import { instrumentNamed, type InstrumentDeclaration } from "../extensions/jefferson/visuals/instrument.ts";
-import { createFooter } from "../extensions/jefferson/visuals/row-renderer.ts";
+import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/format.ts";
+import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
+import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
-  cwd: "/Users/joelleibow/Projects/pi-jefferson",
+  cwd: "/Users/joelleibow/Projects/pi-jefferson", home: "/Users/joelleibow",
+  branch: "main", sessionName: "refactor footer", statuses: undefined,
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
 };
@@ -348,6 +350,46 @@ test("a chain on literal text extends the same run", () => {
   const text = rendered("model", "$model via|dim|bold $provider", { theme });
   assert.equal(text, "claude-opus-4 " + theme.style("via", { dim: true, bold: true }) + " anthropic");
   assert.equal(occurrences(stripTerminalSequences(text), "via"), 1);
+});
+
+test("a form is recorded on the variable's segment, apart from the modifier chain", () => {
+  assert.deepEqual(parseFormat(named("path"), "$path|relative"), [
+    { kind: "variable", name: "path", form: "relative", modifiers: [] },
+  ]);
+  assert.deepEqual(parseFormat(named("path"), "$path|base"), [
+    { kind: "variable", name: "path", form: "base", modifiers: [] },
+  ]);
+});
+
+test("a form after literal text rejects naming the instrument and the name", () => {
+  assert.throws(() => parseFormat(named("path"), "hello|base"), {
+    message: '"path"\'s format names a modifier it does not implement: "|base"',
+  });
+});
+
+test("a form on a variable that does not declare it rejects naming that variable", () => {
+  assert.throws(() => parseFormat(named("model"), "$model|base"), {
+    message: '"model"\'s format names a modifier it does not implement: "|base"',
+  });
+});
+
+test("a form after another modifier rejects naming the instrument and the form", () => {
+  assert.throws(() => parseFormat(named("path"), "$path|bold|absolute"), {
+    message: '"path"\'s format names a modifier it does not implement: "|absolute"',
+  });
+});
+
+test("two forms on one variable reject on the second", () => {
+  assert.throws(() => parseFormat(named("path"), "$path|base|absolute"), {
+    message: '"path"\'s format names a modifier it does not implement: "|absolute"',
+  });
+});
+
+test("a form applies to its own variable only, so two cells' forms do not swap", () => {
+  const segments = parseFormat(named("path"), "$path|absolute/$path|base");
+  assert.deepEqual(segments.map((segment) => segment.kind === "variable" ? segment.form : String(segment.kind)), [
+    "absolute", "literal", "base",
+  ]);
 });
 
 test("a modifier on the bar rejects naming the bar and the modifier", () => {

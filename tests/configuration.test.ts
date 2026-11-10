@@ -7,20 +7,22 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { createFooter } from "../extensions/jefferson/visuals/row-renderer.ts";
-import type { Cell } from "../extensions/jefferson/visuals/row.ts";
+import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
+import type { Cell } from "../extensions/jefferson/components/row/row.ts";
 import type { Configuration } from "../extensions/jefferson/configuration.ts";
 import {
   DEFAULT_CELLS,
   MAX_CELLS,
   readConfiguration,
 } from "../extensions/jefferson/configuration.ts";
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: "/a/pi-jefferson",
+  home: "/a", branch: "main", sessionName: "refactor footer",
+  statuses: new Map([["b", "idle"], ["a", "3 tasks"]]),
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0, cost: 0.123 },
 };
@@ -768,7 +770,8 @@ test("an empty configured label removes a shipped default and its gap", () => {
 test("a shipped default label does not render over an unknown datum", () => {
   const unknown: Readings = {
     provider: undefined, model: undefined, thinkingLevel: undefined,
-    cwd: undefined, contextUsage: undefined, totals: undefined,
+    cwd: undefined, home: undefined, branch: undefined, sessionName: undefined, statuses: undefined,
+    contextUsage: undefined, totals: undefined,
   };
   for (const name of ["path", "context", "tokens", "cost", "model"]) {
     const { rows, warning } = readDocument({ cells: [{ instrument: name }] });
@@ -788,6 +791,57 @@ test("blank declares no default label, so its placeholder and its empty format c
   const emptied = readDocument({ instruments: { blank: { format: "" } }, cells: [{ instrument: "blank" }] });
   assert.equal(emptied.warning, undefined);
   assert.deepEqual(emptied.rows[0]?.cells.map(cellText), [""], 'a format of "" renders nothing, not a lone label');
+});
+
+test("the branch cell renders its default label, and nothing at all outside a repository", () => {
+  const known = readDocument({ cells: [{ instrument: "branch" }] });
+  assert.equal(known.warning, undefined);
+  assert.deepEqual(known.rows[0]?.cells.map(cellText), ["Branch: main"]);
+
+  const outside = readDocument({ cells: [{ instrument: "branch" }] });
+  assert.deepEqual(
+    outside.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, branch: undefined }, 80, fakeTheme())),
+    [""],
+    "unknown is not an empty string: no label and no gap",
+  );
+  const empty = outside.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, branch: "" }, 80, fakeTheme()));
+  assert.deepEqual(empty, ["Branch: "], "an empty string is a datum, so the bare label renders");
+});
+
+test("the session cell renders its default label, and nothing at all for an unnamed session", () => {
+  const named = readDocument({ cells: [{ instrument: "session" }] });
+  assert.equal(named.warning, undefined);
+  assert.deepEqual(named.rows[0]?.cells.map(cellText), ["Session: refactor footer"]);
+  assert.deepEqual(
+    named.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, sessionName: undefined }, 80, fakeTheme())),
+    [""],
+    "no name means no label and no gap, not a lone `Session:`",
+  );
+});
+
+test("the status cell renders its default label over the statuses, and nothing over none", () => {
+  const set = readDocument({ cells: [{ instrument: "status" }] });
+  assert.equal(set.warning, undefined);
+  assert.deepEqual(set.rows[0]?.cells.map(cellText), ["Status: 3 tasks idle"]);
+  const none = readDocument({ cells: [{ instrument: "status" }] });
+  assert.deepEqual(
+    none.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, statuses: undefined }, 80, fakeTheme())),
+    [""],
+    "no statuses means no label and no gap",
+  );
+  const blankText = none.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, statuses: new Map([["a", " \n "]]) }, 80, fakeTheme()));
+  assert.deepEqual(blankText, [""], "a status that collapses to nothing renders nothing, as with no statuses");
+});
+
+test("a coloured status is measured as its text, so the cell's plan counts '● ok' only", () => {
+  const { rows, warning } = readDocument({ cells: [{ instrument: "status" }] });
+  assert.equal(warning, undefined);
+  const cell = rows[0]!.cells[0]!;
+  const coloured = { ...seed, statuses: new Map([["a", "\x1b[32m●\x1b[0m ok"]]) };
+  // A row sizes a cell from its text rendered at width 0: its probe.
+  const probe = cell.instrument.render(coloured, 0, fakeTheme());
+  assert.equal(probe, "Status: ● ok");
+  assert.equal(visibleWidth(probe), visibleWidth("Status: ● ok"), "the plan counts the text, not the sequences");
 });
 
 test("a shipped default label precedes a configured format", () => {

@@ -1,0 +1,24 @@
+{
+  "verdict": "approve",
+  "requirements": [
+    {"requirement": "F1 (major): renames.sh had no planted red; 1.1's claim about 1.4 did not hold", "evidence": "redgreen-derek.md gains 'Third run: the rename check's planted red', transcribing the two reds I ran (row.ts padded by 40 lines → NOT FOLLOWED AS A RENAME A/D, RENAME FAIL; width-plan.ts deleted and plan.ts added → the same shape) and the clean commit 1's `renames: 6 … PASS`. Task 1.4 cites it as its red and names the mistake it catches (a move read as delete-plus-add, which loses `git log --follow`). 1.1's 'Red proof: … 1.3 and 1.4' now holds. Every check a task relies on has a recorded red and green, so Joel's process ruling is met. Resolved.", "status": "met"},
+    {"requirement": "F2 (minor): 1.2 and 2.3 cited the commit-4 mutated hash", "evidence": "1.2 now reads `944 lines, 2b8f959eabac57a6` against `37f605345cc24d3a`; 2.3 reads `944 lines, fd73a940030b6d32` against `5266812335e73621` under `--strip-export`; both are the values I measured on the spike at those commits, and both name their source. 4.2 keeps `fc4749a7838a1411`, which is correct there. Resolved.", "status": "met"},
+    {"requirement": "F3 (minor): 3.1 and 4.1 named no failing test", "evidence": "3.1 states the red (the pin's bar.ts import with its `[\"drawBar\"]` assertion fails ERR_MODULE_NOT_FOUND on the commit-2 tree, green at this commit); 4.1 states 'none beyond pnpm typecheck' with the condition that makes it fail and points at 4.2 as the check. Resolved.", "status": "met"},
+    {"requirement": "The edits introduce nothing outside the three findings", "evidence": "The diff cc86d46..b89c03d touches only redgreen-derek.md (the appended Third run) and the five task lines named by the findings (1.2, 1.4, 2.3, 3.1, 4.1). No value, order, script or expectation elsewhere changed; the checks in `checks/` are untouched.", "status": "met"}
+  ],
+  "findings": [],
+  "later_gates": [
+    "Implementation gate: every change maps to a task and lands in its D9 commit; `git diff -M --raw` on commit 1 shows six R-scores at or above 90 and no A/D under extensions/ (task 1.4's red is what a failure looks like).",
+    "Implementation gate: re-run all seven scripts from `checks/` on the real branch at each commit rather than reading the attached output: multiset `37f605345cc24d3a`, then `5266812335e73621` under `--strip-export`, then `529431e8fb7a9fe6` at 955, then `d1a326804f97195c` at 954 and unchanged by commit 5; graph 20/38/39/40 edges with the final list equal to `expected/edges-final-D6.txt`; exports 30 then 31 against the expected files; tarball 21 then 22 with `pi.extensions` and `files` unchanged; lodash PASS; suite 317/317 and `pnpm typecheck` clean at every commit.",
+    "Implementation gate: diff the trimmed line sets of commits 2 and 3 and confirm exactly D5's 13 added and 2 removed lines; commits 3 and 4 differ by the one alias line; the threshold mutation in `bar.ts` fails `tests/format.test.ts:139` and is reverted; the GAP mutation reads the per-commit hashes the tasks now state.",
+    "Implementation gate: `git diff -U0 main -- tests/` holds only import lines, the ten new exact-key assertions, the scan array and the stability block; `SHIPPED` and `THINKING_FG` stay private; `bar.ts` imports only the host `ThemeStyle` type; the unused `Instrument` import leaves `format.ts` in commit 4; no Markdown other than tasks.md, no suppression comments, no edit to `~/.pi/agent/pi-jefferson.json`.",
+    "Implementation gate: `release.yml` gains exactly `if: github.ref == 'refs/heads/main'` on the release job and nothing else; CI's own tarball step passes on the pull request.",
+    "Joel's 7.1 before the archive: `/reload`, `/jefferson`, his footer unchanged; the only end-to-end check of jiti resolving `.ts` imports three directories deep in the installed package.",
+    "Before sync: 8.1's paragraph measure (all under 500) and `openspec validate --strict`."
+  ],
+  "not_covered": [
+    "Only the diff cc86d46..b89c03d was judged; the tasks, design and checks settled in the first PL7 pass were not re-derived.",
+    "The reds and greens were not re-run this pass; the transcribed values are the ones I measured in the first pass.",
+    "CI and the release workflow remain unrun; the docs pass and ADR 0009 are Bambadjan's after the implementation gate."
+  ]
+}

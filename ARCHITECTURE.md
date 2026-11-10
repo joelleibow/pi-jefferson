@@ -12,12 +12,19 @@ extensions/jefferson/
   startup.ts                     the install lifecycle: the command, then the session-start installs
   configuration.ts               where pi-jefferson.json lives, reads it, validates it, normalizes rows
   footer-setup.ts                pi's footer factory and the component it returns
+  format.ts                      the format language every instrument shares: parses a format and places $bar
+  shipped.ts                     the shipped instruments, and instrumentNamed to look one up
   data/                          the session data and how the host's session and events reach it
-  visuals/                       what a cell shows, the format language, rows, their widths, binding, and drawing them
+  components/                    the parts, each directory holding only its own logic
+    instruments/                 the instrument contract, the binding, and one file per instrument
+    row/                         a row, its cells' width plan, and the renderer that draws it
+    visuals/                     what an instrument can mix in; today the bar
 ```
 
-The decision behind the layout, and the alternatives it weighed, are in
-[ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility.md).
+Logic that many parts share, and the process flow, sit directly under `extensions/jefferson/`. A
+part's directory holds only that part's logic. The decision behind the layout, and the alternatives
+it weighed, are in [ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility.md), revised by
+[ADR 0009](docs/adr/0009-components-hold-the-parts-and-the-bar-stands-alone.md).
 
 **Entry.** `extensions/jefferson.ts` is the only file the host loads. It registers the extension and
 hands the host's API to startup, and does nothing else.
@@ -25,29 +32,40 @@ hands the host's API to startup, and does nothing else.
 **Startup.** Owns the `/jefferson` command and the `session_start` handler. The handler releases the
 previous install, then installs the data, reads the configuration and installs the footer, in that
 order. Startup also wires the repaint callback: the footer hands the host's repaint request back out,
-and the data side calls it. It decides *when* things run; it computes nothing.
+and the data side calls it. It supplies the data side its home reader too, `node:os`'s `homedir`, so
+the root is the one file that names a process API. It decides *when* things run; it computes nothing.
 
-**Data feed.** Lives in `data/`. Seeds the store from the session context, supplies the readers, and
-subscribes to the events that push into the store. One release undoes the subscriptions and disposes
-the store. The store names no host event; the feed does.
+**Data feed.** Lives in `data/`. Seeds the store from the session context and the readers it is
+handed, and subscribes to the events that push into the store. The branch, its change subscription
+and the statuses exist only inside the host's footer factory. So the feed returns an attachment
+beside the store, and the factory hands the footer's data through it. The attachment seeds the branch
+and subscribes to its change, and that subscription joins the one release with the rest. One release
+undoes the subscriptions and disposes the store. The store names no host event; the feed does.
 
 **Footer setup.** Calls `ctx.ui.setFooter` with a factory that builds the row renderer's footer, and
-returns the component the host expects. Disposing that component runs the release it was given.
+returns the component the host expects. The factory's third parameter is the host's footer data, and
+setup hands it to the feed's attachment before the footer is built, so the first sample already
+carries the branch. Disposing that component runs the release it was given.
 
-**Store.** Holds provider, model, thinking level, working directory, context usage and usage totals.
-The four static datums are seeded at `session_start`; the two selection pushes update model and
-thinking level. Injected readers sample context usage each render and scan the whole session's
-usage-bearing entries only when `(sessionId, leafId)` moves. `turn_end` compares the five totals and
-requests a repaint only when they change. A read is synchronous, total, and never throws. The host
-disposes the footer, and through it the store, before it invalidates the session context, so a read
-cannot outlive its context; disposal clears the readers, and later samples are all-unknown. One sample
-per render is handed to every cell, so cost and tokens share one totals object.
+**Store.** Holds provider, model, thinking level, working directory, home directory, the git branch,
+the session's name, the extension statuses, context usage and usage totals. Provider, model,
+thinking level, working directory, home and the session's name are seeded at `session_start`, and the
+branch is seeded when the footer is built. The two selection pushes update model and thinking level,
+a renamed session pushes its name, and a branch change pushes the branch. The attachment hands the
+store a statuses reader; the store calls it once per sample, holds the map as the host reported it,
+and treats an empty one as unknown. Injected readers sample context usage and the statuses each
+render, and scan the whole session's usage-bearing entries only when `(sessionId, leafId)` moves. `turn_end` compares the five
+totals and requests a repaint only when they change. A read is synchronous, total, and never throws.
+The host disposes the footer, and through it the store, before it invalidates the session context, so
+a read cannot outlive its context; disposal clears the readers, and later samples are all-unknown.
+One sample per render is handed to every cell, so cost and tokens share one totals object and two
+status cells share one text.
 
 **Configuration.** Resolves where the document lives (the agent directory's, and a trusted project's),
 reads it, validates it, resolves instrument names, and normalizes rows.
 The optional `instruments` section configures each name once; formats, labels and styles are validated
 at read time against its declaration and the live theme, then one bound instrument per name is shared
-across the document. The binding itself lives in `visuals/`. Every failure mode rejects the whole
+across the document. The binding itself lives in `components/instruments/`. Every failure mode rejects the whole
 document, renders the default row, and warns with a message that names what was wrong. An unknown
 instrument *name* is different: it warns and renders `blank` in that cell.
 
@@ -58,8 +76,11 @@ control characters once, trims it, and hands it to the format language as a lead
 the label is styled and measured like the format's own text. When a non-empty format follows, that
 segment ends in one space, the gap, so the label's style covers it and `$bar` counts its column; see
 [ADR 0006](docs/adr/0006-a-label-gets-one-gap-and-outer-whitespace-is-not-text.md). A variable's
-declared token can replace that segment's `fg`. The bound `(readings, width, theme) => string`
-renders its format with those values.
+declared token can replace that segment's `fg`. A variable may also declare forms, named resolvers
+over the same readings with one of them the default, and a `|name` placed directly after that
+variable selects one: `$path|relative` renders the directory under home, a bare `$path` the basename.
+The declaration is the only list of a variable's forms, and parsing and rendering both read it. The
+bound `(readings, width, theme) => string` renders its format with those values.
 A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
 declares is unknown, collapses control characters, trims a format's outer whitespace when it parses,
@@ -68,12 +89,17 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
+**Bar.** The bar lives in `components/visuals/bar.ts` and stands alone. It imports no file of this
+package, so a change to the format language or to an instrument cannot reach it. The format language
+only places the bar: `format.ts` parses `$bar` and gives it the columns the row left, and `bar.ts`
+draws it.
+
 **Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
 `HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
 empty lines between its children, so row one sits flush on the editor; see
 [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md). `rowGap` reaches the renderer once, at install. The vertical gap is that `gap`; the horizontal one below is the `HStack`'s.
 On each render the renderer asks every cell for the width of its text at width 0 and gives those to the width
-plan in `visuals/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
+plan in `components/row/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
 cells fill. The joint is one column owned by the right-hand cell, drawn as a leading space inside it.
 Every cell is `shrink: 1` with `minSize: 0`, so a row over its width loses columns to the host's
 allocator and stays one line; the allocator also spends any remainder (the `HStack`'s `gap: 0`). A row with
@@ -93,9 +119,14 @@ installs. No file imports the entry. Within `extensions/jefferson/`:
 
 - `data/` holds the files that keep session data and take it from the host. It imports host packages
   and its own files, and no file outside `data/`.
-- `visuals/` holds the files that decide what a cell shows or how rows are laid out and drawn. It
-  imports host packages, its own files and the types of `data/`. It never imports startup, footer
-  setup or configuration.
+- `components/` holds the parts. Its files import host packages, their own directory, the types of
+  `data/` and `format.ts`. They never import startup, footer setup, configuration or `shipped.ts`.
+  - `row/` imports only the type of the instrument contract.
+  - `instruments/` imports `format.ts` only in the binding.
+  - `components/visuals/bar.ts` imports no local file.
+- `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
+  `data/`.
+- `shipped.ts` imports the instrument files.
 - Everything above those directories may import any of their files.
 
 Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never

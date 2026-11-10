@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  CONFIG_DIR_NAME, type ContextUsage, type ReadonlyFooterDataProvider, type SessionEntry, type Theme,
+} from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
-import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/visuals/instrument.ts";
+import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -46,7 +48,10 @@ interface FakeSession {
   footers: FakeFooter[];
   repaints: () => number;
   subscriptions: Subscription[];
-  host: { contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[] };
+  host: {
+    contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[];
+    sessionName: string | undefined; branch: string | null; statuses: Map<string, string>;
+  };
   reads: { usage: number; sessionId: number; leafId: number; entries: number };
   lines(width: number): string[];
 }
@@ -58,6 +63,11 @@ interface SessionOptions {
   trusted?: boolean;
   /** Absent for a session the host restored with no model. */
   model?: { provider: string; id: string };
+  /** Absent for a session the host has not named. */
+  sessionName?: string;
+  /** What the host reports as the branch; absent outside a repository. */
+  branch?: string | null;
+  statuses?: Array<[string, string]>;
   thinkingLevel?: string;
   contextUsage?: ContextUsage;
   entries?: SessionEntry[];
@@ -107,7 +117,11 @@ function harness(): Harness {
         footers,
         repaints: () => repaints,
         subscriptions: [],
-        host: { contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null, entries: options.entries ?? [] },
+        host: {
+          contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null,
+          sessionName: options.sessionName, branch: options.branch ?? null, statuses: new Map(options.statuses ?? []),
+          entries: options.entries ?? [],
+        },
         reads: { usage: 0, sessionId: 0, leafId: 0, entries: 0 },
         lines(width: number) {
           return footers.at(-1)?.render(width) ?? [];
@@ -122,6 +136,7 @@ function harness(): Harness {
         sessionManager: {
           getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
           getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
+          getSessionName: () => session.host.sessionName,
           getEntries: () => { session.reads.entries++; return session.host.entries; },
         },
         isProjectTrusted: () => options.trusted ?? false,
@@ -131,10 +146,19 @@ function harness(): Harness {
           // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
           // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
           // drifting from the host it stands in for.
-          setFooter: (factory: (tui: Pick<TUI, "requestRender">, theme: Theme) => FakeFooter) => {
+          setFooter: (
+            factory: (tui: Pick<TUI, "requestRender">, theme: Theme, footerData: ReadonlyFooterDataProvider) => FakeFooter,
+          ) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
-            footers.push(factory(tui, fakeTheme()));
+            // The host's footer-only data, faked at its boundary: the branch and the statuses.
+            const footerData: ReadonlyFooterDataProvider = {
+              getGitBranch: () => session.host.branch,
+              getExtensionStatuses: () => session.host.statuses,
+              getAvailableProviderCount: () => 0,
+              onBranchChange: () => () => {},
+            };
+            footers.push(factory(tui, fakeTheme(), footerData));
           },
         },
       };
@@ -296,6 +320,39 @@ test("a rejected configuration warns and still installs the default row", async 
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
 });
 
+test("the branch, session and status cells render their labels at their alignments end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    // Equal shares, so each cell owns columns its content does not fill and its alignment shows.
+    distribution: "equal",
+    cells: [
+      { instrument: "branch", align: "left" },
+      { instrument: "session", align: "center" },
+      { instrument: "status", align: "right" },
+    ],
+  });
+
+  // The host's footer data as the factory receives it: the branch, the name, and the statuses.
+  const session = await harness().start({
+    branch: "main",
+    sessionName: "docs",
+    statuses: [["b", "idle"], ["a", "3 tasks"]],
+  });
+
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(visibleWidth(line), 80);
+  const text = stripTerminalSequences(line);
+  // The left cell is flush with the row's edge, the centred one sits away from its cell's left
+  // edge, and the right one ends at the row's right edge.
+  assert.equal(text.indexOf("Branch: main"), 0, "the left cell is flush with the row's left edge");
+  assert.equal(text.indexOf("Session: docs"), 34, "the centred cell is centred in its own cell");
+  assert.equal(
+    text.indexOf("Status: 3 tasks idle") + "Status: 3 tasks idle".length,
+    80,
+    "the right cell ends at the row's right edge",
+  );
+});
+
 test("a right-aligned cell ends at its cell's right edge end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking", align: "right" }] });
@@ -313,61 +370,72 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
 });
 
 test("the exported surface offers no way to supply or replace cell content", async () => {
-  const entry = await import("../extensions/jefferson.ts");
-  assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
-
-  const renderer = await import("../extensions/jefferson/visuals/row-renderer.ts");
-  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
-
-  const configuration = await import("../extensions/jefferson/configuration.ts");
-  assert.deepEqual(
-    Object.keys(configuration).sort(),
-    ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
-  );
-
-  const row = await import("../extensions/jefferson/visuals/row.ts");
-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS", "DISTRIBUTIONS"]);
-
-  const widthPlan = await import("../extensions/jefferson/visuals/width-plan.ts");
-  assert.deepEqual(Object.keys(widthPlan).sort(), ["planRow"]);
-
-  const binding = await import("../extensions/jefferson/visuals/instrument-binding.ts");
-  assert.deepEqual(Object.keys(binding).sort(), ["instrumentBindings"]);
-
-  const feed = await import("../extensions/jefferson/data/session-data-feed.ts");
-  assert.deepEqual(Object.keys(feed).sort(), ["feedSessionData"]);
-
-  const footerSetup = await import("../extensions/jefferson/footer-setup.ts");
-  assert.deepEqual(Object.keys(footerSetup).sort(), ["installFooter"]);
-
-  const startup = await import("../extensions/jefferson/startup.ts");
-  assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
-
-  const instrument = await import("../extensions/jefferson/visuals/instrument.ts");
-  const store = await import("../extensions/jefferson/data/session-data-store.ts");
-  const format = await import("../extensions/jefferson/visuals/format.ts");
-  for (const key of [
-    ...Object.keys(instrument),
-    ...Object.keys(store),
-    ...Object.keys(format),
-    ...Object.keys(row),
-    ...Object.keys(binding),
-    ...Object.keys(feed),
-    ...Object.keys(footerSetup),
-    ...Object.keys(startup),
-  ]) {
-    assert.ok(
-      !/register|supply|contribute/i.test(key),
-      `${key} looks like a contribution interface`,
-    );
+  // One row per shipped source file that holds an export: the file, and its exact runtime keys.
+  const pinned: Array<[string, string[]]> = [
+    ["../extensions/jefferson.ts", ["VERSION", "default"]],
+    ["../extensions/jefferson/components/row/row-renderer.ts", ["createFooter"]],
+    [
+      "../extensions/jefferson/configuration.ts",
+      ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
+    ],
+    ["../extensions/jefferson/components/row/row.ts", ["ALIGNMENTS", "DISTRIBUTIONS"]],
+    ["../extensions/jefferson/components/row/width-plan.ts", ["planRow"]],
+    ["../extensions/jefferson/components/instruments/instrument-binding.ts", ["instrumentBindings"]],
+    ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
+    ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
+    ["../extensions/jefferson/startup.ts", ["startUp"]],
+    ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
+    ["../extensions/jefferson/components/instruments/compact-count.ts", ["compactCount"]],
+    ["../extensions/jefferson/components/instruments/blank.ts", ["blank"]],
+    ["../extensions/jefferson/components/instruments/model.ts", ["model"]],
+    ["../extensions/jefferson/components/instruments/thinking.ts", ["thinking"]],
+    ["../extensions/jefferson/components/instruments/path.ts", ["path"]],
+    ["../extensions/jefferson/components/instruments/context.ts", ["context"]],
+    ["../extensions/jefferson/components/instruments/tokens.ts", ["tokens"]],
+    ["../extensions/jefferson/components/instruments/cost.ts", ["cost"]],
+    ["../extensions/jefferson/components/instruments/branch.ts", ["branch"]],
+    ["../extensions/jefferson/components/instruments/session.ts", ["session"]],
+    ["../extensions/jefferson/components/instruments/status.ts", ["status"]],
+    ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
+    ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
+  ];
+  const pinnedModules = new Map<string, Record<string, unknown>>();
+  for (const [path, expected] of pinned) {
+    const module = await import(path);
+    pinnedModules.set(path, module);
+    assert.deepEqual(Object.keys(module).sort(), expected, path);
   }
+
+  // The store and the format language are scanned, not pinned: their keys are their own business,
+  // and neither gives a caller a way to supply cell content.
+  const store = await import("../extensions/jefferson/data/session-data-store.ts");
+  const format = await import("../extensions/jefferson/format.ts");
+  for (const exports of [...pinnedModules.values(), store, format]) {
+    for (const key of Object.keys(exports)) {
+      assert.ok(
+        !/register|supply|contribute/i.test(key),
+        `${key} looks like a contribution interface`,
+      );
+    }
+  }
+
+  // Every shipped source file joins the pin: one of its rows, or the scanned-only pair above.
+  const scannedOnly = ["../extensions/jefferson/data/session-data-store.ts", "../extensions/jefferson/format.ts"];
+  const covered = [...pinned.map(([path]) => path), ...scannedOnly].sort();
+  const shippedFiles = readdirSync(join(import.meta.dirname, "..", "extensions"), { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => `../extensions/${name}`)
+    .sort();
+  assert.deepEqual(shippedFiles.filter((path) => !covered.includes(path)), [], "a shipped file the pin does not cover");
 
   // `instrumentNamed` is a lookup, not a registration path: an unimplemented name stays
   // unimplemented, and asking for it changes neither file's exported surface.
-  const surface = [Object.keys(instrument).sort(), Object.keys(store).sort()];
-  assert.equal(instrument.instrumentNamed("nope"), undefined);
-  assert.equal(instrument.instrumentNamed("nope"), undefined);
-  assert.deepEqual([Object.keys(instrument).sort(), Object.keys(store).sort()], surface);
+  const shipped = pinnedModules.get("../extensions/jefferson/shipped.ts") as { instrumentNamed(name: string): unknown };
+  const surface = [Object.keys(shipped).sort(), Object.keys(store).sort()];
+  assert.equal(shipped.instrumentNamed("nope"), undefined);
+  assert.equal(shipped.instrumentNamed("nope"), undefined);
+  assert.deepEqual([Object.keys(shipped).sort(), Object.keys(store).sort()], surface);
 });
 
 test("an untrusted project's document is ignored end to end", async (t) => {
@@ -400,13 +468,13 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
   });
 }
 
-test("in TUI mode a session takes exactly the three subscriptions it names", async (t) => {
+test("in TUI mode a session takes exactly the four subscriptions it names", async (t) => {
   useTempAgentDir(t);
   const session = await harness().start();
   assert.deepEqual(
     session.subscriptions.map((subscription) => subscription.event),
-    ["model_select", "thinking_level_select", "turn_end"],
-    "the two selections and the named turn boundary, with no other subscription",
+    ["model_select", "thinking_level_select", "turn_end", "session_info_changed"],
+    "the two selections, the named turn boundary and the session's name, with no other subscription",
   );
 });
 
@@ -496,14 +564,15 @@ test("a second session_start releases the first install before installing its ow
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1, 1],
-    "each of the first install's three unsubscribes fired exactly once",
+    [1, 1, 1, 1],
+    "each of the first install's four unsubscribes fired exactly once",
   );
   assert.deepEqual(h.log, [
     "setFooter#1",
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
     "unsubscribe:turn_end",
+    "unsubscribe:session_info_changed",
     "setFooter#2",
   ]);
 
@@ -539,7 +608,7 @@ test("disposing a footer then replacing the session releases the first install o
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1, 1],
+    [1, 1, 1, 1],
     "each unsubscribe fired exactly once in total, across both callers",
   );
   assert.deepEqual(h.log, [
@@ -547,6 +616,7 @@ test("disposing a footer then replacing the session releases the first install o
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
     "unsubscribe:turn_end",
+    "unsubscribe:session_info_changed",
     "setFooter#2",
   ]);
 

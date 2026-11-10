@@ -1,19 +1,5 @@
 schema: marbleization
 
-# Project context. Every `openspec instructions` call prints this block, which is how a seat that
-# does not read AGENTS.md (the documenter, the researchers) still gets it. It repeats facts owned
-# elsewhere: the commands and the TypeScript rule in AGENTS.md, the vocabulary and the Joel-only
-# tasks in his rulings. Change them together.
-context: |
-  Vocabulary (Joel's 2026-11-03 ruling): a row holds cells, and a cell holds an instrument.
-  Never use the words "module" or "widget" for the statusline concept. Where the
-  extension-source-layout spec uses "module" as a term of art, it means a source file, and new
-  prose says "source file".
-  Commands are pnpm typecheck, pnpm test and openspec validate --strict. Only erasable TypeScript
-  is allowed, and relative imports end in .ts.
-  A task that only Joel can observe, in his own pi session, is marked his and is never ticked by
-  the writer.
-
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:

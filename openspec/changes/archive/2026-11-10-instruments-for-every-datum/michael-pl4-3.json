@@ -1,0 +1,80 @@
+{
+  "verdict": "approve",
+  "requirements": [
+    {
+      "requirement": "Every source path the amended design names exists at HEAD e0eac59 and holds what the design says",
+      "evidence": "Listed the tree: extensions/jefferson/{configuration,footer-setup,format,shipped,startup}.ts, data/{session-data-store,session-data-feed}.ts, components/instruments/{instrument,instrument-binding,compact-count,blank,model,thinking,path,context,tokens,cost}.ts, components/row/{row,width-plan,row-renderer}.ts, components/visuals/bar.ts; no visuals/ at top level. Checked each cited range: Readings data/session-data-store.ts:15-23 ✓; InstrumentDeclaration.variables instrument.ts:15-24 ✓; path.ts:6-12 with the basename resolver at :8 ✓; MODIFIERS format.ts:23-35 ✓; the variable-declaration check in parseFormat at format.ts:62-70 ✓; instrumentBindings instrument-binding.ts:15-37 calling resolveFormat at :33 ✓; shipped.ts:1-17 ✓.",
+      "status": "met"
+    },
+    {
+      "requirement": "Every test path and line D8 relocates is true at HEAD",
+      "evidence": "tests/instrument.test.ts: seven-count test :61-76 with the assertion at :73 ✓; shapes :32-40 ✓; labels :42-46 ✓; expected :86-90 ✓; width-0 measured list at :255 ✓ (the test itself runs :235-264, not :233-261 — minor); unresolved names :79-84 holding git and branch ✓. tests/session-data-store.test.ts:51-57, key list at :55 ✓. tests/jefferson.test.ts: fake setFooter :124-140, factory at :134-137 ✓; pin :315-400 with blocks :316-378, store/format scanned-only at :379-380, scanned list :381-384, name scan :385-392, stability block :394-399 ✓.",
+      "status": "met"
+    },
+    {
+      "requirement": "The export-pin rewrite is named as the layout change's Validate finding and the living scenario 'A new file joins the pin' require",
+      "evidence": "D8 names the commit (the one adding branch.ts, session.ts, status.ts), the shape (one [path, expectedKeys] table), the rows (the 20 blocks the pin names today — I counted 20 in tests/jefferson.test.ts:316-378 and D8's list has the same 20 — plus three new rows expecting [\"branch\"], [\"session\"], [\"status\"]), what it keeps (name scan, stability block, store and format scanned-only) and the argument that none of the new files supplies cell content. Matches openspec/changes/archive/2026-11-10-intuitive-source-layout/michael-validate.json's finding at tests/jefferson.test.ts:346-377 and openspec/specs/extension-source-layout/spec.md:214-217.",
+      "status": "met"
+    },
+    {
+      "requirement": "No decision changed",
+      "evidence": "Read every hunk of git diff HEAD -- design.md: the source-key line, Context bullets, Goal 1, D1, D3 'Why in the store' and 'Alternatives', D4, D8 and Migration Plan gain paths, line numbers and A2 citations only. Goal 1's 'one file each … one entry in shipped.ts' restates Joel's 2026-11-10 ruling and the living layout requirement, not a new decision. D2, D5, D6, D7, D9, Risks, Open Questions untouched. The delta specs are untouched (git diff shows no specs/ hunk), which is correct: neither delta names a source path.",
+      "status": "met"
+    },
+    {
+      "requirement": "Nothing in the new tree contradicts a decision: D4's mechanism against the ruled homes",
+      "evidence": "openspec/specs/extension-source-layout/spec.md:346-363: format.ts may import the contract (it already does, format.ts:7 type import of InstrumentDeclaration); the forms shape lands on InstrumentDeclaration in components/instruments/instrument.ts (the contract, not an instrument's file) and path.ts declares its three; parse and resolve read it in format.ts. Compatible. D6's node:path reads sit in path.ts, which imports only instrument.ts today (path.ts:4) — allowed.",
+      "status": "met"
+    },
+    {
+      "requirement": "Nothing in the new tree contradicts a decision: the store-only rule and the data home",
+      "evidence": "spec.md:243-255: data/ imports no file outside itself. D1 adds a structural footerData shape and D3 adds os.homedir() inside data/session-data-feed.ts — a host type and a Node builtin, both permitted (:139-156). footer-setup.ts receives the attachment as a parameter from startup.ts and needs no new import. The raw statuses map in Readings is a host type, as ContextUsage already is (session-data-store.ts:21).",
+      "status": "met"
+    },
+    {
+      "requirement": "Nothing in the new tree contradicts a decision: adding the three instruments",
+      "evidence": "spec.md:308-325: one file per instrument, one shipped.ts entry, no edit to another instrument's file. Goal 1 and the Migration Plan state exactly that. shipped.ts:11-13 is the one table; configuration.ts and the tests are the only other importers permitted (:360-363), and the design adds none.",
+      "status": "met"
+    },
+    {
+      "requirement": "owner-rulings.md addition is quoted, dated and consistent with the design",
+      "evidence": "Section '2026-11-10 — The pause, and how this ships' quotes Joel twice and binds: resume on intuitive-source-layout's tree, one file per instrument under components/instruments/, one PR for both changes. The design's Goal 1 cites it as R '2026-11-10'. git log confirms the branch sits on 204756a 'Resume … on top of the source layout'.",
+      "status": "met"
+    },
+    {
+      "requirement": "Baseline",
+      "evidence": "pnpm typecheck clean; pnpm test 317/317; openspec validate --all --strict 4 passed, at HEAD with the amendment in the working tree.",
+      "status": "met"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "minor",
+      "location": "design.md D3, 'Why in the store' and 'Alternatives' bullets (AGENTS.md 'Adding an instrument' cited at `:15-27`); research-eleanor.md Addendum 2 §5 (its source)",
+      "finding": "False at HEAD. AGENTS.md's 'Adding an instrument' section is lines 24-40 (heading at :24, steps at :26-40). It was :18-34 before e0eac59 moved the vocabulary ruling into AGENTS.md, so A2's :15-27 was never right. The design elsewhere cites this section by heading, which is the stable form.",
+      "required_change": "Cite the section by its heading only, or correct both citations to `:24-40`. Documentation remedy; no code consequence.",
+      "required_change_ran": false
+    },
+    {
+      "severity": "minor",
+      "location": "design.md D8 'Expectations that must change' (`tests/instrument.test.ts:233-261`)",
+      "finding": "The width-0 against width-200 test runs :235-264 at HEAD; :233-234 is the previous test's close. The load-bearing line, the measured list at :255, is correct.",
+      "required_change": "Write `:235-264`. Documentation remedy.",
+      "required_change_ran": false
+    }
+  ],
+  "later_gates": [
+    "Tasks gate: the status.ts resolver collapses whitespace without importing format.ts — the layout spec's 'An instrument file imports' scenario (spec.md:350-353) forbids an instrument file naming format.ts, so the collapse is a regex in status.ts or a helper in instrument.ts/compact-count.ts's class, and the task says which.",
+    "Tasks gate: the three instrument tasks each add one file and one shipped.ts line and touch no other instrument's file; the path-forms task edits path.ts and the contract, and the task list says so explicitly so the layout spec's 'no other instrument's file changes' is checkable in the diff.",
+    "Tasks gate: the pin-table rewrite is one task, in the same commit as the three files, with its red state being the three unlisted files (the table lacks them) and its green state the three rows; the scanned list, name scan and stability block are shown unchanged.",
+    "Tasks gate: D8's expectation edits are exactly the list at the lines D8 now cites; any other edited assertion blocks.",
+    "Implementation gate: the forms shape on InstrumentDeclaration is read by parseFormat and resolveFormat only; no second name table; status.ts, branch.ts, session.ts import only instrument.ts (and a data type if needed).",
+    "Implementation gate: data/ still imports nothing outside itself after the attachment and os.homedir() land; the footerData shape in the feed is structural, not pi's exported type."
+  ],
+  "not_covered": [
+    "The decisions approved in michael-pl4-2.json were not re-derived; only the amendment's hunks and the tree were checked.",
+    "Addendum 2's claims about pi dependency paths (node_modules) — unchanged by the layout and not re-run here.",
+    "The uncommitted .openspec.yaml run-id change; bookkeeping, not design.",
+    "The README rider and the conductor's project tree."
+  ]
+}

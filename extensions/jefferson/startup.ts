@@ -2,6 +2,8 @@
  * The install lifecycle: the `/jefferson` command, and what a session start installs in what order.
  * The data comes from `data/`, the document from `configuration.ts`, the footer from `footer-setup.ts`.
  */
+import { homedir } from "node:os";
+
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { configurationPaths, readConfiguration } from "./configuration.ts";
@@ -43,7 +45,7 @@ export function startUp(pi: ExtensionAPI): void {
     // factory's call sets it, so every push after the install reaches the host.
     let requestRepaint: (() => void) | undefined;
 
-    const { store, release } = feedSessionData(pi, ctx, () => requestRepaint?.());
+    const { store, release, attachFooterData } = feedSessionData(pi, ctx, () => requestRepaint?.(), homedir);
     releasePrevious = release;
 
     const { rows, rowGap, warning } = readConfiguration({
@@ -62,6 +64,7 @@ export function startUp(pi: ExtensionAPI): void {
       receiveRepaint: (repaint) => {
         requestRepaint = repaint;
       },
+      attachFooterData,
     });
   });
 }

@@ -1,0 +1,77 @@
+{
+  "findings": [
+    {
+      "finding": "Both state the reason D6 was amended to retract: that resolving both paths is what makes the trailing-separator and sibling-prefix inputs come out right. D6 (PL4 amendment, confirmed by Derek's note 5 and my own measurement) says path.relative does that work — it resolves its own arguments and answers `..` for a sibling — and the resolves are kept only as pi's shape. A comment is the one place a reader six months out will look for the why, and this one is the discredited why. No behavior is affected; the assertions are right.",
+      "location": "extensions/jefferson/components/instruments/path.ts:6-10 (the relativeToHome doc comment); tests/instrument.test.ts:207 (test title 'path's relative form resolves both paths, so a trailing separator and a sibling prefix both hold')",
+      "required_change": "Reword the comment to D6's reason ('`path.relative` resolves its arguments and answers `..` for a sibling; the explicit resolves copy pi's shape') and retitle the test ('path's relative form holds for a trailing separator on home and for a sibling that only shares its prefix'). Title and comment only; no assertion moves and the removed-assert counts stay as they are.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "Four citations are false against the branch as built: 2.1's real red is end-to-end ('the left cell is flush with the row's left edge', -1 vs 0) once group 7 exists; 3.6's string-prefix plant yields '~/../joelleibow2/app' with the predicate swapped; 9.1's padded paragraph measured 556; and no scope line names tasks.md although every commit must carry its ticks, so the check as written fails on every group. Derek recorded all four and ran the scopes with tasks.md added.",
+      "location": "openspec/changes/instruments-for-every-datum/tasks.md 2.1 (red cites 2.3's `undefined`/`'main'`), 3.6 (`'~/2/app'`), 9.1 (`656`), every 'Group scope' line (tasks.md absent from the allowed paths)",
+      "required_change": "In the docs pass, correct the three red values and add tasks.md to each group's scope line (or a preamble sentence saying the group's ticks ride in its commit and are allowed). Documentation remedy; Derek's 'Docs for Bambadjan' already lists the design.md line drift.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Validate: 9.3 — Joel's live check on this branch (/reload, /jefferson, a real repository's branch, a real extension's statuses, a setCwd switch), in his words, before the archive; the fakes assume footerData reaches the feed and no test here observes the TUI.",
+    "Docs pass (Bambadjan): README instruments table (+branch, session, status) and the path forms where modifiers are described, the gallery image rider; ARCHITECTURE.md store/feed/footer-setup/instrument sentences Derek listed; AGENTS.md 'Adding an instrument' gains the variableForms convention; the one ADR from D4; design.md's D8 line citations and the two red values that belong to other plants; tasks.md per finding 2.",
+    "Validate: the spec sync — both deltas merge into the living specs with every paragraph still ≤ 500 characters (checks/specs.sh at the archive)."
+  ],
+  "not_covered": [
+    "pi 1.5.x runtime behavior; the suite and my reading are against the pinned 1.4.0 node_modules, and Chidi reported the footer-data surface byte-identical across 1.4.0–1.5.2.",
+    "Windows path semantics for |relative/|absolute (USERPROFILE, backslashes); the design does not claim them.",
+    "CI and the release workflow; the tarball check is local.",
+    "Every planted red in Derek's report; I re-ran four load-bearing ones and the suite, and accepted the rest on his transcripts plus the clean tree."
+  ],
+  "requirements": [
+    {
+      "evidence": "checks/suite.sh <repo> 357 → 357 passed, 0 failed (tsc inside); imports.mjs PASS; terminal.sh PASS; tarball.sh 25 PASS; specs.sh PASS (477 / 467); scope.sh PASS for all eight group ranges with each group's list plus tasks.md (Derek's deviation 1, which I accept: the tick belongs in the commit). git status clean. Removed-assert counts by file: instrument 2, session-data-store 1, jefferson 20, format/configuration/row-renderer 0 — D8's set exactly. No suppression comments, no Markdown in the diff but tasks.md, no secrets or env files.",
+      "requirement": "Mechanical: typecheck, suite, imports, terminal, tarball, specs, scope — run by me against the main checkout",
+      "status": "met"
+    },
+    {
+      "evidence": "tasks.md diff is 47 ticks and nothing else (paired remove/add per task, verified); 9.3 unticked. Each commit's file set equals its group's scope list (git show --stat × 8). Deliverables checked: Readings +4 fields in D2's order; branchChanged/sessionNamed/readStatusesFrom; readHome as feedSessionData's fourth parameter with no default, homedir passed from startup.ts (the only node:os import); FooterDatumSource structural, installFooter taking ReadonlyFooterDataProvider and attaching from the factory's third parameter before createFooter; variableForms on the contract, path's three forms, parse/resolve reading them; branch.ts, session.ts, status.ts one file each plus one shipped.ts line each; 23-row pin with the readdirSync coverage assertion and the two-file scanned-only pair; `git` still unresolved.",
+      "requirement": "Contract adherence: every change maps to a task, every task's deliverable is in the diff, every tick matches code",
+      "status": "met"
+    },
+    {
+      "evidence": "Every new noun is D1-D6's: the attachment and its three guards, the four datums and their patterns, the injected home reader (PL4 r2 ruling), forms recorded on the segment apart from the modifier chain, pi's relative rule copied, sanitize private to status.ts. resolveFormat's `formValues`/`arrived` are the mechanism D4 names ('hands the format language each variable's value per form, as strings'); no lock, retry, cache or table beyond that.",
+      "requirement": "No mechanism the design never described",
+      "status": "met"
+    },
+    {
+      "evidence": "Store delta: null→unknown (branchChanged `next ?? undefined`), same-branch no repaint, name cleared→unknown, statuses raw with size 0→unknown, read per sample, attach-after-release/second-attach/callback-after-release guards, home ''/throw→unknown. Statusline delta: bare $path = base, |absolute, |relative with ~, ~/…, outside absolute, trailing separator, sibling prefix, unknown home → absolute, unknown cwd → nothing in every form, form before modifiers, five rejections with the existing message, three labels, unknown renders nothing (incl. 'Branch: ' for a genuine ''). All read in the diff and asserted in tests/instrument.test.ts, format.test.ts, configuration.test.ts, session-data-feed.test.ts.",
+      "requirement": "Spec scenarios hold against the code, not only the report",
+      "status": "met"
+    },
+    {
+      "evidence": "The feed tests build the real feed and store over a fake pi, fake ctx and fake footerData with counters (reads, statusReads, subscriptions, releases, listeners held vs ever taken); the end-to-end harness gains a footerData fake and drives the real setFooter. Re-ran four plants in a scratch copy: readHome catch removed → 'a reader that throws' fails; listener's `if (released) return` removed → 'the store was not asked to read the branch' fails; form position check removed → 'Missing expected exception' on $path|bold|absolute; statuses size guard removed → 'statuses are read on every sample' fails. All four red as the tasks claim. No mocked internals asserted, no 'does not throw' tests, no skipped tests.",
+      "requirement": "Tests: real implementation driven through its lifecycle, fakes only at the boundary, mutation checks re-run",
+      "status": "met"
+    },
+    {
+      "evidence": "The edited expectations are exactly D8's (count 7→10, width-0 list, store key list, instrumentNamed('branch'), the four subscription assertions, fixtures) plus two titles/comments with no assertion change (Derek's deviation 4; the 'all ten datums unknown' test asserts against the ten-field `unknown` fixture, so the title is true). readHome is supplied by production (startup.ts), not a test-only parameter; attachFooterData is called by production (footer-setup.ts).",
+      "requirement": "Making it pass: no edited expectation outside D8's list, no test-only branch or parameter",
+      "status": "met"
+    },
+    {
+      "evidence": "data/ imports pi types and its own files only (imports.mjs PASS); instrument files import instrument.ts (+ node:path for path.ts) and nothing else; format.ts imports the contract type; startup.ts (composition root) wires homedir and attachFooterData; no instrument imports format.ts or shipped.ts. Dependencies point inward; no shims.",
+      "requirement": "Architecture and layout spec",
+      "status": "met"
+    },
+    {
+      "evidence": "The one new failure path, a throwing home lookup, is caught at the feed and seeds unknown as D3 requires; attachment guards refuse the three states D1 names. The repository has no logging surface and this change adds no entry point or external call beyond the host's footerData reads, so nothing further is owed.",
+      "requirement": "Observability and errors",
+      "status": "met"
+    },
+    {
+      "evidence": "Nine commits in dependency order, each green; the seed's `sessionName: undefined` literal lived one commit before 2.9 replaced it (deviation 7) — acceptable. `null→undefined` mapping lives once in branchChanged; `''/throw→unknown` once in homeDirectory; the status rule once in status.ts; pi's relative predicate once in path.ts. Comments explain why, except the one in finding 1.",
+      "requirement": "Derek's standards: one hat, smallest change, one home per fact",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

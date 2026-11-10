@@ -1,0 +1,51 @@
+{
+  "findings": [
+    {
+      "finding": "§2.15 lists the test; it holds no transcript of that red. The measurement was mine, in michael-pl4-4-r1 (a scratch copy with `|| undefined` removed fails 'an empty home is unknown'), and Derek's only statement of it is prose in 'Not verified'. The claim is true; the citation names a place that does not contain it.",
+      "location": "design.md D3, bullet 'Both halves are tested through a fake reader' — 'its red was measured by removing the guard [redgreen-derek.md §2.15]'",
+      "required_change": "Cite the measurement where it lives (michael-pl4-4-r1) or drop 'its red was measured' and let the task that builds the seam record its own red. Documentation remedy.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Tasks gate: the home task names the seam exactly — `readHome` as feedSessionData's parameter after requestRender, startup.ts passing homedir from node:os — and its two reds: catch removed with a throwing reader, guard removed with a \"\"-returning reader; the HOME=\"\" process assertion is cited as the end-to-end check, with its red measured by the task itself, not by reference.",
+    "Tasks gate: the subscription-test and fixture edits are bounded by D8's corrected lines and the removed-assert count (0 for format/configuration/row-renderer); the pin task cites the coverage assertion's two reds.",
+    "Tasks gate: tasks do not claim a failing test for the own-variable half of the form rule or the form-level undefined guard (redgreen-derek.md note 4, 'Not verified').",
+    "Implementation gate: node:os imported in startup.ts only; readHome has no default value; the feed's catch is reached by a test; the pin's coverage assertion is present and the scanned-only pair is two files.",
+    "Validate: Joel's live check on the PR branch, in his words, before the archive."
+  ],
+  "not_covered": [
+    "Anything approved in earlier passes and untouched by this round's diff.",
+    "Derek's spike code; it does not ship, and the real implementation is judged at its own gate.",
+    "The checks/ scripts' behavior beyond the single red I reproduced last round."
+  ],
+  "requirements": [
+    {
+      "evidence": "git diff HEAD -- design.md: D3's heading now reads 'seeded by the feed through a reader the root supplies'; its first sentence names startup.ts as the supplier; the new bullet 'The read is injected, and the root supplies it' names `readHome: () => string` beside `requestRender`, the store's readUsage/readEntries as the precedent, node:os named once at the root, data/ naming no process API, the catch mapping \"\" and a throw to unknown, and the production-always-supplies-it argument. 'Unknown home' is restated in terms of the reader with the same behavior. D1 gains the one clause 'The same file hands the feed its home reader, beside the repaint request (D3)'. D8's inputs read 'a reader that returns \"\" and a reader that throws, both unknown'. Open Questions still 'None'; the deferral sentence is gone. The ruling is written in as I gave it, no wider.",
+      "requirement": "Finding 1 (major): the home read is injected and the design states it as its decision",
+      "status": "met"
+    },
+    {
+      "evidence": "Store delta :117 'read once when the session starts from the host process … When the process reports an empty string, or the lookup throws' stays true: the reader is the process's homedir, supplied by the root. The layout spec's data/ rule (imports no local source file) is unaffected; node:os moving to startup.ts is a Node builtin at the composition root, which ARCHITECTURE.md describes as 'wires … computes nothing'. D3's 'Why os.homedir()' and 'Alternatives' bullets remain correct because the root still passes os.homedir.",
+      "requirement": "The seam does not contradict the delta or the living specs",
+      "status": "met"
+    },
+    {
+      "evidence": "D8 now reads event list :437-438, first [1,1,1] :528-529, h.log arrays :531-537 and :575-581, row-renderer store seed :455-460; :432 and :571 unchanged. Matches what I measured on the base tree last round.",
+      "requirement": "Finding 2 (minor): four citation ranges corrected",
+      "status": "met"
+    },
+    {
+      "evidence": "The bullet that carried it is gone; the surviving claim cites §2.15's feed test ('the home directory is the one the host process reports, and none is unknown') and 'Not verified' for the mock.module / live-binding fact, which is where Derek recorded it.",
+      "requirement": "Finding 3 (minor): the §2.11 citation replaced",
+      "status": "met"
+    },
+    {
+      "evidence": "Every hunk in the diff is one of: the round-1 amendments already judged (D5 message, D6 reason, D8 subscription tests, fixtures, pin coverage), the D3/D1/D8 edits for finding 1, or the line corrections for finding 2. openspec validate instruments-for-every-datum --strict: valid.",
+      "requirement": "No decision changed beyond the three findings",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

@@ -1,0 +1,50 @@
+{
+  "findings": [
+    {
+      "finding": "9.2 states the branch-head suite count, and the Validate fixes (6bc0a41, 552cf66) added three tests, so the head is 360. The task is ticked against a number that is no longer the head's; the archive carries tasks.md as the record of what was verified.",
+      "location": "openspec/changes/instruments-for-every-datum/tasks.md 9.2 ('checks/suite.sh <repo> 357')",
+      "required_change": "Restate 9.2's count as 360 with one clause naming the source of the three ('after the Validate fixes: two for the status strip, one for the forms record'); the conductor re-ticks after re-running suite.sh <repo> 360. Documentation remedy; the group counts stand.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "9.3: Joel's live check on this branch — /reload, /jefferson, a real repository's branch, a real extension's statuses (including a coloured one, e.g. pi's status-line example, rendering as text without escape fragments), a setCwd switch — in his words, before the archive.",
+    "Archive: the two delta specs merge into the living specs; specs.sh at the archive confirms every paragraph ≤ 500 (the status requirement is two paragraphs, 345 and 150).",
+    "Implementation-gate minor finding 1 (path.ts relativeToHome comment and the 'resolves both paths' test title restating the retracted D6 reason) remains recorded, not assigned; it ships as minor unless the docs pass picked it up."
+  ],
+  "not_covered": [
+    "Live TUI behaviour — 9.3.",
+    "The intuitive-source-layout half of the PR, archived at d9bf511.",
+    "Windows path semantics; not claimed.",
+    "The README raw-image URL, which resolves after merge to main."
+  ],
+  "requirements": [
+    {
+      "evidence": "Reproduced the close: the same probe that printed \" [32m● [0m ok\" at 04c3a78 prints \"● ok\" at HEAD. status.ts sanitize now runs stripTerminalSequences (pi-tui, a host import the instrument rule allows; imports.mjs PASS) before the whitespace rules, with the why in its comment. Two tests added: tests/instrument.test.ts 'a status's own terminal sequences are stripped…' (asserts \"● ok\" and no ESC) and tests/configuration.test.ts 'a coloured status is measured as its text…' (width-0 probe renders 'Status: ● ok' and its visible width is the text's). Derek reports both red before the strip; the tests assert on the rendered output, not a mock.",
+      "requirement": "Finding 1 (blocking): coloured statuses render as text",
+      "status": "met"
+    },
+    {
+      "evidence": "rg defaultForm|byName over extensions, tests, AGENTS.md, docs and the change: no hits. VariableForms is gone; variableForms is Record<variable, Record<form, VariableForm>>; path.ts declares { base, absolute, relative } with variables.path === base; parseFormat and resolveFormat read the flattened record. New test 'a variable's forms are its named resolvers, and a bare $name hands out its variables entry' pins the key set and the identity forms.base === variables.path. The instrument.ts doc comment states the rule once.",
+      "requirement": "Finding 2 (major): defaultForm declared and never read",
+      "status": "met"
+    },
+    {
+      "evidence": "statusline delta 'The status instrument': 'the text other extensions set for the footer' → 'the footer text other extensions set' and 'to single spaces' → 'to one space' — same meaning; the requirement body is now two paragraphs (345 and 150 characters; 496 joined), the second carrying the new strip sentence and the unchanged 'No statuses left is unknown' clause. 'A variable can declare forms': 'one of them the default a bare variable hands out' → 'The bare variable hands out its variables entry, which may also be named as a form' — the corrected rule, as I required. design.md D2 gains the strip sentence; D4 the bare-variable sentence; AGENTS.md step 1 the same. All three say one thing in one place each. openspec validate --strict valid; specs.sh longest 477 / 494, none over 500.",
+      "requirement": "Spec and design wording: meaning preserved under the trims",
+      "status": "met"
+    },
+    {
+      "evidence": "git diff 46371db..HEAD touches only the nine files the three commits name. suite.sh 360: 360 pass, tsc clean; imports, terminal, tarball 25, specs PASS. Removed-assert counts against 39be820 unchanged: instrument 2, session-data-store 1, jefferson 20, others 0 — the fixes added tests and removed no assertion.",
+      "requirement": "Nothing else moved; checks green at HEAD",
+      "status": "met"
+    },
+    {
+      "evidence": "tasks.md 8.2 and 9.2 cite checks/suite.sh <repo> 357, measured before the Validate fixes; the branch head is 360. The groups' own counts (325…357) are true of their commits and stay. 9.2 is the branch-head statement and is now false by three; the preamble's rule is 'write the count a group actually reaches … and never lower it'.",
+      "requirement": "tasks.md counts before the archive",
+      "status": "must_change"
+    }
+  ],
+  "verdict": "approve"
+}

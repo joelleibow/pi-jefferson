@@ -12,6 +12,10 @@ const seed: Readings = {
   model: "claude-opus-4",
   thinkingLevel: "high",
   cwd: "/Users/joelleibow/Projects/pi-jefferson",
+  home: "/Users/joelleibow",
+  branch: undefined,
+  sessionName: undefined,
+  statuses: undefined,
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: zeroTotals,
 };
@@ -20,6 +24,10 @@ const unknown: Readings = {
   model: undefined,
   thinkingLevel: undefined,
   cwd: undefined,
+  home: undefined,
+  branch: undefined,
+  sessionName: undefined,
+  statuses: undefined,
   contextUsage: undefined,
   totals: undefined,
 };
@@ -49,10 +57,12 @@ function newStore(readings: Readings) {
   return { store, host, calls, repaints: () => repaints };
 }
 
-test("a sample is exactly the six datums, in order, carrying the seed", () => {
+test("a sample is exactly the ten datums, in order, carrying the seed", () => {
   const { store } = newStore(seed);
   const sample = store.sample();
-  assert.deepEqual(Object.keys(sample), ["provider", "model", "thinkingLevel", "cwd", "contextUsage", "totals"]);
+  assert.deepEqual(Object.keys(sample), [
+    "provider", "model", "thinkingLevel", "cwd", "home", "branch", "sessionName", "statuses", "contextUsage", "totals",
+  ]);
   assert.deepEqual(sample, seed);
 });
 
@@ -267,7 +277,7 @@ test("disposal is idempotent", () => {
   assert.doesNotThrow(() => store.dispose(), "a second dispose does nothing");
 });
 
-test("a disposed store reads all six datums unknown without calling throwing readers", () => {
+test("a disposed store reads all ten datums unknown without calling throwing readers", () => {
   const calls = { usage: 0, entries: 0 };
   const store = createSessionDataStore({
     seed,
@@ -309,4 +319,69 @@ test("a disposed store and its all-unknown replacement both read without throwin
   assert.doesNotThrow(() => first.store.sample());
   assert.doesNotThrow(() => second.store.sample());
   assert.equal(second.store.sample().model, undefined);
+});
+
+test("the branch is held as reported, and the host's null reads unknown rather than an empty string", () => {
+  const { store } = newStore(seed);
+  store.branchChanged("main");
+  assert.equal(store.sample().branch, "main");
+  store.branchChanged("detached");
+  assert.equal(store.sample().branch, "detached", "detached is the text the host reports");
+  store.branchChanged(null);
+  assert.equal(store.sample().branch, undefined);
+  assert.notEqual(store.sample().branch, "");
+});
+
+test("a branch change repaints once, and a report of the branch already held repaints nothing", () => {
+  const { store, repaints } = newStore(seed);
+  store.branchChanged("main");
+  assert.equal(repaints(), 1, "a first report replaces unknown and repaints");
+  store.branchChanged("main");
+  assert.equal(repaints(), 1, "the held branch repaints nothing");
+  store.branchChanged("feature/x");
+  assert.equal(repaints(), 2);
+  assert.equal(store.sample().branch, "feature/x");
+});
+
+test("the session's name is seeded, replaced by a push, and cleared to unknown", () => {
+  const { store, repaints } = newStore({ ...seed, sessionName: "refactor footer" });
+  assert.equal(store.sample().sessionName, "refactor footer");
+  store.sessionNamed("docs");
+  assert.equal(store.sample().sessionName, "docs");
+  assert.equal(repaints(), 1);
+  store.sessionNamed(undefined);
+  assert.equal(store.sample().sessionName, undefined, "a cleared name is unknown, not stale");
+  assert.equal(repaints(), 2, "clearing the name is a change and repaints");
+  store.sessionNamed(undefined);
+  assert.equal(repaints(), 2, "a push that changes nothing repaints nothing");
+});
+
+test("statuses are read once per sample, held raw, and an empty map reads unknown", () => {
+  const { store } = newStore(seed);
+  let reads = 0;
+  const statuses = new Map([["b", "idle"], ["a", "3 tasks"]]);
+  store.readStatusesFrom(() => {
+    reads++;
+    return statuses;
+  });
+  const sample = store.sample();
+  assert.equal(reads, 1, "one sample asks the host once");
+  assert.equal(sample.statuses, statuses, "the host's map is held raw, not composed here");
+  assert.deepEqual([...sample.statuses!.keys()], ["b", "a"], "the store does not order them");
+  store.readStatusesFrom(() => new Map());
+  assert.equal(store.sample().statuses, undefined, "an empty set is unknown");
+});
+
+test("a branch push, a name push and a status reader after disposal leave the store untouched", () => {
+  const { store, repaints } = newStore(seed);
+  let reads = 0;
+  store.readStatusesFrom(() => { reads++; return new Map([["a", "x"]]); });
+  store.dispose();
+  store.branchChanged("main");
+  store.sessionNamed("docs");
+  assert.equal(repaints(), 0);
+  assert.equal(store.sample().branch, undefined);
+  assert.equal(store.sample().sessionName, undefined);
+  assert.equal(store.sample().statuses, undefined);
+  assert.equal(reads, 0, "a disposed store reads no statuses");
 });

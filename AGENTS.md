@@ -3,6 +3,12 @@
 Notes for an agent working in this repository. `ARCHITECTURE.md` describes the parts; this file is the
 handful of things that are easy to get wrong.
 
+## Words
+
+A row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). Never call the statusline
+concept a "module" or a "widget". Where the extension-source-layout spec uses "module" as a term of
+art, it means a source file, and new prose says "source file".
+
 ## Running things
 
 ```bash
@@ -17,12 +23,17 @@ extension.
 
 ## Adding an instrument
 
-1. Add one declaration to `extensions/jefferson/visuals/instrument.ts` — name, variables, defaults
-   and options, plus a `defaultLabel` or a `variableFg` if it needs them — and include it in the
-   shipped declarations table so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
+1. Add one file under `extensions/jefferson/components/instruments/` that imports
+   `FOUNDATIONAL_OPTIONS` from `instrument.ts` and declares the instrument — name, variables, defaults
+   and options, plus a `defaultLabel` or a `variableFg` if it needs them — then add one entry to
+   `extensions/jefferson/shipped.ts` so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
    space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required
    on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as
-   `blank` does. A `$bar` in a format makes the cell fill without saying so.
+   `blank` does. A `$bar` in a format makes the cell fill without saying so. A variable with more
+   than one rendering declares `variableForms` in the same file: the named resolvers for that
+   variable; a bare `$name` renders `variables.name`. `parseFormat` rejects a `|name` the declaration
+   does not carry, and `resolveFormat` renders the form a format names, so the forms are declared
+   once, on the instrument.
 2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
    `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
 3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`,

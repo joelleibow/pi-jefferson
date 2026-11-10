@@ -2,7 +2,7 @@
 import type { ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
-import { collapse, parseFormat, resolveFormat, type FormatSegment } from "./format.ts";
+import { collapse, parseFormat, resolveFormat, type FormatSegment } from "../../format.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 
