@@ -89,7 +89,7 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
         if (afterName && subject?.kind === "variable" && subject.form === undefined
-          && subject.modifiers.length === 0 && forms !== undefined && Object.hasOwn(forms.byName, name)) {
+          && subject.modifiers.length === 0 && forms !== undefined && Object.hasOwn(forms, name)) {
           segments[segments.length - 1] = { ...subject, form: name };
         } else {
           const modifier = MODIFIERS.get(name);
@@ -197,7 +197,7 @@ export function resolveFormat(
   const formValues = new Map<string, string>();
   for (const segment of segments) {
     if (segment.kind !== "variable" || segment.form === undefined) continue;
-    const value = declaration.variableForms?.[segment.name]?.byName[segment.form]?.(readings);
+    const value = declaration.variableForms?.[segment.name]?.[segment.form]?.(readings);
     if (value === undefined) return "";
     formValues.set(`${segment.name}|${segment.form}`, collapse(value));
   }

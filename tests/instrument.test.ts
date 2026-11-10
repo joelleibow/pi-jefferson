@@ -194,6 +194,18 @@ test("path's base form is the basename a bare $path renders", async () => {
   assert.equal(await render("path", seed, "$path|base"), await render("path", seed));
 });
 
+test("a variable's forms are its named resolvers, and a bare $name hands out its variables entry", () => {
+  const declaration = named("path");
+  const forms = declaration.variableForms?.path;
+  assert.ok(forms, "path declares forms for $path");
+  assert.deepEqual(
+    Object.keys(forms).sort(),
+    ["absolute", "base", "relative"],
+    "the forms are the named resolvers, with no second home for the default",
+  );
+  assert.equal(forms.base, declaration.variables.path, "the form named base is the resolver a bare $path renders");
+});
+
 test("path's absolute form is the whole directory", async () => {
   assert.equal(await render("path", seed, "$path|absolute"), "/Users/joelleibow/Projects/pi-jefferson");
 });

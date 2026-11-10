@@ -26,7 +26,7 @@ export const path: InstrumentDeclaration = {
   name: "path",
   variables: { path: base },
   variableForms: {
-    path: { defaultForm: "base", byName: { base, absolute: readings => readings.cwd, relative: relativeToHome } },
+    path: { base, absolute: readings => readings.cwd, relative: relativeToHome },
   },
   defaultFormat: "$path",
   defaultLabel: "Path:",
