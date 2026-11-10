@@ -352,6 +352,46 @@ test("a chain on literal text extends the same run", () => {
   assert.equal(occurrences(stripTerminalSequences(text), "via"), 1);
 });
 
+test("a form is recorded on the variable's segment, apart from the modifier chain", () => {
+  assert.deepEqual(parseFormat(named("path"), "$path|relative"), [
+    { kind: "variable", name: "path", form: "relative", modifiers: [] },
+  ]);
+  assert.deepEqual(parseFormat(named("path"), "$path|base"), [
+    { kind: "variable", name: "path", form: "base", modifiers: [] },
+  ]);
+});
+
+test("a form after literal text rejects naming the instrument and the name", () => {
+  assert.throws(() => parseFormat(named("path"), "hello|base"), {
+    message: '"path"\'s format names a modifier it does not implement: "|base"',
+  });
+});
+
+test("a form on a variable that does not declare it rejects naming that variable", () => {
+  assert.throws(() => parseFormat(named("model"), "$model|base"), {
+    message: '"model"\'s format names a modifier it does not implement: "|base"',
+  });
+});
+
+test("a form after another modifier rejects naming the instrument and the form", () => {
+  assert.throws(() => parseFormat(named("path"), "$path|bold|absolute"), {
+    message: '"path"\'s format names a modifier it does not implement: "|absolute"',
+  });
+});
+
+test("two forms on one variable reject on the second", () => {
+  assert.throws(() => parseFormat(named("path"), "$path|base|absolute"), {
+    message: '"path"\'s format names a modifier it does not implement: "|absolute"',
+  });
+});
+
+test("a form applies to its own variable only, so two cells' forms do not swap", () => {
+  const segments = parseFormat(named("path"), "$path|absolute/$path|base");
+  assert.deepEqual(segments.map((segment) => segment.kind === "variable" ? segment.form : String(segment.kind)), [
+    "absolute", "literal", "base",
+  ]);
+});
+
 test("a modifier on the bar rejects naming the bar and the modifier", () => {
   assert.throws(() => parseFormat(named("context"), "$bar|bold"),
     { message: '"context"\'s format puts a modifier on "$bar": "|bold"' });

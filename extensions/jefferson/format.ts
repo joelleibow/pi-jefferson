@@ -11,7 +11,7 @@ import type { Readings } from "./data/session-data-store.ts";
 
 export type FormatSegment =
   | { kind: "literal"; text: string; modifiers: readonly Modifier[] }
-  | { kind: "variable"; name: string; modifiers: readonly Modifier[] }
+  | { kind: "variable"; name: string; form?: string; modifiers: readonly Modifier[] }
   | { kind: "bar" };
 
 type StyleAttribute = Exclude<keyof ThemeStyle, "fg" | "bg">;
@@ -85,25 +85,33 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         literal += character;
         afterName = false;
       } else {
-        const modifier = MODIFIERS.get(name);
-        if (modifier === undefined) {
-          throw formatError(declaration, `names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
-        }
-        if (afterName && subject !== undefined) {
-          if (subject.kind === "bar") {
-            throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
-          }
-          segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+        const forms = subject?.kind === "variable" ? declaration.variableForms?.[subject.name] : undefined;
+        // A form comes first after its variable, once; anywhere else the name is no form, and
+        // the modifier table decides whether the document is rejected.
+        if (afterName && subject?.kind === "variable" && subject.form === undefined
+          && subject.modifiers.length === 0 && forms !== undefined && Object.hasOwn(forms.byName, name)) {
+          segments[segments.length - 1] = { ...subject, form: name };
         } else {
-          const text = collapse(literal);
-          const run = text.match(/\S+$/)?.[0];
-          if (run === undefined) {
-            throw formatError(declaration, `has a modifier with nothing before it: ${JSON.stringify("|" + name)}`);
+          const modifier = MODIFIERS.get(name);
+          if (modifier === undefined) {
+            throw formatError(declaration, `names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
           }
-          const prefix = text.slice(0, text.length - run.length);
-          if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
-          segments.push({ kind: "literal", text: run, modifiers: [modifier] });
-          literal = "";
+          if (afterName && subject !== undefined) {
+            if (subject.kind === "bar") {
+              throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
+            }
+            segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+          } else {
+            const text = collapse(literal);
+            const run = text.match(/\S+$/)?.[0];
+            if (run === undefined) {
+              throw formatError(declaration, `has a modifier with nothing before it: ${JSON.stringify("|" + name)}`);
+            }
+            const prefix = text.slice(0, text.length - run.length);
+            if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
+            segments.push({ kind: "literal", text: run, modifiers: [modifier] });
+            literal = "";
+          }
         }
         index += name.length;
         afterName = true;
@@ -185,11 +193,23 @@ export function resolveFormat(
     if (value === undefined) return "";
     values.set(name, collapse(value));
   }
-  const pieces = segments.map(segment => {
+  // A form is another reading of the same datum, and unknown when its own resolver says so.
+  const formValues = new Map<string, string>();
+  for (const segment of segments) {
+    if (segment.kind !== "variable" || segment.form === undefined) continue;
+    const value = declaration.variableForms?.[segment.name]?.byName[segment.form]?.(readings);
+    if (value === undefined) return "";
+    formValues.set(`${segment.name}|${segment.form}`, collapse(value));
+  }
+  // The text a variable arrived as, before any modifier changed it: the token reads this one.
+  const arrived = segments.map(segment => {
     if (segment.kind === "bar") return "";
-    const text = segment.kind === "literal" ? segment.text : values.get(segment.name)!;
-    return segment.modifiers.reduce((piece, modifier) => "mutate" in modifier ? modifier.mutate(piece) : piece, text);
+    return segment.kind === "literal" ? segment.text : segment.form === undefined
+      ? values.get(segment.name)!
+      : formValues.get(`${segment.name}|${segment.form}`)!;
   });
+  const pieces = segments.map((segment, index) => segment.kind === "bar" ? ""
+    : segment.modifiers.reduce((piece, modifier) => "mutate" in modifier ? modifier.mutate(piece) : piece, arrived[index]!));
   let bar = "";
   if (segments.some(segment => segment.kind === "bar")) {
     const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);
@@ -203,7 +223,7 @@ export function resolveFormat(
     if (segment.kind === "bar") return bar;
     const merged = mergedStyle(style, segment.modifiers);
     // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
-    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(values.get(segment.name)!) : undefined;
+    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(arrived[index]!) : undefined;
     return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
   }).join("");
 }

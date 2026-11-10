@@ -12,9 +12,20 @@ export interface Instrument {
   render(readings: Readings, width: number, theme: Theme): string;
 }
 
+/** One named way of showing a variable's datum, over the readings the sample already carries. */
+export type VariableForm = (readings: Readings) => string | undefined;
+
+/** The forms a variable accepts, the one a bare `$name` renders among them. */
+export interface VariableForms {
+  readonly defaultForm: string;
+  readonly byName: Readonly<Record<string, VariableForm>>;
+}
+
 export interface InstrumentDeclaration {
   readonly name: string;
   readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
+  /** The forms a variable accepts; `|name` after that variable selects one of them. */
+  readonly variableForms?: Readonly<Record<string, VariableForms>>;
   readonly bar?: (readings: Readings) => number | null;
   /** A declaration that fills in every format. A `$bar` in the format fills without saying so. */
   readonly fills?: boolean;

@@ -182,6 +182,52 @@ test("path renders only the basename including trailing-separator and root bound
   }
 });
 
+test("path's base form is the basename a bare $path renders", async () => {
+  assert.equal(await render("path", seed), "pi-jefferson");
+  assert.equal(await render("path", seed, "$path|base"), "pi-jefferson");
+  assert.equal(await render("path", seed, "$path|base"), await render("path", seed));
+});
+
+test("path's absolute form is the whole directory", async () => {
+  assert.equal(await render("path", seed, "$path|absolute"), "/Users/joelleibow/Projects/pi-jefferson");
+});
+
+test("path's relative form is pi's rule: ~ at home, ~/ below it, the path outside it", async () => {
+  assert.equal(await render("path", seed, "$path|relative"), "~/Projects/pi-jefferson");
+  assert.equal(await render("path", { ...seed, cwd: "/Users/joelleibow" }, "$path|relative"), "~");
+  assert.equal(await render("path", { ...seed, cwd: "/opt/work" }, "$path|relative"), "/opt/work");
+});
+
+test("path's relative form resolves both paths, so a trailing separator and a sibling prefix both hold", async () => {
+  assert.equal(
+    await render("path", { ...seed, home: "/Users/joelleibow/", cwd: "/Users/joelleibow/Projects" }, "$path|relative"),
+    "~/Projects",
+  );
+  assert.equal(
+    await render("path", { ...seed, home: "/Users/joelleibow", cwd: "/Users/joelleibow2/app" }, "$path|relative"),
+    "/Users/joelleibow2/app",
+    "joelleibow2 is not under joelleibow",
+  );
+});
+
+test("an unknown home directory renders the absolute directory, and the cell is not empty", async () => {
+  const relative = await render("path", { ...seed, home: undefined }, "$path|relative");
+  assert.equal(relative, "/Users/joelleibow/Projects/pi-jefferson");
+  assert.notEqual(relative, "");
+});
+
+test("an unknown working directory renders nothing in every form", async () => {
+  for (const format of ["$path", "$path|base", "$path|absolute", "$path|relative"]) {
+    assert.equal(await render("path", { ...seed, cwd: undefined }, format), "", format);
+  }
+});
+
+test("a form with another modifier after it renders the form's text under that modifier", async () => {
+  const theme = fakeTheme();
+  assert.equal(await render("path", seed, "$path|relative|bold"), theme.style("~/Projects/pi-jefferson", { bold: true }));
+  assert.equal(await render("path", seed, "$path|absolute|upper"), "/USERS/JOELLEIBOW/PROJECTS/PI-JEFFERSON");
+});
+
 test("token variables use the four totals fields and cost uses the same totals", async () => {
   const readings = { ...seed, totals: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 } };
   assert.equal(await render("tokens", readings, "$input $output $cacheRead $cacheWrite $totalTokens"), "118 59 23 12 212");
