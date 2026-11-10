@@ -30,10 +30,10 @@ extension.
    space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required
    on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as
    `blank` does. A `$bar` in a format makes the cell fill without saying so. A variable with more
-   than one rendering declares `variableForms` in the same file: `{ defaultForm, byName }` for that
-   variable, one resolver per form. `parseFormat` rejects a `|name` the declaration does not carry,
-   and `resolveFormat` renders the form a format names, so the forms are declared once, on the
-   instrument.
+   than one rendering declares `variableForms` in the same file: the named resolvers for that
+   variable; a bare `$name` renders `variables.name`. `parseFormat` rejects a `|name` the declaration
+   does not carry, and `resolveFormat` renders the form a format names, so the forms are declared
+   once, on the instrument.
 2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
    `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
 3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`,

@@ -155,7 +155,7 @@ Every shipped instrument that displays a datum MUST declare a default label and 
 
 ### Requirement: A variable can declare forms
 
-An instrument MAY declare forms for a variable: named ways of showing one datum, one of them the default a bare variable hands out. A form MUST be written `|name` directly after its variable, before any other modifier, once. A form name after literal text, after a variable that declares no such form, after another modifier or twice MUST reject the document when it is read, naming the instrument and the modifier. A form selects a value and changes no text.
+An instrument MAY declare forms for a variable: named ways of showing one datum. The bare variable hands out its `variables` entry, which may also be named as a form. A form MUST be written `|name` directly after its variable, before any other modifier, once. A form name after literal text, after a variable that declares no such form, after another modifier or twice MUST reject the document when it is read, naming the instrument and the modifier. A form selects a value and changes no text.
 
 #### Scenario: A form with another modifier after it
 
@@ -222,7 +222,9 @@ The extension MUST implement a `session` instrument declaring the variable `$nam
 
 ### Requirement: The status instrument
 
-The extension MUST implement a `status` instrument declaring the variable `$status`, the text other extensions set for the footer, with the default label `Status:` and `$status` as its default format. The resolver MUST order statuses by key, collapse each one's whitespace and newlines to single spaces, drop those left empty and join the rest by one space. No statuses left is unknown, so the cell renders nothing, label included.
+The extension MUST implement a `status` instrument declaring the variable `$status`, the footer text other extensions set, with the default label `Status:` and `$status` as its default format. The resolver MUST order statuses by key, collapse each one's whitespace and newlines to one space, drop those left empty and join the rest by one space.
+
+A status's own terminal sequences are stripped; the cell's style colours it. No statuses left is unknown, so the cell renders nothing, label included.
 
 #### Scenario: Several statuses
 
