@@ -193,3 +193,131 @@ One, and it is closed. I asked the conductor what to record for commit 1's multi
 - CI and the release workflow were not run; the tarball was checked locally with `pnpm pack --dry-run --json` only.
 - `git log --follow` behaviour beyond commit 1's similarity scores was not inspected.
 - `exports.mjs` reads each module's runtime keys; it does not check the type surface.
+
+## Second run: the two missing planted reds
+
+Derek run `1651faa6-4b8e-4715-8b0e-79a364fc2558`, spike clean at `f32c55f`. Transcribed verbatim.
+
+Both checks now have their planted red. The tree is clean at `f32c55f` on `intuitive-source-layout-spike`.
+
+## 1. Task 2.1 — the export pin written before the split
+
+**Setup.** Detached at `f5ab4d6` (commit 1), then the pin's committed text from `fa018fc` laid over the commit-1 tree:
+
+```sh
+git checkout -q f5ab4d6
+git show fa018fc:tests/jefferson.test.ts > tests/jefferson.test.ts
+```
+
+Nine files the pin names do not exist at commit 1: `components/instruments/{compact-count,blank,model,thinking,path,context,tokens,cost}.ts` and `shipped.ts` — all `MISSING`.
+
+**Red, stage 1 — the pin as written.** `node --test tests/jefferson.test.ts`:
+
+```
+✖ the exported surface offers no way to supply or replace cell content (0.7755ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      'DEFAULT_CELL_TEXT',
+  +   'blank',
+  +   'instrumentNamed'
+  -   'FOUNDATIONAL_OPTIONS'
+    ]
+
+      at TestContext.<anonymous> (file:///private/tmp/isl-spike/tests/jefferson.test.ts:347:10)
+ℹ tests 41
+ℹ pass 40
+ℹ fail 1
+```
+
+The pin's first new assertion is the contract's exact keys. At commit 1 `instrument.ts` still carries `blank` and `instrumentNamed`, so it fails there and the run never reaches the missing files. **The task's order is honest but the red has two causes in sequence, and this is the first one.**
+
+**Red, stage 2 — the not-yet-existing files.** Commenting out that one assertion and rerunning, the pin reaches its first new import:
+
+```
+✖ the exported surface offers no way to supply or replace cell content (0.507417ms)
+  Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+    '/private/tmp/isl-spike/extensions/jefferson/components/instruments/compact-count.ts'
+    imported from /private/tmp/isl-spike/tests/jefferson.test.ts
+ℹ pass 40
+ℹ fail 1
+```
+
+**Green at `fa018fc`.** The file run at commit 1 was saved first (`/tmp/pin-at-commit-1.ts`); at `fa018fc` it is byte-identical, so the same assertions are what pass:
+
+```
+3995098d5951bb99…  /tmp/pin-at-commit-1.ts
+3995098d5951bb99…  tests/jefferson.test.ts
+```
+
+```sh
+git checkout -q fa018fc && node --test tests/jefferson.test.ts
+```
+```
+✔ the exported surface offers no way to supply or replace cell content (0.724625ms)
+ℹ tests 41
+ℹ pass 41
+ℹ fail 0
+```
+and the whole suite there: `ℹ tests 317 / ℹ pass 317 / ℹ fail 0`.
+
+Reverted with `git checkout -- tests/jefferson.test.ts` (status empty) before moving to `fa018fc`.
+
+## 2. Task 4.3 — the lodash grep (`/tmp/isl/checks/lodash.sh`)
+
+**Plant A — a whole-package import.** Added `import _ from "lodash-es";` above the three per-function imports in `format.ts`:
+
+```sh
+cd /tmp/isl/checks && ./lodash.sh
+```
+```
+extensions/jefferson/format.ts:4:import _ from "lodash-es";
+extensions/jefferson/format.ts:5:import toLower from "lodash-es/toLower.js";
+extensions/jefferson/format.ts:6:import toUpper from "lodash-es/toUpper.js";
+extensions/jefferson/format.ts:7:import upperFirst from "lodash-es/upperFirst.js";
+extensions/jefferson/format.ts:31:  // lodash's `capitalize` lowercases the rest of the string; the ruling is first letter only,
+lodash lines: 5
+NOT A PER-FUNCTION IMPORT:
+extensions/jefferson/format.ts:4:import _ from "lodash-es";
+LODASH FAIL
+exit=1
+```
+
+**Revert, green.**
+
+```
+extensions/jefferson/format.ts:4:import toLower from "lodash-es/toLower.js";
+extensions/jefferson/format.ts:5:import toUpper from "lodash-es/toUpper.js";
+extensions/jefferson/format.ts:6:import upperFirst from "lodash-es/upperFirst.js";
+extensions/jefferson/format.ts:30:  // lodash's `capitalize` lowercases the rest of the string; the ruling is first letter only,
+lodash lines: 4
+PASS
+exit=0
+```
+
+**Plant B — the other shape the task names.** `import { upperFirst } from "lodash";` replacing the per-function import (the wrong package *and* a named import):
+
+```
+extensions/jefferson/format.ts:6:import { upperFirst } from "lodash";
+lodash lines: 4
+NOT A PER-FUNCTION IMPORT:
+extensions/jefferson/format.ts:6:import { upperFirst } from "lodash";
+LODASH FAIL
+exit=1
+```
+Reverted (`git checkout -- extensions/jefferson/format.ts`, status empty) → `PASS`.
+
+## Tree as I left it
+
+```
+$ git status --porcelain --untracked-files=all
+(empty)
+$ git log --oneline -1
+f32c55f Release only from main
+$ git branch --show-current
+intuitive-source-layout-spike
+```
+And the guards still green at `f32c55f`: `suite: 317 passed, 0 failed (expected 317) PASS`, `lodash PASS`, `graph 40 edges = D6 PASS`, `multiset 954 lines, d1a326804f97195c PASS`.
+
+One thing to carry into tasks.md: the pin's red at 2.1 has two distinct causes — the contract's key change (`:347`, an assertion) and the not-yet-existing files (`ERR_MODULE_NOT_FOUND`, only reachable once the first passes). A task that says "the pin goes red" is true, but the worker will see the assertion first and may mistake it for the whole proof.
