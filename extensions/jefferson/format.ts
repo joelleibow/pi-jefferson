@@ -5,6 +5,7 @@ import toLower from "lodash-es/toLower.js";
 import toUpper from "lodash-es/toUpper.js";
 import upperFirst from "lodash-es/upperFirst.js";
 
+import { drawBar } from "./components/visuals/bar.ts";
 import type { Instrument, InstrumentDeclaration } from "./components/instruments/instrument.ts";
 
 type Readings = Parameters<Instrument["render"]>[0];
@@ -33,9 +34,6 @@ const MODIFIERS: ReadonlyMap<string, Modifier> = new Map<string, Modifier>([
   ["upper", { mutate: toUpper }],
   ["lower", { mutate: toLower }],
 ]);
-
-const WARNING_PERCENT = 70;
-const ERROR_PERCENT = 90;
 
 export function collapse(text: string): string {
   return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
@@ -198,11 +196,9 @@ export function resolveFormat(
     const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);
     const barWidth = Math.max(0, width - nonBar);
     const percent = declaration.bar!(readings);
-    const filled = percent === null ? 0 : Math.min(barWidth, Math.floor((percent / 100) * barWidth));
-    const filledStyle: ThemeStyle = percent !== null && percent > ERROR_PERCENT ? { ...style, fg: "error" }
-      : percent !== null && percent > WARNING_PERCENT ? { ...style, fg: "warning" } : style;
-    bar = styledPiece("█".repeat(filled), filledStyle, theme)
-      + styledPiece("░".repeat(barWidth - filled), { ...style, dim: true }, theme);
+    bar = drawBar(barWidth, percent, style)
+      .map(part => styledPiece(part.text, part.style, theme))
+      .join("");
   }
   return segments.map((segment, index) => {
     if (segment.kind === "bar") return bar;

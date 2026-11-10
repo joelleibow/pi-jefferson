@@ -373,10 +373,13 @@ test("the exported surface offers no way to supply or replace cell content", asy
   const shipped = await import("../extensions/jefferson/shipped.ts");
   assert.deepEqual(Object.keys(shipped).sort(), ["instrumentNamed"]);
 
+  const bar = await import("../extensions/jefferson/components/visuals/bar.ts");
+  assert.deepEqual(Object.keys(bar).sort(), ["drawBar"]);
+
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/format.ts");
   const scanned = [
-    contract, compactCounts, blank, model, thinking, path, context, tokens, cost, shipped,
+    contract, compactCounts, blank, model, thinking, path, context, tokens, cost, shipped, bar,
     store, format, row, binding, feed, footerSetup, startup,
   ];
   for (const module of scanned) {
