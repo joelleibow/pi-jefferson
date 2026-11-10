@@ -1,0 +1,62 @@
+{
+  "findings": [
+    {
+      "finding": "A status carrying ANSI (pi's documented 'themed colors' example) renders its escape sequences as visible text — ' [32m● [0m ok' — because the format language collapses ESC in every datum value, a rule that predates this change and is right for every other datum but was never reconciled with a datum that is styled text by convention. Reproduced with the real resolver. The route: keeping the colour would revise the ratified collapse rule and let one datum's SGR leak into the cell's own style and pad (the trap AGENTS.md names), so the colour is stripped and the cell's `style` owns the colour, as it does for every other instrument. Stripping is the instrument's job (variables arrive already formatted), and pi-tui's stripTerminalSequences is the existing helper — a host package import, which the layout spec and imports.mjs allow in an instrument file. No new mechanism. Measured: stripTerminalSequences(\"\\x1b[32m●\\x1b[0m ok\") === \"● ok\"; it also removes OSC 8 links, leaving their text. Joel can overrule in favour of keeping colour; that would be a design change to the collapse rule, not a fix.",
+      "location": "extensions/jefferson/components/instruments/status.ts:8-23 (sanitize / statusText); openspec/changes/instruments-for-every-datum/specs/statusline/spec.md 'The status instrument'; design.md D2 statuses bullet",
+      "required_change": "Derek: in status.ts sanitize, strip terminal sequences before the whitespace replacements (stripTerminalSequences from @earendil-works/pi-tui); add one test in tests/instrument.test.ts feeding \"\\x1b[32m●\\x1b[0m ok\" and expecting \"● ok\" with no ESC and no double space, red before the strip, and one in tests/configuration.test.ts or jefferson.test.ts showing the cell's planned width counts '● ok' only. Bambadjan: one sentence in the delta's status requirement ('A status's own terminal sequences are stripped; the cell's style colours it') — the paragraph is 431 characters, so it fits under 500 — and the same sentence in D2's statuses bullet. Fixed in the change, not ticketed.",
+      "required_change_ran": false,
+      "severity": "blocking"
+    },
+    {
+      "finding": "defaultForm has no reader. The bare variable's rendering is variables.<name>, and path points both it and byName.base at one function, so the behaviour is right and pinned ($path === $path|base, tests/instrument.test.ts:194) — but the default is now stated in two places and the declared one does nothing, while AGENTS.md instructs authors to set it. A future instrument setting defaultForm to a form other than its variables entry would change nothing and nobody would be told. One home for the fact: variables.<name> is the default a bare variable hands out; byName lists the named forms. Removing the field is the smallest fix and adds no mechanism; wiring it as a consumer would make resolveFormat consult two tables for one value.",
+      "location": "extensions/jefferson/components/instruments/instrument.ts:18-22 (VariableForms.defaultForm); path.ts:29; AGENTS.md:33; design.md D4; specs/statusline/spec.md 'A variable can declare forms' ('one of them the default a bare variable hands out')",
+      "required_change": "Derek: remove defaultForm from VariableForms (and the now one-field wrapper if that is simplest: variableForms: Record<variable, Record<form, VariableForm>>), update path.ts, re-run the suite; no test's assertion changes, the removed-assert count stays 2+1+20. Bambadjan: AGENTS.md:33 reads 'declares variableForms in the same file: the named resolvers for that variable; a bare $name renders variables.name'; D4 and the delta's 'one of them the default a bare variable hands out' become 'the bare variable hands out its variables entry, which may also be named as a form'. Fixed in the change, not ticketed.",
+      "required_change_ran": false,
+      "severity": "major"
+    }
+  ],
+  "later_gates": [
+    "Re-run after Derek's two fixes: suite green at 357 + the new tests; imports.mjs PASS (status.ts gains a host import, which the instrument rule allows); testdiff removed-assert counts unchanged; the probe above renders '● ok'.",
+    "9.3: Joel's live check on this branch — including, now, an extension that sets a coloured status (pi's status-line example) rendering without escape text.",
+    "Archive: specs.sh after the status sentence lands (status paragraph ≤ 500); the two delta sentences merge into the living specs."
+  ],
+  "not_covered": [
+    "The intuitive-source-layout half of the PR beyond the whole-tree checks; it is archived at d9bf511 and was judged at its own gates.",
+    "Windows path semantics and USERPROFILE; not claimed by the design.",
+    "The README raw-image URL, which resolves only after merge to main.",
+    "Live TUI behaviour — 9.3."
+  ],
+  "requirements": [
+    {
+      "evidence": "Reproduced at 04c3a78 with the real parseFormat/resolveFormat over the shipped status declaration and a status of \"\\x1b[32m●\\x1b[0m ok\": the cell text is \" [32m● [0m ok\". Cause: resolveFormat passes every datum value through collapse (format.ts), which maps ESC to a space — the ratified rule for datum text (living spec 'Content that would span more than one line'; tests/format.test.ts:196 'collapse runs before styling so data ESC becomes a space'). pi's example status-line extension sets themed colours and pi's own footer keeps them (footer.js sanitizeStatusText does not touch ESC; truncateToWidth is ANSI-aware). The status instrument is the first datum that routinely carries ANSI, so this is a defect this change introduced: the instrument cannot show the datum it was shipped to show. Valid blocker.",
+      "requirement": "PR review must-fix 1: coloured statuses render as garbage",
+      "status": "must_change"
+    },
+    {
+      "evidence": "rg defaultForm extensions: declared at instrument.ts:20, set at path.ts:29, read nowhere. A bare $path renders through variables.path (the same base function by reference); the equality is pinned behaviourally at tests/instrument.test.ts:194. So the default is spelled twice — variables.path and defaultForm: \"base\" — and one spelling is dead; AGENTS.md:33 tells authors to set it. Derek's standard ('add only what your change consumes') and my implementation-gate rule ('a consumer for every new field') both catch it; I missed it there. Valid; a defect this change introduced, fixed in the change.",
+      "requirement": "Verification suggestion 1: defaultForm is declared and never read",
+      "status": "must_change"
+    },
+    {
+      "evidence": "tests/session-data-feed.test.ts:59-61 sets HOME and asserts os.homedir() returns it. That is the test D3 names as 'the one end-to-end check of the root's wiring', deliberately against the real process; .github/workflows/ci.yml and release.yml run on ubuntu-latest, and the project claims no Windows behaviour. Valid non-blocker; no change.",
+      "requirement": "Verification suggestion 2: a feed test depends on the host's home directory",
+      "status": "met"
+    },
+    {
+      "evidence": "Joel's ruling of 2026-11-10 (owner-rulings.md 'One pull request carries both changes'): the branch is rebased onto intuitive-source-layout, archived at d9bf511 and not merged, and one PR ships both. Out of scope for Validate; it is the ruled shape.",
+      "requirement": "Verification suggestion 3: the PR is wider than this change",
+      "status": "met"
+    },
+    {
+      "evidence": "Agrees with my implementation gate: 47/48 ticked with 9.3 open; suite 357; imports/terminal/tarball/specs PASS. The reporter did not compare testdiff against D8; I did at the implementation gate (2 + 1 + 20, fixtures 0) and scope.sh per group with tasks.md allowed. Nothing to adjudicate beyond the three suggestions.",
+      "requirement": "Verification report: completeness, correctness, coherence, checks",
+      "status": "met"
+    },
+    {
+      "evidence": "README has the three rows, the forms table and the gallery image; ADR 0010 exists; ARCHITECTURE and AGENTS updated (verification report; head is the docs commit). AGENTS.md:33 carries the `{ defaultForm, byName }` wording that finding 2 retires — Bambadjan's one-line follow-up.",
+      "requirement": "Docs pass (D9) landed as the design states",
+      "status": "met"
+    }
+  ],
+  "verdict": "changes_requested"
+}
