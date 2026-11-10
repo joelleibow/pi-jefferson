@@ -3,6 +3,12 @@
 Notes for an agent working in this repository. `ARCHITECTURE.md` describes the parts; this file is the
 handful of things that are easy to get wrong.
 
+## Words
+
+A row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). Never call the statusline
+concept a "module" or a "widget". Where the extension-source-layout spec uses "module" as a term of
+art, it means a source file, and new prose says "source file".
+
 ## Running things
 
 ```bash
