@@ -20,6 +20,7 @@
     "LICENSE"
   ],
   "pi": {
+    "image": "https://raw.githubusercontent.com/joelleibow/pi-jefferson/main/docs/images/jefferson-cosmic-star-dragon.png",
     "extensions": [
       "./extensions/jefferson.ts"
     ]
