@@ -3,13 +3,13 @@ created: 2026-11-10
 x-marbleization:
   working_dir_state: existing_project
   runs:
-    michael: "b95eaad1-4f44-4b23-b99e-89c763d79d54"
+    michael: "3dac3d26-2719-40da-ae6b-7d3f47c71479"
     chidi: "812fa0dd-a61c-4144-b5f2-cb50d527d681"
     eleanor: "961704fe-8f77-4de6-bc8e-9703b76d69ae"
     judge_audit: "958bd7dd-5222-4d00-98b5-a3ee42e073ae"
   gates:
     council_owner: approved
-    design: changes_requested
+    design: approved
     tasks: pending
     implement: pending
     validate: pending
