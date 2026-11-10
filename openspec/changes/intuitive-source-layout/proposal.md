@@ -1,6 +1,6 @@
 # Proposal
 
-Sources are cited as [R] `owner-rulings.md`, [C §n] `research-chidi.md` (its numbered Findings), [E heading] `research-eleanor.md`, [A n] `research-audit.md` (finding number) and [M §n] `michael-orientation.md`. A [R] ruling is binding. Nothing here picks a layout; the council and the design do.
+Sources are cited as [R] `owner-rulings.md`, [C §n] `research-chidi.md` (its numbered Findings), [E heading] `research-eleanor.md`, [A n] `research-audit.md` (finding number) and [M §n] `michael-orientation.md` and [CN] `council.md`, whose "Joel's rulings" are binding like [R]. The layout is Joel's tree [CN, "Joel's rulings" 2]; the design carries it out. Each open question below ends with where it is settled; "D" numbers are `design.md`'s decisions.
 
 ## Why
 
@@ -49,14 +49,20 @@ Of the seven findings in [A], two belong here: finding 1 (the release-job line) 
 
 ## Open questions
 
-These are for the council and the design. None is settled here.
+Settled after the council and Joel's rulings; each names where.
 
 1. How are shared logic and part-specific logic named and grouped under Joel's frame, and what does a reader see in the tree that tells them which is which? Comparable packages stay flat or group by feature, and use one file per item only where each item is a registered tool [C §2, §4]; there is no consensus for small codebases [C §4].
+   **Settled:** Joel's tree [CN]. `components/` holds the parts, `format.ts` and `shipped.ts` sit at `jefferson/`, and the directory rules are in the delta spec ("Imports between the homes run one way") and D1, D6.
 2. Where does the bar go: its own file, or findable by name and header inside the format file? A separate file needs a new export and pin [M §4].
+   **Settled:** its own file, `components/visuals/bar.ts` [CN, Joel's ruling 1]; D5.
 3. Does `visuals/` survive, under a new definition, or is it renamed or dissolved? That decides whether the reader's complaint is the word or the placement [M §3 item 2].
+   **Settled:** the top-level `visuals/` is dissolved [CN]; D1. `components/visuals/` is a new single-file directory.
 4. Is ADR 0005 extended or revised? Moving files out of `visuals/` also makes a sentence in ADR 0007 untrue [M §1].
+   **Settled:** a new ADR revises ADR 0005's `visuals/` bullet and import sentence and keeps ADR 0007 true; ADR 0005's body is not edited [CN]; D10.
 5. How does the paused change's approved design get its paths updated? It cites `startup.ts`, `footer-setup.ts` and the `data/` files, and a rename re-opens a design that passed PL4 [M §2].
+   **Settled:** none of those paths moves, so no re-gate; D11 lists every path the paused change cites and its new path.
 6. Which file does each new directory's membership rule and import rule live in? The living spec requires the change that adds a directory to state both.
+   **Settled:** the delta spec's "The source tree has the ruled homes" and "Imports between the homes run one way", with the reasoning in D1 and D6.
 
 ## Capabilities
 
@@ -66,7 +72,7 @@ None.
 
 ### Modified Capabilities
 
-- `extension-source-layout`: adds the requirements that hold whatever layout is chosen: one file per instrument, the published surface unchanged, and the proof of unchanged behavior. Requirements that depend on the chosen layout wait for the design.
+- `extension-source-layout`: adds one file per instrument, the ruled tree's homes, the import directions between them, the bar's own file, the published surface unchanged and the proof of unchanged behavior. No living requirement names `visuals/` or an old file, so none is modified.
 
 ## Impact
 
