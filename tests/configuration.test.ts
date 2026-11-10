@@ -793,6 +793,21 @@ test("blank declares no default label, so its placeholder and its empty format c
   assert.deepEqual(emptied.rows[0]?.cells.map(cellText), [""], 'a format of "" renders nothing, not a lone label');
 });
 
+test("the branch cell renders its default label, and nothing at all outside a repository", () => {
+  const known = readDocument({ cells: [{ instrument: "branch" }] });
+  assert.equal(known.warning, undefined);
+  assert.deepEqual(known.rows[0]?.cells.map(cellText), ["Branch: main"]);
+
+  const outside = readDocument({ cells: [{ instrument: "branch" }] });
+  assert.deepEqual(
+    outside.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, branch: undefined }, 80, fakeTheme())),
+    [""],
+    "unknown is not an empty string: no label and no gap",
+  );
+  const empty = outside.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, branch: "" }, 80, fakeTheme()));
+  assert.deepEqual(empty, ["Branch: "], "an empty string is a datum, so the bare label renders");
+});
+
 test("a shipped default label precedes a configured format", () => {
   const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, cells: [{ instrument: "path" }] });
   assert.equal(warning, undefined);

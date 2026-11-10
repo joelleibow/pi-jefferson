@@ -40,12 +40,13 @@ const shapes = [
   ["context", ["tokens", "window", "percent"], "$percent/$window"],
   ["tokens", ["input", "output", "cacheRead", "cacheWrite", "totalTokens"], "$totalTokens"],
   ["cost", ["cost"], "$cost"],
+  ["branch", ["branch"], "$branch"],
 ] as const;
 
-/** Every shipped declaration's default label: the six texts, and `blank`'s deliberate absence [D3]. */
+/** Every shipped declaration's default label, and `blank`'s deliberate absence [D3]. */
 const labels = {
   blank: undefined, model: "Model:", thinking: "Thinking:", path: "Path:", context: "Context:",
-  tokens: "Tokens:", cost: "Cost:",
+  tokens: "Tokens:", cost: "Cost:", branch: "Branch:",
 } as const;
 
 function named(name: string): InstrumentDeclaration {
@@ -61,7 +62,7 @@ async function render(name: string, readings: Readings, format?: string): Promis
   return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
 }
 
-test("the seven shipped declarations own their names, variables, defaults and foundational options", () => {
+test("the eight shipped declarations own their names, variables, defaults and foundational options", () => {
   const declared: Record<string, string | undefined> = {};
   const declarations = shapes.map(([name, variables, format]) => {
     const declaration = named(name);
@@ -73,21 +74,24 @@ test("the seven shipped declarations own their names, variables, defaults and fo
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
   });
-  assert.equal(declarations.length, 7);
+  assert.equal(declarations.length, 8);
   assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
   for (const declaration of declarations) assert.equal(declaration.options, blank.options);
   assert.equal(instrumentNamed("blank"), blank);
 });
 
 test("unimplemented and inherited names stay unresolved however often asked", () => {
-  for (const name of ["git", "branch", "nope", "toString", "constructor", "hasOwnProperty", "__proto__"]) {
+  for (const name of ["git", "nope", "toString", "constructor", "hasOwnProperty", "__proto__"]) {
     assert.equal(instrumentNamed(name), undefined, name);
     assert.equal(instrumentNamed(name), undefined, name);
   }
 });
 
 test("every shipped default parses and renders its declared text", async () => {
-  const expected = [DEFAULT_CELL_TEXT, "anthropic/claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson", "43.2%/200k", "0", "$0.000"];
+  const expected = [
+    DEFAULT_CELL_TEXT, "anthropic/claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson",
+    "43.2%/200k", "0", "$0.000", "main",
+  ];
   for (const [index, [name]] of shapes.entries()) {
     assert.equal(await render(name, seed), expected[index], name);
   }
@@ -228,6 +232,12 @@ test("a form with another modifier after it renders the form's text under that m
   assert.equal(await render("path", seed, "$path|absolute|upper"), "/USERS/JOELLEIBOW/PROJECTS/PI-JEFFERSON");
 });
 
+test("branch reads only the branch, and renders the text the host reported", async () => {
+  assert.equal(await render("branch", unreadable({ branch: "main" })), "main");
+  assert.equal(await render("branch", { ...seed, branch: "detached" }), "detached", "a detached HEAD is the text the host reports");
+  assert.equal(await render("branch", unknown), "", "no branch renders nothing");
+});
+
 test("token variables use the four totals fields and cost uses the same totals", async () => {
   const readings = { ...seed, totals: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 } };
   assert.equal(await render("tokens", readings, "$input $output $cacheRead $cacheWrite $totalTokens"), "118 59 23 12 212");
@@ -301,7 +311,7 @@ test("an instrument that does not fill renders the same text at width 0 and at w
     assert.equal(atZero, instrument.render(seed, 200, theme), `${name} does not fill, so the width cannot change its text`);
     measured.push(name);
   }
-  assert.deepEqual(measured, ["model", "thinking", "path", "context", "tokens", "cost"], "six of the seven are measured");
+  assert.deepEqual(measured, ["model", "thinking", "path", "context", "tokens", "cost", "branch"], "seven of the eight are measured");
 
   // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
   const configured = instrumentBindings(new Map([
