@@ -148,9 +148,9 @@ Builds the requirement "Extension statuses are read once per render sample", sce
 
 Group scope: `checks/scope.sh <repo> <base> HEAD extensions/jefferson/data/session-data-store.ts tests/session-data-feed.test.ts`
 
-- [ ] 8.1 Two bound `status` cells rendered through `createFooter` ask the host once and read the same text. The store reads the statuses once per `sample()` and the footer samples once per render, so neither cell reads twice. Verify: `node --test --test-name-pattern='two status cells in one render' tests/session-data-feed.test.ts`. Red: the rejected shape "one sample per cell" (the cell view calling `sampleReadings()`) fails with "one render asks the host once", actual `5`, expected `1`. Green: one read, both cells reading `3 tasks idle`. Touches: `tests/session-data-feed.test.ts` (`data/session-data-store.ts` only if the single sample per render does not already hold; it does after group 1). Design: D2, D8.
+- [x] 8.1 Two bound `status` cells rendered through `createFooter` ask the host once and read the same text. The store reads the statuses once per `sample()` and the footer samples once per render, so neither cell reads twice. Verify: `node --test --test-name-pattern='two status cells in one render' tests/session-data-feed.test.ts`. Red: the rejected shape "one sample per cell" (the cell view calling `sampleReadings()`) fails with "one render asks the host once", actual `5`, expected `1`. Green: one read, both cells reading `3 tasks idle`. Touches: `tests/session-data-feed.test.ts` (`data/session-data-store.ts` only if the single sample per render does not already hold; it does after group 1). Design: D2, D8.
 
-- [ ] 8.2 The group is green on the suite. Verify: `checks/suite.sh <repo> 357`. Design: D8.
+- [x] 8.2 The group is green on the suite. Verify: `checks/suite.sh <repo> 357`. Design: D8.
 
 ## 9. The change is ready to archive
 

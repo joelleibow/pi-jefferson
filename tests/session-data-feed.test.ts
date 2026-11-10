@@ -244,3 +244,34 @@ test("statuses are read on every sample and an empty set reads unknown", () => {
   footer.statuses.clear();
   assert.equal(store.sample().statuses, undefined, "statuses cleared by the host read unknown");
 });
+
+test("two status cells in one render ask the host once and read the same text", async () => {
+  const { store, attachFooterData } = feed();
+  const footer = fakeFooterData({ statuses: [["a", "3 tasks"]] });
+  attachFooterData(footer.source);
+
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { createFooter } = await import("../extensions/jefferson/components/row/row-renderer.ts");
+  const { instrumentNamed } = await import("../extensions/jefferson/shipped.ts");
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  const { fakeTheme } = await import("./fake-theme.ts");
+
+  const declaration = instrumentNamed("status");
+  assert.ok(declaration);
+  const cell = instrumentBindings()(declaration);
+  const created = createFooter(
+    [{
+      id: "row-0",
+      distribution: "equal",
+      cells: [{ instrument: cell, align: "left" }, { instrument: cell, align: "left" }],
+    }],
+    () => store.sample(),
+    fakeTheme(),
+    0,
+  );
+
+  const before = footer.counts.statusReads;
+  const line = created.render(80)[0] ?? "";
+  assert.equal(footer.counts.statusReads - before, 1, "one render asks the host once");
+  assert.deepEqual(stripTerminalSequences(line).match(/Status: 3 tasks/g), ["Status: 3 tasks", "Status: 3 tasks"]);
+});
