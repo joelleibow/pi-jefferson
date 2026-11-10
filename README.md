@@ -221,7 +221,7 @@ manifest configured that way.
 `toLower` perform every string mutation a modifier makes. pi installs a package's dependencies when
 it installs the package, so it arrives with this one rather than shipping in the tarball; why this
 build and not the CommonJS one is
-[ADR 0004](docs/adr/0004-string-mutations-come-from-lodash-es.md).
+[ADR 0004](https://github.com/joelleibow/pi-jefferson/blob/main/docs/adr/0004-string-mutations-come-from-lodash-es.md).
 
 ### A workstation cannot publish
 
