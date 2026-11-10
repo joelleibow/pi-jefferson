@@ -140,14 +140,24 @@ export function drawBar(barWidth: number, percent: number | null, style: ThemeSt
 
 `format.ts` computes `barWidth` and `percent`, calls `drawBar`, and applies `styledPiece(part.text, part.style, theme)` to each part, joining them. The bar takes its width and its percent as plain numbers, so it needs no theme, no pi-tui and no other file of the package. It imports only the `ThemeStyle` type from the host package `format.ts:2` already imports it from. That is what "independent of anything else's responsibility" requires [CN, ruling 1], and it is why the bar returns parts rather than calling `styledPiece`: calling it would import `format.ts` from `bar.ts` while `format.ts` imports `bar.ts`, a cycle. The parameter keeps the name `barWidth`, and `filled` and `filledStyle` move verbatim, so the lines stay recognizable in the diff.
 
-**Byte-for-byte.** The old branch built `styledPiece(filledText, filledStyle, theme) + styledPiece(emptyText, {...style, dim: true}, theme)`. The new one calls the same function with the same three arguments per part, in the same order, and concatenates. The text is the same by construction, and the existing tests prove it by running (D7 item 1). `tests/format.test.ts:138-145` asserts the colors at 70, 70.1, 90 and 90.1, so the rule for commit 3 is a mutation check that shows it: Derek changes `WARNING_PERCENT` to 71 and `ERROR_PERCENT` to 91 and shows that test fail, then reverts.
+**Byte-for-byte.** The old branch built `styledPiece(filledText, filledStyle, theme) + styledPiece(emptyText, {...style, dim: true}, theme)`. The new one calls the same function with the same three arguments per part, in the same order, and concatenates. The text is the same by construction, and the existing tests prove it by running (D7 item 1). `tests/format.test.ts:139-146` (declared at `:139`, assertion at `:144`, after commit 2's import split; `:138-145` on the baseline) asserts the colors at 70, 70.1, 90 and 90.1, so the rule for commit 3 is a mutation check that shows it: Derek changes `WARNING_PERCENT` to 71 and `ERROR_PERCENT` to 91 and shows that test fail, then reverts.
 
-The export grows by one name, `drawBar`, pinned with the others (D3). The multiset in D7 is taken over lines with leading whitespace stripped, because the moved `filled` and `filledStyle` lines change indentation (four spaces inside `resolveFormat`'s `if`, two inside `drawBar`). Commit 3 differs from commit 2 in these lines, by category, and the exact added text is fixed at the tasks gate:
+The export grows by one name, `drawBar`, pinned with the others (D3). The multiset in D7 is taken over lines with leading whitespace stripped, because the moved `filled` and `filledStyle` lines change indentation (four spaces inside `resolveFormat`'s `if`, two inside `drawBar`). Commit 3 differs from commit 2 in these lines, by category, and the exact added text, copied from the red/green run [`redgreen-derek.md`, "Commit 3's exact lines"], is fixed here:
 
 - **Required identical after trimming:** `WARNING_PERCENT`, `ERROR_PERCENT`, `filled`, and both lines of `filledStyle`.
-- **Removed from `format.ts`:** the two lines of the old `bar = styledPiece(...) + styledPiece(...)` assignment (`:204-205`).
-- **Added in `bar.ts`:** the `BarPart` type lines, `drawBar`'s signature, the closing braces of the function body and its `return` of the two parts.
-- **Added in `format.ts`:** the call that receives the two parts and the two lines that apply `styledPiece` to them.
+- **Removed from `format.ts`** (2 lines, the old assignment at `:204-205`, trimmed):
+  - `bar = styledPiece("█".repeat(filled), filledStyle, theme)`
+  - `+ styledPiece("░".repeat(barWidth - filled), { ...style, dim: true }, theme);`
+- **Added in `bar.ts`** (10 lines, trimmed):
+  - `export interface BarPart {`, `readonly text: string;`, `readonly style: ThemeStyle;` and a closing `}`
+  - `export function drawBar(barWidth: number, percent: number | null, style: ThemeStyle): [BarPart, BarPart] {` and its closing `}`
+  - `return [`, `{ text: "█".repeat(filled), style: filledStyle },`, `{ text: "░".repeat(barWidth - filled), style: { ...style, dim: true } },` and `];`
+- **Added in `format.ts`** (3 lines, trimmed):
+  - `bar = drawBar(barWidth, percent, style)`
+  - `.map(part => styledPiece(part.text, part.style, theme))`
+  - `.join("");`
+
+That is 13 added and 2 removed: 944 → 955 lines. Comment, import and blank lines are outside the multiset.
 
 Drawing is the glyphs, the filled portion and the colors. Applying the theme to a returned part is the format language's styling of every piece, the same call each of them gets [SPEC, "The bar has its own file"].
 
@@ -189,15 +199,25 @@ Between directories, `format.ts` and `components/instruments/` import each other
 
 ### D7. The proof of no behavior change
 
-Source: [M §2], carried into the delta spec's "The change carries the proof…". Each item is output attached to the pull request. The baseline [M, measured at `3bfd157`]: 317 tests, 20 edges, 946 lines, prefix `133e899b93fcb35d` over the lines as written, and `76f7eb251a60fa0e` over the same lines with leading whitespace stripped [M, PL4 verdict `michael-pl4.json`, measured]. The checks below use the stripped hash.
+Source: [M §2], carried into the delta spec's "The change carries the proof…". Each item is output attached to the pull request. The filter is [M §2]'s command plus a leading-whitespace trim, plus one pattern the red/green run added by the conductor's ruling: `^\s*}\s*from\s+"`, so the closing line of a wrapped import counts as an import [`redgreen-derek.md`, "Where the run contradicts the design" 1]. Without it, a specifier-only edit to `configuration.ts`'s wrapped import reads as a changed line. The baseline [M, measured at `3bfd157`]: 317 tests and 20 edges. The checks below use the script `checks/multiset.sh`.
 
 1. **Tests.** `pnpm typecheck` and `pnpm test` pass with 317 of 317. `git diff -U0 main -- tests/` holds only specifier lines, new import lines for relocated names, and the pin.
 2. **Export union.** The sorted union of runtime exports is the 22 names plus the 9 in D3 and D5, and nothing else.
-3. **Line multiset.** The sorted multiset of shipped non-import, non-comment lines, by the command in [M §2] with `| sed 's/^[[:space:]]*//'` added before `sort`. Expected after each commit:
-   - Commit 1 (moves): hash `76f7eb251a60fa0e`; the untrimmed `133e899b93fcb35d` also holds, as a move changes no line.
-   - Commit 2 (split): `76f7eb251a60fa0e` after also stripping a leading `export ` from each line. The eight new exports are the only edits; the check shows it.
+3. **Line multiset.** The sorted multiset of shipped non-import, non-comment lines, by the command in [M §2] with the wrapped-import pattern above and `| sed 's/^[[:space:]]*//'` before `sort`. Expected, measured by the run:
+
+   | Point | Lines | Hash |
+   |---|---|---|
+   | Baseline, trimmed | 944 | `37f605345cc24d3a` |
+   | Baseline, export-stripped (also `| sed 's/^export //'`) | 944 | `5266812335e73621` |
+   | Commit 3 | 944 → 955 | `529431e8fb7a9fe6`, judged by the D5 categories |
+   | Commit 4 | 954 | `d1a326804f97195c` |
+
+   - Commit 1 (moves): equals the trimmed baseline, `37f605345cc24d3a`, with no permitted difference.
+   - Commit 2 (split): equals the export-stripped baseline, `5266812335e73621`, with no permitted difference. The eight new exports are the only edits and the stripping removes them.
    - Commit 3 (bar): the differences listed by category in D5, and only them.
-   - Commit 4 (finding 7): the removed alias line or lines, and nothing else.
+   - Commit 4 (finding 7): the one removed line, `type Readings = Parameters<Instrument["render"]>[0];`, and nothing else.
+
+   The values in `michael-pl4-2.json` (`76f7eb251a60fa0e`, `09563e1f7ed0b8c7`) and the untrimmed `133e899b93fcb35d` of the earlier measurement are superseded by this table. That verdict is a recorded record and stays unedited; this paragraph is where it is superseded.
 4. **Import graph.** The script shown catching three planted mistakes (a cycle, an import of the entry, a specifier without `.ts`), then run on the real tree: no cycle, no import of the entry, every specifier ends in `.ts`, and the edge list equals D6's or each difference is explained [SPEC, living "The import graph is shown acyclic"].
 5. **Tarball.** `pnpm pack --dry-run --json` before the pull request, because a merge releases [M §2]: every shipped source file under `extensions/`, plus `package.json`, `README.md` and `LICENSE`, and nothing else. Today's 12 source files become 22: ten are new (`bar`, `shipped`, `compact-count` and the seven instrument files), and `instrument.ts` stays as the contract.
 6. **`lodash-es`.** `rg -n lodash extensions/` shows only per-function `lodash-es/<fn>.js` imports in `format.ts` [ADR 0004].
@@ -257,7 +277,7 @@ Not tasks [Michael's tasks gate]. Bambadjan writes them after the implementation
 
 - **[Risk] The split gives up `git log --follow` for each instrument's lines** [M §2]. → Commit 1 moves before commit 2 splits, so the contract keeps its history. The per-instrument lines lose theirs permanently; the squash-merge keeps no per-commit history anyway.
 - **[Risk] A moved line is changed in passing and the multiset hides it.** → D7 item 3 states the permitted difference after each commit.
-- **[Risk] The bar drifts.** → The threshold test at `tests/format.test.ts:138-145` and the mutation check in D5.
+- **[Risk] The bar drifts.** → The threshold test at `tests/format.test.ts:139-146` and the mutation check in D5.
 - **[Risk] Eight new exports widen the surface.** → D3 argues each against "Cell content comes from an instrument", pins each, and scans each name.
 - **[Risk] `components/visuals/` is a single-file directory.** → Joel's call; D10 records it. A reader can reverse it by moving one file.
 - **[Trade-off] More files and directories for a footer that has seven instruments.** Michael's challenge was that this is ceremony unless each move answers a reader's search [M §4]. D2 gives that answer for each. Joel chose the granularity: "A bit more granularity and not as generalized" [CN, ruling 2].
