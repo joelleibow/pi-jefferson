@@ -40,26 +40,26 @@ Under `extensions/jefferson/`, `format.ts`, `shipped.ts`, `startup.ts`, `configu
 
 ### Requirement: Imports between the homes run one way
 
-`data/` MUST import no source file outside itself. A file in `components/row/` MAY import its own directory, the types of `data/` and the type `instrument.ts` defines. A file in `components/instruments/` MAY import its own directory, the types of `data/` and, for `instrument-binding.ts` only, `format.ts`. Only `shipped.ts` MUST import the files that declare instruments. Source: `owner-rulings.md` (2026-11-06, imports); `shipped.ts` avoids a cycle with the contract (`council.md`).
+`data/` MUST import no source file outside itself. A file in `components/row/` MAY import its own directory, the types of `data/` and the type `instrument.ts` defines. No instrument's file MUST import `shipped.ts`, `format.ts`, `components/row/` or another instrument's file, and `shipped.ts` MUST import every instrument's file. Source: `owner-rulings.md` (2026-11-06, imports); `shipped.ts` avoids a cycle with the contract (`council.md`).
 
 #### Scenario: An instrument file imports
 
-- **WHEN** the imports of one instrument's file are listed
-- **THEN** each names `instrument.ts`, `compact-count.ts` or a type of `data/`, and none names `shipped.ts`, `format.ts` or `components/row/`
+- **WHEN** the local imports of one instrument's file are listed
+- **THEN** each names `instrument.ts`, `compact-count.ts` or a type of `data/`, and none names `shipped.ts`, `format.ts`, `components/row/` or another instrument
 
 #### Scenario: A row file imports
 
 - **WHEN** the imports of a file in `components/row/` are listed
 - **THEN** none names `format.ts`, `shipped.ts` or an instrument's file
 
-#### Scenario: Only the table names the instruments
+#### Scenario: Who names the instruments
 
 - **WHEN** the importers of an instrument's file are listed
-- **THEN** only `shipped.ts` and the tests appear
+- **THEN** only `shipped.ts`, `configuration.ts` (for the fallback `blank`) and the tests appear
 
 ### Requirement: The bar has its own file
 
-The bar's drawing, its filled-portion rule and its threshold colors MUST live in `components/visuals/bar.ts` and nowhere else, and that file MUST import no other source file of this package. `format.ts` MUST still parse `$bar` and place the bar, and MUST NOT draw it. Output MUST equal the output before the change. Source: `council.md`, Joel's bar ruling (an instrument mixes it in; it must stand independent).
+The bar's drawing (glyphs, filled portion, threshold colors) MUST live in `components/visuals/bar.ts` and nowhere else, and that file MUST import no other source file of this package. `format.ts` MUST still parse `$bar`, place the bar and apply the theme to the parts it returns, as it does every piece. Output MUST equal the output before. Source: `council.md`, Joel's bar ruling (an instrument mixes it in; it must stand independent).
 
 #### Scenario: Looking for the bar
 
@@ -103,3 +103,43 @@ The change MUST attach the output of each check its design names to show behavio
 
 - **WHEN** the multiset of shipped non-import, non-comment lines differs from the baseline
 - **THEN** the design names each difference and its reason, or the change does not conform
+
+## MODIFIED Requirements
+
+### Requirement: Each responsibility has a home recognizable from its path
+
+Startup, configuration loading, footer setup, data and its updates, and the parts with the logic they share MUST each have a stated home, and each home's path MUST name its responsibility. The parts live under `components/`, and the shared logic is `format.ts` and `shipped.ts`. A file holding more than one of the five MUST be named in the change's design, which states whether it is separated or why it stays and what would change it. Source: `owner-rulings.md`; `council.md`, Joel's tree.
+
+#### Scenario: Looking for a responsibility
+
+- **WHEN** a reader wants where the config paths are resolved, where the footer is installed, where session data is kept, where the session-start lifecycle and the `/jefferson` command are registered (startup), or where the host's session and events reach the session data (data)
+- **THEN** the path alone leads to one home for each
+
+#### Scenario: Looking for a part or its shared logic
+
+- **WHEN** a reader wants an instrument, the row, the bar, the format language, or the list of shipped instruments
+- **THEN** the path alone leads to `components/instruments/`, `components/row/`, `components/visuals/`, `format.ts` or `shipped.ts`
+
+#### Scenario: A file holding two responsibilities
+
+- **WHEN** a shipped source file holds code of more than one of the five
+- **THEN** the design names it and states the seam, or states why the file stays whole
+
+#### Scenario: A grouping directory
+
+- **WHEN** the restructure introduces a directory to group files
+- **THEN** the design states, as "Responsibility is inferable from path" requires, what belongs in it and what may import what
+
+### Requirement: Data and its updates do not depend on visuals or process flow
+
+The home of data and its updates MUST NOT import a source file from `components/`, `format.ts`, `shipped.ts`, footer setup, startup or configuration loading. Files in those homes MAY import its types. Source: `owner-rulings.md` (data and updates kept apart from visuals); today the store imports no local file and `Readings` flows to the visuals as a type only (`research-eleanor.md` §3).
+
+#### Scenario: Imports out of the data home
+
+- **WHEN** the imports of the data home are listed
+- **THEN** none names a file in another home of this change
+
+#### Scenario: Visuals reading data types
+
+- **WHEN** a file in `components/` or `format.ts` imports a type the data home defines
+- **THEN** the tree conforms

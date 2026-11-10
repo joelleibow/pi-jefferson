@@ -72,13 +72,13 @@ None.
 
 ### Modified Capabilities
 
-- `extension-source-layout`: adds one file per instrument, the ruled tree's homes, the import directions between them, the bar's own file, the published surface unchanged and the proof of unchanged behavior. No living requirement names `visuals/` or an old file, so none is modified.
+- `extension-source-layout`: adds one file per instrument, the ruled tree's homes, the import directions between them, the bar's own file, the published surface unchanged and the proof of unchanged behavior. It modifies two living requirements that named "visuals and process flow" as a home, which no path now names: "Each responsibility has a home recognizable from its path" and "Data and its updates do not depend on visuals or process flow".
 
 ## Impact
 
 - **Code:** shipped source under `extensions/`, and `tests/` for import specifiers and the export-surface pin only [M §2].
 - **Docs:** comments and documents that name paths go stale: `AGENTS.md`, `ARCHITECTURE.md`, `README.md`, ADR 0007 and ADR 0005. The docs pass fixes them, not a task [M §2].
 - **CI and release:** `release.yml` gains one line [A 1]. `ci.yml`, `package.json` and `tsconfig.json` do not change [E What pins the layout].
-- **Published version:** every merge to `main` releases, so this lands as a patch release no user can observe [M §3 item 4]. The release label is Joel's call.
+- **Published version:** every merge to `main` releases, so this lands as a patch release no user can observe [M §3 item 4]. The release label is a patch, unlabelled, the conductor's call [CN, "Synthesis"].
 - **Paused change:** `instruments-for-every-datum` rebases without conflicts, since it differs from `main` only under `openspec/changes/` [M §2].
 - **Acceptance:** "intuitive" has no test. Joel's reading of the tree, and his own `/reload`, `/jefferson` and footer check in pi, are his to observe [M §3 item 3].
