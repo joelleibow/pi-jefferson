@@ -1,7 +1,17 @@
 /** What keeps the session data current: the seed, the readers of the host's session, and its pushes. */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { createSessionDataStore, type SessionDataStore } from "./session-data-store.ts";
+import { createSessionDataStore, type Reading, type SessionDataStore } from "./session-data-store.ts";
+
+/** The home directory pi's own footer reads, from the process pi runs in; unknown when there is none. */
+function homeDirectory(readHome: () => string): Reading {
+  try {
+    return readHome() || undefined;
+  } catch {
+    // A failed password-database lookup must not stop the install; the path stays absolute.
+    return undefined;
+  }
+}
 
 /**
  * Create this install's store from the host's context, subscribe to the events that move it, and
@@ -11,6 +21,7 @@ export function feedSessionData(
   pi: ExtensionAPI,
   ctx: ExtensionContext,
   requestRender: () => void,
+  readHome: () => string,
 ): { store: SessionDataStore; release: () => void } {
   // Seeded from the context because the host reports no selection when it restores a session.
   const store = createSessionDataStore({
@@ -19,6 +30,8 @@ export function feedSessionData(
       model: ctx.model?.id,
       thinkingLevel: ctx.thinkingLevel,
       cwd: ctx.cwd,
+      home: homeDirectory(readHome),
+      sessionName: undefined,
     },
     requestRender,
     readUsage: () => ({

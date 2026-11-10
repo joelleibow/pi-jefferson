@@ -9,13 +9,16 @@ import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
-  cwd: "/Users/joelleibow/Projects/pi-jefferson",
+  cwd: "/Users/joelleibow/Projects/pi-jefferson", home: "/Users/joelleibow",
+  branch: "main", sessionName: "refactor footer",
+  statuses: new Map([["b", "idle"], ["a", "3 tasks"]]),
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
 };
 const unknown: Readings = {
   provider: undefined, model: undefined, thinkingLevel: undefined,
-  cwd: undefined, contextUsage: undefined, totals: undefined,
+  cwd: undefined, home: undefined, branch: undefined, sessionName: undefined, statuses: undefined,
+  contextUsage: undefined, totals: undefined,
 };
 
 /** Any datum this declaration does not display must remain unread. */

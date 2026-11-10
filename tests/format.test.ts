@@ -13,7 +13,8 @@ import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
-  cwd: "/Users/joelleibow/Projects/pi-jefferson",
+  cwd: "/Users/joelleibow/Projects/pi-jefferson", home: "/Users/joelleibow",
+  branch: "main", sessionName: "refactor footer", statuses: undefined,
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
 };

@@ -21,6 +21,8 @@ import { fakeTheme } from "./fake-theme.ts";
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high", cwd: "/a/pi-jefferson",
+  home: "/a", branch: "main", sessionName: "refactor footer",
+  statuses: new Map([["b", "idle"], ["a", "3 tasks"]]),
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0, cost: 0.123 },
 };
@@ -768,7 +770,8 @@ test("an empty configured label removes a shipped default and its gap", () => {
 test("a shipped default label does not render over an unknown datum", () => {
   const unknown: Readings = {
     provider: undefined, model: undefined, thinkingLevel: undefined,
-    cwd: undefined, contextUsage: undefined, totals: undefined,
+    cwd: undefined, home: undefined, branch: undefined, sessionName: undefined, statuses: undefined,
+    contextUsage: undefined, totals: undefined,
   };
   for (const name of ["path", "context", "tokens", "cost", "model"]) {
     const { rows, warning } = readDocument({ cells: [{ instrument: name }] });
