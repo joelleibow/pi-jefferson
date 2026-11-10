@@ -321,3 +321,9 @@ intuitive-source-layout-spike
 And the guards still green at `f32c55f`: `suite: 317 passed, 0 failed (expected 317) PASS`, `lodash PASS`, `graph 40 edges = D6 PASS`, `multiset 954 lines, d1a326804f97195c PASS`.
 
 One thing to carry into tasks.md: the pin's red at 2.1 has two distinct causes — the contract's key change (`:347`, an assertion) and the not-yet-existing files (`ERR_MODULE_NOT_FOUND`, only reachable once the first passes). A task that says "the pin goes red" is true, but the worker will see the assertion first and may mistake it for the whole proof.
+
+## Third run: the rename check's planted red (Michael, at the tasks gate)
+
+Michael ran these against a scratch clone of the spike at `f5ab4d6` during his PL7 pass (run `fee5359a-a03e-4606-a40f-60c19ad95cd7`, `michael-pl7.json` finding 1). Transcribed verbatim from that finding.
+
+> `renames.sh` is the one check with no planted red. [RG §7] records only its green, so Joel's ruling that every check runs red and green before tasks.md is final is not met, and 1.1's claim that 1.4 supplies a red does not hold. I ran the red on a scratch clone of the spike at f5ab4d6: a move whose target gains 40 lines (`row.ts` padded) prints `NOT FOLLOWED AS A RENAME A extensions/jefferson/components/row/row.ts`, `NOT FOLLOWED AS A RENAME D extensions/jefferson/visuals/row.ts`, `RENAME FAIL`; deleting `width-plan.ts` and adding an unrelated `plan.ts` prints the same two lines for those paths and `RENAME FAIL`. The clean spike's commit 1 then reads `renames: 6 … PASS`.
