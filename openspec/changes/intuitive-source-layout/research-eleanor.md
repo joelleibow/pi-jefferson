@@ -88,3 +88,98 @@ Ran `pnpm typecheck && pnpm test`: passed. TypeScript emitted no errors; Node te
 - The paused change design on branch `instruments-for-every-datum` specifies branch/session/status instruments, four additional store datums, footer-data attachment through feed, and variable forms in the format language; it is not implemented in this checked-out source. The design states its baseline as 317 passing, agreeing with this run.
 - The local import graph was assembled from current source import statements and visually checked for cycles; no automated graph checker was run. CI has no standing cycle check, as ADR 0005 notes.
 - `openspec instructions research --change intuitive-source-layout --json` returned the markdown template and wildcard output path. The requested authoritative destination `research-eleanor.md` was used instead of its unresolved `research-*.md` path.
+
+## Addendum 1 — the bar and the instrument split
+
+Evidence below is from tree `92f5d9d`; source locations use that tree's line numbers.
+
+### 1. Bar declarations in `visuals/format.ts`
+
+- `FormatSegment` at `extensions/jefferson/visuals/format.ts:12-15` has the variant `{ kind: "bar" }`; it carries no width or percent.
+- `WARNING_PERCENT` at `:37` is `70`; `ERROR_PERCENT` at `:38` is `90`.
+- The bar drawing is the local `bar` string and its branch in `resolveFormat` at `:196-206`; `filled` at `:201` computes the filled portion, and `filledStyle` at `:202-203` selects threshold foregrounds.
+
+### 2. How the bar gets width, percent, and color
+
+`resolveFormat` receives `width` as a parameter (signature `extensions/jefferson/visuals/format.ts:177-184`), and reads the percent by calling `declaration.bar!(readings)` at `:200`. It does not read percent from a `Readings` field directly, nor receive percent as a parameter. The declaration's `bar` resolver may itself read `Readings` (the context declaration does so; see `visuals/instrument.ts:88`). Width is the remaining cell width after measuring non-bar pieces with `visibleWidth`.
+
+Threshold color selection constructs `ThemeStyle` objects (`fg: "error"` / `fg: "warning"`); it does not call a theme color-selection method. `styledPiece` eventually calls `theme.style` when style is nonempty.
+
+Whole bar branch (`format.ts:196-206`):
+
+```ts
+  let bar = "";
+  if (segments.some(segment => segment.kind === "bar")) {
+    const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);
+    const barWidth = Math.max(0, width - nonBar);
+    const percent = declaration.bar!(readings);
+    const filled = percent === null ? 0 : Math.min(barWidth, Math.floor((percent / 100) * barWidth));
+    const filledStyle: ThemeStyle = percent !== null && percent > ERROR_PERCENT ? { ...style, fg: "error" }
+      : percent !== null && percent > WARNING_PERCENT ? { ...style, fg: "warning" } : style;
+    bar = styledPiece("█".repeat(filled), filledStyle, theme)
+      + styledPiece("░".repeat(barWidth - filled), { ...style, dim: true }, theme);
+  }
+```
+
+Function signatures used by this branch:
+
+```ts
+// pi-tui import; format.ts:3
+visibleWidth(text: string): number
+
+// format.ts:165
+function styledPiece(text: string, style: ThemeStyle, theme: Theme): string
+
+// InstrumentDeclaration field; instrument.ts:19
+bar?: (readings: Readings) => number | null
+```
+
+The declaration of `visibleWidth` is from pi-tui, not defined locally in this tree. `resolveFormat`'s complete signature is at `format.ts:177-184`.
+
+### 3. Fill rule and declaration `bar`
+
+The fill rule lives in `extensions/jefferson/visuals/instrument-binding.ts:32`: `fills: declaration.fills === true || segments.some(segment => segment.kind === "bar")`. It examines the parsed segment list produced by `parseFormat` at `:21`; it does not call a format function at the fill expression itself. `parseFormat` is imported from `format.ts` at `instrument-binding.ts:5` and is called at `:21` when no configured segments are supplied.
+
+`InstrumentDeclaration.bar` is an optional resolver `(readings: Readings) => number | null`, declared at `extensions/jefferson/visuals/instrument.ts:19`. `parseFormat` checks its presence to permit `$bar` at `format.ts:68`; `resolveFormat` invokes it to get the percent at `format.ts:200`. The context declaration supplies it at `instrument.ts:88`.
+
+### 4. Dependencies of the drawing
+
+The bar branch itself uses `visibleWidth` imported from `@earendil-works/pi-tui` (`format.ts:3`), `styledPiece` (local, `:165-168`), the `ThemeStyle` type and `Theme` value passed to the function (import at `:2`, function parameter at `:183`), and the two threshold constants (`:37-38`). It also uses ordinary `Math`, string `repeat`, `pieces`, `width`, `style`, `declaration.bar`, and `readings`.
+
+It does not use `collapse`; collapse is used earlier while resolving values/format (`:40`, `:189`). It does not use `parseColor` or the lodash imports in its branch. The drawing does not need other format-language declarations such as `MODIFIERS`, `parseFormat`, `FormatSegment`, or `mergedStyle`. Thus the bar drawing's direct behavior needs pi-tui's `visibleWidth` and the theme styling call (`theme.style` inside `styledPiece`), along with its input values and style data; it is not wholly dependent only on pi-tui and theme because it reads `declaration.bar` and local thresholds/styles.
+
+### 5. Seven instrument declarations and shared declarations
+
+Private helpers/constants and uses, from `extensions/jefferson/visuals/instrument.ts`:
+
+| Instrument | Exported today? | Shared declarations it uses | Other private dependencies |
+|---|---|---|---|
+| `blank` (`:42-48`) | Yes | `DEFAULT_CELL_TEXT` (`:7-8`), `FOUNDATIONAL_OPTIONS` (`:28`) | None; `fills: true` |
+| `model` (`:50-56`) | No | `FOUNDATIONAL_OPTIONS` | None |
+| `thinking` (`:64-71`) | No | `FOUNDATIONAL_OPTIONS`, `THINKING_FG` (`:59-62`) | None; `THINKING_FG` is consulted by `variableFg` |
+| `path` (`:73-79`) | No | `FOUNDATIONAL_OPTIONS` | imported `basename` (`:2`) |
+| `context` (`:81-92`) | No | `FOUNDATIONAL_OPTIONS`, `compactCount` (`:34-40`) | `bar` resolver at `:88` supplies `contextUsage?.percent ?? null`; percent formatting uses `toFixed` |
+| `tokens` (`:94-106`) | No | `FOUNDATIONAL_OPTIONS`, `compactCount` | Reads totals fields; all five variables use `compactCount` |
+| `cost` (`:108-114`) | No | `FOUNDATIONAL_OPTIONS` | Formats `totals.cost` with `toFixed(3)` |
+
+`DEFAULT_CELL_TEXT` is exported; it is used by `blank` and externally by tests. `FOUNDATIONAL_OPTIONS`, `THOUSAND`, `MILLION`, `DECIMAL_THOUSANDS_LIMIT`, `DECIMAL_MILLIONS_LIMIT`, `compactCount`, `THINKING_FG`, and the six named declarations `model`, `thinking`, `path`, `context`, `tokens`, `cost` are private. `blank` and `instrumentNamed` are exported; `Instrument` and `InstrumentDeclaration` are exported types. `SHIPPED` (`:116-118`) is private and collects all seven declarations; exported `instrumentNamed` (`:120-122`) reads it.
+
+Shared across more than one instrument: `FOUNDATIONAL_OPTIONS` is used by all seven. `compactCount` is shared by `context` and `tokens`. `DEFAULT_CELL_TEXT` is used only by `blank`; `THINKING_FG` only by `thinking`; the `bar` field only by `context` among these seven.
+
+### 6. Export-key pin in `tests/jefferson.test.ts`
+
+The test at `tests/jefferson.test.ts:315-370` pins exact sorted keys via `Object.keys(...).sort()` for these files:
+
+| Imported file | Exact keys asserted |
+|---|---|
+| `extensions/jefferson.ts` (`:316-317`) | `VERSION`, `default` |
+| `extensions/jefferson/visuals/row-renderer.ts` (`:319-320`) | `createFooter` |
+| `extensions/jefferson/configuration.ts` (`:322-326`) | `DEFAULT_CELLS`, `MAX_CELLS`, `configurationPaths`, `readConfiguration` |
+| `extensions/jefferson/visuals/row.ts` (`:328-329`) | `ALIGNMENTS`, `DISTRIBUTIONS` |
+| `extensions/jefferson/visuals/width-plan.ts` (`:331-332`) | `planRow` |
+| `extensions/jefferson/visuals/instrument-binding.ts` (`:334-335`) | `instrumentBindings` |
+| `extensions/jefferson/data/session-data-feed.ts` (`:337-338`) | `feedSessionData` |
+| `extensions/jefferson/footer-setup.ts` (`:340-341`) | `installFooter` |
+| `extensions/jefferson/startup.ts` (`:343-344`) | `startUp` |
+
+It imports `instrument.ts`, `session-data-store.ts`, and `format.ts` at `:346-348`, but does **not** assert exact keys for them. Instead it scans all keys of those three and of `row.ts`, binding, feed, footer setup, and startup at `:349-363`, rejecting names matching `/register|supply|contribute/i`. A further check at `:365-370` snapshots instrument/store key lists before and after unresolved `instrumentNamed("nope")` lookups and asserts the lists stay unchanged; that is a stability check, not an explicit exact-key list.
