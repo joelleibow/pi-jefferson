@@ -819,6 +819,20 @@ test("the session cell renders its default label, and nothing at all for an unna
   );
 });
 
+test("the status cell renders its default label over the statuses, and nothing over none", () => {
+  const set = readDocument({ cells: [{ instrument: "status" }] });
+  assert.equal(set.warning, undefined);
+  assert.deepEqual(set.rows[0]?.cells.map(cellText), ["Status: 3 tasks idle"]);
+  const none = readDocument({ cells: [{ instrument: "status" }] });
+  assert.deepEqual(
+    none.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, statuses: undefined }, 80, fakeTheme())),
+    [""],
+    "no statuses means no label and no gap",
+  );
+  const blankText = none.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, statuses: new Map([["a", " \n "]]) }, 80, fakeTheme()));
+  assert.deepEqual(blankText, [""], "a status that collapses to nothing renders nothing, as with no statuses");
+});
+
 test("a shipped default label precedes a configured format", () => {
   const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, cells: [{ instrument: "path" }] });
   assert.equal(warning, undefined);

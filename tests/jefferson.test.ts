@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -325,76 +325,47 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
 });
 
 test("the exported surface offers no way to supply or replace cell content", async () => {
-  const entry = await import("../extensions/jefferson.ts");
-  assert.deepEqual(Object.keys(entry).sort(), ["VERSION", "default"]);
+  // One row per shipped source file that holds an export: the file, and its exact runtime keys.
+  const pinned: Array<[string, string[]]> = [
+    ["../extensions/jefferson.ts", ["VERSION", "default"]],
+    ["../extensions/jefferson/components/row/row-renderer.ts", ["createFooter"]],
+    [
+      "../extensions/jefferson/configuration.ts",
+      ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
+    ],
+    ["../extensions/jefferson/components/row/row.ts", ["ALIGNMENTS", "DISTRIBUTIONS"]],
+    ["../extensions/jefferson/components/row/width-plan.ts", ["planRow"]],
+    ["../extensions/jefferson/components/instruments/instrument-binding.ts", ["instrumentBindings"]],
+    ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
+    ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
+    ["../extensions/jefferson/startup.ts", ["startUp"]],
+    ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
+    ["../extensions/jefferson/components/instruments/compact-count.ts", ["compactCount"]],
+    ["../extensions/jefferson/components/instruments/blank.ts", ["blank"]],
+    ["../extensions/jefferson/components/instruments/model.ts", ["model"]],
+    ["../extensions/jefferson/components/instruments/thinking.ts", ["thinking"]],
+    ["../extensions/jefferson/components/instruments/path.ts", ["path"]],
+    ["../extensions/jefferson/components/instruments/context.ts", ["context"]],
+    ["../extensions/jefferson/components/instruments/tokens.ts", ["tokens"]],
+    ["../extensions/jefferson/components/instruments/cost.ts", ["cost"]],
+    ["../extensions/jefferson/components/instruments/branch.ts", ["branch"]],
+    ["../extensions/jefferson/components/instruments/session.ts", ["session"]],
+    ["../extensions/jefferson/components/instruments/status.ts", ["status"]],
+    ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
+    ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
+  ];
+  const pinnedModules = new Map<string, Record<string, unknown>>();
+  for (const [path, expected] of pinned) {
+    const module = await import(path);
+    pinnedModules.set(path, module);
+    assert.deepEqual(Object.keys(module).sort(), expected, path);
+  }
 
-  const renderer = await import("../extensions/jefferson/components/row/row-renderer.ts");
-  assert.deepEqual(Object.keys(renderer).sort(), ["createFooter"]);
-
-  const configuration = await import("../extensions/jefferson/configuration.ts");
-  assert.deepEqual(
-    Object.keys(configuration).sort(),
-    ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
-  );
-
-  const row = await import("../extensions/jefferson/components/row/row.ts");
-  assert.deepEqual(Object.keys(row).sort(), ["ALIGNMENTS", "DISTRIBUTIONS"]);
-
-  const widthPlan = await import("../extensions/jefferson/components/row/width-plan.ts");
-  assert.deepEqual(Object.keys(widthPlan).sort(), ["planRow"]);
-
-  const binding = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
-  assert.deepEqual(Object.keys(binding).sort(), ["instrumentBindings"]);
-
-  const feed = await import("../extensions/jefferson/data/session-data-feed.ts");
-  assert.deepEqual(Object.keys(feed).sort(), ["feedSessionData"]);
-
-  const footerSetup = await import("../extensions/jefferson/footer-setup.ts");
-  assert.deepEqual(Object.keys(footerSetup).sort(), ["installFooter"]);
-
-  const startup = await import("../extensions/jefferson/startup.ts");
-  assert.deepEqual(Object.keys(startup).sort(), ["startUp"]);
-
-  const contract = await import("../extensions/jefferson/components/instruments/instrument.ts");
-  assert.deepEqual(Object.keys(contract).sort(), ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]);
-
-  const compactCounts = await import("../extensions/jefferson/components/instruments/compact-count.ts");
-  assert.deepEqual(Object.keys(compactCounts).sort(), ["compactCount"]);
-
-  const blank = await import("../extensions/jefferson/components/instruments/blank.ts");
-  assert.deepEqual(Object.keys(blank).sort(), ["blank"]);
-
-  const model = await import("../extensions/jefferson/components/instruments/model.ts");
-  assert.deepEqual(Object.keys(model).sort(), ["model"]);
-
-  const thinking = await import("../extensions/jefferson/components/instruments/thinking.ts");
-  assert.deepEqual(Object.keys(thinking).sort(), ["thinking"]);
-
-  const path = await import("../extensions/jefferson/components/instruments/path.ts");
-  assert.deepEqual(Object.keys(path).sort(), ["path"]);
-
-  const context = await import("../extensions/jefferson/components/instruments/context.ts");
-  assert.deepEqual(Object.keys(context).sort(), ["context"]);
-
-  const tokens = await import("../extensions/jefferson/components/instruments/tokens.ts");
-  assert.deepEqual(Object.keys(tokens).sort(), ["tokens"]);
-
-  const cost = await import("../extensions/jefferson/components/instruments/cost.ts");
-  assert.deepEqual(Object.keys(cost).sort(), ["cost"]);
-
-  const shipped = await import("../extensions/jefferson/shipped.ts");
-  assert.deepEqual(Object.keys(shipped).sort(), ["instrumentNamed"]);
-
-  const bar = await import("../extensions/jefferson/components/visuals/bar.ts");
-  assert.deepEqual(Object.keys(bar).sort(), ["drawBar"]);
-
+  // The store and the format language are scanned, not pinned: their keys are their own business,
+  // and neither gives a caller a way to supply cell content.
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/format.ts");
-  const scanned = [
-    contract, compactCounts, blank, model, thinking, path, context, tokens, cost, shipped, bar,
-    store, format, row, binding, feed, footerSetup, startup,
-  ];
-  for (const exports of scanned) {
+  for (const exports of [...pinnedModules.values(), store, format]) {
     for (const key of Object.keys(exports)) {
       assert.ok(
         !/register|supply|contribute/i.test(key),
@@ -403,8 +374,19 @@ test("the exported surface offers no way to supply or replace cell content", asy
     }
   }
 
+  // Every shipped source file joins the pin: one of its rows, or the scanned-only pair above.
+  const scannedOnly = ["../extensions/jefferson/data/session-data-store.ts", "../extensions/jefferson/format.ts"];
+  const covered = [...pinned.map(([path]) => path), ...scannedOnly].sort();
+  const shippedFiles = readdirSync(join(import.meta.dirname, "..", "extensions"), { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => `../extensions/${name}`)
+    .sort();
+  assert.deepEqual(shippedFiles.filter((path) => !covered.includes(path)), [], "a shipped file the pin does not cover");
+
   // `instrumentNamed` is a lookup, not a registration path: an unimplemented name stays
   // unimplemented, and asking for it changes neither file's exported surface.
+  const shipped = pinnedModules.get("../extensions/jefferson/shipped.ts") as { instrumentNamed(name: string): unknown };
   const surface = [Object.keys(shipped).sort(), Object.keys(store).sort()];
   assert.equal(shipped.instrumentNamed("nope"), undefined);
   assert.equal(shipped.instrumentNamed("nope"), undefined);

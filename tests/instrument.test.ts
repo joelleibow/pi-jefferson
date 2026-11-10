@@ -42,12 +42,13 @@ const shapes = [
   ["cost", ["cost"], "$cost"],
   ["branch", ["branch"], "$branch"],
   ["session", ["name"], "$name"],
+  ["status", ["status"], "$status"],
 ] as const;
 
 /** Every shipped declaration's default label, and `blank`'s deliberate absence [D3]. */
 const labels = {
   blank: undefined, model: "Model:", thinking: "Thinking:", path: "Path:", context: "Context:",
-  tokens: "Tokens:", cost: "Cost:", branch: "Branch:", session: "Session:",
+  tokens: "Tokens:", cost: "Cost:", branch: "Branch:", session: "Session:", status: "Status:",
 } as const;
 
 function named(name: string): InstrumentDeclaration {
@@ -63,7 +64,7 @@ async function render(name: string, readings: Readings, format?: string): Promis
   return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
 }
 
-test("the nine shipped declarations own their names, variables, defaults and foundational options", () => {
+test("the ten shipped declarations own their names, variables, defaults and foundational options", () => {
   const declared: Record<string, string | undefined> = {};
   const declarations = shapes.map(([name, variables, format]) => {
     const declaration = named(name);
@@ -75,7 +76,7 @@ test("the nine shipped declarations own their names, variables, defaults and fou
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
   });
-  assert.equal(declarations.length, 9);
+  assert.equal(declarations.length, 10);
   assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
   for (const declaration of declarations) assert.equal(declaration.options, blank.options);
   assert.equal(instrumentNamed("blank"), blank);
@@ -91,7 +92,7 @@ test("unimplemented and inherited names stay unresolved however often asked", ()
 test("every shipped default parses and renders its declared text", async () => {
   const expected = [
     DEFAULT_CELL_TEXT, "anthropic/claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson",
-    "43.2%/200k", "0", "$0.000", "main", "refactor footer",
+    "43.2%/200k", "0", "$0.000", "main", "refactor footer", "3 tasks idle",
   ];
   for (const [index, [name]] of shapes.entries()) {
     assert.equal(await render(name, seed), expected[index], name);
@@ -245,6 +246,22 @@ test("session reads only the name, and renders nothing for an unnamed session", 
   assert.equal(await render("session", unknown), "");
 });
 
+test("status orders by key, collapses whitespace, drops what is left empty and joins by one space", async () => {
+  const statuses = (...entries: Array<[string, string]>) => ({ ...seed, statuses: new Map(entries) });
+  assert.equal(await render("status", statuses(["b", "idle"], ["a", "3 tasks"])), "3 tasks idle", "insertion order is not key order");
+  assert.equal(await render("status", statuses(["a", "building\n  3 files"])), "building 3 files", "a newline and a run of spaces collapse");
+  assert.equal(await render("status", statuses(["a", "  trimmed  "])), "trimmed");
+  assert.equal(await render("status", statuses(["a", "one"], ["b", "two"])), "one two");
+  assert.equal(await render("status", statuses(["a", "  \n\t "])), "", "a status that collapses to nothing is unknown");
+  assert.equal(await render("status", statuses(["a", "  \n\t "], ["b", "kept"])), "kept", "and is dropped from the join");
+  assert.equal(await render("status", { ...seed, statuses: undefined }), "", "no statuses is unknown");
+  assert.equal(await render("status", { ...seed, statuses: new Map() }), "");
+});
+
+test("status reads only the statuses", async () => {
+  assert.equal(await render("status", unreadable({ statuses: new Map([["a", "3 tasks"]]) })), "3 tasks");
+});
+
 test("token variables use the four totals fields and cost uses the same totals", async () => {
   const readings = { ...seed, totals: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 } };
   assert.equal(await render("tokens", readings, "$input $output $cacheRead $cacheWrite $totalTokens"), "118 59 23 12 212");
@@ -318,7 +335,11 @@ test("an instrument that does not fill renders the same text at width 0 and at w
     assert.equal(atZero, instrument.render(seed, 200, theme), `${name} does not fill, so the width cannot change its text`);
     measured.push(name);
   }
-  assert.deepEqual(measured, ["model", "thinking", "path", "context", "tokens", "cost", "branch", "session"], "eight of the nine are measured");
+  assert.deepEqual(
+    measured,
+    ["model", "thinking", "path", "context", "tokens", "cost", "branch", "session", "status"],
+    "nine of the ten are measured",
+  );
 
   // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
   const configured = instrumentBindings(new Map([
