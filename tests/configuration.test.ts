@@ -808,6 +808,17 @@ test("the branch cell renders its default label, and nothing at all outside a re
   assert.deepEqual(empty, ["Branch: "], "an empty string is a datum, so the bare label renders");
 });
 
+test("the session cell renders its default label, and nothing at all for an unnamed session", () => {
+  const named = readDocument({ cells: [{ instrument: "session" }] });
+  assert.equal(named.warning, undefined);
+  assert.deepEqual(named.rows[0]?.cells.map(cellText), ["Session: refactor footer"]);
+  assert.deepEqual(
+    named.rows[0]?.cells.map((cell) => cell.instrument.render({ ...seed, sessionName: undefined }, 80, fakeTheme())),
+    [""],
+    "no name means no label and no gap, not a lone `Session:`",
+  );
+});
+
 test("a shipped default label precedes a configured format", () => {
   const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, cells: [{ instrument: "path" }] });
   assert.equal(warning, undefined);
