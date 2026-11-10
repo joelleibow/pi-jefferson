@@ -22,3 +22,7 @@ Joel's rulings for this change, quoted and dated. They are binding and newer tha
 - **2026-11-03, vocabulary:** a row holds cells, and a cell holds an instrument. *"`module` and `widget` are rejected words."*
 - **Breaks before 1.0 are cheap:** *"that's okay since we're in pre release."* Nothing here should need one.
 - **2026-11-06:** his `~/.pi/agent/pi-jefferson.json` is his preferred setup, and no task edits it.
+
+## 2026-11-10: How this ships
+
+- **One PR with the instruments change.** After his live check, he said: *"We should be certain to archive this openspec on this branch and then have the default instruments change branch off of this. We'll then PR that branch and have all changes in that one PR. It creates a more logical release of changes that way."* **This change is archived on its branch and is not merged on its own. The paused `instruments-for-every-datum` branch is rebased onto this branch, and a single pull request from that branch carries both changes.** PR #20 is closed as superseded.

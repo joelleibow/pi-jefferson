@@ -56,7 +56,7 @@ Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typ
 
 ## 7. Joel's observation (his, ticked only by him, before the archive)
 
-- [ ] 7.1 **Joel.** In his own pi session on the branch, with his config unedited: `/reload` runs clean; `/jefferson` reports his footer installed with his two rows; his footer looks exactly as before. This is the only end-to-end check that pi resolves the moved files three directories deep [RG, "Not verified"].
+- [x] 7.1 **Joel.** In his own pi session on the branch, with his config unedited: `/reload` runs clean; `/jefferson` reports his footer installed with his two rows; his footer looks exactly as before. This is the only end-to-end check that pi resolves the moved files three directories deep [RG, "Not verified"]. **Observed 2026-11-10 by Joel**, in his own pi session on this branch with his config unedited (screenshot `pi-clipboard-56765752…png`): `/jefferson` printed *"pi-jefferson — the statusline footer is installed, 2 rows."* In his words: *"And everything looks great after a reload."*
 
 ## 8. Sync and archive
 
