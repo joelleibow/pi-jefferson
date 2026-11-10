@@ -8,7 +8,7 @@ x-marbleization:
     eleanor: "bf5cf730-a8e3-4226-8c82-7fb7dbf0f294"
     judge_audit: "958bd7dd-5222-4d00-98b5-a3ee42e073ae"
   gates:
-    council_owner: pending
+    council_owner: approved
     design: pending
     tasks: pending
     implement: pending

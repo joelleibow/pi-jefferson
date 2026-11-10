@@ -96,4 +96,36 @@ Recorded at PL2, 2026-11-10.
 1. **The bar.** He was asked whether the bar should stay in `format.ts` (the council's recommendation) or get its own `bar.ts`. He answered: *"It most definitely doesn't go in format. Why did it ever even end up in format? It has nothing to do with formating? That's just silly. It's a component that an instrument can mix in to help with affordance of the data presented. We're going to be making some changes to it in a future spec so it needs to be independent of anything else's responsibility."*
    - **The ruling:** the bar's drawing, its fill rule and its threshold colors leave `format.ts` for a home of their own that no other responsibility shares. An instrument mixes the bar in. This overrides both advisors.
    - **The conductor's reading:** the format language still parses the `$bar` token, because that is how a user places the bar among prose. His 2026-11-05 ruling made `$bar` a format variable for exactly that reason (archive/2026-11-05-configurable-instruments/owner-rulings.md:22). Placing the bar is the format language's job. Drawing it is the bar's. He confirmed the purpose of `$bar` the same day: *"$bar in a format was solely for users to be able to use it themselves if they see fit. That's all. It's going to be used in our default off the shelf context instrument but some crafty user may find a use for it elsewhere."*
-2. **The tree.** The question's preview truncated and he could not see it: *"I can't see the suggestions in this question"*. The tree is re-presented with the bar ruling applied. Open.
+2. **The tree.** The question's preview truncated, so he could not see it: *"I can't see the suggestions in this question"*. He was then shown the full tree, with the bar ruling applied, and wrote his own in reply: *"This feels better to me. A bit more granularity and not as generalized."* **His tree is the ruled layout, word for word:**
+
+```text
+extensions/jefferson/
+   ├── startup.ts
+   ├── configuration.ts
+   ├── footer-setup.ts
+   ├── format.ts
+   ├── data/
+   │   ├── session-data-store.ts
+   │   └── session-data-feed.ts
+   ├── components/
+   │   ├── instruments/
+   │   │   ├── instrument.ts
+   │   │   ├── instrument-binding.ts
+   │   │   ├── blank.ts  model.ts  thinking.ts  path.ts
+   │   │   ├── context.ts  tokens.ts  cost.ts
+   │   │   ├── compact-count.ts
+   │   │   └── (branch.ts  session.ts  status.ts arrive with the paused change)
+   │   ├── row/
+   │   │   ├── row.ts
+   │   │   ├── width-plan.ts
+   │   │   └── row-renderer.ts
+   │   └── visuals/
+   │        └── bar.ts
+   └── shipped.ts
+```
+
+   - **What it overrides.** It overrides the council on two points:
+     - `components/` holds the parts, and `instruments/`, `row/` and `visuals/` sit beneath it.
+     - `shipped.ts` (the table of shipped instruments and lookup by name) sits at `jefferson/`.
+   - **What it settles.** It also settles the bar's home, `components/visuals/bar.ts`. That directory holds a single file today, and the new ADR records the exception to ADR 0005's "no directory holds a single file". The exception is his call, made in anticipation of more visualizations.
+   - **A fact he was told, which does not change the ruling:** `components/row/row-renderer.ts` and `footer-setup.ts` import pi-tui's `Component` type, so "component" means pi-tui's renderable class in those files and his "parts" in the path.
