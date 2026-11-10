@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { CONFIG_DIR_NAME, type ContextUsage, type SessionEntry, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  CONFIG_DIR_NAME, type ContextUsage, type ReadonlyFooterDataProvider, type SessionEntry, type Theme,
+} from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { TUI } from "@earendil-works/pi-tui";
 
@@ -122,6 +124,7 @@ function harness(): Harness {
         sessionManager: {
           getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
           getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
+          getSessionName: () => undefined,
           getEntries: () => { session.reads.entries++; return session.host.entries; },
         },
         isProjectTrusted: () => options.trusted ?? false,
@@ -131,10 +134,19 @@ function harness(): Harness {
           // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
           // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
           // drifting from the host it stands in for.
-          setFooter: (factory: (tui: Pick<TUI, "requestRender">, theme: Theme) => FakeFooter) => {
+          setFooter: (
+            factory: (tui: Pick<TUI, "requestRender">, theme: Theme, footerData: ReadonlyFooterDataProvider) => FakeFooter,
+          ) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
-            footers.push(factory(tui, fakeTheme()));
+            // The host's footer-only data, faked at its boundary: no repository and no statuses.
+            const footerData: ReadonlyFooterDataProvider = {
+              getGitBranch: () => null,
+              getExtensionStatuses: () => new Map(),
+              getAvailableProviderCount: () => 0,
+              onBranchChange: () => () => {},
+            };
+            footers.push(factory(tui, fakeTheme(), footerData));
           },
         },
       };
@@ -429,13 +441,13 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
   });
 }
 
-test("in TUI mode a session takes exactly the three subscriptions it names", async (t) => {
+test("in TUI mode a session takes exactly the four subscriptions it names", async (t) => {
   useTempAgentDir(t);
   const session = await harness().start();
   assert.deepEqual(
     session.subscriptions.map((subscription) => subscription.event),
-    ["model_select", "thinking_level_select", "turn_end"],
-    "the two selections and the named turn boundary, with no other subscription",
+    ["model_select", "thinking_level_select", "turn_end", "session_info_changed"],
+    "the two selections, the named turn boundary and the session's name, with no other subscription",
   );
 });
 
@@ -525,14 +537,15 @@ test("a second session_start releases the first install before installing its ow
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1, 1],
-    "each of the first install's three unsubscribes fired exactly once",
+    [1, 1, 1, 1],
+    "each of the first install's four unsubscribes fired exactly once",
   );
   assert.deepEqual(h.log, [
     "setFooter#1",
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
     "unsubscribe:turn_end",
+    "unsubscribe:session_info_changed",
     "setFooter#2",
   ]);
 
@@ -568,7 +581,7 @@ test("disposing a footer then replacing the session releases the first install o
 
   assert.deepEqual(
     first.subscriptions.map((subscription) => subscription.calls),
-    [1, 1, 1],
+    [1, 1, 1, 1],
     "each unsubscribe fired exactly once in total, across both callers",
   );
   assert.deepEqual(h.log, [
@@ -576,6 +589,7 @@ test("disposing a footer then replacing the session releases the first install o
     "unsubscribe:model_select",
     "unsubscribe:thinking_level_select",
     "unsubscribe:turn_end",
+    "unsubscribe:session_info_changed",
     "setFooter#2",
   ]);
 

@@ -45,7 +45,7 @@ export function startUp(pi: ExtensionAPI): void {
     // factory's call sets it, so every push after the install reaches the host.
     let requestRepaint: (() => void) | undefined;
 
-    const { store, release } = feedSessionData(pi, ctx, () => requestRepaint?.(), homedir);
+    const { store, release, attachFooterData } = feedSessionData(pi, ctx, () => requestRepaint?.(), homedir);
     releasePrevious = release;
 
     const { rows, rowGap, warning } = readConfiguration({
@@ -64,6 +64,7 @@ export function startUp(pi: ExtensionAPI): void {
       receiveRepaint: (repaint) => {
         requestRepaint = repaint;
       },
+      attachFooterData,
     });
   });
 }
