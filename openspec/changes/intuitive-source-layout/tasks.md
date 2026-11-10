@@ -51,7 +51,7 @@ Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typ
 
 ## 6. Before the pull request
 
-- [ ] 6.1 Final measures on the real branch, attached to the pull request: `suite` 317 of 317; multiset `d1a326804f97195c` at 954 lines; graph 40 edges; exports 31; tarball 22 source files; shipped files 12 → 22 [D7; RG "Final counts"].
+- [x] 6.1 Final measures on the real branch, attached to the pull request: `suite` 317 of 317; multiset `d1a326804f97195c` at 954 lines; graph 40 edges; exports 31; tarball 22 source files; shipped files 12 → 22 [D7; RG "Final counts"].
 - [x] 6.2 Docs pass: design D12, plus Derek's "Docs for Bambadjan" list in [RG] (`AGENTS.md` "Adding an instrument"; `ARCHITECTURE.md`'s `visuals/` lines; ADR 0007:30 restated by ADR 0009). Not a task of Derek's [Michael's tasks gate].
 
 ## 7. Joel's observation (his, ticked only by him, before the archive)
