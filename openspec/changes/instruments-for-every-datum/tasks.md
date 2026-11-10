@@ -138,9 +138,9 @@ Builds D8's alignment expectation, through the real `setFooter`.
 
 Group scope: `checks/scope.sh <repo> <base> HEAD tests/jefferson.test.ts`
 
-- [ ] 7.1 One row holding the branch, session and status cells at left, centre and right under `distribution: "equal"` renders each at its own alignment, through the real `setFooter`. The distribution must be pinned: with the default distribution the centred cell's content fills its cell, so the plant below stays green and the test proves nothing — that vacuous framing is why Derek needed a second commit for this. Verify: `node --test --test-name-pattern='at their alignments end to end' tests/jefferson.test.ts`. Red: the cell view ignoring `align` (`const before = 0;`) fails with "the centred cell is centred in its own cell", actual `27`, expected `34`. Green: the branch at index 0, `Session: docs` at 34, the status ending at 80. Touches: `tests/jefferson.test.ts`. Design: D8.
+- [x] 7.1 One row holding the branch, session and status cells at left, centre and right under `distribution: "equal"` renders each at its own alignment, through the real `setFooter`. The distribution must be pinned: with the default distribution the centred cell's content fills its cell, so the plant below stays green and the test proves nothing — that vacuous framing is why Derek needed a second commit for this. Verify: `node --test --test-name-pattern='at their alignments end to end' tests/jefferson.test.ts`. Red: the cell view ignoring `align` (`const before = 0;`) fails with "the centred cell is centred in its own cell", actual `27`, expected `34`. Green: the branch at index 0, `Session: docs` at 34, the status ending at 80. Touches: `tests/jefferson.test.ts`. Design: D8.
 
-- [ ] 7.2 The group is green on the suite. Verify: `checks/suite.sh <repo> 356`. Design: D8.
+- [x] 7.2 The group is green on the suite. Verify: `checks/suite.sh <repo> 356`. Design: D8.
 
 ## 8. Two status cells share one render's sample
 

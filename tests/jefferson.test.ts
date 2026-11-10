@@ -48,7 +48,10 @@ interface FakeSession {
   footers: FakeFooter[];
   repaints: () => number;
   subscriptions: Subscription[];
-  host: { contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[] };
+  host: {
+    contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[];
+    sessionName: string | undefined; branch: string | null; statuses: Map<string, string>;
+  };
   reads: { usage: number; sessionId: number; leafId: number; entries: number };
   lines(width: number): string[];
 }
@@ -60,6 +63,11 @@ interface SessionOptions {
   trusted?: boolean;
   /** Absent for a session the host restored with no model. */
   model?: { provider: string; id: string };
+  /** Absent for a session the host has not named. */
+  sessionName?: string;
+  /** What the host reports as the branch; absent outside a repository. */
+  branch?: string | null;
+  statuses?: Array<[string, string]>;
   thinkingLevel?: string;
   contextUsage?: ContextUsage;
   entries?: SessionEntry[];
@@ -109,7 +117,11 @@ function harness(): Harness {
         footers,
         repaints: () => repaints,
         subscriptions: [],
-        host: { contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null, entries: options.entries ?? [] },
+        host: {
+          contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null,
+          sessionName: options.sessionName, branch: options.branch ?? null, statuses: new Map(options.statuses ?? []),
+          entries: options.entries ?? [],
+        },
         reads: { usage: 0, sessionId: 0, leafId: 0, entries: 0 },
         lines(width: number) {
           return footers.at(-1)?.render(width) ?? [];
@@ -124,7 +136,7 @@ function harness(): Harness {
         sessionManager: {
           getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
           getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
-          getSessionName: () => undefined,
+          getSessionName: () => session.host.sessionName,
           getEntries: () => { session.reads.entries++; return session.host.entries; },
         },
         isProjectTrusted: () => options.trusted ?? false,
@@ -139,10 +151,10 @@ function harness(): Harness {
           ) => {
             log.push(`setFooter#${++installs}`);
             const tui = { requestRender: () => void (repaints += 1) };
-            // The host's footer-only data, faked at its boundary: no repository and no statuses.
+            // The host's footer-only data, faked at its boundary: the branch and the statuses.
             const footerData: ReadonlyFooterDataProvider = {
-              getGitBranch: () => null,
-              getExtensionStatuses: () => new Map(),
+              getGitBranch: () => session.host.branch,
+              getExtensionStatuses: () => session.host.statuses,
               getAvailableProviderCount: () => 0,
               onBranchChange: () => () => {},
             };
@@ -306,6 +318,39 @@ test("a rejected configuration warns and still installs the default row", async 
   const cellText = truncateToWidth(DEFAULT_CELL_TEXT, 8).replace(/\x1b\[[0-9;]*m/g, "");
   assert.equal(visible(lines[0] ?? "").replace(/\x1b\[[0-9;]*m/g, ""), cellText.repeat(10));
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
+});
+
+test("the branch, session and status cells render their labels at their alignments end to end", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    // Equal shares, so each cell owns columns its content does not fill and its alignment shows.
+    distribution: "equal",
+    cells: [
+      { instrument: "branch", align: "left" },
+      { instrument: "session", align: "center" },
+      { instrument: "status", align: "right" },
+    ],
+  });
+
+  // The host's footer data as the factory receives it: the branch, the name, and the statuses.
+  const session = await harness().start({
+    branch: "main",
+    sessionName: "docs",
+    statuses: [["b", "idle"], ["a", "3 tasks"]],
+  });
+
+  const line = session.lines(80)[0] ?? "";
+  assert.equal(visibleWidth(line), 80);
+  const text = stripTerminalSequences(line);
+  // The left cell is flush with the row's edge, the centred one sits away from its cell's left
+  // edge, and the right one ends at the row's right edge.
+  assert.equal(text.indexOf("Branch: main"), 0, "the left cell is flush with the row's left edge");
+  assert.equal(text.indexOf("Session: docs"), 34, "the centred cell is centred in its own cell");
+  assert.equal(
+    text.indexOf("Status: 3 tasks idle") + "Status: 3 tasks idle".length,
+    80,
+    "the right cell ends at the row's right edge",
+  );
 });
 
 test("a right-aligned cell ends at its cell's right edge end to end", async (t) => {
