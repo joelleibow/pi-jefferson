@@ -28,7 +28,7 @@ The store MUST hold the data the extension's instruments display, and any datum 
 
 ### Requirement: A new datum enters the store and the feed, never an instrument
 
-A datum the host provides and no instrument yet displays MUST enter through the store's reading and the feed's wiring: the feed seeds it, pushes it or supplies the reader the store samples. An instrument MUST NOT read host state, subscribe to a host event or hold the datum itself. Every subscription the feed takes for it MUST be released with the others.
+A datum the host provides and no instrument yet displays MUST enter through the store's reading and the feed's wiring: the feed seeds it, pushes it or supplies the reader the store samples. An instrument MUST NOT read host state, subscribe to a host event or hold the datum itself. Every subscription the feed takes for it MUST be released with the others. A host value that means none, a null branch, an unnamed session or an empty status set, MUST reach the store as unknown.
 
 #### Scenario: An instrument added for a new datum
 
@@ -95,7 +95,7 @@ The store MUST hold the session's name, read when the session starts and replace
 
 ### Requirement: Extension statuses are read once per render sample
 
-The store MUST read the host's extension statuses once per render sample and hold them as one text: statuses ordered by key, each with its whitespace and newlines collapsed to single spaces, those left empty dropped, joined by one space. No statuses left MUST read as unknown. The store MUST claim no freshness beyond the last render the host requested, and MUST NOT poll.
+The store MUST read the host's extension statuses once per render sample and hold them as the host reports them, raw. An empty set MUST read as unknown. The store MUST claim no freshness beyond the last render the host requested, and MUST NOT poll.
 
 #### Scenario: A status is set between two renders
 
@@ -114,7 +114,7 @@ The store MUST read the host's extension statuses once per render sample and hol
 
 ### Requirement: The home directory is held beside the working directory
 
-The store MUST hold the home directory of the user pi runs as, read once when the session starts from the host process, and MUST NOT run a command or read the terminal to get it. When the process reports none the store MUST hold it as unknown. A consumer MUST NOT read the environment itself.
+The store MUST hold the home directory of the user pi runs as, read once when the session starts from the host process, and MUST NOT run a command or read the terminal to get it. When the process reports an empty string, or the lookup throws, the store MUST hold it as unknown. A consumer MUST NOT read the environment itself.
 
 #### Scenario: The home directory is read at session start
 
@@ -123,8 +123,8 @@ The store MUST hold the home directory of the user pi runs as, read once when th
 
 #### Scenario: No home directory
 
-- **WHEN** the host process reports no home directory
-- **THEN** the store holds it as unknown, and a read does not throw
+- **WHEN** the host process reports an empty string as the home directory, or the lookup throws
+- **THEN** the store holds it as unknown, the session still starts, and a read does not throw
 
 ### Requirement: The footer's host data is attached once and released with the feed
 

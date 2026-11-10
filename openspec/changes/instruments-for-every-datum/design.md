@@ -53,13 +53,12 @@ Source: M §2 "Branch wiring", C A1 4, CR "Accepted" (Neil's wiring point). The 
 
 | Datum | Pattern | Read | Announced by | Unknown when |
 |---|---|---|---|---|
-| Branch | seed at footer build, push | `getGitBranch()` | `onBranchChange` re-reads; the host refreshed its cache first, so the re-read neither blocks nor spawns [M §2; C A1 4] | host reports `null` |
+| Branch | seed at footer build, push | `getGitBranch()` | `onBranchChange` re-reads. On the watcher path the host has set its cache first, so the re-read is a cache hit. On `setCwd` the cache is cleared first, but the host has already disposed this footer and released the subscription, because `resetExtensionUI` runs before `rebindCurrentSession` calls `setCwd` [C A1 1, A1 4; M §2] | host reports `null` |
 | Session name | seed at `session_start`, push | `sessionManager.getSessionName()` | `session_info_changed`, using `event.name`; the name is readable first [C A1 5] | no name, or `event.name` undefined |
 | Statuses | read per sample | `getExtensionStatuses()` | none needed: `setStatus` requests its own render [C A1 3] | no statuses, or every text collapses to nothing |
 
 - **`null` is mapped to unknown by the feed**, not stored as `""`. An empty string renders the bare label, `Branch:` in every directory that is not a repository; pi's footer renders nothing there [CR "Perspectives"; C §Q2]. `detached` is text and renders as written.
-- **The status text is built in the feed's reader**: sorted by key as pi's footer sorts (`localeCompare`), newlines, tabs and runs of spaces collapsed, trimmed, joined by one space [C §Q2 Line 3; CR "Accepted" (Matt)]. A text that collapses to nothing is dropped; that is my reading of "collapsed", not a ruling, and the spec pins it ("A status that collapses to nothing").
-- **Why not the store's raw map.** The store holds distinct datums, not composed values [living session-data-store spec], and the host's map is not one. The statuses are one datum whose text is that composition, built at the edge that reads the host.
+- **The store holds the statuses raw**, the host's map as sampled each render, or unknown when it is empty, the way it holds the context usage [living store spec; M §2]. The sort, collapse, join and drop-empty rule lives in the `status` instrument's `$status` resolver, because formatting for display is the instrument's job [archived 2026-11-05 design D11; Michael PL4 finding 1]. The rule: sort by key as pi's footer does (`localeCompare`), collapse newlines, tabs and runs of spaces, trim, drop texts left empty, join by one space, and return unknown when nothing is left [C §Q2 Line 3; CR "Accepted" (Matt)]. Dropping a text that collapses to nothing is my reading of "collapsed", not a ruling; the spec pins it ("A status that collapses to nothing").
 - **Session replacement.** The session name and home are re-seeded at `session_start`; the install is released and rebuilt by the existing handler [C A1 1; living store spec "Store data does not survive a session replacement"]. A footer built in that handler runs after the host's `setCwd`, so its branch is the new directory's [C A1 1]. Statuses cleared by the host on a switch read as unknown at the next sample [C A1 1].
 - **The branch is read once at build, so the first read may spawn `git`** on a reftable repository; pi's own footer does the same on its first render. That is pi's act, not Jefferson's shell-out [M §2 "Scope line"].
 
@@ -70,7 +69,7 @@ The feed reads `os.homedir()` once at session start and seeds `Readings` with it
 - **Why in the store.** AGENTS.md: instruments read the store and never host state, the environment included [E "Adding an instrument"]. The store holds "the data its instruments display and any datum a displayed form derives from"; the delta rewrites the living requirement for that.
 - **Why `os.homedir()`.** It is one call, it is a Node built-in rather than a project import, and it answers from `HOME` on POSIX and `USERPROFILE` on Windows, the variables pi's footer reads [C §Q2]. It runs no command and reads no terminal, so "nothing reads the terminal and nothing shells out" holds [R "2026-11-05"]. The home directory is a property of the process pi runs in, and pi's footer takes it from the same place.
 - **Alternatives.** `process.env.HOME || process.env.USERPROFILE` copies pi's rule character for character, at the cost of two environment reads and the rule's "no HOME → raw" branch written out by us. `os.homedir()` differs only when `HOME` is unset on POSIX, where it consults the password database and pi's footer shows the path raw. Cheaper and the difference is an edge. An environment read inside the `path` resolver breaks the store-only rule [E AGENTS.md:23-24].
-- **Unknown home.** The store holds it unknown when the process reports none; `|relative` then renders the absolute path, never an empty cell (spec "A home directory the store does not know").
+- **Unknown home.** The feed seeds home as unknown when `os.homedir()` returns an empty string, which it does when `HOME` is set to nothing; pi's footer treats an empty home as none [Michael PL4 finding 2; footer.js:32 as he measured]. If `os.homedir()` throws, because the password-database lookup failed, the feed catches it and seeds unknown; a throw at `session_start` must not stop the install. `|relative` then renders the absolute path, never an empty cell (spec "A home directory the store does not know"). Without the empty-string guard D6 would read every path as under home.
 
 ### D4. A variable declares forms; the format names one with `|name`
 
@@ -97,7 +96,9 @@ It follows the existing rule for a modifier the extension does not implement: re
 
 ### D6. `|relative` follows pi's rule
 
-Under the home directory it renders `~` for home itself and `~/sub/dir` below; elsewhere it renders the absolute path [C §Q2; CR "conductor's reading"]. A directory is under home only when the home directory's path is followed by a separator or ends the string, so `/Users/joelleibow2/app` is not under `/Users/joelleibow`. This boundary is the bug a prefix test would ship; a task names it as the failing input.
+Under the home directory it renders `~` for home itself and `~/sub/dir` below; elsewhere it renders the absolute path [C §Q2; CR "The conductor's reading of ruling 3"]. That is the conductor's reading, binding on this design; Joel can revise it.
+
+The mechanism is pi's own rule, copied rather than invented [C §Q2; Michael PL4 finding 3]: resolve both the home directory and the working directory, take `path.relative(home, cwd)`, and call the directory under home if the result is `""` or neither starts with `..` nor is absolute. `""` renders `~`; otherwise the result follows `~/`. This handles `/Users/joelleibow2/app` under `/Users/joelleibow`, and a home written with a trailing separator, `/Users/joelleibow/`, which a string-prefix test would miss. A task names both as failing inputs.
 
 ### D7. Modes
 
@@ -106,7 +107,7 @@ Under the home directory it renders `~` for home itself and `~/sub/dir` below; e
 ### D8. The tests run through the bindings, with the host faked at its boundary
 
 - **Seam.** Each test builds the feed with a fake `pi` (`on`, the session context) and a fake `footerData` (branch, a branch-change callback it can fire, a statuses map, a counter of reads), attaches it, and renders through the bound instrument, the way the existing cell tests do [E "Adding an instrument"; M §2]. The end-to-end fake `setFooter` in `jefferson.test.ts` gains a `footerData` argument [M §2].
-- **Inputs that make right and wrong differ.** Statuses inserted in the opposite order to their keys (sorting); a text with `\n` and runs of spaces (collapsing); a `null` branch versus `""` (bare label); `/Users/joelleibow2/app` under home `/Users/joelleibow` (the prefix); home itself; unknown home; the branch-read counter asserting no read per sample after a fixed seed; a branch change to the held value asserting no repaint.
+- **Inputs that make right and wrong differ.** Statuses inserted in the opposite order to their keys (sorting); a text with `\n` and runs of spaces (collapsing); a `null` branch versus `""` (bare label); `/Users/joelleibow2/app` under home `/Users/joelleibow` (the sibling prefix); `/Users/joelleibow/Projects` under home `/Users/joelleibow/` (the trailing separator); home itself; a home of `""` (`HOME=""`) and one that throws, both unknown; the branch-read counter asserting no read per sample after a fixed seed; a branch change to the held value asserting no repaint.
 - **Expectations that must change, and are stated here so an edit is not a blocker.** The instrument count of seven, the `shapes`, `labels` and `expected` tables, the width-0 versus width-200 list of six, the store's key list of six, and the assertion that `instrumentNamed("branch")` resolves nothing [M §2 "Width-0"]. `"git"` stays unresolved.
 - **Disposal.** After `release`, firing the fake branch callback runs no store code and requests no repaint; attaching after `release` leaves the fake with zero subscriptions.
 - Commands are `pnpm typecheck` and `pnpm test`; baseline 317 passing [E "Baseline"].
@@ -126,7 +127,6 @@ After Michael approves the implementation, Bambadjan:
 - [`os.homedir()` differs from pi's rule when `HOME` is unset on POSIX] → The path stays correct and absolute at worst; the spec pins unknown-home behavior. Accepted for one line over two.
 - [The first branch read can spawn `git` for a reftable repository, at footer build] → pi's own provider does it, once; Jefferson reads a cache afterwards [C A1 4].
 - [Status freshness is "as of the last render the host requested"] → `setStatus` requests one itself; the store claims no more [C A1 3; living store spec "Freshness"].
-- [The store's host-reading boundary now includes a built text for statuses] → One reader in the feed; the store treats it as it treats the context usage reader.
 - [A form is a new concept the format language carries] → Bounded by D5's rejections and one declaration; it dismantles by removing the declaration.
 - [`session_info_changed` is emitted with `void`, so the push may land after the setter returns] → The repaint comes from the event, not the setter [C A1 5].
 
@@ -136,5 +136,4 @@ None. A bare `$path` and every existing document render as before; the three ins
 
 ## Open Questions
 
-- Joel may want `|relative` for a directory outside home to read differently than pi's absolute path. D6 follows pi's rule because the research offers no other; nothing in the tasks depends on the answer beyond one scenario.
-- Nothing else. The status text's handling of a status that collapses to nothing (D2) is stated and pinned, not open.
+None.

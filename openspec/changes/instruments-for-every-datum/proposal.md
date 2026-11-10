@@ -10,7 +10,7 @@ Joel's complaint of 2026-11-06: *"We aren't providing default instruments for al
 - `$path` takes three modifiers, `|base`, `|absolute` and `|relative`; a bare `$path` stays the basename. [CR ruling 3]
 - A datum the store does not hold enters the store and the feed first. The instrument only reads [E "Adding an instrument"; M 1D].
 - Every new instrument that shows a datum has a default label, and `blank` stays label-free [R "default labels"].
-- A new instrument renders nothing over a datum the store reads as unknown [M 1G].
+- A new instrument renders nothing over a datum the store reads as unknown [M 1G]; the rule lives once, in the default-label requirement, and each instrument's requirement names its unknown case.
 - The living `session-data-store` requirement that the store holds a fixed list of datums, with its exclusion scenario naming the branch, statuses and provider count, stops being true now that two of them get instruments [M 1D]. The delta restates it without a list and names the provider count and active tools as the exclusions.
 - A datum the store holds only to derive a form, the home directory, enters the store too [design D3].
 - Not in this change: git beyond the branch (dirty, ahead/behind) [R "2026-11-05, git"], anything that reads the terminal or shells out [R "the source of truth"], and the host-only values no extension can read: pi's routed model, the `(sub)` marker's source, the experimental flag and the entry count [C §Q1 1b, 1e].
@@ -68,7 +68,7 @@ None.
 
 ### Modified Capabilities
 
-- `statusline`: the `branch`, `session` and `status` instruments; `path` gains three forms and the format language gains variable-declared forms; every datum-showing instrument declares a default label; a new instrument renders nothing over an unknown datum.
+- `statusline`: the `branch`, `session` and `status` instruments; `path` gains three forms and the format language gains variable-declared forms; every datum-showing instrument declares a default label and renders nothing over an unknown datum.
 - `session-data-store`: the store holds the branch, the session name, the statuses and the home directory, each with a stated freshness, and the footer-only data is attached and released with the feed.
 
 ## Impact

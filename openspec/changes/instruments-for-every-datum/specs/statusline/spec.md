@@ -34,6 +34,11 @@ The extension MUST implement a `path` instrument declaring the variable `$path`,
 - **WHEN** the working directory is `/opt/work` and the format is `$path|relative`
 - **THEN** the variable renders `/opt/work`, because pi's own footer keeps a path outside home absolute
 
+#### Scenario: A home directory with a trailing separator
+
+- **WHEN** the home directory is `/Users/joelleibow/`, the working directory is `/Users/joelleibow/Projects` and the format is `$path|relative`
+- **THEN** the variable renders `~/Projects`, because pi's rule resolves both paths before it compares them
+
 #### Scenario: A directory that only shares the home directory's prefix
 
 - **WHEN** the home directory is `/Users/joelleibow`, the working directory is `/Users/joelleibow2/app` and the format is `$path|relative`
@@ -41,7 +46,7 @@ The extension MUST implement a `path` instrument declaring the variable `$path`,
 
 #### Scenario: A home directory the store does not know
 
-- **WHEN** the store reads the home directory as unknown and the format is `$path|relative`
+- **WHEN** the store reads the home directory as unknown, as it does for an empty string and the format is `$path|relative`
 - **THEN** the variable renders the absolute directory, and the cell is not empty
 
 #### Scenario: A directory the host has not supplied
@@ -217,7 +222,7 @@ The extension MUST implement a `session` instrument declaring the variable `$nam
 
 ### Requirement: The status instrument
 
-The extension MUST implement a `status` instrument declaring the variable `$status`, the text other extensions set for the footer, with the default label `Status:` and `$status` as its default format. Statuses MUST be ordered by key, each with its whitespace and newlines collapsed to single spaces, and joined by one space. No statuses is unknown, so the cell renders nothing, label included.
+The extension MUST implement a `status` instrument declaring the variable `$status`, the text other extensions set for the footer, with the default label `Status:` and `$status` as its default format. The resolver MUST order statuses by key, collapse each one's whitespace and newlines to single spaces, drop those left empty and join the rest by one space. No statuses left is unknown, so the cell renders nothing, label included.
 
 #### Scenario: Several statuses
 
@@ -238,17 +243,3 @@ The extension MUST implement a `status` instrument declaring the variable `$stat
 
 - **WHEN** the only status's text is whitespace and newlines
 - **THEN** the cell renders nothing, as with no statuses
-
-### Requirement: A new instrument renders nothing over an unknown datum
-
-An instrument added for a host datum MUST render nothing, label and gap included, when the store reads any datum it declares as unknown. It MUST NOT render a placeholder, a zero or an empty string in its place. A host value that means "none", a null branch, an unnamed session or an empty status map, MUST reach the store as unknown.
-
-#### Scenario: A datum the store cannot supply
-
-- **WHEN** a cell holds an instrument added for a host datum and the store reads that datum as unknown
-- **THEN** the cell renders nothing, with no default label and no gap
-
-#### Scenario: A host value that means none
-
-- **WHEN** the host reports a null branch, an unnamed session or an empty status map
-- **THEN** the store reads that datum as unknown and not as an empty string
