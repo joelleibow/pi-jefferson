@@ -47,7 +47,7 @@ Each group is one commit [D9]. Each commit passes `suite` (317 of 317, `pnpm typ
 
 ## 5. Commit 5: the `release.yml` line [D8]
 
-- [ ] 5.1 The release job gains `if: github.ref == 'refs/heads/main'` [D8]. Verify: `git diff` shows the one added line in `.github/workflows/release.yml` and nothing under `extensions/` or in `package.json`; the multiset stays `d1a326804f97195c` [RG §2]. Not run: CI and the release workflow were not run in [RG]; no requirement covers this line.
+- [x] 5.1 The release job gains `if: github.ref == 'refs/heads/main'` [D8]. Verify: `git diff` shows the one added line in `.github/workflows/release.yml` and nothing under `extensions/` or in `package.json`; the multiset stays `d1a326804f97195c` [RG §2]. Not run: CI and the release workflow were not run in [RG]; no requirement covers this line.
 
 ## 6. Before the pull request
 
