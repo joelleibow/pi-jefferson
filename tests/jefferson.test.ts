@@ -382,8 +382,8 @@ test("the exported surface offers no way to supply or replace cell content", asy
     contract, compactCounts, blank, model, thinking, path, context, tokens, cost, shipped, bar,
     store, format, row, binding, feed, footerSetup, startup,
   ];
-  for (const module of scanned) {
-    for (const key of Object.keys(module)) {
+  for (const exports of scanned) {
+    for (const key of Object.keys(exports)) {
       assert.ok(
         !/register|supply|contribute/i.test(key),
         `${key} looks like a contribution interface`,
