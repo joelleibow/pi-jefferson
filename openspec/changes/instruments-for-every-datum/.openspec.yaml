@@ -7,7 +7,7 @@ x-marbleization:
     chidi: "b479ca01-e1db-4899-bfc6-d6f1c53260ab"
     eleanor: "3fe16eb1-d9e3-4c3b-b97b-af0e0db33767"
   gates:
-    council_owner: pending
+    council_owner: approved
     design: pending
     tasks: pending
     implement: pending
