@@ -6,9 +6,8 @@ import toUpper from "lodash-es/toUpper.js";
 import upperFirst from "lodash-es/upperFirst.js";
 
 import { drawBar } from "./components/visuals/bar.ts";
-import type { Instrument, InstrumentDeclaration } from "./components/instruments/instrument.ts";
-
-type Readings = Parameters<Instrument["render"]>[0];
+import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
+import type { Readings } from "./data/session-data-store.ts";
 
 export type FormatSegment =
   | { kind: "literal"; text: string; modifiers: readonly Modifier[] }
