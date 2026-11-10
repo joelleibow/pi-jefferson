@@ -1,0 +1,82 @@
+{
+  "findings": [
+    {
+      "finding": "The design leaves the mechanism for a throwing os.homedir() undecided. Ruling: the home read is injected. feedSessionData takes a `readHome: () => string` beside `requestRender` (the shape the store's `readUsage`/`readEntries` already have), and startup.ts — the composition root — passes `homedir` from `node:os`, so `node:os` is named once, at the root, and data/ names no process API. The feed wraps readHome in the existing catch and maps `\"\"` and a throw to unknown. A test passes a throwing reader and an empty-string reader; the HOME=\"\" assertion against the real process may stay as the one end-to-end check of the root's wiring. This is not a test-only parameter: production always supplies it, as it supplies requestRender.",
+      "location": "design.md D3, bullet 'The throw cannot be reached from a test as the suite is run, and what follows is Michael's to rule'; D8 'Inputs that make right and wrong differ' ('with the throwing read in D3 named as one no test reaches')",
+      "required_change": "Rewrite the D3 bullet as the decision: the feed reads home through a reader startup supplies from os.homedir(); the catch seeds unknown; both halves are tested by a fake reader, red when the guard or the catch is removed. Restore 'one that throws' to D8's inputs as 'a reader that throws'. Add the parameter to D1's description of what startup hands the feed (one clause). Nothing else moves: the layout spec allows data/ to import host and Node modules either way, and the living 'home directory' requirement's 'read … from the host process' stays true.",
+      "required_change_ran": false,
+      "severity": "major"
+    },
+    {
+      "finding": "Four citations are off: the event list is :437-438, the first [1,1,1] is :528-529, the h.log arrays are :531-537 and :575-581 (the cited :536 and :580 are the 'setFooter#2' lines after the insertion point), and row-renderer's store seed is :455-460 (:459 is readEntries). D8 is the scope boundary for the implementation gate, so its lines should bracket the assertions they name.",
+      "location": "design.md D8 'Expectations that must change' (jefferson.test.ts base lines) and 'The fixtures move with the type' (row-renderer.test.ts:459)",
+      "required_change": "Correct the four ranges. Documentation remedy.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "§2.11 is the instrument-side test ('an unknown home directory renders the absolute directory'). The feed-side HOME=\"\" test is the one listed in §2.15 ('the home directory is the one the host process reports, and none is unknown'), and Derek's report shows no transcript of its red; I measured it myself (removing `|| undefined` fails that test). The sentence is true; the citation points at the wrong test and at prose rather than a measurement.",
+      "location": "design.md D3 new bullet, citation '[redgreen-derek.md §2.11 and \"Not verified\"]'",
+      "required_change": "Cite §2.15's feed test and 'Not verified', or, after the seam lands, the new red/green the task will record. Documentation remedy.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Tasks gate: the home task's red is a fake reader that throws (catch removed → test fails) and a fake reader returning \"\" (guard removed → fails); startup's wiring of homedir from node:os is covered by the end-to-end test or stated as Joel's live check.",
+    "Tasks gate: no task claims a failing test for the own-variable half of the form rule or for the form-level undefined guard (redgreen-derek.md note 4 and 'Not verified'); each says what its test does and does not distinguish.",
+    "Tasks gate: the pin task cites the coverage assertion's red (a row removed) and the widened-export red, as Derek measured them, and the scanned-only pair stays two files.",
+    "Tasks gate: the scope boundary is D8's corrected list plus the removed-assert count 0 for format/configuration/row-renderer; any other edited assertion is outside the contract.",
+    "Implementation gate: the seam is one parameter with production wiring in startup.ts; no default value that exists only for tests; node:os imported in startup.ts only.",
+    "Implementation gate: commit granularity — Derek's spike used one commit per instrument with the pin riding in status's; the design says 'the commit that adds the three files'. Either is acceptable; the tasks must say which and the pin commit must be the one that adds the last file the coverage assertion would otherwise miss."
+  ],
+  "not_covered": [
+    "Decisions approved in passes 2 and 3 and untouched by this amendment were not re-derived.",
+    "Derek's spike code beyond the four spots I read (feed home read, feed test, pin test, startup call) — it does not ship.",
+    "The checks/ scripts' behavior; they are the tasks gate's evidence, cited not run here except the single red I reproduced for the HOME=\"\" guard.",
+    "The README rider and the conductor's project tree."
+  ],
+  "requirements": [
+    {
+      "evidence": "Accepted. The living scenario 'A new file joins the pin' (openspec/specs/extension-source-layout/spec.md:214-217) asks that the pin cover a new file; a table of known names cannot notice an absent one, which Derek showed (redgreen-derek.md 'Where the run contradicts the design' 1, §4). Read the spike's test (spike tests/jefferson.test.ts:392-449): readdirSync(extensions, {recursive:true}) filtered to .ts, compared with the rows plus the two scanned-only files; red with branch.ts's row removed, red with a widened export, green on the base tree (22 files = 20 rows + 2). It adds a test assertion, no production mechanism, and the amended D8 bullet states it with its reason and its base-tree result.",
+      "requirement": "Ruling (1): the pin's coverage assertion — every shipped file under extensions/ has a row or is in the scanned-only pair",
+      "status": "met"
+    },
+    {
+      "evidence": "Derek's measurement is right: under plain node --test, mock.module needs a flag and an ESM named import is a live binding the default export cannot be patched over, so no test can plant a throw into the feed as the spike wrote it (spike data/session-data-feed.ts:2,19-26). I rule for the seam, not for an untested catch: Joel's red/green ruling makes an untested branch one no task may claim, and a catch nobody can fire is code the suite cannot defend. The seam is the pattern this change already uses — the store takes readUsage and readEntries, the feed takes requestRender — so it is the existing shape, not new mechanism. The design currently says 'this design does not make it', so the contract is incomplete until the ruling is written in.",
+      "requirement": "Ruling (2): D3's throwing os.homedir()",
+      "status": "must_change"
+    },
+    {
+      "evidence": "The claim 'the feed seeds unknown on HOME=\"\" and the session still starts, and its guard goes red when removed' — the test is spike tests/session-data-feed.test.ts:212-227; Derek's transcript shows no red for it (only the prose in 'Not verified'), so I ran it: a scratch copy with `|| undefined` removed fails 'an empty home is unknown' (1 fail, 11 pass). Claim true. The citation '§2.11' is the instrument-side test, not this one — minor.",
+      "requirement": "D3 amendment states what the spike proved about HOME=\"\"",
+      "status": "met"
+    },
+    {
+      "evidence": "redgreen-derek.md §2.12 shows the expected message `\"path\"'s format names a modifier it does not implement: \"|absolute\"` and the red when the position check is dropped. It names the instrument and the modifier, which is what the living spec and the delta's scenarios require. Derek's call, recorded; no decision changes.",
+      "requirement": "D5 amendment: a form out of position produces the existing rejection message",
+      "status": "met"
+    },
+    {
+      "evidence": "Matches what I measured at PL4 pass 1 (path.relative('/Users/joelleibow/', '/Users/joelleibow/Projects') === 'Projects') and Derek's note 5 (the sibling prefix is rejected by the leading '..'). The resolves stay as pi's shape, stated as not the reason. The '..' predicate wording from my pass-2 minor finding is unchanged and still stands as recorded.",
+      "requirement": "D6 amendment: path.relative, not the resolves, is why the two boundary inputs hold",
+      "status": "met"
+    },
+    {
+      "evidence": "Checked the base tree (tests unchanged between c5ff75e and 5cf355e): title at tests/jefferson.test.ts:432 ✓; the event list is :437-438 (design says :438-439); the first [1,1,1] is :528 with its message at :529 (design says :529-530); the second [1,1,1] :571 ✓; the h.log arrays run :531-537 and :575-581 (design cites :536 and :580, the 'setFooter#2' lines). Fixtures: format.test.ts:14 ✓, configuration.test.ts:22 ✓ and :771 ✓, instrument.test.ts:10 ✓ and :18 ✓, row-renderer.test.ts:34 ✓ and the store seed at :455-460 (design says :459, the readEntries line), session-data-store.test.ts:10 ✓ and :22 ✓. The conductor's ruling that these change is recorded in redgreen-derek.md §3. The removed-assert count as scope boundary is a measured rule (0 in three files, 2/1/20 in the others). Lines off by one to three in four citations — minor.",
+      "requirement": "D8 expectations list: the three subscription tests and the five fixture files",
+      "status": "met"
+    },
+    {
+      "evidence": "Read every hunk of git diff HEAD -- design.md: D3 adds a measured fact and defers one ruling; D5 states the existing message; D6 corrects a reason; D8 adds expectations, fixtures and the coverage assertion, and flips 'one that throws' to 'no test reaches'. Open Questions still 'None'. The spike's other contradictions (note 4: a form's own undefined is masked by the whole-declaration guard; 'Not verified': the own-variable half of the form rule has no distinguishing input) are correctly left for tasks to not over-claim, not design changes.",
+      "requirement": "No decision changed beyond what the spike proved",
+      "status": "met"
+    },
+    {
+      "evidence": "Bambadjan reports valid; I did not re-run because the deltas are untouched by this amendment and passed at pass 3.",
+      "requirement": "openspec validate --strict",
+      "status": "met"
+    }
+  ],
+  "verdict": "changes_requested"
+}

@@ -695,3 +695,247 @@ $ git branch --show-current
 instruments-for-every-datum-spike
 ```
 Checks green at HEAD: `suite: 355 passed, 0 failed (expected 355) PASS`; `imports: edges 46 PASS`; `terminal PASS`; `tarball: 25 (tracked: 25) PASS`; `specs: longest 477 / 467, none over 500 PASS`; `scope PASS` for each of the five commits measured.
+
+## Addendum — five more reds (for the tasks gate)
+
+Five further plants, run after Michael's tasks gate, on the same worktree at `5451cea` with the same rules: plant one line, run the named test, transcribe the failure, `git checkout --` the file, run the green. The tree was clean `--untracked-files=all` before and after each, and `pnpm typecheck` plus `node --test` are green at `5451cea` afterwards: `ℹ tests 355 / ℹ pass 355 / ℹ fail 0`, `tsc` clean.
+
+**A measured trap in the command, worth carrying into `tasks.md`.** The flag has to come *before* the file. `node --test --test-name-pattern='…' tests/x.test.ts` runs the one test; `node --test tests/x.test.ts --test-name-pattern='…'` (the order the brief writes) ignores the pattern and runs the whole file — measured: 12 tests, 11 pass, 1 fail, and every other test in the file scrolls past the reader. The transcripts below use the flag first.
+
+### 1. `tests/session-data-feed.test.ts:94` — no footer data reads unknown
+
+The brief offered two plants. **The statuses one cannot fail**, and that is worth knowing: the store's empty-set rule absorbs it.
+
+- Plant: the statuses reader defaulted to an empty map, `let readStatuses: (() => ReadonlyMap<string, string>) | undefined = () => new Map();`
+
+```
+$ node --test --test-name-pattern="no footer data means" tests/session-data-feed.test.ts
+✔ no footer data means the branch and the statuses read unknown (0.452291ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+```
+
+- **Green with the mistake in place**, because `sample()` maps a map with nothing in it to unknown, exactly as it maps no reader at all. A task must not rely on this plant; it must plant the branch.
+
+- Plant that does fail: the branch's initial value is an empty string instead of unknown, `let branch: Reading;` → `let branch: Reading = "";`
+
+```
+$ node --test --test-name-pattern="no footer data means" tests/session-data-feed.test.ts
+✖ no footer data means the branch and the statuses read unknown (0.710125ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.655959
+
+✖ failing tests:
+
+test at tests/session-data-feed.test.ts:94:1
+✖ no footer data means the branch and the statuses read unknown (0.710125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  '' !== undefined
+
+      at TestContext.<anonymous> (file:///…/spike/tests/session-data-feed.test.ts:97:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+```
+
+- Green after revert:
+
+```
+✔ no footer data means the branch and the statuses read unknown (0.449541ms)
+ℹ tests 1
+```
+
+### 2. Post-dispose silence — `tests/session-data-store.test.ts`, pattern `after disposal`
+
+The pattern names two tests: `a push after disposal requests no repaint` and `a branch push, a name push and a status reader after disposal leave the store untouched`. **Two separate guards are load-bearing**, and each plant is caught by the second test.
+
+- Plant A, the sample's disposed guard removed (the whole `if (readUsage === undefined || readEntries === undefined)` early return):
+
+```
+$ node --test --test-name-pattern="after disposal" tests/session-data-store.test.ts
+✔ a push after disposal requests no repaint (0.482167ms)
+✖ a branch push, a name push and a status reader after disposal leave the store untouched (0.124083ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+✖ failing tests:
+
+test at tests/session-data-store.test.ts:375:1
+✖ a branch push, a name push and a status reader after disposal leave the store untouched (0.124083ms)
+  TypeError: readUsage is not a function
+      at Object.sample (file:///…/spike/extensions/jefferson/data/session-data-store.ts:82:51)
+      at TestContext.<anonymous> (file:///…/spike/tests/session-data-store.test.ts:383:22)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+```
+
+- Plant B, the setter's own guard removed from `branchChanged` (`if (requestRender === undefined) return;`):
+
+```
+✖ a branch push, a name push and a status reader after disposal leave the store untouched (0.09525ms)
+  TypeError: requestRender is not a function
+      at Object.branchChanged (file:///…/spike/extensions/jefferson/data/session-data-store.ts:118:20)
+      at TestContext.<anonymous> (file:///…/spike/tests/session-data-store.test.ts:380:9)
+```
+
+- Green after each revert:
+
+```
+✔ a push after disposal requests no repaint (0.44275ms)
+✔ a branch push, a name push and a status reader after disposal leave the store untouched (0.08325ms)
+```
+
+- The red is a thrown `TypeError`, not an assertion: the disposed store calls a reader the host has already invalidated, which is the data loss this guard exists to prevent. A task should say "no reader is called after disposal" rather than "the test asserts", because what the suite reports is the throw.
+
+### 3. The form on its own variable's segment — `tests/format.test.ts:355`, pattern `a form is recorded on the variable`
+
+- Plant: the form recorded on the modifier chain instead of the segment's `form` field, `{ ...subject, form: name }` → `{ ...subject, modifiers: [...subject.modifiers, { style: "dim" }] }`.
+
+```
+$ node --test --test-name-pattern="a form is recorded on the variable" tests/format.test.ts
+✖ a form is recorded on the variable's segment, apart from the modifier chain (1.1655ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 91.325583
+
+✖ failing tests:
+
+test at tests/format.test.ts:355:1
+✖ a form is recorded on the variable's segment, apart from the modifier chain (1.1655ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      {
+  -     form: 'relative',
+        kind: 'variable',
+  +     modifiers: [
+  +       {
+  +         style: 'dim'
+  +       }
+  +     ],
+  -     modifiers: [],
+        name: 'path'
+      }
+    ]
+
+      at TestContext.<anonymous> (file:///…/spike/tests/format.test.ts:356:10)
+    actual: [ { kind: 'variable', name: 'path', modifiers: [Array] } ],
+    expected: [ { kind: 'variable', name: 'path', form: 'relative', modifiers: [] } ],
+    operator: 'deepStrictEqual',
+```
+
+- Green after revert: `✔ a form is recorded on the variable's segment, apart from the modifier chain (0.754458ms)`.
+
+- The plant goes red on the assertion, so the not-yet-built red is not needed; it is measured anyway, for a task that would rather cite it, on the base tree `c5ff75e` before `fb3e532`:
+
+```
+$ git checkout c5ff75e && node .base-red.mjs
+$path: accepted
+$path|base: "path"'s format names a modifier it does not implement: "|base"
+```
+
+  The base tree rejects `$path|base` as an unknown modifier and accepts the bare `$path`; the plant above is the sharper red, because it catches a form recorded in the wrong place rather than a form not recorded at all.
+
+### 4. `path`'s base form is the basename — `tests/instrument.test.ts:191`, pattern `base form is the basename`
+
+- Plant: `byName.base` pointed at the absolute resolver while `variables.path` keeps the basename, `byName: { base, … }` → `byName: { base: readings => readings.cwd, … }`.
+
+```
+$ node --test --test-name-pattern="base form is the basename" tests/instrument.test.ts
+✖ path's base form is the basename a bare $path renders (4.33875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+✖ failing tests:
+
+test at tests/instrument.test.ts:191:1
+✖ path's base form is the basename a bare $path renders (4.33875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + '/Users/joelleibow/Projects/pi-jefferson'
+  - 'pi-jefferson'
+
+      at TestContext.<anonymous> (file:///…/spike/tests/instrument.test.ts:193:10)
+    actual: '/Users/joelleibow/Projects/pi-jefferson',
+    expected: 'pi-jefferson',
+    operator: 'strictEqual',
+```
+
+- Green after revert: `✔ path's base form is the basename a bare $path renders (4.001916ms)`.
+
+- Worth carrying into the task: this test is the one that holds `$path|base` and the bare `$path` to the *same* text, and it is the only test that separates `variables.path` from `byName.base`. A task that writes only "the base form renders the basename" will not catch the two drifting apart.
+
+### 5. The status resolver reads only the statuses — `tests/instrument.test.ts:261`, pattern `status reads only the statuses`
+
+- Plant: the variable made to read `branch`, one line, `variables: { status: statusText }` → `variables: { status: readings => readings.branch }`.
+
+```
+$ node --test --test-name-pattern="status reads only the statuses" tests/instrument.test.ts
+✖ status reads only the statuses (3.580916ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+✖ failing tests:
+
+test at tests/instrument.test.ts:261:1
+✖ status reads only the statuses (3.580916ms)
+  Error: the instrument read branch, a datum it does not display
+      at Object.get [as branch] (file:///…/spike/tests/instrument.test.ts:30:30)
+      at status (file:///…/spike/extensions/jefferson/components/instruments/status.ts:26:45)
+      at resolveFormat (file:///…/spike/extensions/jefferson/format.ts:192:19)
+      at render (file:///…/spike/tests/instrument.test.ts:64:10)
+      at async TestContext.<anonymous> (file:///…/spike/tests/instrument.test.ts:262:16)
+```
+
+- Green after revert: `✔ status reads only the statuses (3.705625ms)`.
+
+### Tree as this addendum leaves it
+
+```
+$ git status --porcelain --untracked-files=all
+(empty)
+$ git log --oneline -1
+5451cea Read the statuses once per render, and prove two cells share the text
+```
+`pnpm typecheck` clean; `node --test` `ℹ tests 355 / ℹ pass 355 / ℹ fail 0`.

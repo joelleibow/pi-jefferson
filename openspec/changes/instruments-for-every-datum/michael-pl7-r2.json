@@ -1,0 +1,47 @@
+{
+  "findings": [],
+  "later_gates": [
+    "Implementation gate: every new test lands inside a task; removed assert lines are exactly instrument.test.ts 2 + session-data-store.test.ts 1 + the pin's 20; checks/scope.sh green per group with its listed paths; suite counts 325/335/348/350/352/355/356/357 or the actually-reached count written into the task, never lower.",
+    "Implementation gate: readHome has no default, node:os imported in startup.ts only, status.ts imports instrument.ts only, 23-row pin with the coverage assertion and the two-file scanned-only pair, `\"git\"` unresolved; the four reds from the addendum are re-shown on the real branch in Derek's report.",
+    "Implementation gate: 3.1 and 3.7 claim no red for the own-variable half and the form-level guard; a report that claims one is a finding.",
+    "Validate: 9.3 in Joel's words before the archive; the README rider and docs pass follow the implementation gate."
+  ],
+  "not_covered": [
+    "Reds I did not re-run myself this round: the four addendum transcripts are taken as Derek measured them (his tree-clean and 355/355 closing state is stated); I re-ran only the flag-order claim.",
+    "Test titles are the spike's and may be retitled on the real branch; the patterns must follow.",
+    "Groups 4, 5, 7, 8 were not re-read beyond the lines the findings touched; they were approved in substance last round."
+  ],
+  "requirements": [
+    {
+      "evidence": "tasks.md 2.2 'Before any footer is built, the branch and the statuses read unknown', pattern 'no footer data means', red `let branch: Reading = \"\"` failing `'' !== undefined` at session-data-feed.test.ts:97 — matches Derek's addendum §1 transcript. The task records that the statuses plant stays green (also measured in the addendum) so nobody leans on it. Group 2 renumbered 2.1-2.12; 1.3's pointer now reads 2.9 and that task is the name seed. Cited to the store delta 'No footer data' and D1's guard table.",
+      "requirement": "Finding 1 (major): the 'No footer data' scenario has a task",
+      "status": "met"
+    },
+    {
+      "evidence": "1.6 cites addendum §2: TypeError readUsage at store.ts:82 and requestRender at :118, stated as throws with the two tests the pattern runs. 3.1 cites addendum §3's deepEqual diff (form on the modifier chain) and records the base-tree red as the weaker alternative. 3.3 uses the plant I proposed — byName.base at the absolute resolver — with addendum §4's actual/expected, and records that removing defaultForm stays green at 28 pass, as I measured. 6.3 cites addendum §5's `Error: the instrument read branch…` through status.ts:26. The preamble (:7) says every red is Derek's from §2, §3 or the addendum. The addendum itself ends with the tree clean and 355/355 green.",
+      "requirement": "Finding 2 (major): the four unmeasured reds are transcripts",
+      "status": "met"
+    },
+    {
+      "evidence": "Header :13 reads 325 → 335 → 348 → 350 → 352 → 355 → 356 → 357 with both reasons (home feed test moved to group 1; alignment test to group 7). 1.7 'Derek's 322, plus the home feed test his group 2 wrote and the seam's two'. 6.6 → 355, 7.2 → 356. '41' no longer appears in the file.",
+      "requirement": "Finding 3 (minor): suite counts",
+      "status": "met"
+    },
+    {
+      "evidence": "9.2 names instrument.test.ts's two (:73, :255), session-data-store.test.ts's one (:55) and the pin's twenty, and says the fifteen subscription lines remove no assert line. Matches Derek §3's table.",
+      "requirement": "Finding 4 (minor): 9.2's removed-assert allowlist",
+      "status": "met"
+    },
+    {
+      "evidence": "Measured on the spike: `node --test tests/session-data-feed.test.ts --test-name-pattern=…` runs 12 tests; `node --test --test-name-pattern=… tests/session-data-feed.test.ts` runs 1. tasks.md has the pattern before the file in every filtered command (rg: only 2.11 and 6.5 run `node --test tests/…` and both intend the whole file); the preamble :9 carries the measured reason.",
+      "requirement": "The flag-order correction across every task",
+      "status": "met"
+    },
+    {
+      "evidence": "design.md diff is the already-approved PL4 r2 amendment plus the michael-pl4-4-r1 citation (21 changed lines, same as last round). redgreen-derek.md gains only the addendum (five reds, flag-order trap, clean tree). openspec validate --strict: valid. 48 tasks (`- [ ]` count), 9.3 still Joel's.",
+      "requirement": "No decision changed; design.md and redgreen-derek.md touches are what the report says",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

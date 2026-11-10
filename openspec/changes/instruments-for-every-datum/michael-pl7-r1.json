@@ -1,0 +1,91 @@
+{
+  "findings": [
+    {
+      "finding": "The scenario 'WHEN no footer has been built THEN the branch and the statuses read as unknown' has no task. Derek's spike has the test ('no footer data means the branch and the statuses read unknown') and it is one of the 10 feed tests group 2's count of 335 assumes, so it will be written without a task naming it, which the implementation gate treats as work outside the contract.",
+      "location": "tasks.md group 2 (no task); specs/session-data-store/spec.md:148-151 'No footer data'; spike tests/session-data-feed.test.ts:94",
+      "required_change": "Add a task to group 2 (before 2.2): before any attach, `sample().branch` and `sample().statuses` are unknown; verify with `node --test tests/session-data-feed.test.ts --test-name-pattern='no footer data means'`; red: the store seeded with `\"\"` for the branch or the statuses reader defaulting to `new Map()` — run it in the spike and transcribe, since Derek's §2 shows no red for this test. Touches: data/session-data-feed.ts, tests/session-data-feed.test.ts. Design: D1 (guard table), store delta 'No footer data'.",
+      "required_change_ran": false,
+      "severity": "major"
+    },
+    {
+      "finding": "Four tasks name a planted red nobody ran. Joel's process ruling for this pipeline is that every check a task relies on is shown red and green before tasks.md is written; these four are proposals. I ran 3.3's — `defaultForm` removed from path's `variableForms` in a scratch copy of the spike — and `node --test tests/instrument.test.ts --test-name-pattern=\"base form is the basename\"` reports 28 pass, 0 fail: a bare `$path` resolves through `variables.path`, so the plant never reaches the default form. The task would send Derek to record a red that does not exist. 1.6's, 3.1's and 6.3's plants are plausible but unmeasured.",
+      "location": "tasks.md 1.6, 3.1, 3.3, 6.3 (reds written 'record the output' or cited to a §2.16 transcript that covers other instruments)",
+      "required_change": "For each of the four, run the plant in the spike worktree and transcribe the failing output into the task, or replace it with a plant that fails. For 3.3 the distinguishing plant is `byName.base` pointed at the absolute resolver while `variables.path` keeps the basename, so `$path|base` and a bare `$path` disagree — proposed unrun. For 6.3, §2.16's status plant (the variable reading `branch`) is one line to run. If a red cannot be produced for 3.1's 'recorded on the modifier chain' plant, say so and cite the not-yet-built red instead, with its transcript.",
+      "required_change_ran": false,
+      "severity": "major"
+    },
+    {
+      "finding": "Derek's 354 at 69b89be already contains the alignment test (668ddc2 adds none); here 7.1 writes it, so group 6 reaches 355 and group 7 356. 6.4's 41 is the file's count with that test present (the spike HEAD file has 42). 1.7's arithmetic says plus two but adds three (Derek's home test moved from his group 2 into group 1), which is what makes 325 and 335 consistent with each other.",
+      "location": "tasks.md header 'Suite counts', 1.7 ('322 plus the seam's two'), 6.4 ('41 tests in the file'), 6.6 (356), 7.2 (356)",
+      "required_change": "6.6 → 355, 7.2 → 356, 6.4 → the count without the alignment test (40, or drop the number), header and 1.7 → 'Derek's 322 plus the home test moved from his group 2 and the seam's two'.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "Derek's §3 table: removed `assert` lines are instrument.test.ts 2, session-data-store.test.ts 1, jefferson.test.ts 20 (all in the pin hunk); the fifteen subscription lines remove no `assert` line. As written, the closing check's allowlist excludes three legitimate D8 removals and includes fifteen lines the grep will never show.",
+      "location": "tasks.md 9.2 ('no assertion removed outside D8's list (the fifteen subscription lines and the pin's twenty)')",
+      "required_change": "9.2 → 'no assertion removed outside D8's list: instrument.test.ts's two (:73, :255), session-data-store.test.ts's one (:55) and the pin's twenty; the subscription edits remove none'.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Implementation gate: every new test lands inside a task (including the 'No footer data' one once added); the removed-assert set is exactly 2 + 1 + 20; checks/scope.sh green per group with its list.",
+    "Implementation gate: readHome has no default, node:os is imported in startup.ts only, status.ts imports instrument.ts only, the pin table has 23 rows plus the coverage assertion and the two-file scanned-only pair; `\"git\"` stays unresolved.",
+    "Implementation gate: the four reds this verdict asks to be measured are shown red in Derek's report of the real implementation, not cited back to the spike.",
+    "Validate: 9.3 in Joel's words before the archive; nothing in the tests observes the real TUI."
+  ],
+  "not_covered": [
+    "I did not re-run checks/suite.sh across the spike's eight commits; Derek's per-commit counts are taken as measured except where their relocation here changes them (finding 3).",
+    "The exact wording of each test-name-pattern against the final implementation; names are the spike's and may be retitled.",
+    "The README rider's placement and the docs pass — after the implementation gate."
+  ],
+  "requirements": [
+    {
+      "evidence": "git diff HEAD -- design.md: D3's 'Both halves' bullet now cites michael-pl4-4-r1 for the HOME=\"\" red; every other hunk is the PL4 r1/r2 amendment already approved. openspec validate --strict valid (Bambadjan); checks/specs.sh on the main checkout: 477 / 467, none over 500.",
+      "requirement": "design.md: the minor finding from PL4 r2 applied and nothing else moved",
+      "status": "met"
+    },
+    {
+      "evidence": "Store delta → 1.1 (holds), 1.2/2.2-2.7 (branch), 1.3/2.8 (name), 1.4/2.9/8.1 (statuses), 1.5 (home), 2.1/2.5/2.6 (attachment). Statusline → 3.3-3.7 (path), 3.1 (name in two places), 3.1/3.2/3.8 (forms), 4.1/5.1/6.1-6.2 (instruments and labels). D1-D8 each named by at least one task. One scenario has no task: the store delta's 'No footer data' (specs/session-data-store/spec.md:148-151) — the test exists in Derek's spike (tests/session-data-feed.test.ts:94 'no footer data means the branch and the statuses read unknown') and no task in group 1 or 2 names it, so at the implementation gate it would land outside every task.",
+      "requirement": "Both directions: every delta requirement and design decision has a task; every task traces to one",
+      "status": "must_change"
+    },
+    {
+      "evidence": "Cross-checked each task's red against redgreen-derek.md §2.1-2.16 and §3-4. 1.1-1.5, 1.7, 2.1-2.10, 3.2, 3.4-3.8, 4.1-4.2, 5.1-5.2, 6.1-6.2, 6.4-6.6, 7.1, 8.1 cite reds Derek transcribed. Four do not: 1.6 ('record the output'), 3.1 ('record the output'), 3.3 ('record the output'), 6.3 (§2.16 shows the branch and session plants, not status's). I ran 3.3's plant in a scratch copy of the spike — `defaultForm` removed from path's variableForms — and the named test stays green (28 pass, 0 fail), because a bare `$path` resolves through `variables.path`, not the default form. A task naming a red that does not go red is the mistake the ruling exists to catch.",
+      "requirement": "Each task starts with a failing test, with a measured red (Joel's ruling: red and green before tasks.md)",
+      "status": "must_change"
+    },
+    {
+      "evidence": "Every behavioral task runs the real store, feed, parser and bindings with a fake pi, fake footerData and fake theme; 2.x count reads on the fake. The design's discriminating inputs (sibling prefix, trailing separator, home itself, \"\" reader, throwing reader, reversed status keys, newline text, null vs \"\") each sit in a named task (3.6, 3.5, 1.5, 6.1, 2.4). Test titles match the spike's (checked tests/session-data-store.test.ts:324-375, session-data-feed.test.ts:94-230, format.test.ts:355-388, instrument.test.ts:191-261, configuration.test.ts:796-822, jefferson.test.ts:343,491).",
+      "requirement": "Dependencies faked at boundaries, never the thing under test; boundary cases named",
+      "status": "met"
+    },
+    {
+      "evidence": "Nine groups follow Derek's commit order (store → attachment → forms → branch → session → status+pin → alignment → two-cells → closing). Group scopes match the spike commits' file sets (ad4803f, ac1a0f8, fb3e532, d933bfc, 8f5e562, 69b89be, 668ddc2, 5451cea — checked with git show --stat), with the deliberate moves stated: the name seed to 2.8, the home test and the two seam tests to 1.5, the alignment test to 7.1. README rider, ARCHITECTURE, ADR and AGENTS are stated as not tasks per D9. 9.3 is marked Joel's and ticked only by the conductor.",
+      "requirement": "One behavior per task, dependency order, each group lands its own tests, no Markdown task",
+      "status": "met"
+    },
+    {
+      "evidence": "3.1 and 3.7 disclaim the own-variable half and the form-level guard in place; 'What these tasks do not claim' lists the throwing read's missing transcript, getSessionName live, CI, imports.mjs's text-only reading; 1.5 records its own reds for the seam rather than citing Derek.",
+      "requirement": "Tasks claim nothing Derek listed as 'Not verified'",
+      "status": "met"
+    },
+    {
+      "evidence": "Suite counts: Derek's 354 at 69b89be includes the alignment test (668ddc2 added none: 354 → 354), but here that test is written in 7.1, so group 6 reaches 355 and group 7 356, not 356 and 356 (6.6, 7.2); 6.4's '41 tests in the file' is Derek's count with the alignment test present. 1.7's '322 plus the seam's two' is plus three (the home test moved from Derek's group 2), which is why 325 and 335 are otherwise consistent. 9.2's allowlist of removed assertions ('the fifteen subscription lines and the pin's twenty') omits instrument.test.ts's two and session-data-store.test.ts's one, and the subscription edits remove no `assert` line (Derek §3: jefferson's 20 are all in the pin hunk). The 'write the count you reach, never lower it' instruction limits the harm; the numbers should still be right.",
+      "requirement": "A claim one task makes about another holds",
+      "status": "must_change"
+    },
+    {
+      "evidence": "Each group carries checks/scope.sh with the spike commit's file set. Ran checks/imports.mjs, terminal.sh and tarball.sh 25 against the spike HEAD: PASS, PASS, PASS. checks/specs.sh on the main checkout: PASS.",
+      "requirement": "Scope checks are per group with the exact paths",
+      "status": "met"
+    },
+    {
+      "evidence": "The feed's attachment guards (2.5-2.7) and the readHome catch (1.5) are the error handling the design names; the repository has no logging surface and the tasks add no entry point. Nothing further required at this gate.",
+      "requirement": "Logging and error handling where a task adds an adapter or entry point",
+      "status": "met"
+    }
+  ],
+  "verdict": "changes_requested"
+}

@@ -3,13 +3,14 @@ created: 2026-11-10
 x-marbleization:
   working_dir_state: existing_project
   runs:
-    michael: "8ab6dcc9-2df2-453d-9ba7-747caab3fbcc"
+    michael: "fd211908-3d35-4361-84cd-2aab1ad69cf2"
     chidi: "b479ca01-e1db-4899-bfc6-d6f1c53260ab"
     eleanor: "47fdf89c-9911-4344-8934-5a31388a265c"
+    derek_spike: "8ce84582-3552-45be-b06a-b673110e81ba"
   gates:
     council_owner: approved
     design: approved
-    tasks: pending
+    tasks: approved
     implement: pending
     validate: pending
   routing:
@@ -19,3 +20,4 @@ x-marbleization:
   resumed:
     - "2026-11-10: rebased onto intuitive-source-layout at d9bf511 (that change archived on its branch, not merged). Joel: \"have the default instruments change branch off of this. We'll then PR that branch and have all changes in that one PR.\" Next: Bambadjan updates design.md and delta-spec file paths to the new tree (archive/2026-11-10-intuitive-source-layout design D11 lists them), Michael re-confirms the design gate on the path-only amendment, then the red/green spike and tasks.md."
     - "2026-11-10: design amended to the new tree (Bambadjan b5c035d8, from Eleanor Addendum 2, run 47fdf89c). Michael re-confirmed PL4: approve (michael-pl4-3.json, run 8ab6dcc9), two minor citation findings routed to Bambadjan."
+    - "2026-11-10: red/green spike (Derek, scratch branch instruments-for-every-datum-spike, redgreen-derek.md + checks/). Design amended from it (PL5); Michael PL4: changes_requested r1 (ruled the pin coverage assertion in and a readHome seam for the throwing os.homedir()), approve r2. tasks.md drafted; Michael PL7: changes_requested r1, approve r2 after five more measured reds."
