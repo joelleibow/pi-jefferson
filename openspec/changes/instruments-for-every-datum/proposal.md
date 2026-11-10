@@ -6,11 +6,13 @@ Joel's complaint of 2026-11-06: *"We aren't providing default instruments for al
 
 ## What Changes
 
-- Every datum in the inventory below is either given a shipped instrument or named, with a reason, as not given one. Which is which is open (see Open questions). Nothing here chooses.
+- Three instruments ship: `branch` (`Branch:`, `$branch`), `session` (`Session:`, `$name`) and `status` (`Status:`, `$status`). Every other datum in the inventory below is named as not given one, and the reason is in the table at "Settled". [CR "Joel's rulings" 1]
+- `$path` takes three modifiers, `|base`, `|absolute` and `|relative`; a bare `$path` stays the basename. [CR ruling 3]
 - A datum the store does not hold enters the store and the feed first. The instrument only reads [E "Adding an instrument"; M 1D].
 - Every new instrument that shows a datum has a default label, and `blank` stays label-free [R "default labels"].
 - A new instrument renders nothing over a datum the store reads as unknown [M 1G].
-- The living `session-data-store` requirement that the store holds a fixed list of datums, with its exclusion scenario naming the branch, statuses and provider count, stops being true once any of them gets an instrument [M 1D]. The delta restates it without a list, so it holds whatever Joel rules.
+- The living `session-data-store` requirement that the store holds a fixed list of datums, with its exclusion scenario naming the branch, statuses and provider count, stops being true now that two of them get instruments [M 1D]. The delta restates it without a list and names the provider count and active tools as the exclusions.
+- A datum the store holds only to derive a form, the home directory, enters the store too [design D3].
 - Not in this change: git beyond the branch (dirty, ahead/behind) [R "2026-11-05, git"], anything that reads the terminal or shells out [R "the source of truth"], and the host-only values no extension can read: pi's routed model, the `(sub)` marker's source, the experimental flag and the entry count [C §Q1 1b, 1e].
 - **Rider, not part of this change's scope.** The README gains the gallery image `docs/images/jefferson-cosmic-star-dragon.png` through its absolute raw GitHub URL, because `docs/` is not in the package. It rides in this pull request and is written in the docs pass [R "A rider"]. The conductor picks its place; Eleanor observed a fit before `## Status` [E "README rider"].
 
@@ -44,17 +46,19 @@ Joel's complaint of 2026-11-06: *"We aren't providing default instruments for al
 
 Reported, not run: the research read source and docs; nothing ran in a live pi session [C §Assumptions]. Whether the first footer render precedes the provider count's first update was reasoned, not run [C A1 residual].
 
-## Open questions
+## Settled
 
-Joel's unless a name says otherwise. None is answered here.
+Joel ruled at PL2, 2026-11-10 [CR "Joel's rulings"]; CR is `council.md`, the other keys are as above. Each open question the proposal first carried is settled below and none remains his.
 
-1. **Which data become instruments**, and each one's name, default label (a word and a colon), variables and default format. The ruling says "every datum" [R]; the inventory above is long, and Michael's challenge is that "every" is a quantifier over a list nobody had produced [M 4]. Rows like the idle flag, project trust or the system prompt are data pi provides, and "Don't invent what we don't have to" [R] pulls the other way. [M 3.1, 3.5]
-2. **The freshness split** [M 4]. Some datums have a push or a clean read: branch, session name, working directory. Others only have "as current as the host's last render": statuses, provider count, active tools. Does "every" include the second group, knowing the store can promise no more than that? The living spec forbids claiming freshness beyond the host's delivery and forbids polling [M 1E, 2].
-3. **What an absent branch renders.** pi reports `null` for "not a repository", which is a real value and not unknown [M 2]. The cell can render nothing, as pi's footer does, or the bare label. [M 3.2]
-4. **The compact count band.** The ratified spec prints `20.4k`; pi's own rule prints `20k` [E "`compactCount`"; C §Q2]. Keep the ratified band or mirror pi, which is a spec change [M 1K, 3.4].
-5. **A full-path working directory.** `path` shows the basename [E "Seven shipped instruments"]. Is a full path wanted beside it, `~`-abbreviated or absolute, and what is it called? Renaming `path` was ruled a separate card on 2026-11-08 [M 1J], and Joel's live config uses `path` [E "Joel's configuration"], which no task edits [R]. Does he reopen the rename? [M 3.3]
-6. **Where the branch's name collides.** `branch` means the git branch and the session-tree branch in pi [M 2]. Which one an instrument named for it shows is Joel's naming call under question 1.
-7. **How the branch reaches the store.** `footerData` exists only inside the footer factory, built after the store [M 2]. That is a design question for Michael's gate, not a rule here.
+| Question | Settled as |
+|---|---|
+| 1. Which data become instruments | The three above. Not given one: provider count, active tools, idle, queue, MCP servers, scoped models, trust, OAuth, auto-compact, `version`, `$cacheHit`, the model's `$name` and pi's internals [CR ruling 1]. Session id, file and header, per-message fields, slash commands, flags, system prompt, theme and labels stay out as internals the council named [CR "Perspectives"]. |
+| 2. The freshness split | Branch and session name are seeded and pushed. Statuses are read per sample, since `setStatus` requests a render itself [C A1 3]. The data with no render trigger do not ship [CR "Accepted & Rejected"]. |
+| 3. What an absent branch renders | Nothing, label included: `null` is unknown [CR "Perspectives"; spec "The branch instrument"]. |
+| 4. The compact count band | Stays `20.4k` [CR ruling 2]. Nothing changes. |
+| 5. A full-path working directory | `$path\|absolute` and `$path\|relative`; `path` is not renamed and `$path` stays the basename [CR ruling 3 and the conductor's reading]. |
+| 6. Where the branch's name collides | `branch` shows the git branch [CR ruling 1; spec "The branch instrument"]. |
+| 7. How the branch reaches the store | The feed's footer-data attachment [design D1]. |
 
 ## Capabilities
 
@@ -64,13 +68,13 @@ None.
 
 ### Modified Capabilities
 
-- `statusline`: every shipped instrument that shows a datum declares a default label (the living requirement says "a shipped instrument that declares one"); a new instrument renders nothing over an unknown datum. No instrument is named, because none is ruled yet.
-- `session-data-store`: the store holds the datums its instruments display without a closed list or a named exclusion; a new datum enters the store and the feed, never an instrument.
+- `statusline`: the `branch`, `session` and `status` instruments; `path` gains three forms and the format language gains variable-declared forms; every datum-showing instrument declares a default label; a new instrument renders nothing over an unknown datum.
+- `session-data-store`: the store holds the branch, the session name, the statuses and the home directory, each with a stated freshness, and the footer-only data is attached and released with the feed.
 
 ## Impact
 
 - Specs: the two capabilities above.
-- Code, by the existing path [E "Adding an instrument"]: `Readings` and its sampling in the store, the feed's wiring and its single release, the instrument declarations table, and the tests whose fixtures count instruments [M 2]. Which files move depends on the rulings.
+- Code, by the existing path [E "Adding an instrument"]: `Readings` and its sampling in the store, the feed's wiring and its single release, the instrument declarations table, and the tests whose fixtures count instruments [M 2]. The footer's construction hands the feed its footer data [design D1].
 - Documentation: the README rider and the docs pass, after the implementation gate.
 - No dependency changes are known; none is proposed.
 - Breaking: none expected. Joel accepts breaks before 1.0 [R].
