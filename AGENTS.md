@@ -17,9 +17,10 @@ extension.
 
 ## Adding an instrument
 
-1. Add one declaration to `extensions/jefferson/visuals/instrument.ts` — name, variables, defaults
-   and options, plus a `defaultLabel` or a `variableFg` if it needs them — and include it in the
-   shipped declarations table so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
+1. Add one file under `extensions/jefferson/components/instruments/` that imports
+   `FOUNDATIONAL_OPTIONS` from `instrument.ts` and declares the instrument — name, variables, defaults
+   and options, plus a `defaultLabel` or a `variableFg` if it needs them — then add one entry to
+   `extensions/jefferson/shipped.ts` so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
    space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required
    on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as
    `blank` does. A `$bar` in a format makes the cell fill without saying so.

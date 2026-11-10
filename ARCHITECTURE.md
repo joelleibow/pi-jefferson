@@ -12,12 +12,19 @@ extensions/jefferson/
   startup.ts                     the install lifecycle: the command, then the session-start installs
   configuration.ts               where pi-jefferson.json lives, reads it, validates it, normalizes rows
   footer-setup.ts                pi's footer factory and the component it returns
+  format.ts                      the format language every instrument shares: parses a format and places $bar
+  shipped.ts                     the shipped instruments, and instrumentNamed to look one up
   data/                          the session data and how the host's session and events reach it
-  visuals/                       what a cell shows, the format language, rows, their widths, binding, and drawing them
+  components/                    the parts, each directory holding only its own logic
+    instruments/                 the instrument contract, the binding, and one file per instrument
+    row/                         a row, its cells' width plan, and the renderer that draws it
+    visuals/                     what an instrument can mix in; today the bar
 ```
 
-The decision behind the layout, and the alternatives it weighed, are in
-[ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility.md).
+Logic that many parts share, and the process flow, sit directly under `extensions/jefferson/`. A
+part's directory holds only that part's logic. The decision behind the layout, and the alternatives
+it weighed, are in [ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility.md), revised by
+[ADR 0009](docs/adr/0009-components-hold-the-parts-and-the-bar-stands-alone.md).
 
 **Entry.** `extensions/jefferson.ts` is the only file the host loads. It registers the extension and
 hands the host's API to startup, and does nothing else.
@@ -47,7 +54,7 @@ per render is handed to every cell, so cost and tokens share one totals object.
 reads it, validates it, resolves instrument names, and normalizes rows.
 The optional `instruments` section configures each name once; formats, labels and styles are validated
 at read time against its declaration and the live theme, then one bound instrument per name is shared
-across the document. The binding itself lives in `visuals/`. Every failure mode rejects the whole
+across the document. The binding itself lives in `components/instruments/`. Every failure mode rejects the whole
 document, renders the default row, and warns with a message that names what was wrong. An unknown
 instrument *name* is different: it warns and renders `blank` in that cell.
 
@@ -68,12 +75,16 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
+**Bar.** Lives in `components/visuals/bar.ts` and stands alone: it imports no file of this package, so
+a change to the format language or to an instrument cannot reach it. The format language only places
+it: `format.ts` parses `$bar` and gives it the columns the row left, and `bar.ts` draws it.
+
 **Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
 `HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
 empty lines between its children, so row one sits flush on the editor; see
 [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md). `rowGap` reaches the renderer once, at install. The vertical gap is that `gap`; the horizontal one below is the `HStack`'s.
 On each render the renderer asks every cell for the width of its text at width 0 and gives those to the width
-plan in `visuals/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
+plan in `components/row/`, a pure function that returns each cell's basis, grow and joint. `blank` and `$bar`
 cells fill. The joint is one column owned by the right-hand cell, drawn as a leading space inside it.
 Every cell is `shrink: 1` with `minSize: 0`, so a row over its width loses columns to the host's
 allocator and stays one line; the allocator also spends any remainder (the `HStack`'s `gap: 0`). A row with
@@ -93,9 +104,12 @@ installs. No file imports the entry. Within `extensions/jefferson/`:
 
 - `data/` holds the files that keep session data and take it from the host. It imports host packages
   and its own files, and no file outside `data/`.
-- `visuals/` holds the files that decide what a cell shows or how rows are laid out and drawn. It
-  imports host packages, its own files and the types of `data/`. It never imports startup, footer
-  setup or configuration.
+- `components/` holds the parts. Its files import host packages, their own directory, the types of
+  `data/` and `format.ts`, and never startup, footer setup, configuration or `shipped.ts`. The
+  directories differ in what else they reach: `row/` imports only the type of the instrument contract,
+  `instruments/` imports `format.ts` only in the binding, and `components/visuals/bar.ts` imports no local file.
+- `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
+  `data/`. `shipped.ts` imports the instrument files.
 - Everything above those directories may import any of their files.
 
 Host packages (`@earendil-works/*`) are `peerDependencies` with a `*` range and never
