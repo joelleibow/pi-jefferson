@@ -176,3 +176,79 @@ Boundary artefacts of the rule as written: 9,999 → `10.0k`; 999,500-999,999 �
 - The queue is a boolean only; pi's own queued-message display (`updatePendingMessagesDisplay`) is not in the footer and its count is not exposed.
 - Did not read `docs/rpc-extension-ui.md` in full or `docs/tui.md`.
 - Not inspected, by instruction: this repository's code (Eleanor) and its compact-band behaviour (the brief says `20.4k`; pi's rule yields `20k` as shown above).
+
+## Addendum 1 — freshness of the event-less datums
+
+Package root `P` = `$(npm root -g)/@earendil-works/pi-coding-agent` (1.5.2). `im` = `P/dist/modes/interactive/interactive-mode.js`. Lines are 1.5.2's; 1.4.0 equivalents are noted. (Output path note: the run's authoritative path is this file; it is a copy of `research-chidi.md` plus this section.)
+
+### 1. Working directory on a session switch
+
+**Yes for TUI: `setCwd` runs before `session_start`, and `ctx.cwd` is already the new cwd when any handler runs.**
+
+Sequence for new/resume/fork (`P/dist/core/agent-session-runtime.js`):
+1. `switchSession` (l.128-146) / `newSession` (l.148-172) / fork (l.~176-250) call `teardownCurrent` (emits `session_shutdown`, l.~104-114), then `createRuntime({cwd: sessionManager.getCwd(), …, sessionStartEvent: {type:"session_start", reason, previousSessionFile}})` (l.141, 165, 211, 229, 246, 299). The `session_start` event is only stored on the new `AgentSession` (`agent-session.js:226` `_sessionStartEvent`); it is not emitted yet.
+2. `apply()` (l.~117) swaps in the new session; `finishSessionReplacement` (l.~123) calls the host's `rebindSession`.
+3. The TUI registered that callback as `rebindCurrentSession({renderBeforeBind:true})` (`im:385-387`).
+4. `rebindCurrentSession` (`im:1698-1716`) runs, in order: `applyRuntimeSettings()` → `bindCurrentSessionExtensions()` → `updateAvailableProviderCount()`.
+5. `applyRuntimeSettings` (`im:1679-1680`) calls `footer.setSession(...)`, `footer.setAutoCompactEnabled(...)` and **`footerDataProvider.setCwd(sessionManager.getCwd())`**. `setCwd` (`footer-data-provider.js:147-161`) resets the cached branch, re-finds git paths, re-arms the watcher and calls `notifyBranchChange()`.
+6. `bindCurrentSessionExtensions` (`im:1584-`) calls `session.bindExtensions`, which does `await this._extensionRunner.emit(this._sessionStartEvent)` (`agent-session.js:2776`). **`session_start` is emitted here, after `setCwd`.**
+
+`ctx.cwd`: the getter returns `runner.cwd` (`runner.js` createContext, `get cwd()`). The runner is constructed per session with `this._cwd` (`agent-session.js:3079`, `runner.js:204`), and the new session was built with the new `sessionManager.getCwd()`. So `ctx.cwd` is correct from the first `session_start` handler; nothing "updates" it later. The old session's ctx throws (`assertActive`) after teardown.
+
+Startup is the same: `run()` → `init()` → `rebindCurrentSession()` (`im:820`) → same three steps, then `session_start` reason `"startup"`. The provider is first constructed in the constructor with the startup cwd (`im:424`).
+
+Caveats: a footer factory registered in `session_start` runs after `setCwd`, so `getGitBranch()` is for the new cwd. `setCwd` triggers `notifyBranchChange()`, which the TUI forwards to `requestRender` (`im:830-832`); a footer that subscribed with `onBranchChange` before the switch was already torn down: `resetExtensionUI` runs `setExtensionFooter(undefined)` (`im:2031-ish`, disposing the old custom footer) and `clearExtensionStatuses()`. Extension statuses are cleared at that point; extensions must set them again in `session_start`. **1.4.0**: same order (`setCwd` at `im:1570`, `updateAvailableProviderCount` at 1605, `bindExtensions` emits at `agent-session.js:2680`); `rebindCurrentSession` body is identical.
+
+### 2. Is `getAvailableProviderCount()` populated before the first extension footer render?
+
+**No, not at `session_start` time.** Evidence:
+- The field starts at `0` (`footer-data-provider.js:99`); a probe (`/tmp/probe.mjs`) confirmed `getAvailableProviderCount() === 0` on a freshly constructed provider.
+- It is set only by `updateAvailableProviderCount()` (`im:4510-4516`; scoped models if any, else `modelRuntime.getAvailableSnapshot()`, unique `provider` count). That is called in `rebindCurrentSession` **after** `await bindCurrentSessionExtensions()` (`im:1715`, so after `session_start`), once more in `init` (`im:834`), again after the background catalog refresh in `run()` (`im:865-867`, skipped when `PI_OFFLINE`), and on model select, scoped-models change, login/logout (`im:4594, 4649, 5181, 5246, 5284`).
+- A custom footer set inside a `session_start` handler is built immediately (`setExtensionFooter` calls `factory(...)` synchronously, `im:2084`) with count `0`. `requestRender` is deferred by `process.nextTick` (`tui.js:658-668`), and `updateAvailableProviderCount` runs after the `await` in `rebindCurrentSession`; I did not prove which of the first render and the count update runs first. A footer factory that reads the count in its constructor sees `0`; one that reads inside `render()` sees the updated value once the update has run, and `0` for a render that happens earlier.
+- The snapshot is **not network-fresh at startup**: the first call uses the cached snapshot; the refreshed count arrives later (`im:862-867`), and no event announces it. A change from the refresh is followed by `requestRender` only if something else asks for one (see 3).
+
+**1.4.0**: same: set at `im:801, 834, 1605` (after bind), and `4334` (function body).
+
+### 3. Data with no change event: what re-renders pi's footer?
+
+How a render happens: `TUI.requestRender()` schedules a render of the **whole component tree** on the next tick (`pi-tui/dist/tui.js:658-668`); the custom footer's `render(width)` is called on every pass, so a footer that re-reads on render sees current values whenever *any* render occurs. Input to a focused component also calls `requestImmediateRender()` (`tui.js:775-783`).
+
+| Datum | Who changes it | Does the change itself call `requestRender`? |
+|---|---|---|
+| Extension statuses | `ctx.ui.setStatus` → `im:1890-1892` `setExtensionStatus`: `footerDataProvider.setExtensionStatus(key, text)` then **`this.ui.requestRender()`**. (`FooterDataProvider.setExtensionStatus`, `footer-data-provider.js:127-134`, itself only mutates the Map.) `clearExtensionStatuses` (`im:2031`-ish, in `resetExtensionUI`) calls `footer.invalidate()` (a no-op) and is followed by the caller's render. | **Yes** for `setStatus`. |
+| Available provider count | `setAvailableProviderCount` (`footer-data-provider.js:144-146`) only assigns. `updateAvailableProviderCount` (`im:4510-4516`) does **not** call `requestRender`. Callers sometimes do: the scoped-models flow calls `this.ui.requestRender()` right after (`im:4650`); the model selector calls `footer.invalidate()` (no-op) then `done()`, which re-renders; login/logout paths end in `ui.requestRender()` (`im:5284`-area). The background refresh in `run()` (`im:865-867`) calls only `updateAvailableProviderCount()`. | **No** (render only if the caller or later activity triggers one). |
+| Active tools | `pi.setActiveTools` → `session.setActiveToolsByName` → `_setActiveTools` → `_rebuildSystemPrompt` (`agent-session.js:1178-1190`); no UI call, no event (no `tools_changed` in `types.d.ts`). | **No.** Takes effect "on the next agent turn" (l.1176). A footer sees it on the next render caused by any other thing. |
+| Queue flag (`ctx.hasPendingMessages()`) | Session emits `queue_update`; the TUI handles it with `updatePendingMessagesDisplay(); this.ui.requestRender()` (`im:2879-2882`). That session event is **not** forwarded to extensions (not in the `ExtensionAPI.on` list, `types.d.ts:1229-1269`). | **Yes** (host-side), so a footer reading `hasPendingMessages()` on render is fresh after a queue change. |
+| Auto-compact setting | `/settings` toggle: `onAutoCompactChange` → `session.setAutoCompactionEnabled(enabled)` → `settingsManager.setCompactionEnabled` (`im:4229-4232`; `agent-session.js:2749-2751`), and `footer.setAutoCompactEnabled(enabled)` (assigns only; `footer.js:59-61`). No explicit `requestRender` in the callback. The selector is the focused component, so the keypress ends in `requestImmediateRender()` (`tui.js:780-782`). The same applies to every other setting change made through the selector. | **Indirectly yes** (render triggered by the keypress that toggled it). A direct edit of settings JSON is not watched here (I did not verify a file watcher for settings). |
+| Session name | `session_info_changed` → `footer.invalidate(); ui.requestRender()` (`im:2923-2927`) | **Yes** (and it also has an event). |
+| Thinking level | `thinking_level_changed` → `footer.invalidate()` only (`im:2928-2931`); it has a `thinking_level_select` extension event | Not by that branch; callers (`selectThinkingLevel` etc.) are interactive handlers that already re-render. |
+
+`FooterComponent.invalidate()` is a no-op (`footer.js:66-68`); pi's own footer re-reads state on every render too, caching only by `(session, sessionId, leafId, entryCount, limitsModel)` (`footer.js:81-95`). So pi's footer has no push channel either: it depends on a render pass happening.
+
+**Net for a footer that re-reads in `render()`:** it is fresh after `setStatus`, queue changes, settings-selector toggles and session-name changes. For provider count (background refresh), active tools (`setActiveTools` from code) and a programmatic settings change, freshness depends on the next render caused by something else (streaming, input, status). No event exists to force one except calling `tui.requestRender()` on the `TUI` handed to the factory (`types.d.ts:122`), which a footer can do from any callback it owns.
+
+**1.4.0**: `setExtensionStatus` and `session_info_changed` handlers match (`footer-data-provider.js` has zero diff; `interactive-mode.js` differs by 563 diff lines but not in these functions).
+
+### 4. The branch's first read
+
+`getGitBranch()` (`footer-data-provider.js:111-116`): if `cachedBranch === undefined`, call `resolveGitBranchSync()`; return the cached value. Cached afterwards (including `null`). Invalidation: `setCwd`, and the debounced watcher refresh (`scheduleRefresh` → `refreshGitBranchAsync`) that updates `cachedBranch` and calls `notifyBranchChange`.
+
+`resolveGitBranchSync()` (l.215-229): it is a **synchronous file read**: `readFileSync(gitPaths.headPath)`; `ref: refs/heads/<name>` gives the name; anything else gives `"detached"`; no git repo gives `null`; any read error gives `null`. `gitPaths` is found by walking up from cwd (`findGitPaths`, called in the constructor, l.~106, and in `setCwd`). **A synchronous `git` spawn happens only when HEAD reads `ref: refs/heads/.invalid`** (the reftable format): `resolveBranchWithGitSync` → `spawnSync("git", ["--no-optional-locks","symbolic-ref","--quiet","--short","HEAD"])` (l.48-56, 222), falling back to `"detached"`. Later refreshes use the async `execFile` variant (l.57-,  l.237-239).
+
+Probe (`node /tmp/probe.mjs` in this repo, pi 1.5.2): first call returned `instruments-for-every-datum` in 0.039 ms, second 0.001 ms (cached). Initial provider count printed `0`. **1.4.0**: `footer-data-provider.js` is identical (0-line diff).
+
+### 5. Session name events
+
+**Yes, both fire `session_info_changed`; the name is readable first.**
+- `pi.setSessionName(name)`: `bindCore` maps it to `this.setSessionName(name)` (`agent-session.js:2886-2888`).
+- `/name <text>`: `handleNameCommand` (`im:5713-5730`) calls `this.session.setSessionName(name)`, the same method. (Bare `/name` only displays the name and fires nothing.)
+- `setSessionName` (`agent-session.js:3343-3348`): `sessionManager.appendSessionInfo(name)` **first**, then builds `{type:"session_info_changed", name: sessionManager.getSessionName()}` and emits it to the session listeners (`this._emit`, which the TUI uses for `footer.invalidate(); requestRender()`, `im:2923`) and to extensions (`void this._extensionRunner.emit(event)`). So `ctx.sessionManager.getSessionName()` and `event.name` are both already the new (normalized) value when handlers run. The extension emit is **not awaited** (`void`), so handlers run asynchronously relative to the setter's return.
+- No event: the session picker's rename (`im:4918`: `SessionManager.open(file).appendSessionInfo(next)`) renames a session file through a separate `SessionManager`, not the active session; it emits nothing to the active session's extensions (for the active session, I did not trace whether the picker can target it).
+- `event.name` is `undefined` when the name is cleared (`types.d.ts:603-606`). `session_start` is the way to read the name on resume.
+
+**1.4.0**: same code (`agent-session.js:3241-3246`, `bindCore` `2790`).
+
+### Residual unknowns for this addendum
+- Whether the first footer render precedes the post-bind `updateAvailableProviderCount` at startup (ordering of `nextTick` vs the `await` continuation) was reasoned, not run; no interactive TUI probe was possible here.
+- No file watcher for settings was searched for; a programmatic or manual `settings.json` edit may not re-render or change `compaction.enabled` for the footer.
+- `resetExtensionUI` line numbers are approximate (`im:2025-2040` region).
