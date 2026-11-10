@@ -833,6 +833,17 @@ test("the status cell renders its default label over the statuses, and nothing o
   assert.deepEqual(blankText, [""], "a status that collapses to nothing renders nothing, as with no statuses");
 });
 
+test("a coloured status is measured as its text, so the cell's plan counts '● ok' only", () => {
+  const { rows, warning } = readDocument({ cells: [{ instrument: "status" }] });
+  assert.equal(warning, undefined);
+  const cell = rows[0]!.cells[0]!;
+  const coloured = { ...seed, statuses: new Map([["a", "\x1b[32m●\x1b[0m ok"]]) };
+  // A row sizes a cell from its text rendered at width 0: its probe.
+  const probe = cell.instrument.render(coloured, 0, fakeTheme());
+  assert.equal(probe, "Status: ● ok");
+  assert.equal(visibleWidth(probe), visibleWidth("Status: ● ok"), "the plan counts the text, not the sequences");
+});
+
 test("a shipped default label precedes a configured format", () => {
   const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, cells: [{ instrument: "path" }] });
   assert.equal(warning, undefined);

@@ -1,12 +1,16 @@
 /** The status instrument: the statuses other extensions set, as pi's own footer shows them. */
+import { stripTerminalSequences } from "@earendil-works/pi-tui";
+
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration, type VariableForm } from "./instrument.ts";
 
 /**
  * pi's own rule for one status's text: carriage returns, newlines and tabs become spaces, a run of
- * spaces collapses to one, and the ends are trimmed.
+ * spaces collapses to one, and the ends are trimmed. A status carries its own terminal sequences
+ * by convention; the cell's style owns colour here, so they are stripped first rather than
+ * reaching the format language, which would collapse each ESC into a visible space.
  */
 function sanitize(text: string): string {
-  return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+  return stripTerminalSequences(text).replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 
 const statusText: VariableForm = (readings) => {

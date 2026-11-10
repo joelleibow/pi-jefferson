@@ -258,6 +258,13 @@ test("status orders by key, collapses whitespace, drops what is left empty and j
   assert.equal(await render("status", { ...seed, statuses: new Map() }), "");
 });
 
+test("a status's own terminal sequences are stripped, so the cell's style owns the colour", async () => {
+  const statuses = (...entries: Array<[string, string]>) => ({ ...seed, statuses: new Map(entries) });
+  const text = await render("status", statuses(["a", "\x1b[32m●\x1b[0m ok"]));
+  assert.equal(text, "● ok", "the cell renders the text, and the joined texts keep one space");
+  assert.ok(!text.includes("\x1b"), "no escape sequence reaches the cell");
+});
+
 test("status reads only the statuses", async () => {
   assert.equal(await render("status", unreadable({ statuses: new Map([["a", "3 tasks"]]) })), "3 tasks");
 });
