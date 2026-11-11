@@ -43,7 +43,11 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
           if (composed !== undefined) {
             const key = composed.select(readings);
             const chosen = key === undefined ? undefined : entry?.formats?.[key] ?? plain[key];
-            if (chosen !== undefined) preResolved = { [composed.variable]: resolvePlain(declaration, chosen, readings) };
+            const composedText = chosen === undefined ? "" : resolvePlain(declaration, chosen, readings);
+            // An empty kind text silences the kind (D5, Joel's 2026-11-11 ruling): nothing to compose
+            // is the unknown rule's nothing, so the cell drops its label and gap rather than rendering
+            // a bare label, which is what an absent value would otherwise do.
+            if (composedText !== "") preResolved = { [composed.variable]: composedText };
           }
           const text = resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
           // A timed declaration's whole text shows or hides: nothing to show renders as nothing,

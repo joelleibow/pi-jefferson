@@ -439,6 +439,25 @@ test("the notice instrument shows its text until its instant and nothing after i
   assert.equal(bound.render({ ...held, sampledAt: 2 }, 80, theme), "", "after it");
 });
 
+test("an empty kind text silences that kind", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  const theme = fakeTheme();
+  const boundWith = (formats: Record<string, string>) => instrumentBindings(new Map([
+    ["notice", { segments: parseFormat(named("notice"), "$notice"), style: {},
+      formats: Object.fromEntries(Object.entries(formats)
+        .map(([kind, format]) => [kind, parseFormat(named("notice"), format, true)])) }],
+  ]))(named("notice"));
+  const held: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" }, shownUntil: 1 } };
+  assert.equal(boundWith({ miss: "" }).render(held, 80, theme), "", "an empty kind text renders nothing, label included");
+  assert.equal(boundWith({ miss: "   " }).render(held, 80, theme), "", "whitespace alone trims to the same");
+  assert.equal(boundWith({ miss: "$idle" }).render(held, 80, theme), "",
+    "and a kind text whose only value this kind does not carry");
+  assert.equal(stripTerminalSequences(boundWith({ miss: "Spent $tokens" }).render(held, 80, theme)),
+    "Notice: Spent 125k", "a kind with text still renders");
+});
+
 test("a configured kind's format renders the user's words around the declared values", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { parseFormat } = await import("../extensions/jefferson/format.ts");

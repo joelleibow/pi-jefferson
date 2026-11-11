@@ -1482,16 +1482,28 @@ commit, and `testdiff` over `0d6cd85..HEAD`, whose moved counts are 9.5's to nam
   - Boundary: the arrival's request against the instant's, which are two and neither may be the only
     one.
   - Files: `extensions/jefferson/data/session-data-store.ts`, `tests/session-data-store.test.ts`.
-- [ ] 10.2 An empty kind text silences that kind
+- [x] 10.2 An empty kind text silences that kind
   - Decision: D5's empty-kind sentence, and Joel's 2026-11-11 ruling — a kind whose configured text is
     empty shows nothing, label and gap included, while that notice would otherwise show.
   - Test: `formats.miss: ""` with a miss held renders `""`, with no `Notice:` label and no gap, and a
-    whitespace-only text trims to the same. A kind with text still renders.
+    whitespace-only text trims to the same. A kind text whose only value a miss does not carry
+    (`$idle`) is silenced by the same rule, which is the third input Validate reproduced. A kind with
+    text still renders.
   - Command: `node --test --test-name-pattern="an empty kind text" tests/instrument.test.ts`
   - Plant: the binding's empty-text rule removed, so an empty composed text renders `Notice: ` as any
     empty value does.
-  - Red: measured by Derek in Implement.
-  - Green: the silenced kind renders nothing and the suite runs 425, one test more than 424.
+  - Red, measured in Implement — the test written and the plant applied:
+    ```
+    ✖ an empty kind text silences that kind
+      AssertionError [ERR_ASSERTION]: an empty kind text renders nothing, label included
+      'Notice: ' !== ''
+          at TestContext.<anonymous> (.../tests/instrument.test.ts:453:10)
+    ```
+    The three empty inputs fail at that first assertion; the kind-with-text case passes either way,
+    which is what makes the plant a plant rather than a deletion.
+  - Green, after the revert: `✔ an empty kind text silences that kind`, `ℹ tests 35` / `ℹ pass 35` /
+    `ℹ fail 0` for the file, and `checks/suite.sh . 425` prints
+    `suite: 425 passed, 0 failed (expected 425)` / `PASS` — one test more than the 424.
   - Boundary: an empty kind text against an absent one: the first silences that kind, and the second is
     the unknown rule's, not this one.
   - Files: `extensions/jefferson/components/instruments/instrument-binding.ts`, `tests/instrument.test.ts`.
