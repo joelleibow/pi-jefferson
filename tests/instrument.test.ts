@@ -453,7 +453,7 @@ test("an empty kind text silences that kind", async () => {
   assert.equal(boundWith({ miss: "" }).render(held, 80, theme), "", "an empty kind text renders nothing, label included");
   assert.equal(boundWith({ miss: "   " }).render(held, 80, theme), "", "whitespace alone trims to the same");
   assert.equal(boundWith({ miss: "$idle" }).render(held, 80, theme), "",
-    "and a kind text whose only value this kind does not carry");
+    "and a text that resolves empty because its only value is one this kind does not carry");
   assert.equal(stripTerminalSequences(boundWith({ miss: "Spent $tokens" }).render(held, 80, theme)),
     "Notice: Spent 125k", "a kind with text still renders");
 });
