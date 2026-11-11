@@ -1068,7 +1068,7 @@ Every red below is quoted from `redgreen-derek.md`'s "Addendum — bare values a
 subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
 `git checkout -- <the planted file>`, and the tree is clean after every pair.
 
-- [ ] 7.1 The visual shows its text until the instant and nothing at or after it
+- [x] 7.1 The visual shows its text until the instant and nothing at or after it
   - Decision: D10 — `timed(text, shownUntil, now)`, where `undefined` past the instant is what makes a
     hidden datum unknown to the cell, label and gap included.
   - Command: `node --test tests/timed.test.ts`, the whole file: its four tests are the check.
@@ -1090,7 +1090,7 @@ subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
   - Boundary: one millisecond before the instant against the instant itself and one after it, and an
     absent instant on either side.
   - Files: `extensions/jefferson/components/visuals/timed.ts`, `tests/timed.test.ts`.
-- [ ] 7.2 A timed declaration shows its text until its instant, and nothing after it
+- [x] 7.2 A timed declaration shows its text until its instant, and nothing after it
   - Decision: D10 — the binding applies `timed` to the resolved text with the declaration's
     `shownUntil` reading and `readings.sampledAt`, and a hidden text becomes `""`.
   - Command: `node --test --test-name-pattern='timed declaration' tests/instrument.test.ts`
@@ -1113,7 +1113,7 @@ subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
     green under the same plant.
   - Files: `extensions/jefferson/components/instruments/instrument.ts`,
     `extensions/jefferson/components/instruments/instrument-binding.ts`, `tests/instrument.test.ts`.
-- [ ] 7.3 The notice instrument is timed through its own reading
+- [x] 7.3 The notice instrument is timed through its own reading
   - Decision: D10 and D1 — the declaration carries `shownUntil: readings => readings.notice?.shownUntil`
     and nothing else about time; the composed step is untouched.
   - Command: `node --test --test-name-pattern='the notice instrument shows its text' tests/instrument.test.ts`
@@ -1132,7 +1132,7 @@ subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
   - Boundary: the shipped instrument, which is the visual's first user; the composed text still takes
     `warning` before it hides.
   - Files: `extensions/jefferson/components/instruments/notice.ts`, `tests/instrument.test.ts`.
-- [ ] 7.4 Every test the amendment moves, each red against its old expectation
+- [x] 7.4 Every test the amendment moves, each red against its old expectation
   - Decision: D10 — the sample carries `sampledAt`, a timed datum carries `shownUntil`, and the store
     never hides, so each old expectation now reads the new state.
   - Command: `git checkout 162ff07 -- <the file>`, then `node --test <the file>` whole, per file in the
@@ -1170,7 +1170,7 @@ subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
   - Files: `tests/session-data-store.test.ts`, `tests/session-data-feed.test.ts`, `tests/notice.test.ts`,
     `tests/instrument.test.ts`, `tests/row-renderer.test.ts`, `tests/configuration.test.ts`,
     `tests/jefferson.test.ts`, `tests/format.test.ts`.
-- [ ] 7.5 A visual imports nothing of this package
+- [x] 7.5 A visual imports nothing of this package
   - Decision: D10 and the layout spec's generalized visual requirement — `components/visuals/` files
     import no source file of the package, and any component or `format.ts` may import one.
   - Command: `node checks/imports.mjs <repo>`
@@ -1193,7 +1193,7 @@ escape so that `\` yields the character after it (D5, D11). It is the same commi
 suite is 424 on both sides of the pair. Every red is quoted from `redgreen-derek.md`'s addendum,
 subsections 6 to 10.
 
-- [ ] 8.1 `$blocks` is the bare count, and the kind follows the count
+- [x] 8.1 `$blocks` is the bare count, and the kind follows the count
   - Decision: D5 — the value carries the number, and the noun is the kind's, so `thinkingOne` exists
     for a count of one.
   - Command: `node --test --test-name-pattern='the thinking delta' tests/notice.test.ts`
@@ -1213,7 +1213,7 @@ subsections 6 to 10.
   - Green, after the revert: `ℹ tests 3`, `ℹ pass 3`, `ℹ fail 0` (§6).
   - Boundary: two blocks against one, where the noun and the kind both change.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 8.2 `thinkingOne`'s default text is pi's singular
+- [x] 8.2 `thinkingOne`'s default text is pi's singular
   - Decision: D5 — the seventh kind's default,
     `Anthropic dropped $blocks thinking block (details in session)`.
   - Command: `node --test --test-name-pattern="notice's default text" tests/instrument.test.ts`
@@ -1229,7 +1229,7 @@ subsections 6 to 10.
   - Boundary: the one-block case, which is the only case the kind chooses; the plural case stays green
     under the same plant.
   - Files: `extensions/jefferson/components/instruments/notice.ts`, `tests/instrument.test.ts`.
-- [ ] 8.3 `$idle` is bare, and `6m` arrives through `missIdle`
+- [x] 8.3 `$idle` is bare, and `6m` arrives through `missIdle`
   - Decision: D5 and D11 — the value is the minutes, the text carries `$idle\m`, and each end has one
     owner.
   - Command: `node --test --test-name-pattern='the idle variant' tests/notice.test.ts`, then
@@ -1257,7 +1257,7 @@ subsections 6 to 10.
   - Files: `extensions/jefferson/data/notice.ts`,
     `extensions/jefferson/components/instruments/notice.ts`, `tests/notice.test.ts`,
     `tests/instrument.test.ts`.
-- [ ] 8.4 A backslash yields the character after it
+- [x] 8.4 A backslash yields the character after it
   - Decision: D11 — `\` escapes any character, in a cell's format and a kind's alike.
   - Command: `node --test --test-name-pattern='backslash|same escape|ADR 0003' tests/format.test.ts` —
     the whole escape set: five tests, three red under the plant and two green (the trailing-backslash
@@ -1293,7 +1293,7 @@ subsections 6 to 10.
   - Boundary: a backslash before a letter, before a space, and before the two characters the language
     already escaped; the trailing backslash has no character after it and stays itself.
   - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
-- [ ] 8.5 An unknown `formats` key still rejects, `thinkingTwo` included
+- [x] 8.5 An unknown `formats` key still rejects, `thinkingTwo` included
   - Decision: D5 — the kind vocabulary is the declaration's, and a near miss is unknown.
   - Command: `node --test --test-name-pattern="formats key the notice" tests/configuration.test.ts`
   - The test, §10: it now loops over `["warm", "thinkingTwo"]`, because `thinkingOne` became a kind.
@@ -1307,7 +1307,7 @@ subsections 6 to 10.
   - Green, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§10).
   - Boundary: `thinkingTwo` against `thinkingOne`, the key the amendment added.
   - Files: `extensions/jefferson/configuration.ts`, `tests/configuration.test.ts`.
-- [ ] 8.6 The audit of every format's backslash, and its result
+- [x] 8.6 The audit of every format's backslash, and its result
   - Decision: D11 — the escape changes what a document carrying a literal backslash before a letter
     means, silently, so ADR 0003's audit is repeated over the tree.
   - Command: `git grep -n '\\'` over the tree, then every backtick span in the markdown and every
@@ -1326,7 +1326,7 @@ subsections 6 to 10.
   - Boundary: a format the repository carried against one the change adds — the first is what the audit
     is for, the second is the rule's own user.
   - Files: none; the audit reads the tree.
-- [ ] 8.7 The commit is green and touches only the paths the two amendment groups name
+- [x] 8.7 The commit is green and touches only the paths the two amendment groups name
   - Command: `checks/suite.sh <repo> 424` and
     `checks/scope.sh <repo> 162ff07 a9a9d7d extensions/jefferson/components/instruments/instrument-binding.ts extensions/jefferson/components/instruments/instrument.ts extensions/jefferson/components/instruments/notice.ts extensions/jefferson/components/visuals/timed.ts extensions/jefferson/data/notice.ts extensions/jefferson/data/session-data-store.ts extensions/jefferson/format.ts checks/imports.mjs tests/configuration.test.ts tests/format.test.ts tests/instrument.test.ts tests/jefferson.test.ts tests/notice.test.ts tests/row-renderer.test.ts tests/session-data-feed.test.ts tests/session-data-store.test.ts tests/timed.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `a9a9d7d`: `suite: 424 passed, 0 failed (expected 424)` `PASS`, and `checks/scope.sh` over

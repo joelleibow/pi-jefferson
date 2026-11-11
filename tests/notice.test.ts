@@ -98,7 +98,7 @@ test("the idle variant: exactly five minutes reads missIdle and a millisecond un
   const under = message({ input: 20_000, cacheRead: 80_000, cacheWrite: 0, cost: 0.1, timestamp: CACHE_TTL_MS - 1 });
   const idle = missNotice([previous], at, 0);
   assert.equal(idle?.kind, "missIdle");
-  assert.equal(idle?.values.idle, "5m");
+  assert.equal(idle?.values.idle, "5");
   assert.equal(missNotice([previous], under, 0)?.kind, "miss");
 });
 
@@ -158,10 +158,10 @@ test("the thinking delta shows when the count rises and stays silent when it rep
   const previous = previousMessage({ dropped: 0 });
   const branch = [previous];
   assert.deepEqual(thinkingNotice(message({ dropped: 2 }), branch), {
-    kind: "thinking", values: { blocks: "2 thinking blocks" },
+    kind: "thinking", values: { blocks: "2" },
   });
   assert.deepEqual(thinkingNotice(message({ dropped: 1 }), branch), {
-    kind: "thinking", values: { blocks: "1 thinking block" },
+    kind: "thinkingOne", values: { blocks: "1" },
   });
   assert.equal(thinkingNotice(message({ dropped: 0 }), branch), undefined, "no diagnostic, no notice");
   const repeated = previousMessage({ dropped: 2 });
@@ -179,7 +179,7 @@ test("the thinking delta reads the branch, not the entries: a sibling's higher c
   // The one message notice reads the entries and the branch as different lists: the entries carry
   // the sibling's higher count and yield no miss, and the branch's zero lets the thinking step rise.
   assert.deepEqual(messageNotice(turn, [sibling], [current], 0), {
-    kind: "thinking", values: { blocks: "1 thinking block" },
+    kind: "thinkingOne", values: { blocks: "1" },
   });
 });
 

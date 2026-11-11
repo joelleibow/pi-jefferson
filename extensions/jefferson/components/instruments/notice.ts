@@ -9,10 +9,14 @@ export const NOTICE_SECONDS = 10;
 const FORMATS: Readonly<Record<NoticeKind, string>> = {
   miss: "Cache miss: $tokens tokens re-billed$cost",
   missModelSwitch: "Cache miss after model switch: $tokens tokens re-billed$cost",
-  missIdle: "Cache miss after $idle idle: $tokens tokens re-billed$cost",
+  // The idle is bare minutes, so the unit lives in the text: `\m` escapes the `m` the name run
+  // would otherwise swallow.
+  missIdle: "Cache miss after $idle\\m idle: $tokens tokens re-billed$cost",
   compaction: "Compaction: $tokens tokens billed$cost",
   branchSummary: "Branch summary: $tokens tokens billed$cost",
-  thinking: "Anthropic dropped $blocks (details in session)",
+  // The count is bare, so the noun lives in the text, and grammatical number is the kind's.
+  thinking: "Anthropic dropped $blocks thinking blocks (details in session)",
+  thinkingOne: "Anthropic dropped $blocks thinking block (details in session)",
 };
 
 export const notice: InstrumentDeclaration = {
@@ -32,6 +36,9 @@ export const notice: InstrumentDeclaration = {
   },
   // pi colours every kind this change ships `warning`, and styling stays at the cell.
   variableFg: { notice: () => "warning" },
+  // The whole notice shows or hides, label included: the timed visual compares this instant
+  // against the render's.
+  shownUntil: readings => readings.notice?.shownUntil,
   defaultFormat: "$notice",
   defaultLabel: "Notice:",
   options: Object.freeze([...FOUNDATIONAL_OPTIONS, "seconds", "formats"]),

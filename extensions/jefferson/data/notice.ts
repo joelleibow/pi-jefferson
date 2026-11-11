@@ -8,8 +8,11 @@
  */
 import type { MessageEndEvent, SessionEntry } from "@earendil-works/pi-coding-agent";
 
-/** The six kinds of notice pi's transcript draws, and the four values a kind's format carries. */
-export type NoticeKind = "miss" | "missModelSwitch" | "missIdle" | "compaction" | "branchSummary" | "thinking";
+/**
+ * The seven kinds of notice pi's transcript draws, and the four values a kind's format carries.
+ * `thinkingOne` is pi's grammatical number for a single dropped block, so no value carries a noun.
+ */
+export type NoticeKind = "miss" | "missModelSwitch" | "missIdle" | "compaction" | "branchSummary" | "thinking" | "thinkingOne";
 export type NoticeValue = "tokens" | "cost" | "idle" | "blocks";
 
 /** A notice: its kind and each value already formatted, absent where the kind does not carry it. */
@@ -147,7 +150,7 @@ export function missNotice(entries: SessionEntry[], message: AssistantMessage, r
     tokens: formatTokens(miss.missedTokens),
     cost: costSuffix(miss.missedCost),
   };
-  if (kind === "missIdle") values.idle = `${Math.round(miss.idleMs / MINUTE_MS)}m`;
+  if (kind === "missIdle") values.idle = `${Math.round(miss.idleMs / MINUTE_MS)}`;
   return { kind, values };
 }
 
@@ -167,8 +170,8 @@ export function thinkingNotice(message: AssistantMessage, branch: SessionEntry[]
     }
   }
   if (dropped <= previous) return undefined;
-  const noun = dropped === 1 ? "thinking block" : "thinking blocks";
-  return { kind: "thinking", values: { blocks: `${dropped} ${noun}` } };
+  // The count is bare and the noun belongs to the kind, so pi's `thinking block` is its own kind.
+  return { kind: dropped === 1 ? "thinkingOne" : "thinking", values: { blocks: `${dropped}` } };
 }
 
 /** The one notice a completed message yields: the miss pi draws second wins the collision. */

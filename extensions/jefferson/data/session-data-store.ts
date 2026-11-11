@@ -16,6 +16,9 @@ export interface UsageTotals {
   readonly cost: number;
 }
 
+/** A datum that shows until an instant: the store stamps the instant once, on arrival. */
+export type Timed<T> = T & { readonly shownUntil: number };
+
 /** One render's values, shared by all its cells. */
 export interface Readings {
   readonly provider: Reading;
@@ -28,8 +31,10 @@ export interface Readings {
   readonly statuses: ReadonlyMap<string, string> | undefined;
   readonly contextUsage: ContextUsage | undefined;
   readonly totals: UsageTotals | undefined;
-  /** The notice a notice instrument shows; unknown while none shows. */
-  readonly notice?: Notice;
+  /** The notice a notice instrument shows, with the instant it shows until; unknown while none is held. */
+  readonly notice?: Timed<Notice>;
+  /** The instant this sample read, once per render; unknown after disposal. */
+  readonly sampledAt: number | undefined;
 }
 
 export interface SessionDataStore {
@@ -97,9 +102,9 @@ export function createSessionDataStore(options: {
   let now: (() => number) | undefined = options.now;
   let schedule: ((callback: () => void, delayMs: number) => () => void) | undefined = options.schedule;
   const noticeSeconds = options.noticeSeconds;
-  // One notice at a time: the slot, the deadline its arrival set, and the pending expiry's cancel.
-  let notice: Notice | undefined;
-  let deadline: number | undefined;
+  // One notice at a time: the slot, carrying the instant its arrival stamped, and the pending
+  // repaint's cancel. The instant lives on the datum, so the store has one home for it.
+  let notice: Timed<Notice> | undefined;
   let cancelExpiry: (() => void) | undefined;
 
   const cancelNotice = (): void => {
@@ -108,18 +113,16 @@ export function createSessionDataStore(options: {
   };
 
   // A timer may not extend or shorten a notice: an early fire re-arms for the time left and
-  // requests nothing, and a fire at or past the deadline requests the one repaint.
+  // requests nothing, and a fire at or past the instant requests the one repaint. The store never
+  // hides the datum, so the callback changes nothing it holds.
   const armExpiry = (at: number): void => {
     if (schedule === undefined || now === undefined) return;
     cancelExpiry = schedule(() => {
-      if (notice === undefined || now === undefined) return;
+      if (now === undefined) return;
       if (now() < at) {
         armExpiry(at);
         return;
       }
-      cancelNotice();
-      notice = undefined;
-      deadline = undefined;
       requestRender?.();
     }, Math.max(0, at - now()));
   };
@@ -127,9 +130,10 @@ export function createSessionDataStore(options: {
   const showNotice = (next: Notice): void => {
     if (noticeSeconds === undefined || now === undefined || schedule === undefined) return;
     cancelNotice();
-    notice = next;
-    deadline = now() + noticeSeconds * 1_000;
-    armExpiry(deadline);
+    // The one home of the instant: stamped on arrival, from the document's seconds.
+    const shownUntil = now() + noticeSeconds * 1_000;
+    notice = { ...next, shownUntil };
+    armExpiry(shownUntil);
   };
 
   return {
@@ -138,12 +142,8 @@ export function createSessionDataStore(options: {
         return {
           provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, home: undefined,
           branch: undefined, sessionName: undefined, statuses: undefined, contextUsage: undefined, totals: undefined,
+          sampledAt: undefined,
         };
-      }
-      if (notice !== undefined && now !== undefined && deadline !== undefined && now() >= deadline) {
-        cancelNotice();
-        notice = undefined;
-        deadline = undefined;
       }
       const { contextUsage, sessionId, leafId } = readUsage();
       if (scanCache?.sessionId !== sessionId || scanCache?.leafId !== leafId) {
@@ -155,6 +155,8 @@ export function createSessionDataStore(options: {
         // The host's map is held raw; a map with nothing in it means no extension set a status.
         statuses: statuses === undefined || statuses.size === 0 ? undefined : statuses,
         contextUsage, totals: scanCache.totals,
+        // One instant per render, so two timed cells in one sample agree on when they are.
+        sampledAt: now === undefined ? undefined : now(),
         ...(notice === undefined ? {} : { notice }),
       };
     },
@@ -226,7 +228,6 @@ export function createSessionDataStore(options: {
       readStatuses = undefined;
       scanCache = undefined;
       notice = undefined;
-      deadline = undefined;
     },
   };
 }

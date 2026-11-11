@@ -340,13 +340,13 @@ test("a notice cell placed takes the three notice subscriptions and releases the
 test("message_end carries a miss to the store's notice", () => {
   const { store, fire } = feed({ noticeSeconds: 10, entries: [previousEntry()], branch: [previousEntry()] });
   fire("message_end", { type: "message_end", message: noticeMessage() });
-  assert.deepEqual(store.sample().notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } });
+  assert.deepEqual(store.sample().notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 10_000 });
 });
 
 test("message_end prices a turn that read no cache with the model's cache-read fallback", () => {
   const { store, fire } = feed({ noticeSeconds: 10, entries: [previousEntry()], branch: [previousEntry()], cacheRead: 2 });
   fire("message_end", { type: "message_end", message: noticeMessage({ cacheRead: 0 }) });
-  assert.deepEqual(store.sample().notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.06)" } });
+  assert.deepEqual(store.sample().notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.06)" }, shownUntil: 10_000 });
 });
 
 test("message_end carries no notice for a user message or a stopped message", () => {
@@ -363,9 +363,9 @@ test("session_compact and session_tree carry their usage to the store's notice",
   const { store, fire } = feed({ noticeSeconds: 10 });
   const usage = { input: 100, output: 400, cacheRead: 200, cacheWrite: 300, totalTokens: 0, cost: { input: 0.38, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.38 } };
   fire("session_compact", { type: "session_compact", compactionEntry: { usage } });
-  assert.deepEqual(store.sample().notice, { kind: "compaction", values: { tokens: "1.0k", cost: " (~$0.38)" } });
+  assert.deepEqual(store.sample().notice, { kind: "compaction", values: { tokens: "1.0k", cost: " (~$0.38)" }, shownUntil: 10_000 });
   fire("session_tree", { type: "session_tree", summaryEntry: { usage } });
-  assert.deepEqual(store.sample().notice, { kind: "branchSummary", values: { tokens: "1.0k", cost: " (~$0.38)" } });
+  assert.deepEqual(store.sample().notice, { kind: "branchSummary", values: { tokens: "1.0k", cost: " (~$0.38)" }, shownUntil: 10_000 });
   fire("session_tree", { type: "session_tree", summaryEntry: undefined });
   assert.equal(store.sample().notice?.kind, "branchSummary", "a tree event carrying no summary leaves the held notice");
 });

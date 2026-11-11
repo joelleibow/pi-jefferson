@@ -412,6 +412,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/instruments/notice.ts", ["NOTICE_SECONDS", "notice"]],
     ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
+    ["../extensions/jefferson/components/visuals/timed.ts", ["timed"]],
   ];
   const pinnedModules = new Map<string, Record<string, unknown>>();
   for (const [path, expected] of pinned) {

@@ -6,7 +6,7 @@ import type { MessageEndEvent, SessionEntry } from "@earendil-works/pi-coding-ag
 import type { Notice } from "../extensions/jefferson/data/notice.ts";
 
 import { createSessionDataStore } from "../extensions/jefferson/data/session-data-store.ts";
-import type { Readings, SessionDataStore } from "../extensions/jefferson/data/session-data-store.ts";
+import type { Readings, SessionDataStore, Timed } from "../extensions/jefferson/data/session-data-store.ts";
 
 const zeroTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
 const seed: Readings = {
@@ -20,6 +20,8 @@ const seed: Readings = {
   statuses: undefined,
   contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 },
   totals: zeroTotals,
+  // The instant the fake clock reads, so a sample taken from this seed equals it.
+  sampledAt: 0,
 };
 const unknown: Readings = {
   provider: undefined,
@@ -32,6 +34,7 @@ const unknown: Readings = {
   statuses: undefined,
   contextUsage: undefined,
   totals: undefined,
+  sampledAt: undefined,
 };
 
 /** Counting readers fake only the host boundary, never the store. */
@@ -163,12 +166,14 @@ function newNoticeStore(options: { noticeSeconds?: number; branch?: SessionEntry
   return { store, timer, repaints: () => repaints };
 }
 
-test("the ten seeded datums, in order, and no notice", () => {
+test("the ten seeded datums and the render's instant, in order, and no notice", () => {
   const { store } = newStore(seed);
   const sample = store.sample();
   assert.deepEqual(Object.keys(sample), [
-    "provider", "model", "thinkingLevel", "cwd", "home", "branch", "sessionName", "statuses", "contextUsage", "totals",
+    "provider", "model", "thinkingLevel", "cwd", "home", "branch", "sessionName", "statuses", "contextUsage",
+    "totals", "sampledAt",
   ]);
+  assert.equal(sample.sampledAt, 0, "the instant the store's clock read");
   assert.deepEqual(sample, seed);
 });
 
@@ -498,8 +503,8 @@ test("a branch push, a name push and a status reader after disposal leave the st
 test("a completed assistant message's notice is the store's notice datum", () => {
   const { store } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
-  const notice: Notice | undefined = store.sample().notice;
-  assert.deepEqual(notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } });
+  const notice: Timed<Notice> | undefined = store.sample().notice;
+  assert.deepEqual(notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 10_000 });
 });
 
 test("a user message, a non-message event and an aborted or errored message take no notice", () => {
@@ -515,9 +520,9 @@ test("a user message, a non-message event and an aborted or errored message take
 test("a compaction and a branch summary each hold their usage as a notice", () => {
   const { store } = newNoticeStore({ noticeSeconds: 10 });
   store.compactionEnded(usageOf(100, 200, 300, 0.38, 400));
-  assert.deepEqual(store.sample().notice, { kind: "compaction", values: { tokens: "1.0k", cost: " (~$0.38)" } });
+  assert.deepEqual(store.sample().notice, { kind: "compaction", values: { tokens: "1.0k", cost: " (~$0.38)" }, shownUntil: 10_000 });
   store.branchSummarised(usageOf(100, 200, 300, 0.38, 400));
-  assert.deepEqual(store.sample().notice, { kind: "branchSummary", values: { tokens: "1.0k", cost: " (~$0.38)" } });
+  assert.deepEqual(store.sample().notice, { kind: "branchSummary", values: { tokens: "1.0k", cost: " (~$0.38)" }, shownUntil: 10_000 });
 });
 
 test("a compaction or a branch summary carrying no usage takes no notice", () => {
@@ -536,24 +541,25 @@ test("with no visible time the store takes no notice and holds no timer", () => 
   assert.equal(timer.pending(), 0, "no visible time, no timer");
 });
 
-test("a notice's expiry on the clock drops it and requests exactly one repaint", () => {
+test("a notice's instant requests exactly one repaint, and the store keeps the notice", () => {
   const { store, timer, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
   assert.equal(repaints(), 0, "the arrival requests nothing; the host renders the event");
-  assert.ok(store.sample().notice, "the notice shows before its deadline");
+  const held = { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 10_000 };
+  assert.deepEqual(store.sample().notice, held, "the notice shows before its instant");
   timer.advance(10_000);
-  assert.equal(repaints(), 1, "the expiry requests one repaint");
-  assert.equal(store.sample().notice, undefined, "the visible time is over");
+  assert.equal(repaints(), 1, "the instant requests one repaint");
+  assert.deepEqual(store.sample().notice, held, "the store never hides the notice");
   assert.equal(timer.pending(), 0, "and the handle is spent");
 });
 
-test("a read past the deadline drops the notice without a timer's help, and requests no repaint", () => {
+test("a read past the instant keeps the notice and its instant, and asks for nothing", () => {
   const { store, timer, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
   timer.move(10_000);
-  assert.equal(store.sample().notice, undefined, "the clock decides, and a read past the deadline drops it");
-  assert.equal(repaints(), 0);
-  assert.equal(timer.pending(), 0, "the read cancels the pending handle");
+  assert.equal(store.sample().notice?.shownUntil, 10_000, "the store still holds the notice and its instant");
+  assert.equal(repaints(), 0, "a read asks nothing of the store");
+  assert.equal(timer.pending(), 1, "the scheduled repaint is still pending");
 });
 
 test("an early fire re-arms for the time left and requests no repaint", () => {
@@ -566,8 +572,8 @@ test("an early fire re-arms for the time left and requests no repaint", () => {
   assert.deepEqual(timer.arms, [10_000, 6_000], "the re-arm covers the time left");
   assert.ok(store.sample().notice, "the notice still shows");
   timer.advance(6_000);
-  assert.equal(repaints(), 1, "the re-armed timer requests the one repaint at the deadline");
-  assert.equal(store.sample().notice, undefined);
+  assert.equal(repaints(), 1, "the re-armed timer requests the one repaint at the instant");
+  assert.equal(store.sample().notice?.shownUntil, 10_000, "and the store still holds the notice");
 });
 
 test("a newer notice replaces the shown one and takes its whole visible time from its own arrival", () => {
@@ -583,7 +589,7 @@ test("a newer notice replaces the shown one and takes its whole visible time fro
   timer.advance(9_999);
   assert.equal(store.sample().notice?.kind, "compaction", "one second short of its full time");
   timer.advance(1);
-  assert.equal(store.sample().notice, undefined, "the second ran its whole ten seconds");
+  assert.equal(store.sample().notice?.shownUntil, 18_000, "the second reached its own instant and stays held");
 });
 
 test("one message carrying a thinking drop and a miss keeps the miss", () => {
@@ -601,7 +607,7 @@ test("the thinking delta reads the branch, not the entries: a sibling's higher c
   const turn = noticeMessage({ dropped: 1, cacheRead: 0 });
   const { store } = newNoticeStore({ noticeSeconds: 10, entries: [sibling], branch: [current] });
   store.messageEnded(turn, 0);
-  assert.deepEqual(store.sample().notice, { kind: "thinking", values: { blocks: "1 thinking block" } });
+  assert.deepEqual(store.sample().notice, { kind: "thinkingOne", values: { blocks: "1" }, shownUntil: 10_000 });
 });
 
 test("the cache-warm entry is the previous request the miss rule measures", () => {

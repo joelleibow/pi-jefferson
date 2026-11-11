@@ -2,6 +2,7 @@
 import type { ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
+import { timed } from "../visuals/timed.ts";
 import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
@@ -44,7 +45,12 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
             const chosen = key === undefined ? undefined : entry?.formats?.[key] ?? plain[key];
             if (chosen !== undefined) preResolved = { [composed.variable]: resolvePlain(declaration, chosen, readings) };
           }
-          return resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
+          const text = resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
+          // A timed declaration's whole text shows or hides: nothing to show renders as nothing,
+          // so the cell drops its label and gap as it does for an unknown datum.
+          return declaration.shownUntil === undefined
+            ? text
+            : timed(text, declaration.shownUntil(readings), readings.sampledAt) ?? "";
         },
       };
       bound.set(declaration.name, instrument);

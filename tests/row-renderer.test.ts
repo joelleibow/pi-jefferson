@@ -34,6 +34,7 @@ function visible(line: string): string {
 const readings: Readings = {
   provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, home: undefined,
   branch: undefined, sessionName: undefined, statuses: undefined, contextUsage: undefined, totals: undefined,
+  sampledAt: 0,
 };
 
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
@@ -178,7 +179,7 @@ test("the notice cell's text sits at its alignment", async () => {
   const declaration = instrumentNamed("notice");
   assert.ok(declaration);
   const notice = instrumentBindings()(declaration);
-  const live: Readings = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } } };
+  const live: Readings = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 1 } };
   const text = "Notice: Cache miss: 20k tokens re-billed (~$0.10)";
   const at = (align: "left" | "center" | "right"): string => stripTerminalSequences(
     createFooter([{ id: "row-0", distribution: "equal", cells: [{ instrument: notice, align }] }], () => live, fakeTheme(), 0)
@@ -191,7 +192,7 @@ test("the notice cell's text sits at its alignment", async () => {
   assert.equal(at("center"), " ".repeat(15) + text + " ".repeat(16));
 });
 
-test("a fill cell gives up the notice's columns and takes them back when it expires", async () => {
+test("a fill cell gives up the notice's columns and takes them back when its instant passes", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const declaration = instrumentNamed("notice");
   assert.ok(declaration);
@@ -206,10 +207,11 @@ test("a fill cell gives up the notice's columns and takes them back when it expi
   const line = (): string => stripTerminalSequences(footer.render(80)[0] ?? "");
   // Nothing to show: the fill takes all 80 columns and the notice's cell takes none.
   assert.equal(line(), "a".padEnd(80), "the fill takes the row while the notice is unknown");
-  current = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } } };
+  current = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 1 } };
   assert.equal(line(), "a".padEnd(31) + text, "the fill gives up the notice's 49 columns");
-  current = { ...readings };
-  assert.equal(line(), "a".padEnd(80), "the fill takes the columns back when the notice expires");
+  // The store still holds the notice; the timed visual is what stops showing it.
+  current = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 0 } };
+  assert.equal(line(), "a".padEnd(80), "the fill takes the columns back when the instant passes");
   assert.equal(visibleWidth(line()), 80);
 });
 

@@ -43,6 +43,11 @@ export interface InstrumentDeclaration {
   readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
   /** A format set chosen by a reading, composed into the variable it names. */
   readonly composed?: ComposedFormat;
+  /**
+   * A timed datum's instant: the reading the timed visual compares against the render's instant.
+   * A declaration carrying it is timed, and the whole cell shows or hides with the datum.
+   */
+  readonly shownUntil?: (readings: Readings) => number | undefined;
   readonly options: readonly string[];
 }
 

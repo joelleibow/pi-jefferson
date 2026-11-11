@@ -60,7 +60,9 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
   };
   for (let index = 0; index < format.length; index++) {
     const character = format[index]!;
-    if (character === "\\" && (format[index + 1] === "$" || format[index + 1] === "|")) {
+    // A backslash yields the character after it, whatever it is, so `\$`, `\|` and `\m` render
+    // `$`, `|` and `m`; a trailing backslash has no character after it and stays itself.
+    if (character === "\\" && format[index + 1] !== undefined) {
       literal += format[index + 1];
       afterName = false;
       index++;
