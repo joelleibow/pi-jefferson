@@ -463,6 +463,9 @@ test("a push between two renders shows up in the next render and not before", ()
     requestRender: () => {},
     readUsage: () => ({ contextUsage: undefined, sessionId: "session-1", leafId: null }),
     readEntries: () => [],
+    readBranch: () => [],
+    now: () => 0,
+    schedule: () => () => {},
   });
   const footer = createFooter(
     [{ id: "row-0", distribution: "equal", cells: [{ instrument: capture, align: "left" }, { instrument: capture, align: "left" }] }],

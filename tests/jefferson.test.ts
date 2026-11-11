@@ -252,6 +252,17 @@ test("outside TUI mode the jefferson command reports that no footer is installed
   assert.deepEqual(notified, ["pi-jefferson — no statusline footer is installed."]);
 });
 
+test("a session_shutdown runs the release, so the session's subscriptions are taken", async (t) => {
+  const pi = harness();
+  const session = await pi.start();
+  const events = session.subscriptions.map((subscription) => subscription.event);
+  for (const subscription of session.subscriptions) assert.equal(subscription.calls, 0, `${subscription.event} is held`);
+  pi.dispatch({ type: "session_shutdown", reason: "reload" });
+  for (const subscription of session.subscriptions) assert.equal(subscription.calls, 1, `${subscription.event} is released`);
+  assert.ok(events.length > 0, "the session subscribed to its events");
+  t.diagnostic(events.join(", "));
+});
+
 test("the session_start handler installs the footer in TUI mode", async (t) => {
   // No document at all: the default row, one row of one line and nothing above it.
   useTempAgentDir(t);

@@ -1,8 +1,12 @@
 /** Session datums and usage derivations; the session data feed supplies readers, never a host handle. */
-import type { ContextUsage, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { ContextUsage, MessageEndEvent, SessionEntry } from "@earendil-works/pi-coding-agent";
+
+import { messageNotice, usageNotice, type Notice } from "./notice.ts";
 
 /** `undefined` is unknown — never an empty string, zero, or a stale value. */
 export type Reading = string | undefined;
+/** The usage a compaction or branch summary carries. */
+type UsageOf = Extract<SessionEntry, { type: "usage" }>["usage"];
 
 export interface UsageTotals {
   readonly input: number;
@@ -24,6 +28,8 @@ export interface Readings {
   readonly statuses: ReadonlyMap<string, string> | undefined;
   readonly contextUsage: ContextUsage | undefined;
   readonly totals: UsageTotals | undefined;
+  /** The notice a notice instrument shows; unknown while none shows. */
+  readonly notice?: Notice;
 }
 
 export interface SessionDataStore {
@@ -34,6 +40,12 @@ export interface SessionDataStore {
   sessionNamed(name: string | undefined): void;
   readStatusesFrom(read: () => ReadonlyMap<string, string>): void;
   turnEnded(): void;
+  /** A completed message: its cache miss and its dropped thinking, the miss winning a collision. */
+  messageEnded(message: MessageEndEvent["message"], readCachePerToken: number | undefined): void;
+  /** A compaction's billed usage, or nothing when it carries none. */
+  compactionEnded(usage: UsageOf | undefined): void;
+  /** A branch summary's billed usage, or nothing when it carries none. */
+  branchSummarised(usage: UsageOf | undefined): void;
   dispose(): void;
 }
 
@@ -63,6 +75,11 @@ export function createSessionDataStore(options: {
   requestRender: () => void;
   readUsage: () => { contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null };
   readEntries: () => SessionEntry[];
+  readBranch: () => SessionEntry[];
+  now: () => number;
+  schedule: (callback: () => void, delayMs: number) => () => void;
+  /** The visible time a notice takes from its arrival, or `undefined` when no row places a notice cell. */
+  noticeSeconds?: number;
 }): SessionDataStore {
   let provider = options.seed.provider;
   let model = options.seed.model;
@@ -76,6 +93,44 @@ export function createSessionDataStore(options: {
   let readEntries: typeof options.readEntries | undefined = options.readEntries;
   let readStatuses: (() => ReadonlyMap<string, string>) | undefined;
   let scanCache: { sessionId: string; leafId: string | null; totals: UsageTotals } | undefined;
+  let readBranch: (() => SessionEntry[]) | undefined = options.readBranch;
+  let now: (() => number) | undefined = options.now;
+  let schedule: ((callback: () => void, delayMs: number) => () => void) | undefined = options.schedule;
+  const noticeSeconds = options.noticeSeconds;
+  // One notice at a time: the slot, the deadline its arrival set, and the pending expiry's cancel.
+  let notice: Notice | undefined;
+  let deadline: number | undefined;
+  let cancelExpiry: (() => void) | undefined;
+
+  const cancelNotice = (): void => {
+    cancelExpiry?.();
+    cancelExpiry = undefined;
+  };
+
+  // A timer may not extend or shorten a notice: an early fire re-arms for the time left and
+  // requests nothing, and a fire at or past the deadline requests the one repaint.
+  const armExpiry = (at: number): void => {
+    if (schedule === undefined || now === undefined) return;
+    cancelExpiry = schedule(() => {
+      if (notice === undefined || now === undefined) return;
+      if (now() < at) {
+        armExpiry(at);
+        return;
+      }
+      cancelNotice();
+      notice = undefined;
+      deadline = undefined;
+      requestRender?.();
+    }, Math.max(0, at - now()));
+  };
+
+  const showNotice = (next: Notice): void => {
+    if (noticeSeconds === undefined || now === undefined || schedule === undefined) return;
+    cancelNotice();
+    notice = next;
+    deadline = now() + noticeSeconds * 1_000;
+    armExpiry(deadline);
+  };
 
   return {
     sample() {
@@ -84,6 +139,11 @@ export function createSessionDataStore(options: {
           provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, home: undefined,
           branch: undefined, sessionName: undefined, statuses: undefined, contextUsage: undefined, totals: undefined,
         };
+      }
+      if (notice !== undefined && now !== undefined && deadline !== undefined && now() >= deadline) {
+        cancelNotice();
+        notice = undefined;
+        deadline = undefined;
       }
       const { contextUsage, sessionId, leafId } = readUsage();
       if (scanCache?.sessionId !== sessionId || scanCache?.leafId !== leafId) {
@@ -95,6 +155,7 @@ export function createSessionDataStore(options: {
         // The host's map is held raw; a map with nothing in it means no extension set a status.
         statuses: statuses === undefined || statuses.size === 0 ? undefined : statuses,
         contextUsage, totals: scanCache.totals,
+        ...(notice === undefined ? {} : { notice }),
       };
     },
     modelSelected(nextProvider, nextModel) {
@@ -127,6 +188,22 @@ export function createSessionDataStore(options: {
     readStatusesFrom(read) {
       readStatuses = read;
     },
+    messageEnded(message, readCachePerToken) {
+      if (requestRender === undefined || readEntries === undefined || readBranch === undefined) return;
+      if (message.role !== "assistant") return;
+      const next = messageNotice(message, readEntries(), readBranch(), readCachePerToken);
+      if (next !== undefined) showNotice(next);
+    },
+    compactionEnded(usage) {
+      if (requestRender === undefined) return;
+      const next = usageNotice("compaction", usage);
+      if (next !== undefined) showNotice(next);
+    },
+    branchSummarised(usage) {
+      if (requestRender === undefined) return;
+      const next = usageNotice("branchSummary", usage);
+      if (next !== undefined) showNotice(next);
+    },
     turnEnded() {
       if (requestRender === undefined) return;
       const previous = scanCache?.totals;
@@ -139,11 +216,17 @@ export function createSessionDataStore(options: {
     },
     dispose() {
       // These callbacks capture the old session; the host disposes us before invalidating it.
+      cancelNotice();
       requestRender = undefined;
       readUsage = undefined;
       readEntries = undefined;
+      readBranch = undefined;
+      now = undefined;
+      schedule = undefined;
       readStatuses = undefined;
       scanCache = undefined;
+      notice = undefined;
+      deadline = undefined;
     },
   };
 }

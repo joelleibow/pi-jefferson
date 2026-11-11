@@ -316,6 +316,9 @@ test("a footer's bound cost and tokens read one identical totals object from one
       scans++;
       return [{ type: "usage", usage: { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, totalTokens: 2775, cost: { total: 0.123 } } }] as import("@earendil-works/pi-coding-agent").SessionEntry[];
     },
+    readBranch: () => [],
+    now: () => 0,
+    schedule: () => () => {},
   });
   const seen: Array<Readings["totals"]> = [];
   for (const cell of rows[0]?.cells ?? []) {

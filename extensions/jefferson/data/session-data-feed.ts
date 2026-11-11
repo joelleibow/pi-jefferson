@@ -1,5 +1,5 @@
 /** What keeps the session data current: the seed, the readers of the host's session, and its pushes. */
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, MessageEndEvent } from "@earendil-works/pi-coding-agent";
 
 import { createSessionDataStore, type Reading, type SessionDataStore } from "./session-data-store.ts";
 
@@ -33,6 +33,9 @@ export function feedSessionData(
   ctx: ExtensionContext,
   requestRender: () => void,
   readHome: () => string,
+  now: () => number,
+  schedule: (callback: () => void, delayMs: number) => () => void,
+  noticeSeconds: number | undefined,
 ): { store: SessionDataStore; release: () => void; attachFooterData: (footerData: FooterDatumSource) => void } {
   // Seeded from the context because the host reports no selection when it restores a session.
   const store = createSessionDataStore({
@@ -51,6 +54,10 @@ export function feedSessionData(
       leafId: ctx.sessionManager.getLeafId(),
     }),
     readEntries: () => ctx.sessionManager.getEntries(),
+    readBranch: () => ctx.sessionManager.getBranch(),
+    now,
+    schedule,
+    ...(noticeSeconds === undefined ? {} : { noticeSeconds }),
   });
 
   // Pushes are unwrapped here, so the store names no host event.
@@ -62,6 +69,21 @@ export function feedSessionData(
   );
   const releaseTurn = pi.on("turn_end", () => store.turnEnded());
   const releaseName = pi.on("session_info_changed", (event) => store.sessionNamed(event.name));
+
+  // The notice subscriptions exist only while a row places a notice cell: a document without one
+  // pays nothing for a notice, and the store is given no visible time.
+  const noticeSubscriptions: Array<() => void> = [];
+  if (noticeSeconds !== undefined) {
+    const cacheReadRate = (message: MessageEndEvent["message"]): number | undefined =>
+      message.role === "assistant"
+        ? (ctx.modelRegistry.find(message.provider, message.model)?.cost.cacheRead ?? 0) / 1_000_000
+        : undefined;
+    noticeSubscriptions.push(
+      pi.on("message_end", (event) => store.messageEnded(event.message, cacheReadRate(event.message))),
+      pi.on("session_compact", (event) => store.compactionEnded(event.compactionEntry.usage)),
+      pi.on("session_tree", (event) => store.branchSummarised(event.summaryEntry?.usage)),
+    );
+  }
 
   let released = false;
   let releaseBranch: (() => void) | undefined;
@@ -91,6 +113,7 @@ export function feedSessionData(
     releaseThinking();
     releaseTurn();
     releaseName();
+    for (const releaseNotice of noticeSubscriptions) releaseNotice();
     store.dispose();
   };
   return { store, release, attachFooterData };

@@ -372,7 +372,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
 `now: () => 0`, `schedule: () => () => {}`. Fixture-only, no behaviour, and no task needs one for them
 (`michael-pl7-r1.json`, finding 5).
 
-- [ ] 3.1 A completed assistant message's notice becomes the store's datum
+- [x] 3.1 A completed assistant message's notice becomes the store's datum
   - Decision: D1 — `Readings.notice`, holding the kind and the values already formatted.
   - Command: `node --test --test-name-pattern="completed assistant message" tests/session-data-store.test.ts`
   - Red: with `messageEnded`'s `if (next !== undefined) showNotice(next);` removed:
@@ -388,7 +388,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: none beyond the datum's shape; D1's unknown state is 3.4's.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.2 A message that carries no notice takes none
+- [x] 3.2 A message that carries no notice takes none
   - Decision: D1 — assistant messages only, and the store spec's "A message that carries no notice".
   - Command: `node --test --test-name-pattern="user message" tests/session-data-store.test.ts`
   - Red: with `messageEnded`'s `if (message.role !== "assistant") return;` removed:
@@ -402,7 +402,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: a user message, a non-message event, and an aborted or errored message.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.3 A compaction and a branch summary each hold their usage
+- [x] 3.3 A compaction and a branch summary each hold their usage
   - Decision: D1 — the two events' `usage` becoming a notice, and the store spec's "A compaction ends"
     and "A branch summary ends".
   - Command: `node --test --test-name-pattern="compaction and a branch summary" tests/session-data-store.test.ts`
@@ -424,7 +424,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: an entry carrying usage against one carrying none; each event on its own.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.4 With no visible time the store takes no notice and holds no timer
+- [x] 3.4 With no visible time the store takes no notice and holds no timer
   - Decision: D3 — an `undefined` visible time means no notice, no previous-request record and no
     handle.
   - Command: `node --test --test-name-pattern="with no visible time" tests/session-data-store.test.ts`
@@ -439,7 +439,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: the absent visible time, which is the gate's own state.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.5 An expiry requests exactly one repaint
+- [x] 3.5 An expiry requests exactly one repaint
   - Decision: D2 — the clock decides and the scheduler requests the repaint, once.
   - Command: `node --test --test-name-pattern="expiry on the clock" tests/session-data-store.test.ts`
   - Red: with the callback's `requestRender?.()` removed:
@@ -452,7 +452,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: one repaint against none — a second repaint would be the cadence D2 refuses.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.6 A read past the deadline drops the notice without a timer's help
+- [x] 3.6 A read past the deadline drops the notice without a timer's help
   - Decision: D2 — the clock decides at the start of a read; the timer only requests the repaint.
   - Command: `node --test --test-name-pattern="read past the deadline" tests/session-data-store.test.ts`
   - Red: with the sample's `if (notice !== undefined && now() >= deadline) { … }` block removed:
@@ -467,7 +467,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: the deadline itself, reached with no timer fired.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.7 An early fire re-arms for the time left and requests nothing
+- [x] 3.7 An early fire re-arms for the time left and requests nothing
   - Decision: D2 — the callback's two branches (`michael-pl4-r2.json`, `later_gates`: the early-fire
     test asserts zero repaints and one re-arm on a fake clock).
   - Command: `node --test --test-name-pattern="early fire" tests/session-data-store.test.ts`
@@ -481,7 +481,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: a timer firing before the deadline, against one firing at or after it.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.8 A newer notice replaces the shown one for its whole visible time
+- [x] 3.8 A newer notice replaces the shown one for its whole visible time
   - Decision: D7 — one slot, the replaced handle cancelled, the newcomer's own arrival as its start.
   - Command: `node --test --test-name-pattern="newer notice replaces" tests/session-data-store.test.ts`
   - Red: with `showNotice`'s `cancelNotice()` removed:
@@ -495,7 +495,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: a second notice arriving 8 seconds into a 10-second one.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.9 Disposal clears the pending expiry, and a message after it takes no notice
+- [x] 3.9 Disposal clears the pending expiry, and a message after it takes no notice
   - Decision: D2 — the handle cancelled in the feed's release, which is the component's `dispose`.
   - Command: `node --test --test-name-pattern="disposal clears the pending expiry" tests/session-data-store.test.ts`
   - Red: with `dispose`'s `cancelNotice()` removed:
@@ -515,7 +515,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: a message arriving after the release, which must reach nothing.
   - Files: `extensions/jefferson/data/session-data-store.ts`,
     `tests/session-data-store.test.ts`.
-- [ ] 3.10 With no notice cell placed, the feed takes no notice subscription
+- [x] 3.10 With no notice cell placed, the feed takes no notice subscription
   - Decision: D3 — the gate; the store spec's "No notice cell placed".
   - Command: `node --test --test-name-pattern="no notice cell placed" tests/session-data-feed.test.ts`
   - Red: with the `if (noticeSeconds !== undefined)` gate removed:
@@ -528,7 +528,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Green: `✔ no notice cell placed takes no notice subscription` (§2.11).
   - Boundary: an absent visible time, which is the gate's off state.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.11 A notice cell placed takes the three subscriptions, and the release takes them back
+- [x] 3.11 A notice cell placed takes the three subscriptions, and the release takes them back
   - Decision: D1's Flow and D-b — three subscriptions joining the feed's single release.
   - Command: `node --test --test-name-pattern="a notice cell placed takes the three" tests/session-data-feed.test.ts`
   - Red: with the release loop `for (const releaseNotice of noticeSubscriptions) releaseNotice();`
@@ -543,7 +543,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     rest` (§2.12).
   - Boundary: the release, after which the three must be gone.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.12 `message_end` carries a miss to the store
+- [x] 3.12 `message_end` carries a miss to the store
   - Decision: D1's Flow — `message_end` brings the scan current, then hands the message over.
   - Command: `node --test --test-name-pattern="message_end carries a miss" tests/session-data-feed.test.ts`
   - Red: with the `pi.on("message_end", …)` subscription removed:
@@ -556,7 +556,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Green: `✔ message_end carries a miss to the store's notice` (§2.13).
   - Boundary: none beyond the event's delivery; the collision is 2.15's.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.13 The feed prices a turn that read no cache with the model's cache-read rate
+- [x] 3.13 The feed prices a turn that read no cache with the model's cache-read rate
   - Decision: D1 — `ctx.modelRegistry.find(provider, model)?.cost.cacheRead / 1_000_000` supplied
     beside the message.
   - Command: `node --test --test-name-pattern="prices a turn that read no cache" tests/session-data-feed.test.ts`
@@ -571,7 +571,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     (§2.14).
   - Boundary: the two prices, where the fallback rate and no rate give different costs.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.14 `session_compact` and `session_tree` carry their usage to the store
+- [x] 3.14 `session_compact` and `session_tree` carry their usage to the store
   - Decision: D1's Flow, and the store spec's "A compaction ends" and "A branch summary ends".
   - Command: `node --test --test-name-pattern="session_compact and session_tree" tests/session-data-feed.test.ts`
   - Red: with the `pi.on("session_compact", …)` subscription removed:
@@ -590,7 +590,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Green: `✔ session_compact and session_tree carry their usage to the store's notice` (§2.15).
   - Boundary: an entry carrying usage against one carrying none, for each event.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.15 A `message_end` after the release takes no notice and repaints nothing
+- [x] 3.15 A `message_end` after the release takes no notice and repaints nothing
   - Decision: D2 and D-b — the release disposes the store, and nothing after it reaches the host.
   - Command: `node --test --test-name-pattern="message_end after the release" tests/session-data-feed.test.ts`
   - Red: with the feed's `store.dispose()` removed from its release:
@@ -603,7 +603,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Green: `✔ a message_end after the release takes no notice and requests no repaint` (§2.16).
   - Boundary: an event delivered after the release.
   - Files: `extensions/jefferson/data/session-data-feed.ts`, `tests/session-data-feed.test.ts`.
-- [ ] 3.16 `session_shutdown` runs the release
+- [x] 3.16 `session_shutdown` runs the release
   - Decision: D2 — `startup.ts` registers the handler, because `ctx.reload()` emits
     `session_shutdown` and never clears the footer.
   - Command: `node --test --test-name-pattern="session_shutdown" tests/jefferson.test.ts`
@@ -617,7 +617,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     §2.17.
   - Boundary: a shutdown that disposes no footer, against a footer disposed mid-notice (3.9).
   - Files: `extensions/jefferson/startup.ts`, `tests/jefferson.test.ts`.
-- [ ] 3.17 A compaction or a branch summary that carries no usage takes no notice
+- [x] 3.17 A compaction or a branch summary that carries no usage takes no notice
   - Decision: D1's Flow — `session_compact` and `session_tree` yield a notice only when the entry
     carries usage.
   - Command: `node --test --test-name-pattern='carrying no usage' tests/session-data-store.test.ts`
@@ -636,7 +636,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     `ℹ fail 0` (addendum §5.1).
   - Boundary: an entry carrying no usage against one that carries it (3.3).
   - Files: `tests/session-data-store.test.ts`.
-- [ ] 3.18 One message carrying a thinking drop and a miss keeps the miss, at the store
+- [x] 3.18 One message carrying a thinking drop and a miss keeps the miss, at the store
   - Decision: D7 — the collision resolved in memory before anything is scheduled, with the miss
     second and therefore kept.
   - Command: `node --test --test-name-pattern='keeps the miss' tests/session-data-store.test.ts`
@@ -653,7 +653,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     (addendum §5.2).
   - Boundary: one message that carries both candidates, where the store must keep the miss.
   - Files: `tests/session-data-store.test.ts`.
-- [ ] 3.19 The store reads the thinking count from the branch, not from the entries
+- [x] 3.19 The store reads the thinking count from the branch, not from the entries
   - Decision: D1 — `messageNotice(message, readEntries(), readBranch(), …)` gives each step its own
     source.
   - Command: `node --test --test-name-pattern='reads the branch' tests/session-data-store.test.ts`
@@ -676,7 +676,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
   - Boundary: the two lists disagreeing, which is the input that makes the sources differ; the
     pure-rule twin is 2.14.
   - Files: `tests/session-data-store.test.ts`.
-- [ ] 3.20 A cache-warm usage entry is the previous request, at the store
+- [x] 3.20 A cache-warm usage entry is the previous request, at the store
   - Decision: D1 — the warm entry measures the turn though no warm notice shows.
   - Command: `node --test --test-name-pattern='the cache-warm entry is the previous request' tests/session-data-store.test.ts`
   - The behaviour landed in 3.1; this task pins the store-level test.
@@ -693,7 +693,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     `ℹ fail 0` (addendum §5.4).
   - Boundary: a turn after a warm entry against a session's first turn, which must stay silent.
   - Files: `tests/session-data-store.test.ts`.
-- [ ] 3.21 With no notice showing, the store holds no timer
+- [x] 3.21 With no notice showing, the store holds no timer
   - Decision: D2 — the handle exists only while a notice does.
   - Command: `node --test --test-name-pattern='no notice, no timer' tests/session-data-store.test.ts`
   - The behaviour landed in 3.5's scheduler handle; this task pins the state before any arrival.
@@ -709,7 +709,7 @@ lines each, the store's fixtures gaining the three readers the store now takes �
     `ℹ fail 0` (addendum §5.5).
   - Boundary: the absent notice, where a pending handle would be the cadence D2 refuses.
   - Files: `tests/session-data-store.test.ts`.
-- [ ] 3.22 The commit is green and touches only the paths this group names
+- [x] 3.22 The commit is green and touches only the paths this group names
   - Command: `checks/suite.sh <repo> 397` and
     `checks/scope.sh <repo> <base> <head> extensions/jefferson/data/session-data-feed.ts extensions/jefferson/data/session-data-store.ts extensions/jefferson/startup.ts tests/instrument.test.ts tests/jefferson.test.ts tests/row-renderer.test.ts tests/session-data-feed.test.ts tests/session-data-store.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `00ef4d5`: `suite: 397 passed, 0 failed`, and `changed:` the eight paths … `PASS`
