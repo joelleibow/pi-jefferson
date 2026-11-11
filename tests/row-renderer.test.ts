@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/components/row/row.ts";
 import type { Instrument } from "../extensions/jefferson/components/instruments/instrument.ts";
@@ -171,6 +171,46 @@ test("text wider than its cell renders identically under any alignment", () => {
   // absorbs each cell's trailing reset into the closing frame: the pre-merge string minus one
   // reset per cell.
   assert.equal(visible(left), "provider\x1b[0m...provide\x1b[0m...");
+});
+
+test("the notice cell's text sits at its alignment", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const declaration = instrumentNamed("notice");
+  assert.ok(declaration);
+  const notice = instrumentBindings()(declaration);
+  const live: Readings = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } } };
+  const text = "Notice: Cache miss: 20k tokens re-billed (~$0.10)";
+  const at = (align: "left" | "center" | "right"): string => stripTerminalSequences(
+    createFooter([{ id: "row-0", distribution: "equal", cells: [{ instrument: notice, align }] }], () => live, fakeTheme(), 0)
+      .render(80)[0] ?? "",
+  );
+  // The text takes 49 columns of the row's 80: the 31 spare columns are the pad's, and the
+  // alignment decides which side of the text they fall on.
+  assert.equal(at("left"), text + " ".repeat(31));
+  assert.equal(at("right"), " ".repeat(31) + text);
+  assert.equal(at("center"), " ".repeat(15) + text + " ".repeat(16));
+});
+
+test("a fill cell gives up the notice's columns and takes them back when it expires", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const declaration = instrumentNamed("notice");
+  assert.ok(declaration);
+  const notice = instrumentBindings()(declaration);
+  const text = "Notice: Cache miss: 20k tokens re-billed (~$0.10)";
+  let current: Readings = { ...readings };
+  const row: Row = {
+    id: "row-0", distribution: "content",
+    cells: [{ instrument: { fills: true, render: () => "a" }, align: "left" }, { instrument: notice, align: "left" }],
+  };
+  const footer = createFooter([row], () => current, fakeTheme(), 0);
+  const line = (): string => stripTerminalSequences(footer.render(80)[0] ?? "");
+  // Nothing to show: the fill takes all 80 columns and the notice's cell takes none.
+  assert.equal(line(), "a".padEnd(80), "the fill takes the row while the notice is unknown");
+  current = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } } };
+  assert.equal(line(), "a".padEnd(31) + text, "the fill gives up the notice's 49 columns");
+  current = { ...readings };
+  assert.equal(line(), "a".padEnd(80), "the fill takes the columns back when the notice expires");
+  assert.equal(visibleWidth(line()), 80);
 });
 
 test("a wide glyph dropped by the clip leaves a pad that keeps the cell's width", () => {

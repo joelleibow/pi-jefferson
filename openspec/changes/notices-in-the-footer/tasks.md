@@ -998,7 +998,7 @@ row's own suite and no production code: the row already places a centred cell an
 row, and the tests pin the notice's text to both. The suite goes from 412 to 414
 (`redgreen-derek.md`, the addendum's tree, measured at `162ff07`).
 
-- [ ] 6.1 The notice cell's text sits at its alignment
+- [x] 6.1 The notice cell's text sits at its alignment
   - Decision: D8 — the notice cell's alignment, in `tests/row-renderer.test.ts` because alignment is
     the row's behaviour (`redgreen-derek.md`, "Where the run contradicts the design" 1).
   - Command: `node --test --test-name-pattern="the notice cell's text sits at its alignment" tests/row-renderer.test.ts`
@@ -1015,7 +1015,7 @@ row, and the tests pin the notice's text to both. The suite goes from 412 to 414
   - Boundary: the centre case, which is the discriminator; the left and right cases stay green under
     the same plant.
   - Files: `tests/row-renderer.test.ts`.
-- [ ] 6.2 A fill cell gives up the notice's columns and takes them back when it expires
+- [x] 6.2 A fill cell gives up the notice's columns and takes them back when it expires
   - Decision: the statusline spec's "A notice beside a fill cell", and the ADR 0007 consequence D8
     records — a row holding a notice cell re-seats when a notice arrives and again when it expires
     (`michael-pl7-r1.json`, finding 3).
@@ -1043,7 +1043,7 @@ row, and the tests pin the notice's text to both. The suite goes from 412 to 414
     re-seat test shrinks a non-empty text with no fill cell, and the fill test and the empty-cell test
     are static (`michael-pl7-r1.json`, finding 3).
   - Files: `tests/row-renderer.test.ts`.
-- [ ] 6.3 The commit is green and touches only the path this group names
+- [x] 6.3 The commit is green and touches only the path this group names
   - Command: `checks/suite.sh <repo> 414` and
     `checks/scope.sh <repo> <base> <head> tests/row-renderer.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green: `suite: 414 passed, 0 failed (expected 414)` / `PASS` at `162ff07`, the spike's commit that
