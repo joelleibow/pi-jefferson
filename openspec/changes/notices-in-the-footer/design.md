@@ -163,8 +163,8 @@ this change names it anyway.
 
 **Flow.** The feed takes three subscriptions, and only while a notice cell is placed (D3):
 
-- `message_end` — brings the store's leaf-keyed scan current for the reported leaf (a no-op when it
-  already is), then hands the store the message and the `cacheRead` price fallback from
+- `message_end` — the miss step scans the entries the handler reads, as pi's does, and the feed hands
+  the store the message with the `cacheRead` price fallback from
   `ctx.modelRegistry.find(provider, model)?.cost.cacheRead / 1_000_000`, which is the same `Model`
   object pi's own runtime returns (`research-chidi.md` Addendum 1 §2). The store computes the
   thinking-drop candidate and the miss with the pure rule, in pi's order, and takes one notice. The two
@@ -233,7 +233,7 @@ usage and statuses as it reads them in any render, and claims no freshness beyon
 `readConfiguration` returns, beside the rows, `noticeSeconds: number | undefined` — the declared
 `seconds`, or the declared default, and `undefined` when no row it is about to return places a
 `notice` cell. `startup.ts` passes it to `feedSessionData`, and an `undefined` means: subscribe to no
-notice event, keep no previous-request record in the scan, hold no timer, and report no notice. The
+notice event, scan no session entries for a notice, hold no timer, and report no notice. The
 store holds no visible time at all then, so nothing it does can depend on one.
 
 Placement is read from the rows, never from the document. `cellsFromNames` already resolves each

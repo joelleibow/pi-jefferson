@@ -30,17 +30,26 @@ it weighed, are in [ADR 0005](docs/adr/0005-source-is-laid-out-by-responsibility
 hands the host's API to startup, and does nothing else.
 
 **Startup.** Owns the `/jefferson` command and the `session_start` handler. The handler releases the
-previous install, then installs the data, reads the configuration and installs the footer, in that
-order. Startup also wires the repaint callback: the footer hands the host's repaint request back out,
-and the data side calls it. It supplies the data side its home reader too, `node:os`'s `homedir`, so
-the root is the one file that names a process API. It decides *when* things run; it computes nothing.
+previous install, reads the configuration, installs the data with what it read, and installs the
+footer, in that order: a notice's visible time has to reach the store when it is built, so
+configuration cannot wait until after the feed exists. Startup also wires the repaint callback: the
+footer hands the host's repaint request back out, and the data side calls it. It supplies the data
+side its readers: `node:os`'s `homedir`, `performance.now` for the clock a notice expires on, and a
+closure over `setTimeout` and `clearTimeout` for the repaint that expiry requests. It is the one file
+that names a process API. It also runs the release on `session_shutdown`, because a reload shuts the
+session down without clearing the footer. It decides *when* things run; it computes nothing.
 
 **Data feed.** Lives in `data/`. Seeds the store from the session context and the readers it is
-handed, and subscribes to the events that push into the store. The branch, its change subscription
-and the statuses exist only inside the host's footer factory. So the feed returns an attachment
-beside the store, and the factory hands the footer's data through it. The attachment seeds the branch
-and subscribes to its change, and that subscription joins the one release with the rest. One release
-undoes the subscriptions and disposes the store. The store names no host event; the feed does.
+handed, and subscribes to the events that push into the store: `model_select`,
+`thinking_level_select`, `turn_end` and `session_info_changed`, plus `message_end`,
+`session_compact` and `session_tree` while a row places a `notice` cell. It hands the store its
+branch reader beside its entries reader, and the clock, the scheduler and the visible time the
+document declares, which the root supplies. The branch, its change subscription and the statuses
+exist only inside the host's footer factory. So the feed returns an attachment beside the store, and
+the factory hands the footer's data through it. The attachment seeds the branch and subscribes to its
+change, and that subscription joins the one release with the rest. One release undoes the
+subscriptions, clears a pending notice expiry and disposes the store. The store names no host event;
+the feed does.
 
 **Footer setup.** Calls `ctx.ui.setFooter` with a factory that builds the row renderer's footer, and
 returns the component the host expects. The factory's third parameter is the host's footer data, and
@@ -48,26 +57,33 @@ setup hands it to the feed's attachment before the footer is built, so the first
 carries the branch. Disposing that component runs the release it was given.
 
 **Store.** Holds provider, model, thinking level, working directory, home directory, the git branch,
-the session's name, the extension statuses, context usage and usage totals. Provider, model,
-thinking level, working directory, home and the session's name are seeded at `session_start`, and the
-branch is seeded when the footer is built. The two selection pushes update model and thinking level,
-a renamed session pushes its name, and a branch change pushes the branch. The attachment hands the
-store a statuses reader; the store calls it once per sample, holds the map as the host reported it,
-and treats an empty one as unknown. Injected readers sample context usage and the statuses each
-render, and scan the whole session's usage-bearing entries only when `(sessionId, leafId)` moves. `turn_end` compares the five
-totals and requests a repaint only when they change. A read is synchronous, total, and never throws.
-The host disposes the footer, and through it the store, before it invalidates the session context, so
-a read cannot outlive its context; disposal clears the readers, and later samples are all-unknown.
-One sample per render is handed to every cell, so cost and tokens share one totals object and two
-status cells share one text.
+the session's name, the extension statuses, context usage, usage totals and the one notice showing.
+Provider, model, thinking level, working directory, home and the session's name are seeded at
+`session_start`, and the branch is seeded when the footer is built. The two selection pushes update
+model and thinking level, a renamed session pushes its name, and a branch change pushes the branch.
+The attachment hands the store a statuses reader; the store calls it once per sample, holds the map as
+the host reported it, and treats an empty one as unknown. Injected readers sample context usage and the
+statuses each render, and scan the whole session's usage-bearing entries only when `(sessionId,
+leafId)` moves. `turn_end` compares the five totals and requests a repaint only when they change, and a
+notice's expiry requests one repaint of its own. The notice arrives only on a push. The store records
+the deadline when it arrives, reads the clock at each sample and drops the notice once it is past, and
+the scheduler's callback requests that one repaint at the deadline, re-arming for the time left when it
+fires early. Nothing is polled: the expiry asks the host nothing. A read is synchronous, total, and
+never throws. The host disposes the footer, and through it the store, before it invalidates the
+session context, so a read cannot outlive its context; disposal clears the readers and cancels a
+pending expiry, and later samples are all-unknown. One sample per render is handed to every cell, so
+cost and tokens share one totals object and two status cells share one text.
 
 **Configuration.** Resolves where the document lives (the agent directory's, and a trusted project's),
-reads it, validates it, resolves instrument names, and normalizes rows.
-The optional `instruments` section configures each name once; formats, labels and styles are validated
-at read time against its declaration and the live theme, then one bound instrument per name is shared
-across the document. The binding itself lives in `components/instruments/`. Every failure mode rejects the whole
-document, renders the default row, and warns with a message that names what was wrong. An unknown
-instrument *name* is different: it warns and renders `blank` in that cell.
+reads it, validates it, resolves instrument names, and normalizes rows. Its result carries the rows,
+the `rowGap`, a warning and the visible time a notice takes. That last is `undefined` unless the rows
+it is about to install place a `notice` cell, so a default row and a rejected document take no visible
+time. The optional `instruments` section configures each name once; formats, labels, styles and a
+composed instrument's `seconds` and `formats` are validated at read time against its declaration and
+the live theme, then one bound instrument per name is shared across the document. The binding itself
+lives in `components/instruments/`. Every failure mode rejects the whole document, renders the default
+row, and warns with a message that names what was wrong. An unknown instrument *name* is different: it
+warns and renders `blank` in that cell.
 
 **Instrument.** One declaration owns its name, variables, default format and options, and may carry a
 default label and a per-variable foreground token. Variables read the store and arrive already
@@ -79,8 +95,14 @@ segment ends in one space, the gap, so the label's style covers it and `$bar` co
 declared token can replace that segment's `fg`. A variable may also declare forms, named resolvers
 over the same readings with one of them the default, and a `|name` placed directly after that
 variable selects one: `$path|relative` renders the directory under home, a bare `$path` the basename.
-The declaration is the only list of a variable's forms, and parsing and rendering both read it. The
-bound `(readings, width, theme) => string` renders its format with those values.
+The declaration is the only list of a variable's forms, and parsing and rendering both read it.
+A declaration may also carry a composed format set: the reading that selects which format to use,
+one default per key, the values those formats may name, and the variable the chosen text arrives at
+the cell's format through. The binding resolves the selected format as plain text — no modifier and
+no form, so the notice stays one colour — and passes it to the cell's format as that variable's
+value. The two variable sets are not interchangeable: a plain format names the composed values, and
+the cell's format names the composed variable. The bound `(readings, width, theme) => string` renders
+its format with those values.
 A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
 declares is unknown, collapses control characters, trims a format's outer whitespace when it parses,
