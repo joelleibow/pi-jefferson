@@ -1,0 +1,47 @@
+{
+  "findings": [
+    {
+      "finding": "The `$idle`-on-a-miss case is silenced by 10.2's rule only by coincidence of composition: `formats.miss: \"$idle\"` resolves to `\"\"` because `$idle` is the format's whole text, so the empty-text rule hides it. A format such as `\"after $idle\"` on a miss renders `Notice: after ` — the absent value joining as `\"\"` as D5 decided. That is the design's documented behaviour, not a defect, but 10.2's test message 'and a kind text whose only value this kind does not carry' reads as if absent values silence, which they do not.",
+      "location": "tests/instrument.test.ts, test 'an empty kind text silences that kind', third assertion's message",
+      "required_change": "Docs pass: reword the message to 'and a text that resolves empty because its only value is one this kind does not carry'. Test-message wording; ships with it.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Joel's live check 9.7: the notice arriving and vanishing in the real footer, `6m`, `1 thinking block`, the 10-second default, an empty kind text silencing, and whether a fade follows.",
+    "Archive: the spec sync lands the MODIFIED 'An instrument's format is plain text and variables' and the layout's visual requirement; `checks/specs.sh` PASS after the sync."
+  ],
+  "not_covered": [
+    "No live pi, no real `setTimeout`, no CI; the arrival repaint is measured through the store's recording `requestRender`.",
+    "I did not re-check the docs pass's README/ARCHITECTURE text against the two new rules beyond the ADR 0011 Status line."
+  ],
+  "requirements": [
+    {
+      "evidence": "`showNotice` now ends with `requestRender?.()` after `armExpiry` (diff). I planted its removal in place: the datum test reds `0 !== 1` and the file runs 42/5, as reported; green restored. design.md:192 'An arrival requests a repaint'; store delta :14 'requests a repaint for the arrival'. Suite 424 at `0213c73` per Derek, assertions moved only; the moved counts are consistent with one arrival repaint plus the instant's.",
+      "requirement": "Round-1 blocking: the arrival requests its own repaint",
+      "status": "met"
+    },
+    {
+      "evidence": "Joel ruled 2026-11-11 'Empty text silences it' (owner-rulings.md). D5 carries 'An empty kind text silences the kind'; statusline delta :97 has the `formats.miss: \"\"` scenario. Binding: `if (composedText !== \"\") preResolved = …`, so an empty composed text leaves `$notice` undefined and the unknown rule blanks the cell. I planted the rule away: the new test reds (`'Notice: ' !== ''`); green restored. Suite 425 PASS (run).",
+      "requirement": "Round-1 minor → Joel's ruling: an empty kind text silences the kind",
+      "status": "met"
+    },
+    {
+      "evidence": "ADR 0011 Status now ends 'Narrowed by [ADR 0013]: the hiding moved to the timed visual; the store stamps the instant and requests the repaint.' Body unchanged (`e80bfba` diff).",
+      "requirement": "Round-1 minor: ADR 0011's forward pointer",
+      "status": "met"
+    },
+    {
+      "evidence": "Group 10 exists with 10.1 and 10.2, both ticked at HEAD with Derek's measured reds (I reproduced both). `e80bfba` holds planning files only (show --name-only); `0213c73` and `f96ab31` each touch one source and one test file plus tasks.md (scope.sh PASS for all three ranges). 9.1 says 425; 9.5 says 25 over `0d6cd85..HEAD` — I measured 25 removed lines, and 3 over `b9668d9..HEAD`. 9.7 alone unticked.",
+      "requirement": "tasks.md group 10 and the spanning counts",
+      "status": "met"
+    },
+    {
+      "evidence": "suite.sh 425 PASS, imports PASS, terminal PASS, tarball 28 PASS, specs.sh PASS, `openspec validate --strict` valid, tree clean (porcelain 0) — all run by me in this checkout, no worktree, no /tmp.",
+      "requirement": "Checks green at HEAD",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

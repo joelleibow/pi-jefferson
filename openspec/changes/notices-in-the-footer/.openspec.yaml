@@ -7,13 +7,13 @@ x-marbleization:
     eleanor: "950a9f7d-6976-43e5-8c29-99f5ba967973"
     derek_spike: "e891da8f-8e18-4584-9453-fc143433f5fd"
     derek: "789bbf7e-e8bd-4f80-86c0-144d22ccbd24"
-    michael: "dfc04c9b-9c42-4fdb-8ac7-44fc07ae0ea5"
+    michael: "bd133d19-feca-4cc6-8d82-3c09597a3bd4"
   gates:
     council_owner: approved
     design: approved
     tasks: approved
     implement: approved
-    validate: pending
+    validate: approved
   blocked:
     - "2026-11-10: Michael's orientation (fresh michael-the-architect, pinned anthropic/claude-fable-5-2) failed: \"Anthropic attribution has no Claude Code model policy for claude-fable-5-2\". pi-background-tasks' anthropic-attribution.js (enabled in settings) has policies up to claude-fable-5-1. Resolved: Joel repinned Michael to fable-5-1 (routing below); orientation ran as a48c7c73."
   routing:
@@ -26,3 +26,4 @@ x-marbleization:
     - "2026-11-10: implemented 9e28c0e..b9221ad (Derek 5119f2e6, fixes 958a52f0; 414 tests). Michael implementation gate changes_requested r1, approve r2 (michael-implement-r2.json)."
     - "2026-11-11: plan amended for Joel's two rulings after the docs pass (bare values with the generalized escape; the timed show-and-hide as a reusable visual). Michael consults 565c7f44 and 3786a15d; PL4 approve (michael-pl4-values-r1.json); spike a9a9d7d, 424 tests; PL7 changes_requested r1, approve r2. New task groups 7 and 8; implement reopened."
     - "2026-11-11: groups 7-8 implemented (62cacf5) and group 9 re-run (0887ffe), 424 tests. Michael implementation gate approve r1 (michael-implement2-r1.json), two minor findings fixed in the change."
+    - "2026-11-11: PR #22 opened. Judge Gen verify 47b44f17 + review 68d211fb. Michael Validate changes_requested r1 (no repaint on arrival, blocking; empty kind text -> Joel ruled it silences), fixed in the change (e80bfba..8cbe7f0, 425 tests); approve r2 (michael-validate-r2.json). Next: Joel's 9.7 live check, then archive."
