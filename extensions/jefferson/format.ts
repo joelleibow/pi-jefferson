@@ -42,7 +42,12 @@ function formatError(declaration: InstrumentDeclaration, detail: string): Error 
   return new Error(`${JSON.stringify(declaration.name)}'s format ${detail}`);
 }
 
-export function parseFormat(declaration: InstrumentDeclaration, format: string): FormatSegment[] {
+/**
+ * Parse a format against the declaration's variables, or in plain mode against a composed
+ * format set's values. A plain format carries no modifier and no form: its text is one colour,
+ * styled at the cell.
+ */
+export function parseFormat(declaration: InstrumentDeclaration, format: string, plain = false): FormatSegment[] {
   // A format's outer whitespace is not text (ADR 0006); collapse first so a trailing control character becomes a space the trim removes.
   format = collapse(format).trim();
   const segments: FormatSegment[] = [];
@@ -64,7 +69,9 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
       if (name === undefined) {
         throw formatError(declaration, "has a bare $; escape a literal dollar as \\$");
       }
-      const declared = name === "bar" ? declaration.bar !== undefined : Object.hasOwn(declaration.variables, name);
+      const declared = plain
+        ? declaration.composed !== undefined && Object.hasOwn(declaration.composed.variables, name)
+        : name === "bar" ? declaration.bar !== undefined : Object.hasOwn(declaration.variables, name);
       if (!declared) {
         throw formatError(declaration, `names a variable it does not declare: ${JSON.stringify("$" + name)}`);
       }
@@ -85,6 +92,7 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string):
         literal += character;
         afterName = false;
       } else {
+        if (plain) throw formatError(declaration, `puts a modifier in a plain format: ${JSON.stringify("|" + name)}`);
         const forms = subject?.kind === "variable" ? declaration.variableForms?.[subject.name] : undefined;
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
@@ -179,6 +187,22 @@ function mergedStyle(style: ThemeStyle, modifiers: readonly Modifier[]): ThemeSt
   );
 }
 
+/** A plain format's text: each literal and value joined, an absent value as nothing. */
+export function resolvePlain(
+  declaration: InstrumentDeclaration,
+  segments: FormatSegment[],
+  readings: Readings,
+): string {
+  const composed = declaration.composed;
+  if (composed === undefined) return "";
+  return segments.map(segment => {
+    if (segment.kind === "bar") return "";
+    if (segment.kind === "literal") return segment.text;
+    const value = composed.variables[segment.name]?.(readings);
+    return value === undefined ? "" : collapse(value);
+  }).join("");
+}
+
 export function resolveFormat(
   declaration: InstrumentDeclaration,
   segments: FormatSegment[],
@@ -186,10 +210,13 @@ export function resolveFormat(
   readings: Readings,
   width: number,
   theme: Theme,
+  preResolved?: Readonly<Record<string, string>>,
 ): string {
   const values = new Map<string, string>();
   for (const [name, resolve] of Object.entries(declaration.variables)) {
-    const value = resolve(readings);
+    const value = preResolved !== undefined && Object.hasOwn(preResolved, name)
+      ? preResolved[name]
+      : resolve(readings);
     if (value === undefined) return "";
     values.set(name, collapse(value));
   }

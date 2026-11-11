@@ -1304,3 +1304,59 @@ test("blank fills, and so does an instrument whose format takes the width", () =
   assert.equal(escaped.warning, undefined);
   assert.deepEqual(escaped.rows[0]?.cells.map((cell) => cell.instrument.fills), [false], "an escaped \\$bar is plain text");
 });
+
+test("a notice cell takes the declared seconds, or the declared default of ten", () => {
+  const configured = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { seconds: 30 } } });
+  assert.equal(configured.noticeSeconds, 30);
+  assert.equal(configured.warning, undefined);
+  const defaulted = readDocument({ cells: [{ instrument: "notice" }] });
+  assert.equal(defaulted.noticeSeconds, 10, "the declared default");
+});
+
+test("a seconds value outside the bounds rejects the document and names the option and the value", () => {
+  for (const seconds of [0, 61, 1.5, "10", null]) {
+    const { rows, warning, noticeSeconds } = readDocument({
+      cells: [{ instrument: "notice" }], instruments: { notice: { seconds } },
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.cells.length, 10, "the default row renders");
+    assert.ok(warning, `${JSON.stringify(seconds)} rejects`);
+    assert.match(warning, /seconds must be a whole number from 1 to 60: /);
+    assert.ok(warning.includes(JSON.stringify(seconds)), `${JSON.stringify(seconds)} is named`);
+    assert.equal(noticeSeconds, undefined, "the default row places no notice cell");
+  }
+});
+
+test("a notice cell takes a configured format for its kind, in the document's words", () => {
+  const { rows } = readDocument({
+    cells: [{ instrument: "notice" }],
+    instruments: { notice: { formats: { miss: "Spent $tokens, paid$cost" } } },
+  });
+  const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" } } };
+  assert.equal(stripTerminalSequences(rows[0]!.cells[0]!.instrument.render(shown, 80, fakeTheme())),
+    "Notice: Spent 125k, paid (~$0.38)");
+});
+
+test("a configured format's undeclared variable, modifier and form each reject the document", () => {
+  for (const [formats, detail] of [
+    [{ miss: "Spent $nope" }, 'names a variable it does not declare: "$nope"'],
+    [{ miss: "$tokens|bold" }, 'puts a modifier in a plain format: "|bold"'],
+    [{ miss: "$notice" }, 'names a variable it does not declare: "$notice"'],
+  ] as const) {
+    const { rows, warning } = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { formats } } });
+    assert.equal(rows[0]?.cells.length, 10, "the default row renders");
+    assert.ok(warning?.includes(detail), `${detail} in the warning: ${warning}`);
+  }
+});
+
+test("a formats key the notice's declaration does not carry rejects the document", () => {
+  const { warning } = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { formats: { warm: "x" } } } });
+  assert.ok(warning?.includes('formats names a kind it does not carry: "warm"'), warning ?? "");
+});
+
+test("a formats value that is not a string, and formats that is not an object, each reject", () => {
+  const notString = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { formats: { miss: 5 } } } });
+  assert.ok(notString.warning?.includes("has a kind whose format is not a string"), notString.warning ?? "");
+  const notObject = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { formats: ["x"] } } });
+  assert.ok(notObject.warning?.includes("has formats that is not an object"), notObject.warning ?? "");
+});

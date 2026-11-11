@@ -407,6 +407,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/instruments/branch.ts", ["branch"]],
     ["../extensions/jefferson/components/instruments/session.ts", ["session"]],
     ["../extensions/jefferson/components/instruments/status.ts", ["status"]],
+    ["../extensions/jefferson/components/instruments/notice.ts", ["NOTICE_SECONDS", "notice"]],
     ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
   ];

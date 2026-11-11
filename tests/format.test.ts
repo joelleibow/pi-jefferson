@@ -4,9 +4,10 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { parseFormat, resolveFormat, validateStyle } from "../extensions/jefferson/format.ts";
+import { parseFormat, resolveFormat, resolvePlain, validateStyle } from "../extensions/jefferson/format.ts";
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
+import { notice as noticeInstrument } from "../extensions/jefferson/components/instruments/notice.ts";
 import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
@@ -462,4 +463,47 @@ test("a mutation runs before styling so it cannot rewrite an escape sequence", (
 
 test("a chain applies its string mutations in the order the format writes them", () => {
   assert.equal(rendered("thinking", "$level|lower|capitalize", { readings: { ...seed, thinkingLevel: "HIGH" } }), "High");
+});
+
+const shown: Readings = {
+  ...seed,
+  notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" } },
+};
+
+test("a plain format parses the composed values and no modifier", () => {
+  assert.deepEqual(parseFormat(noticeInstrument, "Cache miss: $tokens tokens re-billed$cost", true), [
+    { kind: "literal", text: "Cache miss: ", modifiers: [] },
+    { kind: "variable", name: "tokens", modifiers: [] },
+    { kind: "literal", text: " tokens re-billed", modifiers: [] },
+    { kind: "variable", name: "cost", modifiers: [] },
+  ]);
+});
+
+test("a plain format rejects a modifier, a form, the cell's own variable and the bar", () => {
+  for (const [format, detail] of [
+    ["$tokens|bold", 'puts a modifier in a plain format: "|bold"'],
+    ["$tokens|upper", 'puts a modifier in a plain format: "|upper"'],
+    ["$notice", 'names a variable it does not declare: "$notice"'],
+    ["$bar", 'names a variable it does not declare: "$bar"'],
+  ] as const) {
+    assert.throws(() => parseFormat(noticeInstrument, format, true),
+      { message: `"notice"'s format ${detail}` }, format);
+  }
+});
+
+test("resolvePlain joins a literal and a value, an absent value as nothing", () => {
+  const format = "Cache miss: $tokens tokens re-billed$cost";
+  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, true), shown),
+    "Cache miss: 20k tokens re-billed (~$0.10)");
+  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, true), seed),
+    "Cache miss:  tokens re-billed", "an absent value is nothing, not a blank the cell blanks on");
+});
+
+test("the pre-resolved value wins over the declaration's resolver", () => {
+  const segments = parseFormat(noticeInstrument, "$notice");
+  const theme = fakeTheme();
+  assert.equal(resolveFormat(noticeInstrument, segments, {}, shown, 80, theme), "",
+    "the declaration's own resolver yields nothing");
+  assert.equal(resolveFormat(noticeInstrument, segments, {}, shown, 80, theme, { notice: "Cache miss: 20k" }),
+    theme.style("Cache miss: 20k", { fg: "warning" }), "the composed text takes the cell's warning colour");
 });

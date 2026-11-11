@@ -55,7 +55,7 @@ export function startUp(pi: ExtensionAPI): void {
 
     // Read first: the store is built with the visible time the document's notice declaration
     // names, so configuration cannot wait until after the feed exists.
-    const { rows, rowGap, warning } = readConfiguration({
+    const { rows, rowGap, warning, noticeSeconds } = readConfiguration({
       ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
@@ -66,7 +66,7 @@ export function startUp(pi: ExtensionAPI): void {
     let requestRepaint: (() => void) | undefined;
 
     const { store, release, attachFooterData } = feedSessionData(
-      pi, ctx, () => requestRepaint?.(), homedir, () => performance.now(), schedule, undefined,
+      pi, ctx, () => requestRepaint?.(), homedir, () => performance.now(), schedule, noticeSeconds,
     );
     releasePrevious = release;
 

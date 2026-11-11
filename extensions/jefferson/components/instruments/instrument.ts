@@ -15,6 +15,18 @@ export interface Instrument {
 /** One named way of showing a variable's datum, over the readings the sample already carries. */
 export type VariableForm = (readings: Readings) => string | undefined;
 
+/** A format set chosen by a reading: the notice's kind, its values and its default text. */
+export interface ComposedFormat {
+  /** The variable the chosen text arrives at the cell's format through. */
+  readonly variable: string;
+  /** The values a kind's format may name, already formatted. */
+  readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
+  /** The reading that selects the format's key; nothing to compose when it yields `undefined`. */
+  readonly select: (readings: Readings) => string | undefined;
+  /** One default format per key. */
+  readonly formats: Readonly<Record<string, string>>;
+}
+
 export interface InstrumentDeclaration {
   readonly name: string;
   readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
@@ -29,6 +41,8 @@ export interface InstrumentDeclaration {
   readonly defaultFormat: string;
   readonly defaultLabel?: string;
   readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
+  /** A format set chosen by a reading, composed into the variable it names. */
+  readonly composed?: ComposedFormat;
   readonly options: readonly string[];
 }
 

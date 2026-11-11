@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { DEFAULT_CELL_TEXT, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { blank } from "../extensions/jefferson/components/instruments/blank.ts";
 import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
+import type { Notice } from "../extensions/jefferson/data/notice.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -43,12 +44,14 @@ const shapes = [
   ["branch", ["branch"], "$branch"],
   ["session", ["name"], "$name"],
   ["status", ["status"], "$status"],
+  ["notice", ["notice"], "$notice"],
 ] as const;
 
 /** Every shipped declaration's default label, and `blank`'s deliberate absence [D3]. */
 const labels = {
   blank: undefined, model: "Model:", thinking: "Thinking:", path: "Path:", context: "Context:",
   tokens: "Tokens:", cost: "Cost:", branch: "Branch:", session: "Session:", status: "Status:",
+  notice: "Notice:",
 } as const;
 
 function named(name: string): InstrumentDeclaration {
@@ -64,21 +67,22 @@ async function render(name: string, readings: Readings, format?: string): Promis
   return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
 }
 
-test("the ten shipped declarations own their names, variables, defaults and foundational options", () => {
+test("the eleven shipped declarations own their names, variables, defaults and foundational options", () => {
   const declared: Record<string, string | undefined> = {};
   const declarations = shapes.map(([name, variables, format]) => {
     const declaration = named(name);
     assert.deepEqual(Object.keys(declaration.variables), variables);
     assert.equal(declaration.defaultFormat, format);
-    assert.deepEqual(declaration.options, ["format", "style", "label"]);
+    assert.deepEqual(declaration.options.slice(0, 3), ["format", "style", "label"]);
+    assert.deepEqual(declaration.options.slice(3), name === "notice" ? ["seconds", "formats"] : []);
     declared[name] = declaration.defaultLabel;
     assert.equal(Object.isFrozen(declaration.options), true);
     assert.equal(typeof declaration.bar === "function", name === "context");
     return declaration;
   });
-  assert.equal(declarations.length, 10);
+  assert.equal(declarations.length, 11);
   assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
-  for (const declaration of declarations) assert.equal(declaration.options, blank.options);
+  for (const declaration of declarations) assert.deepEqual(declaration.options.slice(0, 3), blank.options);
   assert.equal(instrumentNamed("blank"), blank);
 });
 
@@ -92,7 +96,7 @@ test("unimplemented and inherited names stay unresolved however often asked", ()
 test("every shipped default parses and renders its declared text", async () => {
   const expected = [
     DEFAULT_CELL_TEXT, "anthropic/claude-opus-4", fakeTheme().style("High", { fg: "thinkingHigh" }), "pi-jefferson",
-    "43.2%/200k", "0", "$0.000", "main", "refactor footer", "3 tasks idle",
+    "43.2%/200k", "0", "$0.000", "main", "refactor footer", "3 tasks idle", "",
   ];
   for (const [index, [name]] of shapes.entries()) {
     assert.equal(await render(name, seed), expected[index], name);
@@ -359,8 +363,8 @@ test("an instrument that does not fill renders the same text at width 0 and at w
   }
   assert.deepEqual(
     measured,
-    ["model", "thinking", "path", "context", "tokens", "cost", "branch", "session", "status"],
-    "nine of the ten are measured",
+    ["model", "thinking", "path", "context", "tokens", "cost", "branch", "session", "status", "notice"],
+    "ten of the eleven are measured",
   );
 
   // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
@@ -370,4 +374,42 @@ test("an instrument that does not fill renders the same text at width 0 and at w
   const bar = configured(named("context"));
   assert.equal(bar.fills, true, "a format holding $bar fills");
   assert.notEqual(bar.render(seed, 0, theme), bar.render(seed, 200, theme), "and it is the one whose text the width changes");
+});
+
+test("the notice's default text is its kind's, in the warning colour, and nothing shows without a notice", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  const theme = fakeTheme();
+  const bound = instrumentBindings()(named("notice"));
+  const cases: Array<[Notice, string]> = [
+    [{ kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" } }, "Cache miss: 125k tokens re-billed (~$0.38)"],
+    [{ kind: "miss", values: { tokens: "125k", cost: "" } }, "Cache miss: 125k tokens re-billed"],
+    [{ kind: "missModelSwitch", values: { tokens: "125k", cost: "" } }, "Cache miss after model switch: 125k tokens re-billed"],
+    [{ kind: "missIdle", values: { tokens: "125k", cost: "", idle: "6m" } }, "Cache miss after 6m idle: 125k tokens re-billed"],
+    [{ kind: "compaction", values: { tokens: "125k", cost: " (~$0.38)" } }, "Compaction: 125k tokens billed (~$0.38)"],
+    [{ kind: "branchSummary", values: { tokens: "125k", cost: "" } }, "Branch summary: 125k tokens billed"],
+    [{ kind: "thinking", values: { blocks: "2 thinking blocks" } }, "Anthropic dropped 2 thinking blocks (details in session)"],
+    [{ kind: "thinking", values: { blocks: "1 thinking block" } }, "Anthropic dropped 1 thinking block (details in session)"],
+  ];
+  for (const [notice, text] of cases) {
+    const shown: Readings = { ...seed, notice };
+    assert.equal(stripTerminalSequences(bound.render(shown, 80, theme)), `Notice: ${text}`);
+    assert.equal(bound.render(shown, 80, theme), "Notice: " + theme.style(text, { fg: "warning" }),
+      "the composed text takes the warning colour; the label does not");
+    assert.equal(bound.render(shown, 0, theme), bound.render(shown, 200, theme), "the width cannot change the text");
+  }
+  assert.equal(bound.render(seed, 80, theme), "", "no notice, no label and no gap");
+  assert.equal(bound.fills, false);
+});
+
+test("a configured kind's format renders the user's words around the declared values", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const bound = instrumentBindings(new Map([
+    ["notice", { segments: parseFormat(named("notice"), "$notice"), style: {},
+      formats: { miss: parseFormat(named("notice"), "Spent $tokens, paid$cost", true) } }],
+  ]))(named("notice"));
+  const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" } } };
+  assert.equal((await import("@earendil-works/pi-tui")).stripTerminalSequences(bound.render(shown, 80, fakeTheme())),
+    "Notice: Spent 125k, paid (~$0.38)");
 });

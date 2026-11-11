@@ -728,7 +728,7 @@ installs, and 4.13 passes it to the feed. Group 5 lands the four tests that pin 
 the spike measured, so both groups' suite counts are his (`michael-pl7-r1.json`, finding 4). The suite
 goes from 397 to 409.
 
-- [ ] 4.1 A plain format parses the composed values and rejects the cell's own variable
+- [x] 4.1 A plain format parses the composed values and rejects the cell's own variable
   - Decision: D5 change 3 — the plain mode keeps the grammar and validates against
     `composed.variables`, and `$notice` inside a kind's format is an undeclared name.
   - Command: `node --test --test-name-pattern="a plain format parses" tests/format.test.ts`
@@ -741,7 +741,7 @@ goes from 397 to 409.
   - Green: `✔ a plain format parses the composed values and no modifier` (§2.18).
   - Boundary: an undeclared name in a kind's format, against a declared one.
   - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
-- [ ] 4.2 A plain format rejects a modifier, a form, the cell's own variable and the bar
+- [x] 4.2 A plain format rejects a modifier, a form, the cell's own variable and the bar
   - Decision: D5 — a kind's format carries no styling, so a modifier inside it rejects the document
     naming the instrument and the name (`statusline` spec, "An unknown modifier rejects the document
     when it is read").
@@ -755,7 +755,7 @@ goes from 397 to 409.
     (§2.19).
   - Boundary: each of the four refusals, starting with `$tokens|bold`.
   - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
-- [ ] 4.3 `resolvePlain` joins a literal and a value, and an absent value as nothing
+- [x] 4.3 `resolvePlain` joins a literal and a value, and an absent value as nothing
   - Decision: D5 change 3 — no styling, and an absent value joins as `""` rather than blanking the
     text.
   - Command: `node --test --test-name-pattern="an absent value as nothing" tests/format.test.ts`
@@ -764,7 +764,7 @@ goes from 397 to 409.
   - Green: `✔ resolvePlain joins a literal and a value, an absent value as nothing` (§2.20).
   - Boundary: a value the kind carries against one it does not.
   - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
-- [ ] 4.4 The pre-resolved value wins over the declaration's resolver
+- [x] 4.4 The pre-resolved value wins over the declaration's resolver
   - Decision: D5 change 3 — `resolveFormat`'s one optional parameter, whose only caller is the
     binding; the cell's `warning` foreground survives it (`michael-pl4-r2.json`, `later_gates`).
   - Command: `node --test --test-name-pattern="the pre-resolved value wins" tests/format.test.ts`
@@ -778,7 +778,7 @@ goes from 397 to 409.
   - Boundary: the parameter present against absent, where the `notice` resolver's `undefined` would
     blank the cell.
   - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
-- [ ] 4.5 The declaration may carry a composed format set
+- [x] 4.5 The declaration may carry a composed format set
   - Decision: D5 change 1 — `composed?: { variable, variables, select, formats }` on
     `InstrumentDeclaration`.
   - Command: `pnpm typecheck`, and the tasks below, which exercise the field.
@@ -787,7 +787,7 @@ goes from 397 to 409.
   - Green: `tsc --noEmit` clean (`redgreen-derek.md`, the commit table).
   - Boundary: none — a type, with no behaviour of its own.
   - Files: `extensions/jefferson/components/instruments/instrument.ts`.
-- [ ] 4.6 A notice cell renders its kind's default text in `warning`, and nothing without a notice
+- [x] 4.6 A notice cell renders its kind's default text in `warning`, and nothing without a notice
   - Decision: D5 changes 1 and 4 — six per-kind defaults, `variableFg` colouring `$notice`, and the
     declaration's `notice` resolver yielding nothing when `select` does.
   - Command: `node --test --test-name-pattern="the notice's default text" tests/instrument.test.ts`
@@ -812,7 +812,7 @@ goes from 397 to 409.
     case.
   - Files: `extensions/jefferson/components/instruments/notice.ts`,
     `extensions/jefferson/components/instruments/instrument-binding.ts`, `tests/instrument.test.ts`.
-- [ ] 4.7 The instrument ships, and the tests that count shipped instruments say eleven
+- [x] 4.7 The instrument ships, and the tests that count shipped instruments say eleven
   - Decision: D5 and D6 — one `shipped.ts` entry, and the expectations the eleventh declaration
     moves: the shipped-declarations test's name, its length of ten, its options equality with
     `blank`'s, and the width-0 guard's list gaining `notice` (`redgreen-derek.md` §3;
@@ -830,7 +830,7 @@ goes from 397 to 409.
   - Boundary: a list of ten declarations against a list of eleven — the count itself, and the width-0
     comparison for a text that does not depend on width.
   - Files: `extensions/jefferson/shipped.ts`, `tests/instrument.test.ts`.
-- [ ] 4.8 A configured kind's format renders the user's words around the declared values
+- [x] 4.8 A configured kind's format renders the user's words around the declared values
   - Decision: D5 change 2 — `instruments.notice.formats`, each key a kind the declaration carries
     and each value parsed by the same `parseFormat`.
   - Command: `node --test --test-name-pattern="a configured kind's format" tests/instrument.test.ts`
@@ -850,7 +850,7 @@ goes from 397 to 409.
   - Files: `extensions/jefferson/configuration.ts`,
     `extensions/jefferson/components/instruments/notice.ts`, `tests/configuration.test.ts`,
     `tests/instrument.test.ts`.
-- [ ] 4.9 A `formats` key the declaration does not carry rejects the document
+- [x] 4.9 A `formats` key the declaration does not carry rejects the document
   - Decision: D5 change 2 — the kind vocabulary is the declaration's, checked with
     `Object.hasOwn(declaration.composed.formats, kind)`.
   - Command: `node --test --test-name-pattern="a formats key the notice" tests/configuration.test.ts`
@@ -862,7 +862,7 @@ goes from 397 to 409.
   - Green: `✔ a formats key the notice's declaration does not carry rejects the document` (§2.24).
   - Boundary: a key that is a kind against one that is not.
   - Files: `extensions/jefferson/configuration.ts`, `tests/configuration.test.ts`.
-- [ ] 4.10 `formats` that is not an object, and a value that is not a string, each reject
+- [x] 4.10 `formats` that is not an object, and a value that is not a string, each reject
   - Decision: D5 change 2 — the option's two shape checks, each naming the offender.
   - Command: `node --test --test-name-pattern="a formats value that is not a string" tests/configuration.test.ts`
   - Red: with the `typeof format !== "string"` check removed:
@@ -881,7 +881,7 @@ goes from 397 to 409.
     (§2.25).
   - Boundary: an array against an object, and a number against a string.
   - Files: `extensions/jefferson/configuration.ts`, `tests/configuration.test.ts`.
-- [ ] 4.11 A `seconds` value outside the bounds rejects the document, naming the option and the value
+- [x] 4.11 A `seconds` value outside the bounds rejects the document, naming the option and the value
   - Decision: D6 — a whole number from 1 to 60, default 10 in `NOTICE_SECONDS`, rejected in `rowGap`'s
     shape: `seconds must be a whole number from 1 to 60: <JSON value>`.
   - Command: `node --test --test-name-pattern="a seconds value outside" tests/configuration.test.ts`
@@ -896,7 +896,7 @@ goes from 397 to 409.
   - Boundary: 0, 61, 1.5, `"10"` and null, each against a value inside the bounds.
   - Files: `extensions/jefferson/components/instruments/notice.ts`,
     `extensions/jefferson/configuration.ts`, `tests/configuration.test.ts`.
-- [ ] 4.12 `readConfiguration` returns the notice's visible time, from the rows the root installs
+- [x] 4.12 `readConfiguration` returns the notice's visible time, from the rows the root installs
   - Decision: D3 — the declared `seconds`, or the declared default, and `undefined` when no installed
     row places a `notice` cell; placement read from `cellsFromNames`'s resolved declarations inside the
     ten-cell ceiling, with `NOTICE_SECONDS` read from the instrument's own file.
@@ -907,7 +907,7 @@ goes from 397 to 409.
   - Boundary: a document with no `notice` cell and a rejected document, both of which must yield
     `undefined` rather than a number (5.3, 5.4).
   - Files: `extensions/jefferson/configuration.ts`.
-- [ ] 4.13 `startup.ts` passes the visible time it read to the feed
+- [x] 4.13 `startup.ts` passes the visible time it read to the feed
   - Decision: D3 and D4 — the root hands `feedSessionData` the value, so `data/` reads no
     configuration.
   - Command: `pnpm typecheck`, and 5.2.
@@ -916,7 +916,7 @@ goes from 397 to 409.
   - Boundary: a document that places the cell against one that does not, at the root where the gate is
     set.
   - Files: `extensions/jefferson/startup.ts`.
-- [ ] 4.14 The commit is green and touches only the paths this group names
+- [x] 4.14 The commit is green and touches only the paths this group names
   - Command: `checks/suite.sh <repo> 409` and
     `checks/scope.sh <repo> <base> <head> extensions/jefferson/components/instruments/instrument-binding.ts extensions/jefferson/components/instruments/instrument.ts extensions/jefferson/components/instruments/notice.ts extensions/jefferson/configuration.ts extensions/jefferson/format.ts extensions/jefferson/shipped.ts extensions/jefferson/startup.ts tests/configuration.test.ts tests/format.test.ts tests/instrument.test.ts tests/jefferson.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `2122d26`: `suite: 409 passed, 0 failed`, and `changed:` the eleven paths … `PASS`
