@@ -103,9 +103,11 @@ already exists.
 - `statusline`: adds the notice instrument, the configurable format its text comes from with the
   variables that format carries, its default text and colour, and the `seconds` option its declaration
   carries.
-
-`extension-source-layout` needs no delta. One source file per instrument plus one `shipped.ts` entry
-is what its "Each shipped instrument has its own source file" already requires.
+- `extension-source-layout`: widens "Who names the instruments" so its parenthetical names the
+  `notice` declaration `configuration.ts` imports to gate on, beside `blank`'s file for the fallback.
+  Nothing else in that spec moves, and one source file per instrument plus one `shipped.ts` entry is
+  what "Each shipped instrument has its own source file" already requires, so the change adds no new
+  requirement there.
 
 ## Open Questions
 

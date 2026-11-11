@@ -193,12 +193,14 @@ cannot, and both read at the same cost. `data/` names neither global, which is D
 
 Two readers, because they do two jobs. The **clock decides**: the store records the deadline when the
 notice arrives, converting the visible time from seconds in that one place, and drops the notice when
-a read begins and `now() >= deadline`. The **scheduler
-requests the repaint**: one `schedule` per notice, for `deadline - now()`, whose callback requests a
-repaint and re-arms for the time left when it finds the deadline still ahead. A timer therefore cannot
-extend or shorten a notice: an early fire re-arms, and a late or repeated one finds the clock past the
-deadline and decides nothing new, because the clock decides. That is also what makes the expiry
-testable without timers: a fake clock and a recording `schedule` drive every boundary.
+a read begins and `now() >= deadline`. That is also what makes the expiry testable without timers: a
+fake clock drives every boundary.
+
+The **scheduler requests the repaint**: one `schedule` per notice, for `deadline - now()`, whose
+callback takes one of two branches. If `now() < deadline`, it re-arms for `deadline - now()` and
+requests nothing. Otherwise it requests the one repaint. So a timer cannot extend or shorten a notice:
+an early fire re-arms, and a late or repeated one finds the clock past the deadline and decides nothing
+new. A recording `schedule` tests both branches.
 
 The schedule handle is kept with the slot and cancelled in three places: when a newer notice replaces
 the showing one (D7), when the notice expires, and in the feed's `release`. `startup.ts` registers a
@@ -237,11 +239,15 @@ store holds no visible time at all then, so nothing it does can depend on one.
 Placement is read from the rows, never from the document. `cellsFromNames` already resolves each
 cell's name to a declaration and binds it (`configuration.ts:139-176`), so the reader compares each
 resolved declaration with the `notice` declaration it imports, the way it already imports `blank`'s
-file for the fallback, and counts only cells inside the ten-cell ceiling it already applies. The name,
-the default and the bounds come from that one declaration: `NOTICE_SECONDS`, beside the declaration in
-`components/instruments/notice.ts`, is what the reader passes when the document names none (D6), and
-the reader keeps no copy of either. The layout spec's "Who names the instruments" still holds: the set
-of files that import an instrument's file is unchanged, and `configuration.ts` was already one.
+file for the fallback, and counts only cells inside the ten-cell ceiling it already applies.
+
+The name, the default and the bounds come from that one declaration: `NOTICE_SECONDS`, beside the
+declaration in `components/instruments/notice.ts`, is what the reader passes when the document names
+none (D6), and the reader keeps no copy of either.
+
+The layout spec's "Who names the instruments" holds, because the set of files that import an
+instrument's file is unchanged, and this change's `extension-source-layout` delta widens the
+parenthetical that says why.
 
 A rejected document is the same case. It installs the default row, the default row places no `notice`
 cell, so the reader returns `undefined` and the gate is off. The gate and the value both come from the
