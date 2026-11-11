@@ -137,3 +137,52 @@ All notices are drawn only in `IM` (interactive TUI) as a `Spacer(1)` plus a one
 - The `package.json` `exports` map was not read beyond `main`, so deep-import paths into `core/cache-stats.js` are unconfirmed (the public barrel `index.d.ts` does not export them).
 - No test run was possible; nothing here was executed, only read.
 - Render cost of a timer-driven footer repaint, and behaviour in tmux or terminals without truecolor beyond what the code shows, were not measured.
+
+## Addendum 1 — notice strings and the price lookup
+
+Answered for the repository's pi **1.4.0** (`node_modules/@earendil-works/pi-coding-agent/package.json:3`). Paths below are under that package unless marked 1.5.2. Read from source only; nothing executed.
+
+### 1. Exact strings
+
+All in `dist/modes/interactive/interactive-mode.js` (`IM`), colour token `warning`, each preceded by `new Spacer(1)`.
+
+**`addCacheMissNotice` (`IM:3366-3380`)**
+- Gate: `if (miss.missedTokens < 20_000 && miss.missedCost < 0.1) return;` (3367).
+- Cost suffix: ``const cost = miss.missedCost >= 0.01 ? ` (~$${miss.missedCost.toFixed(2)})` : "";`` (3369). So two decimals, `~` prefix, a leading space, parentheses; omitted when under $0.01.
+- ``const reBilled = `${formatTokens(miss.missedTokens)} tokens re-billed${cost}`;`` (3370).
+- Label (3371-3377): default `"Cache miss"`; if `miss.modelChanged` then `"Cache miss after model switch"`; else if `miss.idleMs >= CACHE_TTL_MS` then ``Cache miss after ${Math.round(miss.idleMs / 60_000)}m idle``.
+- Final text: ``${label}: ${reBilled}`` (3379), e.g. `Cache miss after 7m idle: 184k tokens re-billed (~$0.55)`.
+
+**`addCompactionCostNotice` (`IM:3306-3315`)**
+- `tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite` (3310).
+- ``cost = usage.cost.total >= 0.01 ? ` (~$${usage.cost.total.toFixed(2)})` : ""`` (3311).
+- `label = notice.kind === "compaction" ? "Compaction" : "Branch summary"` (3312).
+- Text: ``${label}: ${formatTokens(tokens)} tokens billed${cost}`` (3314).
+
+**`maybeShowThinkingDropNotice` (`IM:3330-3352`)**
+- `noun = droppedCount === 1 ? "thinking block" : "thinking blocks"` (3349), so it is chosen **by count**, not `block(s)`.
+- Text: ``Anthropic dropped ${droppedCount} ${noun} (details in session)`` (3351).
+- Shown only when `droppedCount` (3333, counted by `countDroppedThinkingBlocks` 3316-3329) is nonzero and greater than the previous assistant message's count (3347).
+
+**`formatTokens` (`dist/modes/interactive/components/footer.js:20-30`)**
+- `count < 1000` → `count.toString()`
+- `count < 10000` → `` `${(count / 1000).toFixed(1)}k` ``
+- `count < 1000000` → `` `${Math.round(count / 1000)}k` ``
+- `count < 10000000` → `` `${(count / 1000000).toFixed(1)}M` ``
+- otherwise → `` `${Math.round(count / 1000000)}M` ``
+- Worked by those rules: `20000` → `20k`; `184000` → `184k`; `1500000` → `1.5M`. (Derived by hand from the code, not executed.) It is imported into `IM` at line 64.
+
+**Dollar formatting:** `toFixed(2)` for both notices, shown only when the value is `>= 0.01`, as ` (~$X.XX)`. The warm notice uses a different formatter (`formatCacheWarmingUsage`, `toFixed(6)` with trailing zeros trimmed to at least 3 decimals; unchanged from my main report).
+
+**1.5.2 differences:** none in text, gates or formatter. `footer.js` is byte-identical (diff empty), and the three methods read the same. Only line numbers differ: `addCompactionCostNotice` 3477-3486, `countDroppedThinkingBlocks`/`maybeShowThinkingDropNotice` 3487-3523, `addCacheMissNotice` 3537-3551.
+
+### 2. `ctx.modelRegistry.find(...)?.cost` versus `detectMiss`'s fallback
+
+- `detectMiss`'s fallback is `(models.getModel(message.provider, message.model)?.cost.cacheRead ?? 0) / 1_000_000` (`dist/core/cache-stats.js:32-34`), used only when the message's own `usage.cacheRead` is 0.
+- `models` is `this.session.modelRuntime` (`IM:3362`, and `3197` for rebuild).
+- The extension's `ctx.modelRegistry` is `new ModelRegistry(this._modelRuntime)` (`dist/core/agent-session.js:2983`), built from the **same** `ModelRuntime` instance (`modelRuntime` getter at `agent-session.js:216-217`).
+- `ModelRegistry.find(provider, modelId)` is `return this.runtime.getModel(provider, modelId)` (`dist/core/model-registry.js:24-26`); the class comment calls it a "Synchronous compatibility facade exposed to extensions" (`model-registry.js:2-5`).
+- `ModelRuntime.getModel` delegates to `this.models.getModel(...)` (`dist/core/model-runtime.js:292-294`).
+- So it is the same function and returns the same `Model` object, with the same `.cost` object. Units are USD per million tokens (`docs/models-configuration.md:41-44`), which is why pi divides by `1_000_000`. An extension multiplying `cost.cacheRead` by tokens must divide by 1,000,000 too.
+- Caveat: `Model.cost` also may carry optional `tiers` (1.5.2 `model-schema.d.ts:37-49`); `detectMiss` ignores them and uses only `cost.cacheRead`. I did not confirm the `tiers` field in 1.4.0's `pi-ai` (not installed separately in the repo's `node_modules`).
+- **1.5.2 difference:** none; `model-registry.js` `find` and `agent-session.js:3079` have the same construction (line shifted).

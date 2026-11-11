@@ -65,3 +65,29 @@ Conclusion: current rules prohibit polling for host data (and instruments owning
 - No alpha/opacity token support or established fade convention was found; whether fade is feasible in Jefferson's styling/terminal API remains unknown. Disappearance needs only text/state timing; fade requires additional verified rendering support.
 - Timer lifetime/cleanup and policy for overlapping notices are design questions; no existing timer abstraction was found. Existing one-release teardown is the natural place for any subscription/timer cleanup, but not yet implemented.
 - Dynamic width basis changes need explicit row-renderer verification: cached cell values are keyed per sample and width, but tests currently test new samples generally rather than notice expiry driven by clock.
+
+## Addendum 1 — configuration timing and existing formatters
+
+### Configuration timing and repeated cells
+
+In TUI `session_start`, `startup.ts` first releases the prior install, creates the session data feed and store with `feedSessionData(...)`, and only then calls `readConfiguration(...)`; it subsequently passes the parsed rows and a `sample: () => store.sample()` callback to `installFooter` (`extensions/jefferson/startup.ts:36-60`). Thus configuration is read after store/feed creation, but before installing the footer. `installFooter` calls `ui.setFooter`; when the host invokes its factory, it attaches footer data, creates the footer tree, and establishes the repaint callback before returning the component (`extensions/jefferson/footer-setup.ts:24-33`).
+
+A valid row may have one or several cells with the same instrument name. `cellsFromNames` resolves each cell's `instrument` name and binds it (`extensions/jefferson/configuration.ts:139-176`); the array must be non-empty and is capped at ten cells (`configuration.ts:65-66, 139-143, 167-175`). There is no uniqueness check on instrument names among cells. Instrument configuration is instead an `instruments` object keyed by instrument name; `readInstruments` iterates that object and prepares one configured binding per name (`configuration.ts:76-123`). `instrumentBindings` caches a bound instrument by declaration name (`extensions/jefferson/components/instruments/instrument-binding.ts:16-37`). Cell objects accept only `instrument` and `align`, so they cannot carry per-cell format/style/label or other option values (`configuration.ts:149-154`). Consequently two `notice` cells can be declared, but they share the single `notice` option set configured once under `instruments.notice`; the current configuration shape has no per-cell distinct options.
+
+### Existing compact-token and USD-cost formatters
+
+`compactCount` is the shared count formatter (`extensions/jefferson/components/instruments/compact-count.ts:2-13`): values below 1,000 are rendered as the integer/string unchanged; from 1,000 up to (exclusive) 100,000 it divides by 1,000, rounds to one decimal place, and appends lowercase `k`; from 100,000 up to (exclusive) 1,000,000 it rounds to the nearest whole thousand and appends `k`; from 1,000,000 up to (exclusive) 10,000,000 it divides by one million, uses one decimal place, and appends uppercase `M`; at 10,000,000 and above it rounds to the nearest whole million and appends `M`. The thresholds and branches are explicit at `compact-count.ts:2-12`.
+
+The tokens instrument applies that formatter separately to input, output, cacheRead, cacheWrite and their summed total (`extensions/jefferson/components/instruments/tokens.ts:5-16`). Therefore:
+
+- 20,000 → `20.0k`
+- 184,000 → `184k`
+- 1,500,000 → `1.5M`
+
+USD cost has no separate helper: the cost variable formats the total as `$${totals.cost.toFixed(3)}` (`extensions/jefferson/components/instruments/cost.ts:4-9`), i.e. dollar sign and exactly three fractional digits (rounding according to JavaScript `Number.prototype.toFixed`). Examples:
+
+- $0.004 → `$0.004`
+- $0.41 → `$0.410`
+- $1.84 → `$1.840`
+
+`format.ts` parses and resolves the instrument's configured format, substitutes these already-formatted variable strings, applies string mutations/style modifiers, and renders segments (`extensions/jefferson/format.ts:62-...`, `resolveFormat`); it does not introduce another compact-count or USD format rule. A configured format can select or arrange the variables, but their formatting is owned by these instrument resolvers.
