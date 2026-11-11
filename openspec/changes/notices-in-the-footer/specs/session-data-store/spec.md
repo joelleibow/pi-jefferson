@@ -2,20 +2,22 @@
 
 ### Requirement: The store holds the notice a notice instrument shows
 
-The store MUST hold the notice the extension shows, its kind and the values its format's variables
-show, and MUST read it as unknown, not as an empty string, while no notice is showing. A notice MUST
-arrive from a host event the feed subscribes to, never from a read the store makes on its own.
+The store MUST hold the notice the extension shows, its kind, the values its format's variables show
+and the instant it shows until. It MUST read the notice as unknown, not as an empty string, before a
+notice arrives and after the session is replaced. A notice MUST arrive from a host event the feed
+subscribes to, never from a read the store makes on its own.
 
 #### Scenario: A notice arrives
 
 - **WHEN** the host reports an event that carries a notice
-- **THEN** the store holds that notice's kind and values before the next render, and the notice
-  instrument reads them from the store alone
+- **THEN** the store holds that notice's kind, values and shown-until instant before the next render,
+  and the notice instrument reads them from the store alone
 
 #### Scenario: No notice is showing
 
-- **WHEN** no notice has arrived, or the last one's visible time is over
-- **THEN** the store reads the notice as unknown, distinguishable from an empty notice
+- **WHEN** no notice has arrived, or the session was replaced
+- **THEN** the store reads the notice as unknown, distinguishable from an empty notice, and a notice
+  whose instant has passed stays held
 
 ### Requirement: A notice comes from the event that carries its kind
 
@@ -53,15 +55,15 @@ come from a read the store schedules.
 
 ### Requirement: One notice shows at a time and a newer replaces it
 
-The store MUST hold one notice at a time. A notice that arrives while another shows MUST replace it,
-MUST take its whole visible time from its own arrival, and MUST leave no pending expiry from the
-notice it replaced. When one `message_end` carries a dropped-thinking notice and a cache miss, the
+The store MUST hold one notice at a time. A notice that arrives while another is held MUST replace it,
+MUST write its own shown-until instant from its own arrival, and MUST leave no pending repaint from
+the notice it replaced. When one `message_end` carries a dropped-thinking notice and a cache miss, the
 cache miss MUST be the one that stays and the dropped-thinking notice is lost.
 
 #### Scenario: A newer notice replaces the shown one
 
-- **WHEN** a second notice arrives while a first is showing
-- **THEN** the store holds the second, and the first's expiry has been cleared
+- **WHEN** a second notice arrives while a first is held
+- **THEN** the store holds the second with its own instant, and the first's repaint has been cancelled
 
 #### Scenario: The newer notice runs its full time
 
@@ -126,7 +128,7 @@ five-minute TTL, or neither. A model change MUST take precedence over an idle.
 
 A dropped-thinking notice MUST show only when the count pi derives for the message exceeds the count on
 the branch's previous assistant message, so a later turn that repeats the same count MUST NOT show it
-again. The notice MUST carry that count.
+again. The notice MUST carry that count as a bare number, and its kind MUST name the noun.
 
 #### Scenario: The count rises
 
@@ -138,10 +140,16 @@ again. The notice MUST carry that count.
 - **WHEN** a message drops the same count as the previous assistant message
 - **THEN** the store holds no dropped-thinking notice
 
+#### Scenario: A count of one
+
+- **WHEN** a message drops exactly one thinking block and the branch's previous assistant message
+  dropped none
+- **THEN** the store holds a `thinkingOne` notice whose `$blocks` value is `1`
+
 ### Requirement: The notice's subscriptions and its timer exist only for a placed cell
 
-The feed MUST subscribe to the notice events, and the store MUST hold a notice's expiry, only while the
-rows the root installs place a `notice` cell in some row. With no `notice` cell in any row the
+The feed MUST subscribe to the notice events, and the store MUST hold a timed datum's repaint, only
+while the rows the root installs place a `notice` cell in some row. With no `notice` cell in any row the
 extension MUST NOT subscribe to those events, MUST NOT scan session entries for a notice, MUST NOT hold
 a timer, and MUST take no visible time from the composition root.
 
@@ -171,49 +179,72 @@ home MUST NOT read configuration.
 #### Scenario: A configured visible time
 
 - **WHEN** the document declares `seconds` and a notice arrives
-- **THEN** the store expires that notice after the declared number of seconds
+- **THEN** the store stamps that notice's instant at the clock plus the declared number of seconds,
+  converting the document's seconds once
 
 #### Scenario: No visible time configured
 
 - **WHEN** the document declares no `seconds` and a notice arrives
-- **THEN** the store expires that notice after the declared default
+- **THEN** the store stamps that notice's instant at the clock plus the declared default
 
-### Requirement: A notice expires on a clock the composition root supplies
+### Requirement: A timed datum carries the instant it shows until
 
-The store MUST drop a notice when its visible time is over, measured on a clock the composition root
-supplies, and the data home MUST NOT reach for one itself. The expiry MUST be a scheduled change to
-state the store holds, not a poll: one repaint requested, nothing asked of the host, and no freshness
-claimed for any datum.
+The store MUST hold a timed datum's shown-until instant, stamped once on arrival from the clock the
+composition root supplies, and MUST NOT hide the datum: it holds it until a newer one replaces it or
+the session is replaced. Every sample MUST carry `sampledAt`, the render's own instant, read once per
+render and unknown after disposal. The data home MUST NOT reach for a clock itself.
 
-#### Scenario: The visible time is over
+#### Scenario: The instant passes
 
-- **WHEN** a notice's visible time has elapsed
-- **THEN** the store reads the notice as unknown and requests one repaint
+- **WHEN** a render's `sampledAt` is at or after a notice's shown-until instant
+- **THEN** the store still holds the notice with its instant, and the timed visual is what stops
+  showing it
+
+#### Scenario: One instant per render
+
+- **WHEN** two timed cells read the sample in one render
+- **THEN** both read the same `sampledAt`
+
+### Requirement: The store requests one repaint at a timed datum's instant
+
+The store MUST request exactly one repaint at a timed datum's shown-until instant, re-arming for the
+time left when its callback fires early, and MUST NOT poll. It asks the host nothing to do it, so the
+repaint makes no datum fresher than the host delivered.
+
+#### Scenario: One repaint at the instant
+
+- **WHEN** the store schedules the repaint for a notice and the clock reaches its instant
+- **THEN** exactly one repaint is requested
+
+#### Scenario: An early fire
+
+- **WHEN** the scheduled callback fires before the instant
+- **THEN** the store re-arms for the time left and requests no repaint
 
 #### Scenario: Nothing is asked of the host
 
-- **WHEN** the store expires a notice
-- **THEN** it reads nothing from the host to do it, and the repaint it requests makes no datum
-  fresher than the host delivered
+- **WHEN** the store schedules or fires the repaint
+- **THEN** it reads nothing from the host to do it, and the repaint makes no datum fresher than the
+  host delivered
 
-#### Scenario: No notice, no timer
+#### Scenario: No timed datum, no timer
 
-- **WHEN** no notice is showing
-- **THEN** the store holds no pending expiry timer
+- **WHEN** no timed datum is held
+- **THEN** the store holds no pending repaint
 
-### Requirement: A pending expiry is cleared with the release
+### Requirement: A pending repaint is cleared with the release
 
-The store MUST hold no pending expiry after the footer is disposed, and the extension MUST run that
+The store MUST hold no pending repaint after the footer is disposed, and the extension MUST run that
 same release when the session shuts down, because the host does not dispose the footer on every
-reload. After the release no expiry MUST request a repaint or touch a context the host has
+reload. After the release no scheduled callback MUST request a repaint or touch a context the host has
 invalidated.
 
 #### Scenario: The footer is disposed mid-notice
 
-- **WHEN** the host disposes the footer while a notice is showing
-- **THEN** no expiry timer survives and no repaint follows
+- **WHEN** the host disposes the footer while a notice is held
+- **THEN** no scheduled callback survives and no repaint follows
 
 #### Scenario: A shutdown that disposes no footer
 
 - **WHEN** the session shuts down without the host clearing the footer, as `ctx.reload()` does
-- **THEN** the release runs then, so no expiry fires into the invalidated session
+- **THEN** the release runs then, so no callback fires into the invalidated session

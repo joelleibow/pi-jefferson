@@ -4,8 +4,9 @@
 
 The extension MUST implement a `notice` instrument declaring `$notice`, the notice the store holds,
 with the default label `Notice:` and `$notice` as its default format. Its text MUST stay on one line
-and MUST NOT depend on the cell's width, and while no notice is showing the cell MUST render nothing,
-label included.
+and MUST NOT depend on the cell's width. The instrument MUST declare the reading that carries the
+notice's shown-until instant, and while the notice is unknown or that instant has passed the cell MUST
+render nothing, label included.
 
 #### Scenario: The default notice cell
 
@@ -15,8 +16,9 @@ label included.
 
 #### Scenario: No notice to show
 
-- **WHEN** no notice is showing
-- **THEN** the cell renders nothing, with no `Notice:` label and no gap
+- **WHEN** no notice has arrived, or the one the store holds has passed its shown-until instant
+- **THEN** the cell renders nothing, with no `Notice:` label and no gap, because the timed visual
+  hands out nothing and an unknown datum suppresses the label
 
 #### Scenario: The same text at any width
 
@@ -32,14 +34,48 @@ label included.
 
 - **WHEN** a notice arrives in a row that also holds a `blank` or `$bar` cell
 - **THEN** the row re-seats at the notice's width, the fill cell gives up those columns, and it takes
-  them back when the notice expires
+  them back when the timed visual stops showing the notice
+
+### Requirement: A timed visual shows and hides a datum
+
+A visual under `components/visuals/` MUST show a datum's text while the render's instant is before the
+datum's shown-until instant, and MUST hand out nothing — `undefined`, not an empty string — at or
+after it, or when either instant is missing. It MUST import no source file of this package and MUST
+NOT hold time, read a clock, subscribe to an event or keep configuration. An instrument MUST mix it in
+by declaring the reading that carries the instant.
+
+#### Scenario: Before the instant
+
+- **WHEN** the render's instant is one millisecond before the datum's shown-until instant
+- **THEN** the visual hands out the datum's text unchanged, and the cell renders it
+
+#### Scenario: At the instant
+
+- **WHEN** the render's instant is the shown-until instant
+- **THEN** the visual hands out nothing, so the cell renders nothing, label included
+
+#### Scenario: An instant the reading does not carry
+
+- **WHEN** a timed instrument's reading yields no shown-until instant, or the render has no instant
+- **THEN** the visual hands out nothing, and the cell renders nothing
+
+#### Scenario: The instrument mixes it in
+
+- **WHEN** the `notice` instrument renders while its notice's shown-until instant is in the future
+- **THEN** the cell renders the notice, and after that instant the same cell renders nothing
+
+#### Scenario: The visual imports nothing
+
+- **WHEN** the imports of `components/visuals/timed.ts` are listed
+- **THEN** none names another source file of this package
 
 ### Requirement: A notice's text is a format with declared variables
 
 Each notice kind's text MUST be a format the user can configure, and the values in it MUST be
 variables the declaration carries: the token count, the cost, the idle minutes, the number of dropped
-thinking blocks and the like. A variable's value MUST keep pi's formatting, and Jefferson MUST ship no
-translations.
+thinking blocks and the like. A value MUST carry the quantity and no English word — `$idle` is the
+minutes and `$blocks` the count — and a unit or a noun belongs in the kind's text. A variable's
+numeral rendering MUST keep pi's formatting, and Jefferson MUST ship no translations.
 
 #### Scenario: A configured format
 
@@ -50,6 +86,11 @@ translations.
 
 - **WHEN** a configured format shows a count for a notice of 20,000 tokens
 - **THEN** the value reads `20k`, because pi's formatting belongs to the value and not to the words
+
+#### Scenario: A value with no word in it
+
+- **WHEN** a user writes `Anthropic a supprimé $blocks` for a notice of two dropped blocks
+- **THEN** the value is `2`, and the user's own words supply the noun pi would have written
 
 ### Requirement: The default text is pi's text for its kind
 
@@ -81,8 +122,9 @@ where pi rounds to a whole thousand from 10,000 up.
 
 #### Scenario: A miss after an idle
 
-- **WHEN** the notice's variant is an idle
-- **THEN** the notice reads `Cache miss after 6m idle: 125k tokens re-billed`
+- **WHEN** the notice's variant is an idle of six minutes
+- **THEN** the notice reads `Cache miss after 6m idle: 125k tokens re-billed`, because the default
+  writes `$idle\m` and `\` escapes the `m` after the bare minutes
 
 #### Scenario: A compaction's usage
 
@@ -97,13 +139,19 @@ where pi rounds to a whole thousand from 10,000 up.
 #### Scenario: Dropped thinking blocks
 
 - **WHEN** two thinking blocks were dropped during provider recovery
-- **THEN** the cell renders `Notice: Anthropic dropped 2 thinking blocks (details in session)`
+- **THEN** the cell renders `Notice: Anthropic dropped 2 thinking blocks (details in session)`, and the
+  notice's kind is `thinking`
 
 #### Scenario: One dropped thinking block
 
 - **WHEN** one thinking block was dropped during provider recovery
 - **THEN** the cell renders `Notice: Anthropic dropped 1 thinking block (details in session)`, because
-  pi chooses the noun by the count
+  pi chooses the noun by the count and the count of one is its own kind, `thinkingOne`
+
+#### Scenario: The kind carries the number and the text carries the noun
+
+- **WHEN** two thinking blocks were dropped and the notice's kind is `thinking`
+- **THEN** the value `$blocks` is `2`, and the default text supplies `thinking blocks`
 
 ### Requirement: A notice takes the colour pi gives its kind
 
@@ -125,7 +173,8 @@ ships, and MUST NOT change colour, text or columns while the notice shows.
 The `notice` instrument MUST declare a `seconds` option: a whole number of seconds from 1 to 60,
 default 10, checked the way the document-level `rowGap` is. An absent value MUST leave the default. A
 value that is not a whole number, or lies outside 1 to 60, MUST reject the document, naming the option
-and the value, and the default row MUST render.
+and the value, and the default row MUST render. The duration belongs to the instrument's datum: the
+composition root hands it to the store, and the visual keeps no configuration.
 
 #### Scenario: A visible time inside the bounds
 
@@ -142,3 +191,94 @@ and the value, and the default row MUST render.
 - **WHEN** the document sets `seconds` to 0, 61, 1.5, `"10"` or null
 - **THEN** the document is rejected, the default row renders, and the warning names the option and the
   value
+
+## MODIFIED Requirements
+
+### Requirement: An instrument's format is plain text and variables
+
+A `format` MUST be plain text: literal characters render verbatim, and `$name` substitutes the value
+the instrument hands out. The format language MUST NOT format a number or parse Markdown.
+
+`$` starts a variable and `|` a modifier when a name follows it, and `\` makes the character after it
+that character, so `\$`, `\|` and `\m` render `$`, `|` and `m`. A `\` with no character after it is
+the character itself. Whitespace at the front and back of a format MUST be removed, after control
+characters collapse to spaces. An undeclared `$name` MUST reject the document, naming the instrument
+and the variable.
+
+#### Scenario: Literal text among variables
+
+- **WHEN** `model` is configured with `label: ""`, the format `🧠: $model from $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `🧠: claude-opus-4 from anthropic`
+
+#### Scenario: A number the format does not format
+
+- **WHEN** `tokens` is configured with the format `↑$input ↓$output`
+- **THEN** each variable renders exactly as the instrument formatted it, and the format adds no
+  digit, group separator or unit of its own
+
+#### Scenario: A literal dollar sign
+
+- **WHEN** a format carries `\$`
+- **THEN** the cell renders a literal `$` and names no variable
+
+#### Scenario: Brackets are text
+
+- **WHEN** a format carries `[a](b)`
+- **THEN** the cell renders `[a](b)`, because the extension parses no group syntax
+
+#### Scenario: Markdown is text
+
+- **WHEN** a format, or a value substituted into it, carries `**bold**`
+- **THEN** the cell renders the characters `**bold**` and no Markdown is parsed
+
+#### Scenario: A variable the instrument does not declare
+
+- **WHEN** an instrument's format names a variable its declaration does not have
+- **THEN** the document is rejected, the default row renders, and the warning names the instrument
+  and the variable
+
+#### Scenario: A pipe no name follows
+
+- **WHEN** `model` is configured with `label: ""`, the format `$model | $provider` and the store holds
+  `anthropic` and `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4 | anthropic`, because the `|` is followed by a space and
+  not by a name, so it is the character it is
+
+#### Scenario: A literal pipe beside a name
+
+- **WHEN** a format writes `\|` where the next character is one a name may hold
+- **THEN** the cell renders a `|` and starts no modifier
+
+#### Scenario: A backslash before a letter
+
+- **WHEN** a format carries `$idle\m` and the notice's idle is six minutes
+- **THEN** the cell renders `6m` with no space between them, because `\` escapes the `m` and the name
+  `$idlem` is not what the format asks for
+
+#### Scenario: A backslash before any other character
+
+- **WHEN** a format carries `a\b`
+- **THEN** the cell renders `ab`, because a backslash yields the character after it
+
+#### Scenario: A backslash with nothing after it
+
+- **WHEN** a format ends in `\`, so no character follows it
+- **THEN** the cell renders a `\`, because a backslash escapes only a character that follows it
+
+#### Scenario: Space at the front or back of a format
+
+- **WHEN** `model` is configured with `label: ""`, the format `  $model  ` and the store holds `claude-opus-4`
+- **THEN** the cell renders `claude-opus-4`, as if the format had no leading or trailing space
+
+#### Scenario: Control characters at the edge of a format
+
+- **WHEN** a format ends in a newline, which collapses to a space
+- **THEN** that space is removed with the rest of the trailing whitespace, and the cell renders on one
+  line
+
+#### Scenario: Space inside a format
+
+- **WHEN** a format is `$percent $bar`
+- **THEN** the space between the two variables renders as written; only the format's front and back are
+  trimmed

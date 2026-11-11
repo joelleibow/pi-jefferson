@@ -1,9 +1,11 @@
 # Tasks
 
 The first six groups are Derek's six spike commits, in his order (`redgreen-derek.md`, "The spike
-commits"), and the SHA in a group's heading is that commit. The seventh group holds the checks that
-span the change, Joel's live check and the sync. Every command below ran in the spike, and the report
-transcribes each beside its red and green.
+commits"), and the SHA in a group's heading is that commit. Groups 7 and 8 are the plan amendment's
+two halves, measured in one further spike commit, `a9a9d7d` (`redgreen-derek.md`, "Addendum — bare
+values and the escape"). The ninth group holds the checks that span the change, Joel's live check and
+the sync. Every command below ran in the spike, and the report transcribes each beside its red and
+green.
 
 **How to read a task.** Each task names the decision it builds, the command that proves it, the red,
 the green, the boundary and the files it touches. A red is a planted mistake in a committed file, and
@@ -19,7 +21,8 @@ the same in either.
 **The boundary.** Each group ends with one task carrying that group's `checks/scope.sh` allowed paths,
 and every task names the files it touches. A group's list is a ceiling: the commit may touch every path
 it lists and no path it does not, and every group allows
-`openspec/changes/notices-in-the-footer/tasks.md` because the group's ticks ride in its commit.
+`openspec/changes/notices-in-the-footer/tasks.md` because the group's ticks ride in its commit. Groups 7
+and 8 share one commit, so their boundary is 8.7's single task and 7.5 ends the first half.
 
 **Logging and errors.** This change adds no logging and no entry point. The one error path it adds is a
 rejected document, which the existing warning reports, and tasks 4.9 through 4.11 carry it.
@@ -826,7 +829,7 @@ goes from 397 to 409.
     ```
     and `AssertionError [ERR_ASSERTION]: 11 !== 10` (§3).
   - Green: both runs pass, and the only assertion lines the change removes are the three this task
-    replaces (`checks/testdiff.sh`, task 7.5).
+    replaces (`checks/testdiff.sh`, task 9.5).
   - Boundary: a list of ten declarations against a list of eleven — the count itself, and the width-0
     comparison for a text that does not depend on width.
   - Files: `extensions/jefferson/shipped.ts`, `tests/instrument.test.ts`.
@@ -1053,37 +1056,321 @@ row, and the tests pin the notice's text to both. The suite goes from 412 to 414
   - Red: the same `README.md` plant as 1.2 (§6).
   - Boundary: this group's two allowed paths.
 
-## 7. The checks that span the change, Joel's check and the sync
+## 7. Extract the timed show-and-hide into a visual — D10, `a9a9d7d`
 
-These read the change as a whole, so they run after the six groups are in. Task 7.6 runs before the
+The group takes the hiding out of the store and gives it to `components/visuals/timed.ts`: the
+declaration's `shownUntil` field, the binding's `timed` call, `Timed<Notice>`, `sampledAt`, and the
+store no longer clearing the datum (D10). It shares one commit with group 8, because Part A's
+default-text fixtures cannot be green without Part B's bare values (`redgreen-derek.md`, the
+addendum's "My calls"). The suite goes from 414 to 424.
+
+Every red below is quoted from `redgreen-derek.md`'s "Addendum — bare values and the escape",
+subsections 1 to 5, measured at `a9a9d7d`. Each plant's revert is
+`git checkout -- <the planted file>`, and the tree is clean after every pair.
+
+- [ ] 7.1 The visual shows its text until the instant and nothing at or after it
+  - Decision: D10 — `timed(text, shownUntil, now)`, where `undefined` past the instant is what makes a
+    hidden datum unknown to the cell, label and gap included.
+  - Command: `node --test tests/timed.test.ts`, the whole file: its four tests are the check.
+  - The tests, addendum §1: "shows its text while the render's instant is before the datum's" (9,999 ms
+    into a 10 s hold); "hands out nothing at the instant and after it" (10,000 and 10,001); "a missing
+    instant on either side hides the text" (three combinations); "the text it was given comes back
+    unchanged, an empty one included".
+  - Red, §1 — plant `now < shownUntil ? text : undefined` as `now <= shownUntil ? text : undefined`, so
+    the instant itself shows:
+    ```
+    ✖ the timed visual hands out nothing at the instant and after it (0.359208ms)
+      AssertionError [ERR_ASSERTION]: at the instant
+      + actual - expected
+      + 'Notice: Cache miss: 20k tokens re-billed'
+      - undefined
+          at TestContext.<anonymous> (.../tests/timed.test.ts:24:10)
+    ```
+  - Green, after the revert: `ℹ tests 4`, `ℹ pass 4`, `ℹ fail 0` (§1).
+  - Boundary: one millisecond before the instant against the instant itself and one after it, and an
+    absent instant on either side.
+  - Files: `extensions/jefferson/components/visuals/timed.ts`, `tests/timed.test.ts`.
+- [ ] 7.2 A timed declaration shows its text until its instant, and nothing after it
+  - Decision: D10 — the binding applies `timed` to the resolved text with the declaration's
+    `shownUntil` reading and `readings.sampledAt`, and a hidden text becomes `""`.
+  - Command: `node --test --test-name-pattern='timed declaration' tests/instrument.test.ts`
+  - The test, §2: a declaration with `defaultLabel: "Timed:"` and
+    `shownUntil: readings => readings.notice?.shownUntil`, bound by `instrumentBindings()`. Before the
+    instant `"Timed: claude-opus-4"`; at and after it `""` with no text, no label and no gap; a later
+    instant shows the same text again; an unknown instant hides it.
+  - Red, §2 — plant the binding's ternary as `return text;`, so the declaration's `shownUntil` is
+    ignored:
+    ```
+    ✖ a timed declaration shows its text until its instant and nothing after it, label included (4.816667ms)
+      AssertionError [ERR_ASSERTION]: at the instant: no text, no label, no gap
+      + actual - expected
+      + 'Timed: claude-opus-4'
+      - ''
+          at TestContext.<anonymous> (.../tests/instrument.test.ts:422:10)
+    ```
+  - Green, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§2).
+  - Boundary: the instant itself, where the label must go with the text; the left and right sides stay
+    green under the same plant.
+  - Files: `extensions/jefferson/components/instruments/instrument.ts`,
+    `extensions/jefferson/components/instruments/instrument-binding.ts`, `tests/instrument.test.ts`.
+- [ ] 7.3 The notice instrument is timed through its own reading
+  - Decision: D10 and D1 — the declaration carries `shownUntil: readings => readings.notice?.shownUntil`
+    and nothing else about time; the composed step is untouched.
+  - Command: `node --test --test-name-pattern='the notice instrument shows its text' tests/instrument.test.ts`
+  - The test, §3: the shipped `notice` declaration, bound, holding a `miss` with `shownUntil: 1`.
+    Before the instant `"Notice: Cache miss: 125k tokens re-billed"`; at and after it `""`.
+  - Red, §3 — plant the `shownUntil` line removed from `components/instruments/notice.ts`:
+    ```
+    ✖ the notice instrument shows its text until its instant and nothing after it (4.306792ms)
+      AssertionError [ERR_ASSERTION]: at the instant: no label and no gap
+      + actual - expected
+      + 'Notice: \x1B[33mCache miss: 125k tokens re-billed\x1B[39m'
+      - ''
+          at TestContext.<anonymous> (.../tests/instrument.test.ts:438:10)
+    ```
+  - Green, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§3).
+  - Boundary: the shipped instrument, which is the visual's first user; the composed text still takes
+    `warning` before it hides.
+  - Files: `extensions/jefferson/components/instruments/notice.ts`, `tests/instrument.test.ts`.
+- [ ] 7.4 Every test the amendment moves, each red against its old expectation
+  - Decision: D10 — the sample carries `sampledAt`, a timed datum carries `shownUntil`, and the store
+    never hides, so each old expectation now reads the new state.
+  - Command: `git checkout 162ff07 -- <the file>`, then `node --test <the file>` whole, per file in the
+    table. The revert is the plant: the old expectation against the new code.
+  - Red, §4 — twenty-four tests across seven files, plus one typecheck-only move:
+
+    | File | Old tests moved | Reverted run |
+    | --- | --- | --- |
+    | `tests/session-data-store.test.ts` | 12 | 47 / 35 / 12 |
+    | `tests/session-data-feed.test.ts` | 3 | 21 / 18 / 3 |
+    | `tests/notice.test.ts` | 3 | 15 / 12 / 3 |
+    | `tests/instrument.test.ts` | 2 | 32 / 30 / 2 |
+    | `tests/row-renderer.test.ts` | 2 | 55 / 53 / 2 |
+    | `tests/configuration.test.ts` | 1 | 129 / 128 / 1 |
+    | `tests/jefferson.test.ts` | 1 | 44 / 43 / 1 |
+    | `tests/format.test.ts` | 0 runtime | 64 / 64 / 0, and `pnpm typecheck` fails |
+
+    The store's twelve, quoted: the sample's key list gains `+ 'sampledAt'`; four fixture spreads gain
+    `sampledAt` (`0`, or `undefined` after disposal); the two notice-datum tests gain
+    `+ shownUntil: 10000,`; and five lifecycle tests read the held notice where they expected
+    `undefined`, which is the hiding leaving the store — "the visible time is over" reads
+    `{ kind: 'miss', shownUntil: 10000, values: { cost: ' (~$0.10)', tokens: '20k' } }` against
+    `undefined`.
+  - Red, the row-renderer's: "the notice cell's text sits at its alignment" renders 80 spaces where the
+    old literal expected the padded notice, and "a fill cell gives up the notice's columns" renders
+    `"a" + 79 spaces` where it expected `"a".padEnd(31) + "Notice: Cache miss: 20k tokens re-billed
+    (~$0.10)"` (§4).
+  - Red, the format test's typecheck-only move: `seed` gains `sampledAt: 0` and `shown` gains
+    `shownUntil: 1`, no test reads them, and the reverted file runs `64 / 64 / 0` while `tsc` reports
+    `error TS2741: Property 'sampledAt' is missing` and `error TS2322: … is not assignable to type
+    'Timed<Notice>'` (§4).
+  - Green, after each revert: the file's run at HEAD, and `pnpm typecheck` printing only
+    `$ tsc --noEmit` (§4).
+  - Boundary: every expectation the amendment moved, one file at a time, against the code that moved it.
+  - Files: `tests/session-data-store.test.ts`, `tests/session-data-feed.test.ts`, `tests/notice.test.ts`,
+    `tests/instrument.test.ts`, `tests/row-renderer.test.ts`, `tests/configuration.test.ts`,
+    `tests/jefferson.test.ts`, `tests/format.test.ts`.
+- [ ] 7.5 A visual imports nothing of this package
+  - Decision: D10 and the layout spec's generalized visual requirement — `components/visuals/` files
+    import no source file of the package, and any component or `format.ts` may import one.
+  - Command: `node checks/imports.mjs <repo>`
+  - Red, §5 — plant `import { collapse } from "../../format.ts";` at the top of `timed.ts`:
+    ```
+    VISUAL IMPORTS extensions/jefferson/components/visuals/timed.ts imports extensions/jefferson/format.ts
+    IMPORTS FAIL
+    ```
+  - Green, after the revert: `edges: 52`, `PASS`; the `CLOCK` rule still names only `startup.ts`, and
+    the run prints no `CYCLE` (§5).
+  - Boundary: the one edge the widening could open — a visual reaching back into the package it is
+    mixed into.
+  - Files: `checks/imports.mjs`.
+
+## 8. Keep English out of the notice's values — D5, D11, `a9a9d7d`
+
+The group makes `$blocks` the bare count with the kind split by number, makes `$idle` the bare
+minutes with pi's `6m` arriving through `missIdle`'s `$idle\m`, and generalizes the format language's
+escape so that `\` yields the character after it (D5, D11). It is the same commit as group 7, and the
+suite is 424 on both sides of the pair. Every red is quoted from `redgreen-derek.md`'s addendum,
+subsections 6 to 10.
+
+- [ ] 8.1 `$blocks` is the bare count, and the kind follows the count
+  - Decision: D5 — the value carries the number, and the noun is the kind's, so `thinkingOne` exists
+    for a count of one.
+  - Command: `node --test --test-name-pattern='the thinking delta' tests/notice.test.ts`
+  - Red, §6 — plant the old `const noun = dropped === 1 ? "thinking block" : "thinking blocks"` and its
+    `{ kind: "thinking", values: { blocks: `${dropped} ${noun}` } }` back in place of
+    `{ kind: dropped === 1 ? "thinkingOne" : "thinking", values: { blocks: `${dropped}` } }`:
+    ```
+    ✖ the thinking delta shows when the count rises and stays silent when it repeats (0.735834ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+      + actual - expected
+        { kind: 'thinking', values: { + blocks: '2 thinking blocks' / - blocks: '2' } }
+    ✖ the thinking delta reads the branch, not the entries: a sibling's higher count stays silent (0.194375ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+      + actual - expected
+        { + kind: 'thinking' / - kind: 'thinkingOne', values: { + blocks: '1 thinking block' / - blocks: '1' } }
+    ```
+  - Green, after the revert: `ℹ tests 3`, `ℹ pass 3`, `ℹ fail 0` (§6).
+  - Boundary: two blocks against one, where the noun and the kind both change.
+  - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
+- [ ] 8.2 `thinkingOne`'s default text is pi's singular
+  - Decision: D5 — the seventh kind's default,
+    `Anthropic dropped $blocks thinking block (details in session)`.
+  - Command: `node --test --test-name-pattern="notice's default text" tests/instrument.test.ts`
+  - Red, §7 — plant `thinkingOne`'s default as the plural noun:
+    ```
+    ✖ the notice's default text is its kind's, in the warning colour, and nothing shows without a notice (4.753833ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      + actual - expected
+      + 'Notice: Anthropic dropped 1 thinking blocks (details in session)'
+      - 'Notice: Anthropic dropped 1 thinking block (details in session)'
+    ```
+  - Green, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§7).
+  - Boundary: the one-block case, which is the only case the kind chooses; the plural case stays green
+    under the same plant.
+  - Files: `extensions/jefferson/components/instruments/notice.ts`, `tests/instrument.test.ts`.
+- [ ] 8.3 `$idle` is bare, and `6m` arrives through `missIdle`
+  - Decision: D5 and D11 — the value is the minutes, the text carries `$idle\m`, and each end has one
+    owner.
+  - Command: `node --test --test-name-pattern='the idle variant' tests/notice.test.ts`, then
+    `node --test --test-name-pattern="notice's default text" tests/instrument.test.ts`
+  - Red, §8, the value's end — plant
+    `` values.idle = `${Math.round(miss.idleMs / MINUTE_MS)}` `` as `` …}m ``:
+    ```
+    ✖ the idle variant: exactly five minutes reads missIdle and a millisecond under does not (0.870958ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      '5m' !== '5'
+          at TestContext.<anonymous> (.../tests/notice.test.ts:101:10)
+    ```
+  - Red, the text's end — plant `missIdle: "Cache miss after $idle\\m idle: …"` as `$idle idle`:
+    ```
+    ✖ the notice's default text is its kind's, in the warning colour, and nothing shows without a notice (4.837375ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      + actual - expected
+      + 'Notice: Cache miss after 6 idle: 125k tokens re-billed'
+      - 'Notice: Cache miss after 6m idle: 125k tokens re-billed'
+    ```
+  - Green, after each revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§8).
+  - Boundary: the unit at each end. The instrument's case supplies the literal `"6"`, so the data-side
+    plant does not reach it; both ends in one run would render `6mm`, which is not a state the tree
+    reaches (`redgreen-derek.md`, "Where the run contradicts the contract" 3).
+  - Files: `extensions/jefferson/data/notice.ts`,
+    `extensions/jefferson/components/instruments/notice.ts`, `tests/notice.test.ts`,
+    `tests/instrument.test.ts`.
+- [ ] 8.4 A backslash yields the character after it
+  - Decision: D11 — `\` escapes any character, in a cell's format and a kind's alike.
+  - Command: `node --test --test-name-pattern='backslash|same escape|ADR 0003' tests/format.test.ts` —
+    the whole escape set: five tests, three red under the plant and two green (the trailing-backslash
+    pair). The alternation is proposed and was not run; the reds and greens below were measured with
+    the three per-case patterns (§9).
+  - The tests, §9: five are selected, three red and two green. The three reds are the new tests "a
+    backslash ends a name run, so the name is the value and the escaped character is literal"
+    (`$model\m`), "a backslash yields any character, a space included" (`a\b`, `a\ b`) and "a plain
+    format takes the same escape as a cell's format" (`$idle\m`). The two greens are the
+    trailing-backslash pair: "the special characters keep the escape ADR 0003 gave them", and a
+    trailing backslash stays itself.
+  - Red, §9 — plant `if (character === "\\" && format[index + 1] !== undefined)` as the old
+    two-character rule `if (character === "\\" && (format[index + 1] === "$" || format[index + 1] === "|"))`:
+    ```
+    ✖ a backslash ends a name run, so the name is the value and the escaped character is literal (0.995625ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      + actual - expected
+      + 'claude-opus-4\\m'
+      - 'claude-opus-4m'
+    ```
+    ```
+    ✖ a backslash yields any character, a space included (0.936083ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      'a\\b' !== 'ab'
+    ```
+    ```
+    ✖ a plain format takes the same escape as a cell's format (1.269333ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+      + actual - expected
+      … { kind: 'literal', modifiers: [], + text: '\\m idle' / - text: 'm idle' }
+    ```
+  - Green, after the revert: `✔` on all four, `ℹ pass 4`, `ℹ fail 0` (§9).
+  - Boundary: a backslash before a letter, before a space, and before the two characters the language
+    already escaped; the trailing backslash has no character after it and stays itself.
+  - Files: `extensions/jefferson/format.ts`, `tests/format.test.ts`.
+- [ ] 8.5 An unknown `formats` key still rejects, `thinkingTwo` included
+  - Decision: D5 — the kind vocabulary is the declaration's, and a near miss is unknown.
+  - Command: `node --test --test-name-pattern="formats key the notice" tests/configuration.test.ts`
+  - The test, §10: it now loops over `["warm", "thinkingTwo"]`, because `thinkingOne` became a kind.
+  - Red, §10 — plant the membership check as `if (false)`, so any key is taken:
+    ```
+    ✖ a formats key the notice's declaration does not carry rejects the document (1.493584ms)
+      AssertionError [ERR_ASSERTION]
+        actual: undefined,
+        expected: true,
+    ```
+  - Green, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0` (§10).
+  - Boundary: `thinkingTwo` against `thinkingOne`, the key the amendment added.
+  - Files: `extensions/jefferson/configuration.ts`, `tests/configuration.test.ts`.
+- [ ] 8.6 The audit of every format's backslash, and its result
+  - Decision: D11 — the escape changes what a document carrying a literal backslash before a letter
+    means, silently, so ADR 0003's audit is repeated over the tree.
+  - Command: `git grep -n '\\'` over the tree, then every backtick span in the markdown and every
+    `defaultFormat`, `formats` and `format` value in the source and the tests read and classified.
+  - Method and result, addendum's "The audit of every format's backslash": 776 lines matched, and
+    **none found**. No format the repository already carried has a backslash before a character other
+    than `$` or `|`.
+  - The five groups the backslashes fall into: `\$` and `\|`, the two the language always escaped;
+    `\n`, `\r`, `\t`, `\x1b` and `\u…` in code examples, labels and status texts; a trailing
+    backslash with nothing after it (`tests/format.test.ts:82`); Starship's own language in the
+    research files, which pi-jefferson does not parse; and the change's own additions, which are the
+    new rule's users.
+  - `~/.pi/agent/pi-jefferson.json`, read and not edited: no backslash at all, and its five formats are
+    `$path`, `$model via|dim $provider|capitalize`, `$level|capitalize`, `$bar $percent` and `""`.
+  - Green: no casualty, so no document changes meaning, and D11's cost is paid with nothing behind it.
+  - Boundary: a format the repository carried against one the change adds — the first is what the audit
+    is for, the second is the rule's own user.
+  - Files: none; the audit reads the tree.
+- [ ] 8.7 The commit is green and touches only the paths the two amendment groups name
+  - Command: `checks/suite.sh <repo> 424` and
+    `checks/scope.sh <repo> 162ff07 a9a9d7d extensions/jefferson/components/instruments/instrument-binding.ts extensions/jefferson/components/instruments/instrument.ts extensions/jefferson/components/instruments/notice.ts extensions/jefferson/components/visuals/timed.ts extensions/jefferson/data/notice.ts extensions/jefferson/data/session-data-store.ts extensions/jefferson/format.ts checks/imports.mjs tests/configuration.test.ts tests/format.test.ts tests/instrument.test.ts tests/jefferson.test.ts tests/notice.test.ts tests/row-renderer.test.ts tests/session-data-feed.test.ts tests/session-data-store.test.ts tests/timed.test.ts openspec/changes/notices-in-the-footer/tasks.md`
+  - Green at `a9a9d7d`: `suite: 424 passed, 0 failed (expected 424)` `PASS`, and `checks/scope.sh` over
+    the sixteen paths the addendum's head names prints `every changed path is one the task names`,
+    `PASS` (`redgreen-derek.md`, the addendum's "The tree at the addendum's head").
+  - The allowed list above is every path the addendum's measurements name, and `tasks.md`; the
+    addendum's head says sixteen and does not list them, so this list is the ceiling and not a count.
+  - Red: the same `README.md` plant as 1.2, which prints `NOT NAMED BY THE TASK: README.md` and
+    `SCOPE FAIL`.
+  - Boundary: this group's paths, shared by both halves because one commit carries them.
+
+## 9. The checks that span the change, Joel's check and the sync
+
+These read the change as a whole, so they run after the eight groups are in. Task 9.6 runs before the
 specs are synced. None of them adds behaviour.
 
-- [x] 7.1 The whole suite passes and the type check is clean
+- [x] 9.1 The whole suite passes and the type check is clean
   - Decision: D8 — the suite green with the change in.
-  - Command: `checks/suite.sh <repo> 414`
+  - Command: `checks/suite.sh <repo> 424`
   - Red: with `format.ts`'s plain-mode variable set reverted to the cell's variables:
     ```
     ✖ a plain format parses the composed values and no modifier
       Error: "notice"'s format names a variable it does not declare: "$tokens"
     ```
-  - Green: `tests 414`, `pass 414`, `fail 0`, then `suite: 414 passed, 0 failed (expected 414)` /
-    `PASS` (`redgreen-derek.md`, the addendum's tree; §1 measured 413 before 6.2's test joined).
+  - Green: `tests 424`, `pass 424`, `fail 0`, then `suite: 424 passed, 0 failed (expected 424)` /
+    `PASS` (`redgreen-derek.md`, the amendment addendum's tree: 424 at `a9a9d7d`, 414 at `162ff07`).
+    The pinned count carries it; which tests are new is 7.4's and 8.1 to 8.5's business, by name.
   - Boundary: every task above, run together.
   - Files: none.
-- [x] 7.2 The import boundaries hold
+- [x] 9.2 The import boundaries hold
   - Decision: D-a, D-b and the layout spec's "Imports between the homes run one way"; the clock only
     in `startup.ts` (`michael-pl4-r2.json`, `later_gates`).
   - Command: `node checks/imports.mjs <repo>`
   - Red: a `data/` file importing `../components/…` prints `DATA LEAK`, and a `setTimeout` in
     `data/session-data-store.ts` prints `CLOCK … names a process clock; only startup.ts may`
     (`redgreen-derek.md` §5).
-  - Green: `files: 27`, `edges: 51`, `PASS`, with `data/notice.ts` importing nothing outside `data/`,
-    `components/instruments/notice.ts` importing the contract and a `data/` type only, and the clock
-    and the scheduler in `startup.ts` alone (§5).
+  - Green: `files: 28`, `edges: 52`, `PASS`, with `data/notice.ts` importing nothing outside `data/`,
+    `components/instruments/notice.ts` importing the contract and a `data/` type only,
+    `components/visuals/timed.ts` importing nothing of the package, and the clock and the scheduler in
+    `startup.ts` alone (§5; the amendment addendum §5).
   - Boundary: the two leak directions the change could open — a `data/` file reaching out, and a
     process clock reached for outside the root.
   - Files: none.
-- [x] 7.3 Nothing reads the terminal and nothing shells out
+- [x] 9.3 Nothing reads the terminal and nothing shells out
   - Decision: Joel's 2026-11-05 ruling, "pi is the source of truth".
   - Command: `checks/terminal.sh <repo>`
   - Red: a `child_process` import in `data/notice.ts` fails the scan with the matching line and
@@ -1091,40 +1378,57 @@ specs are synced. None of them adds behaviour.
   - Green: `no spawn and no terminal read under extensions/` … `PASS` (§7).
   - Boundary: none — the scan covers every shipped file.
   - Files: none.
-- [x] 7.4 The tarball ships both new files and nothing else
+- [x] 9.4 The tarball ships the new files and nothing else
   - Decision: the layout spec's shipped-path rule.
-  - Command: `checks/tarball.sh <repo> 27`
+  - Command: `checks/tarball.sh <repo> 28`
   - Red: a `.test.ts` beside the source prints `TEST FILE SHIPPED`, a tracked source file missing
     from the pack prints `TRACKED BUT NOT SHIPPED`, and a wrong count prints `SOURCE COUNT … IS NOT …`
     (`redgreen-derek.md` §8).
-  - Green: `source files under extensions/: 27 (tracked: 27) (expected: 27)` / `PASS`, the two new
-    files among them (§8).
-  - Boundary: the two new files added to the previous 25, and no test file among them.
+  - Green: `source files under extensions/: 28 (tracked: 28) (expected: 28)` / `PASS`, the three new
+    files among them (§8; the amendment addendum's "The tree at the addendum's head").
+  - Boundary: the three new files added to the previous 25, and no test file among them.
   - Files: none.
-- [x] 7.5 Every assertion line the change edits is one the tasks name
+- [ ] 9.5 Every assertion line the change edits is one the tasks name
   - Decision: D8, and the expectation edits task 4.7 names — the eleventh declaration's length and
     options, and the width-0 guard's list (`redgreen-derek.md` §3).
-  - Command: `checks/testdiff.sh <repo> b9668d9`
+  - Command: `checks/testdiff.sh <repo> b9668d9`, and again
+    `checks/testdiff.sh <repo> 162ff07 a9a9d7d` for the amendment's range.
   - Red: the old expectations planted back fail with
     `+ [ 'format', 'style', 'label', 'seconds', 'formats' ] - [ 'format', 'style', 'label' ]`, and
     with `11 !== 10` (§3).
-  - Green: the removed lines are the three the shipped-declarations test carried, and every added
-    line is a new test's own assertion (§3).
+  - Green, `b9668d9..162ff07`: the removed lines are the three the shipped-declarations test carried,
+    and every added line is a new test's own assertion (§3).
+  - Green, `162ff07..a9a9d7d`: twenty removed assertion lines, every one under `tests/`, measured by
+    Michael when he reviewed this group (`redgreen-derek.md` has no measure of the amendment's range).
+    The store's `undefined` expectations after the deadline, the `"5m"` idle, the `"1 thinking block"`
+    blocks, the `"warm"` key message, the fill cell's last `padEnd(80)`, and the notice deep-equals
+    that gain `shownUntil`.
+  - Each is a shipped fact that moved — the store no longer hides, `shownUntil` joins the datum,
+    `$idle` and `$blocks` are bare, and `thinkingOne` exists — so each line is an expectation a task
+    names: 7.4 by file and count, 8.1 to 8.5 by case.
+  - Unticked until Derek re-runs the check on the branch. The old green held only for `b9668d9..162ff07`
+    and is false against the amended range, which is why the tick went back.
   - Boundary: an expectation edited to fit the new code, against one edited because a shipped fact
     changed.
   - Files: `tests/` only, as the report's diff names.
-- [x] 7.6 Every requirement paragraph stays under the ceiling, and the change validates
+- [x] 9.6 Every requirement paragraph stays under the ceiling, and the change validates
   - Decision: the specs the sync will merge, measured before it.
   - Command: `checks/specs.sh /Users/joelleibow/Projects/pi-jefferson notices-in-the-footer`, run
     from the main checkout.
   - Red: a paragraph over 500 characters prints `<file>:<line>: <n> characters, over 500: …` and
-    `PASS` is not printed; a requirement whose scenario is missing fails
-    `openspec validate notices-in-the-footer --strict` (`redgreen-derek.md` §9).
-  - Green: `Change 'notices-in-the-footer' is valid`, then `longest paragraph 441`, `375` and `356`
-    characters for the three deltas, `none over 500`, `PASS` (§9).
+    `PASS` is not printed, which is what `extension-source-layout/spec.md:24` did at 573; a requirement
+    whose scenario is missing fails `openspec validate notices-in-the-footer --strict`
+    (`redgreen-derek.md` §9).
+  - Green: `Change 'notices-in-the-footer' is valid`, then `none over 500` for the three deltas. The
+    amendment's own measures were 480 and 386 characters for `statusline` and `session-data-store`,
+    and `extension-source-layout`'s visual requirement measured 573 — over the ceiling, which is
+    `redgreen-derek.md`'s "Where the run contradicts the contract" 1. This amendment trimmed it to 470
+    characters by count.
+  - The trimming is counted, not run: I have no shell, so `checks/specs.sh` is the conductor's to run
+    before the sync.
   - Boundary: 500 characters, measured per requirement paragraph, over the three delta specs.
   - Files: none.
-- [ ] 7.7 **Joel's check** — the footer shows the notice as he wants it
+- [ ] 9.7 **Joel's check** — the footer shows the notice as he wants it
   - Decision: his 2026-11-10 ruling ("Let's /skill:conductor-janet that thing up. I'd love to see it
     in action!!!") and `michael-pl4-r2.json`'s `later_gates`.
   - What it covers: a notice appears in the footer with the `Notice:` label, the 10-second default
@@ -1140,12 +1444,16 @@ specs are synced. None of them adds behaviour.
 ## The docs pass — not tasks
 
 `design.md` D9 lists them, and they are written after the implementation gate, in Bambadjan's docs
-pass: `README.md` (the instrument, `seconds`, `formats`, the contract with pi's
-`showCacheMissNotices`, and why cache warm is absent), `ARCHITECTURE.md` (the datum, the events, the
-two injected readers, the composed-format contract and the gate), `AGENTS.md` (adding a notice kind,
-the `shortcut:` pin, and the two traps), and two ADRs (the store keeping time, and an instrument's text
-composed from a format chosen by a reading). No gate follows that pass, by Joel's ruling that
-documentation gets no review loop and never blocks a feature.
+pass. `README.md` takes the instrument, `seconds`, `formats`, the contract with pi's
+`showCacheMissNotices`, why cache warm is absent, and the amendment's escape — the two sentences at
+`:100-103` and `:181-184` that say a backslash escapes only `$` and `|`. `ARCHITECTURE.md` takes the
+datum, the events, the two injected readers, the composed-format contract and the gate, and the
+amendment's `visuals/` sentences (`:21`, `:92`, `:126-127`). `AGENTS.md` takes adding a notice kind,
+the `shortcut:` pin, the two traps, and the amendment's sentence that a visual imports nothing of the
+package and a timed instrument declares `shownUntil`. `docs/adr/` takes four: the store keeping time,
+an instrument's text composed from a format a reading chooses, the visual as a pure part, and the
+generalized escape extending ADR 0003. No gate follows that pass, by Joel's ruling that documentation
+gets no review loop and never blocks a feature.
 
 ## What these tasks do not claim
 
@@ -1154,9 +1462,10 @@ documentation gets no review loop and never blocks a feature.
   notice's text does not depend on width (4.7's guard), so no notice test carries it. "A notice beside
   a fill cell" is 6.2, added on Michael's ruling (`michael-pl7-r1.json`, finding 3; `design.md` D8).
 - **No live pi was observed.** No `/reload`, no `/jefferson`, no real TUI, so the footer's real
-  `Notice: …` line is Joel's check alone (7.7), not a measured green.
-- **The clock is a fake.** The expiry is driven by an injected clock and a recording scheduler; the
-  real `setTimeout` is not measured ("Not verified").
+  `Notice: …` line is Joel's check alone (9.7), not a measured green.
+- **The clock is a fake.** The visible time is driven by an injected clock and a recording scheduler,
+  and the hiding is the visual's, compared against the sample's instant; the real `setTimeout` and the
+  host's clock are not measured ("Not verified").
 - **Six tests were strengthened at `162ff07`.** The inputs and plants the tasks gate set (2.10's miss
   half, 2.11, 2.14, 3.17 through 3.21 and 6.2) were measured against the spike's `162ff07`, not the
   commits their groups name, and each task that cites `redgreen-derek.md`'s addendum says so
@@ -1166,6 +1475,9 @@ documentation gets no review loop and never blocks a feature.
   quoted run. 4.3's and 4.8's instrument half are likewise untranscribed.
 - **Group 1 adds no test.** D4 asks for the suite green on both sides of a reorder that changes no
   behaviour, and `michael-pl4-r2.json`'s `later_gates` confirms that shape for that step.
+- **The amendment's reds are the spike's `a9a9d7d`, measured against this change's amended design and
+  deltas while the spike's own `openspec/` copy stayed pre-amendment** (`redgreen-derek.md`, "Where the
+  run contradicts the contract" 2).
 - **CI and the release workflow were not run.** The tarball was checked locally only.
 - **Render cost of a row re-seating on a notice's arrival and expiry was not measured**
   (`michael-pl4-r2.json`, `not_covered`), so no task claims a performance property.

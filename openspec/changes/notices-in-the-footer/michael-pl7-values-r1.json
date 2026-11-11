@@ -1,0 +1,70 @@
+{
+  "findings": [
+    {
+      "finding": "9.5 ('Every assertion line the change edits is one the tasks name') is ticked with its old green: 'the removed lines are the three the shipped-declarations test carried'. That was true at `162ff07`. At `a9a9d7d` I ran `checks/testdiff.sh <spike> 162ff07 a9a9d7d`: twenty removed assertion lines (the store's `undefined` expectations after the deadline, the `\"5m\"` idle, the `\"1 thinking block\"` blocks, the `\"warm\"` key message, the fill-cell's last `padEnd(80)` and the notice deep-equals that gain `shownUntil`). Task 7.4 names them by file and count, but 9.5's green sentence is now false against the amended range, and the closing section admits testdiff 'was not re-run after the amendment'. A ticked spanning check whose text no longer holds is a tick that does not match the tree.",
+      "location": "tasks.md 9.5 (Green line and tick); 'What these tasks do not claim' testdiff bullet",
+      "required_change": "Untick 9.5 and restate its green as two ranges: `b9668d9..162ff07` removes the three shipped-declarations lines (§3), and `162ff07..a9a9d7d` removes the twenty lines 7.4's table accounts for, each being an expectation a shipped fact moved (the store no longer hides; `shownUntil` joins the datum; bare `$idle`/`$blocks`; `thinkingOne`). Quote the measured count (I ran it: 20 removed, all under tests/). Re-tick when Derek re-runs it on the branch. Delete the 'was not re-run' bullet.",
+      "required_change_ran": true,
+      "severity": "major"
+    },
+    {
+      "finding": "8.4's command `--test-name-pattern='a backslash' tests/format.test.ts` selects two tests, not the four the task describes: 'a plain format takes the same escape as a cell's format' and 'the special characters keep the escape ADR 0003 gave them, and a trailing backslash stays itself' do not contain the phrase. I ran it: `ℹ tests 2`. Under the plant the two run red, so the check bites, but the third quoted red (`\\m idle` in the plain parse) and the surviving-half green are never run by the task's command.",
+      "location": "tasks.md 8.4, Command line",
+      "required_change": "Make the command the file's escape set: `node --test --test-name-pattern='backslash|same escape|ADR 0003' tests/format.test.ts` (regex alternation; node accepts it) and state 'four tests, three red under the plant, one green'. Proposed; the alternation was not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "9.1's quoted red is the pre-amendment one (the plain-mode variable set reverted). It still reds, but the task's count sentence says 'the amendment's ten new tests are the difference' between 414 and 424. The spike adds `tests/timed.test.ts` (4), three escape tests, two timed-binding/instrument tests and the second `formats`-key loop case: I count 4+3+2 = 9 new `test(` calls plus one split; the ten is unverified by the task. Not load-bearing, since suite.sh pins 424 and I ran it green.",
+      "location": "tasks.md 9.1, Green line",
+      "required_change": "Either name the ten (file and test name) or drop the 'ten new tests' clause and let the pinned count carry it. Documentation remedy.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Implementation: the amendment lands on the real branch as one commit per the shared-commit rule in 7/8's intro, or as two commits if Derek can order Part B before Part A with the suite green between; 8.7's scope list is the ceiling either way. I re-run testdiff over both ranges and 7.4's per-file reverts.",
+    "Implementation: the escape audit (8.6) is re-run on the branch's tree, since the branch's docs pass added README text the spike's audit did not see; Joel's `~/.pi/agent/pi-jefferson.json` is read, never edited.",
+    "Implementation: `imports.mjs`'s `VISUAL IMPORTS` rule is the committed check, and `components/visuals/timed.ts` imports nothing (I ran it red with a planted `format.ts` import).",
+    "Docs pass: ADR 0013/0014, the README escape sentences and `thinkingOne` row, ARCHITECTURE's `visuals/` lines, AGENTS' visual sentence; `checks/specs.sh` PASS before the sync (I ran it: PASS at 470/480/386).",
+    "Joel's live check 9.7, now including the notice vanishing at the instant and `6m` through the default."
+  ],
+  "not_covered": [
+    "7.4's twenty-four reverted expectations I spot-checked for two files (store: 47/35/12; format: 64/64/0 with 2 `tsc` errors), matching the table; the other five files I accept on the addendum.",
+    "7.5's `CYCLE`-free claim and the `CLOCK` rule's continued coverage I accept from the green run (`edges: 52 PASS`).",
+    "No live pi, no real `setTimeout`, no CI."
+  ],
+  "requirements": [
+    {
+      "evidence": "Re-ran in a /tmp worktree of the spike at `a9a9d7d`: 7.1 `<=` reds 'at the instant' (and the empty-text test); 7.2 `return text;` reds the timed-declaration test; 7.3 the removed `shownUntil` line reds the notice-instrument test; 7.5 a planted `format.ts` import prints `VISUAL IMPORTS … IMPORTS FAIL`; 7.4 store revert 47/35/12 and format revert 64/64/0 + 2 `tsc` errors. All match the quotes.",
+      "requirement": "Group 7 (D10): each task's red reproduces",
+      "status": "met"
+    },
+    {
+      "evidence": "Re-ran: 8.1 noun planted back reds both thinking tests (pass 1 fail 2); 8.2 plural `thinkingOne` reds the default-text test; 8.3 both ends red separately ('5m' !== '5'; `6 idle`); 8.4 old two-character rule reds two tests under the task's pattern; 8.5 `if (false)` reds the key test. Code at `a9a9d7d` matches the consult and Joel's ruling: `NoticeKind` seven members, `values.idle` bare, `blocks` bare, `missIdle` default `$idle\\m`, `\\` + any defined character.",
+      "requirement": "Group 8 (D5/D11): each task's red reproduces; bare values and the escape as ruled",
+      "status": "met"
+    },
+    {
+      "evidence": "8.6 states the method (`git grep -n '\\\\'`, 776 lines, every format value classified), result (none found), the five classes, and the agent document's five formats read and not edited. The trailing backslash is covered by the test at format.test.ts:351-356 (`tail\\` stays `tail\\`), which my PL4 re-gate asked for.",
+      "requirement": "D11's audit and the trailing-backslash case",
+      "status": "met"
+    },
+    {
+      "evidence": "suite.sh 424 PASS, imports.mjs 52 edges PASS, tarball 28 PASS, scope.sh over 162ff07..a9a9d7d with 8.7's list PASS, specs.sh PASS (470/480/386), `openspec validate --strict` valid — all run by me. 9.5's green text does not hold for the amended range (major finding); 9.1's 'ten new tests' unverified (minor).",
+      "requirement": "Group 9 spanning checks: counts and ticks match the tree",
+      "status": "must_change"
+    },
+    {
+      "evidence": "Statusline delta's five visual scenarios map to 7.1–7.3; the bare-value, kind-by-count, `$idle\\m` and `a\\b` scenarios to 8.1–8.4; the store delta's `shownUntil`/`sampledAt`/never-hides requirements to 7.4's moved expectations and 7.1; the layout delta's visual-imports scenario to 7.5. D10 and D11 each have a group; D9's docs are not tasks.",
+      "requirement": "Both directions: amended specs and D10/D11 to tasks, tasks back",
+      "status": "met"
+    },
+    {
+      "evidence": "All 49 earlier patterns were swept in the prior gate; of the new ones, 7.2/7.3/8.1–8.3/8.5 select the tests they name (run); 8.4's selects two of the four it describes (minor finding).",
+      "requirement": "Each command finds the test(s) it names",
+      "status": "must_change"
+    }
+  ],
+  "verdict": "changes_requested"
+}

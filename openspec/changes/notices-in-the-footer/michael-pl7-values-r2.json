@@ -1,0 +1,44 @@
+{
+  "findings": [
+    {
+      "finding": "8.4's proposed alternation selects five tests, not four: the pre-existing 'a trailing backslash is literal' (format.test.ts:81) also matches `backslash`. I ran it on the spike: `ℹ tests 5, pass 5`. Under the plant three go red and two stay green, so the check still bites; the task's count sentence is off by one.",
+      "location": "tasks.md 8.4, Command line ('four tests, three red under the plant and one green')",
+      "required_change": "Write 'five tests, three red under the plant and two green (the trailing-backslash pair)'. Ran the command; the count is measured.",
+      "required_change_ran": true,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Implementation: Derek re-runs `checks/testdiff.sh` over both ranges on the branch and re-ticks 9.5 only when the removed set is the three lines plus the twenty 7.4/8.x account for; I re-run it.",
+    "Implementation: 8.4's alternation runs as the task's command and shows 3 red / 2 green under the plant on the branch.",
+    "Implementation: the escape audit (8.6) re-run over the branch's tree including the docs pass's README text; `~/.pi/agent/pi-jefferson.json` read, never edited.",
+    "Docs pass and Joel's live check 9.7 as recorded in round 1."
+  ],
+  "not_covered": [
+    "Round-1 reproductions stand; this round I re-ran only 8.4's alternation and re-read the three amended tasks.",
+    "No live pi, no real `setTimeout`, no CI."
+  ],
+  "requirements": [
+    {
+      "evidence": "9.5 is `- [ ]`; its Command names both ranges; the second range's Green states twenty removed lines under `tests/` as I measured them, tied to the four shipped facts and to 7.4/8.1–8.5; it says it re-ticks on Derek's re-run. The 'was not re-run' bullet is gone (`rg` count 0).",
+      "requirement": "Round-1 finding 1 (major): 9.5 unticked and restated for both ranges",
+      "status": "met"
+    },
+    {
+      "evidence": "Command is the alternation over the escape set and the task says it is proposed, not run; I ran it: five tests selected, all present. Count sentence off by one — minor finding.",
+      "requirement": "Round-1 finding 2 (minor): 8.4's command covers the escape tests",
+      "status": "met"
+    },
+    {
+      "evidence": "9.1's Green states 424 at `a9a9d7d` and 414 at `162ff07` and defers which tests are new to 7.4 and 8.x by name; the 'ten new tests' clause is gone.",
+      "requirement": "Round-1 finding 3 (minor): the unverified 'ten new tests' clause",
+      "status": "met"
+    },
+    {
+      "evidence": "`openspec validate notices-in-the-footer --strict` → valid (run). Groups 7, 8 and 9 otherwise unchanged from the round I measured.",
+      "requirement": "Validate green; nothing else moved",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

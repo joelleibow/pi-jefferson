@@ -1,0 +1,72 @@
+{
+  "findings": [
+    {
+      "finding": "The layout delta's rewritten lead paragraph is 573 characters. `checks/specs.sh` (task 7.6, the check the sync runs before merging) fails on it: `extension-source-layout/spec.md:24: 573 characters, over 500` and prints no `PASS`. Bambadjan's report says the two over-ceiling paragraphs were split; this one was not, or the layout delta was not in the run. Measured by running the script.",
+      "location": "openspec/changes/notices-in-the-footer/specs/extension-source-layout/spec.md:24 (the 'The bar has its own file' requirement text)",
+      "required_change": "Split the paragraph at 'The bar's drawing MUST stay in `bar.ts`…' into a second paragraph, then re-run `checks/specs.sh /Users/joelleibow/Projects/pi-jefferson notices-in-the-footer` to `PASS`. Spec-text remedy. Not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "D11 says 'the guard that needs a character after the backslash stays'. No such guard exists: `parseFormat` tests `format[index + 1] === \"$\" || === \"|\"`, which is simply false at the end of the string, so a trailing `\\` falls through to the literal. I ran the parser at HEAD: `\"tail\\\\\"` yields the literal `tail\\`. Once the condition becomes 'any character', the trailing-backslash case has no decision: `format[index + 1]` is `undefined` and the naive edit appends `undefined`. Neither D11 nor the statusline delta's scenarios ('`a\\b`', '`$idle\\m`') says what a format ending in `\\` renders.",
+      "location": "design.md D11 'What changes'; specs/statusline/spec.md MODIFIED 'An instrument's format is plain text and variables'",
+      "required_change": "State the rule and add the scenario: a `\\` with nothing after it is the character itself (keeps today's behaviour and ADR 0003's 'a backslash before anything but … was a literal backslash' at the edge) — scenario 'A backslash at the end of a format: WHEN a format ends in `\\` THEN the cell renders that backslash'. Reword D11 to 'a backslash with no character after it stays a literal backslash, as today'. Derek's red: trailing `\\` planted to drop. Not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "PL7: tests named for `tests/timed.test.ts` (one ms before / at / missing either side; red = comparison flipped), the binding's `timed` call removed, `sampledAt` in the sample keys and `undefined` after dispose, `thinking`/`thinkingOne` at 1 and 2, `$idle` bare with `6m` through the default, `$idle\\m`, `a\\b`, trailing `\\`, and the ADR 0003 audit over the tree recorded as a task output; the store's deleted sample-time-drop test is named as removed, and the e2e notice test gains the hidden-after-instant assertion if the fake host has a clock.",
+    "Implementation: `components/visuals/timed.ts` imports nothing of the package (imports.mjs gains the `components/visuals` rule or the existing DATA/CLOCK rules are shown to cover it); no `components/` file reads a clock; `shownUntil` stamped in one place; the store never clears `notice` except on replacement and dispose.",
+    "Docs pass: ADR 0013 (visual) narrows ADR 0011 in its own body, ADR 0014 (escape) extends ADR 0003; README loses the residual and gains `thinkingOne`.",
+    "Joel's live check 7.7, now including the notice vanishing at the instant and the `6m` default."
+  ],
+  "not_covered": [
+    "I did not re-read every unchanged decision (D3, D4, D6's bounds, D8's unchanged boundaries); round-2 PL4 stands for them.",
+    "The prose passes' register claims were not judged; only content.",
+    "The spec scenario 'The instrument mixes it in' depends on the e2e harness having a clock; whether `tests/jefferson.test.ts`'s fake host exposes one is PL7's to check."
+  ],
+  "requirements": [
+    {
+      "evidence": "D10 matches my consult point for point: `components/visuals/timed.ts` with `timed(text, shownUntil, now): string | undefined`, imports nothing; `shownUntil?: (readings) => number | undefined` on the declaration; the binding applies `timed(…) ?? \"\"` after `resolveFormat`; `undefined` as the hidden answer so the label drops; no configuration on the visual; four alternatives refused with reasons. The notice declares only `readings => readings.notice?.shownUntil` (design.md:371, :605).",
+      "requirement": "Joel's 'What the timed part is': the show-and-hide is a reusable visual under components/visuals/, composable into any instrument, not baked into the notice",
+      "status": "met"
+    },
+    {
+      "evidence": "D2/D10: the store stamps `shownUntil = now() + seconds×1000` once, arms one repaint with the early-fire re-arm, callback only repaints, never hides; `sampledAt` read once per render, `undefined` after dispose; `Timed<T>` beside `Readings`. Store delta: two requirements replace the expiry one, 'MUST NOT hide the datum', 'MUST request exactly one repaint', 'MUST NOT poll', 'asks the host nothing'. Consistent with store spec :35-37, :192-198 and D-a.",
+      "requirement": "Where time lives: store remembers and repaints on the injected clock; visual decides; no instrument subscribes or polls",
+      "status": "met"
+    },
+    {
+      "evidence": "D1/D5: `NoticeKind` seven members with `thinkingOne`; `$blocks` the bare count, `$idle` the bare minutes; defaults `Anthropic dropped $blocks thinking blocks …`, `… $blocks thinking block …`, `Cache miss after $idle\\m idle`; `$cost` and `$tokens` unchanged with the line stated in D11. Statusline delta: 'A value MUST carry the quantity and no English word', the French-count scenario, the `$blocks`-is-`2` scenario, `thinkingOne` scenario. `rg 'six (kinds|formats)'` over design and specs: none left.",
+      "requirement": "Joel's 'After the docs pass' and my consult: bare `$blocks`/`$idle`, `thinking`/`thinkingOne`, `$idle\\m`, `$cost`/`$tokens` unchanged",
+      "status": "met"
+    },
+    {
+      "evidence": "D11 names the one-condition change in `parseFormat`, pi's `6m` as the need, ADR 0003's precedent and silent-meaning cost with the audit the implementation repeats, and refuses `6m`-in-value and a `|unit` form. MODIFIED statusline requirement carries the rule and `$idle\\m`, `a\\b` scenarios. I ran today's parser: `a\\b` → literal `a\\b`, confirming the change is real. The trailing-backslash case is undecided and D11 cites a guard that does not exist — minor finding.",
+      "requirement": "D11: `\\` escapes any character, in every format",
+      "status": "must_change"
+    },
+    {
+      "evidence": "D6 states `seconds` stays `instruments.notice.seconds` and the root hands it to the store; statusline `seconds` requirement says the visual keeps no configuration. Matches the 2026-11-05 configure-once-by-name ruling and my consult. Config surface unchanged.",
+      "requirement": "`seconds` belongs to the instrument",
+      "status": "met"
+    },
+    {
+      "evidence": "Layout delta generalizes 'The bar has its own file' to every visual (own file, imports nothing, mixed in by a declaration field or the format language, any `components/` file or `format.ts` may import one) and keeps the bar's three scenarios plus two for the timed visual; header kept so the sync modifies rather than adds. Matches D10's 'import rule moves one notch' and ADR 0009's frame. Over the 500-character ceiling — minor finding.",
+      "requirement": "Layout spec: visuals import nothing; components and format.ts may import them",
+      "status": "must_change"
+    },
+    {
+      "evidence": "D8 names the moved boundary (`tests/timed.test.ts`: one ms before / at / missing either side, red = comparison flipped), the store's deleted drop test, the one-repaint case now asserting the notice stays held, the binding red with `timed` removed, the bare-value/kind/escape tests, and `sampledAt` among keys. Each discriminator is named. The unknown-datum rule the visual leans on is cited (statusline :1130).",
+      "requirement": "D8: tests move with the mechanism and each names its red",
+      "status": "met"
+    },
+    {
+      "evidence": "`openspec validate notices-in-the-footer --strict` → valid (run). Store, statusline and layout deltas each have a requirement for every D10/D11/D5 change and nothing beyond them; D9 lists four ADRs with ADR 0011 narrowed in a new body, not edited.",
+      "requirement": "Spec alignment both ways after the amendment; validate green",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

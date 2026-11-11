@@ -3,8 +3,8 @@
 // Every relative specifier ends in .ts and resolves; no file imports the entry; data/ imports
 // nothing outside itself; an instrument's file imports only the contract, the compact-count
 // helper or a type of data/, never format.ts, shipped.ts, components/row/ or another instrument;
-// the clock and the scheduler are named only in startup.ts; and no cycle exists. Prints every
-// edge; fails with the problems found.
+// the clock and the scheduler are named only in startup.ts; a file under components/visuals/ imports
+// nothing of this package; and no cycle exists. Prints every edge; fails with the problems found.
 // usage: node imports.mjs <repo>
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -30,6 +30,8 @@ const INSTRUMENT_DIR = "extensions/jefferson/components/instruments/";
 // and the compact-count helper. Every other file there declares one instrument.
 const NOT_AN_INSTRUMENT = new Set([INSTRUMENT_DIR + "instrument.ts", INSTRUMENT_DIR + "instrument-binding.ts", INSTRUMENT_DIR + "compact-count.ts"]);
 const INSTRUMENT_MAY_IMPORT = new Set([INSTRUMENT_DIR + "instrument.ts", INSTRUMENT_DIR + "compact-count.ts"]);
+// A visual stands alone: it is mixed into an instrument, so it may not reach another part of the package.
+const VISUAL_DIR = "extensions/jefferson/components/visuals/";
 
 const files = sources(join(repo, "extensions"));
 const entry = join(repo, "extensions/jefferson.ts");
@@ -68,6 +70,9 @@ for (const file of files) {
     if (target === entry) problems.push(`IMPORTS ENTRY ${from} imports ${to}`);
     if (from.startsWith("extensions/jefferson/data/") && !to.startsWith("extensions/jefferson/data/")) {
       problems.push(`DATA LEAK ${from} imports ${to}`);
+    }
+    if (from.startsWith(VISUAL_DIR)) {
+      problems.push(`VISUAL IMPORTS ${from} imports ${to}`);
     }
     if (from.startsWith(INSTRUMENT_DIR) && !NOT_AN_INSTRUMENT.has(from)
       && !INSTRUMENT_MAY_IMPORT.has(to) && !to.startsWith("extensions/jefferson/data/")) {

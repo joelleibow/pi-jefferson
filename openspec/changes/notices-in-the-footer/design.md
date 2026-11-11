@@ -47,6 +47,10 @@ first (T10).
   is out (`owner-rulings.md`, 2026-11-10).
 - Each notice's words are a format the user configures, the values are variables, the defaults read
   as pi's English, and no translations ship (`owner-rulings.md`, "2026-11-10: After the council").
+- The timed show-and-hide is a visual in its own right, reusable and composable into any instrument,
+  and the notice is its first user (`owner-rulings.md`, "2026-11-10: What the timed part is").
+- No English sits inside a value: `$blocks` is the count and `$idle` the minutes, and `\` escapes any
+  character in a format (`owner-rulings.md`, "2026-11-10: After the docs pass").
 - A process API is injected at the composition root beside `homedir`; `data/` names none
   (`michael-orientation.md` §1, D-a). A datum enters through the store and the feed, and every
   subscription joins the feed's single release (D-b, living `session-data-store` spec).
@@ -66,8 +70,8 @@ first (T10).
 - A `notice` cell shows the notice pi would have drawn, in pi's colour and pi's words.
 - The notice's text is a format per kind, with the values as variables, defaulting to pi's text
   exactly.
-- The notice disappears when its visible time is over, one notice at a time, newest replacing, on a
-  clock and a scheduler the composition root supplies.
+- The notice disappears when its visible time is over, one notice at a time, newest replacing: a
+  reusable visual hides it, and the store requests the repaint on the root's clock and scheduler.
 - A document with no `notice` cell behaves exactly as it does today: nothing subscribed, nothing
   scanned for a notice, no timer.
 - pi's rule is copied whole, so the spec's "the turns pi's transcript notice would flag and for no
@@ -82,8 +86,8 @@ first (T10).
 - No suppression of pi's transcript notices, and no reading or writing pi's settings (T1).
 - No localization and no translated defaults (`owner-rulings.md`, 2026-11-10: After the council).
 - No modifier and no form inside a notice's own text; styling belongs to the cell (D5).
-- No second rendering of a value (a bare count, a unitless number) beside the one that carries pi's
-  formatting (D5, Risks).
+- No time in the format language: a duration is not a variable, and no format names one (D10).
+- No translation of a numeral's rendering: `$tokens` keeps `k`/`M` and `$cost` its suffix (D11).
 - No change to `compactCount`, to the `cost` instrument's formatter, or to any existing datum.
 - No new dependency, nothing drawn from pi-tui, and no new top-level source directory.
 - No ADR retires the previous change's Non-Goal against timed repaints: that rule never reached a
@@ -97,11 +101,16 @@ instrument's declaration composes. Each decision below defends one piece of that
 
 ### D1 — The notice is a datum in `data/`, and pi's rule is one pure file beside it
 
-**The datum.** `Readings` gains `notice?: Notice`, where
+**The datum.** `Readings` gains `notice?: Timed<Notice>`, where
 
 ```
 Notice = { kind: NoticeKind; values: Partial<Record<NoticeValue, string>> }
+Timed<T> = T & { readonly shownUntil: number }
 ```
+
+`Timed<T>` is declared in `session-data-store.ts` beside `Readings`, so the next timed datum reuses
+it. The store stamps `shownUntil` once, on arrival (D2), and D10's visual compares it against the
+render's instant.
 
 `values` holds each value **already formatted**, so a resolver hands its value on unchanged — the
 duty `AGENTS.md` puts on every resolver and the shape `$percent` already has with `43.2%`
@@ -109,14 +118,16 @@ duty `AGENTS.md` puts on every resolver and the shape `$percent` already has wit
 from `values`, and a value that is genuinely empty is the empty string: the cost suffix under a cent
 is the one that is `""`. A kind's format renders an absent value as nothing, never as a blank cell;
 D5 keeps those four values off `declaration.variables` for exactly that reason. Only the notice itself
-has an unknown state; `notice` is `undefined` while nothing shows, which is the unknown that
-suppresses the cell and its label. The living store spec's
+has an unknown state: `notice` is `undefined` before anything arrives and after the session is
+replaced, and that is the unknown that suppresses the cell and its label. A passed `shownUntil` is the
+visual's unknown, not the store's (D10). The living store spec's
 "as distinct datums rather than composed values" is satisfied as the delta requirement defines the
 datum: the notice, its kind and the values its format's variables show
 (`specs/session-data-store/spec.md`, "The store holds the notice a notice instrument shows").
 
-`NoticeKind` has six members — `miss`, `missModelSwitch`, `missIdle`, `compaction`, `branchSummary`,
-`thinking` — and `NoticeValue` has four: `tokens`, `cost`, `idle`, `blocks`. Both are declared in the
+`NoticeKind` has seven members — `miss`, `missModelSwitch`, `missIdle`, `compaction`,
+`branchSummary`, `thinking`, `thinkingOne` — and `NoticeValue` has four: `tokens`, `cost`, `idle`,
+`blocks`. Both are declared in the
 new file and nowhere else. Why the three miss variants are kinds rather than one kind with a variant
 field is D5.
 
@@ -143,7 +154,7 @@ a `compaction` and a `branch_summary` entry (`:59-65`); a `cache_warm` usage ent
 previous request though no warm notice shows (`:66-76`); assistant messages only (`:77`); the skip of
 a message whose `stopReason` is `aborted` or `error` (`interactive-mode.js:2859-2866`); the token sum
 `input + output + cacheRead + cacheWrite` for a compaction and a branch summary (`:3306-3315`); the
-count-noun choice `thinking block` / `thinking blocks` (`:3349`); pi's `formatTokens`
+kind choice between `thinkingOne` and `thinking` at the count of one (`:3349`); pi's `formatTokens`
 (`dist/modes/interactive/components/footer.js:20-30`); and pi's cost suffix, ` (~$X.XX)` to two
 decimals, present only at `COST_SUFFIX_MIN` or above (`interactive-mode.js:3369`).
 
@@ -181,7 +192,7 @@ this change names it anyway.
 No notice comes from a read the store schedules (the delta requirement). The three subscriptions join
 the feed's single `release` (D-b).
 
-### D2 — The clock and the scheduler are injected at the composition root, and one timer expires a notice
+### D2 — The clock and the scheduler are injected at the composition root, and one timer requests the repaint
 
 `feedSessionData` and the store take two more injected readers, beside `homedir`, `requestRender` and
 the branch reader D1 adds: `now: () => number`, and
@@ -191,24 +202,25 @@ returns the cancel. `startup.ts` supplies `performance.now` and a closure over
 cannot, and both read at the same cost. `data/` names neither global, which is D-a's seam word for word
 (`michael-orientation.md` §1, D-a).
 
-Two readers, because they do two jobs. The **clock decides**: the store records the deadline when the
-notice arrives, converting the visible time from seconds in that one place, and drops the notice when
-a read begins and `now() >= deadline`. That is also what makes the expiry testable without timers: a
-fake clock drives every boundary.
+Two readers, because they do two jobs. The **clock stamps**: on a push of a timed datum the store
+writes `shownUntil = now() + holdMs`, converting the document's seconds to milliseconds in that one
+place, and it never clears the datum. A fake clock still drives every boundary (D8).
 
-The **scheduler requests the repaint**: one `schedule` per notice, for `deadline - now()`, whose
-callback takes one of two branches. If `now() < deadline`, it re-arms for `deadline - now()` and
-requests nothing. Otherwise it requests the one repaint. So a timer cannot extend or shorten a notice:
-an early fire re-arms, and a late or repeated one finds the clock past the deadline and decides nothing
-new. A recording `schedule` tests both branches.
+The **scheduler requests the repaint**: one `schedule` per notice, for `shownUntil - now()`, whose
+callback only requests the repaint. An early fire re-arms for the time left and requests nothing, so
+a timer cannot extend or shorten a notice and a repeated fire decides nothing new. A recording
+`schedule` tests both branches.
 
-The schedule handle is kept with the slot and cancelled in three places: when a newer notice replaces
-the showing one (D7), when the notice expires, and in the feed's `release`. `startup.ts` registers a
-`session_shutdown` handler that runs that same release, because `ctx.reload()` emits `session_shutdown`
-and calls `oldRunner.invalidate()` without ever clearing the footer (T5). Without it, a pending
-callback would request a repaint into a context the host has invalidated, and the render's `sample()`
-would reach `getContextUsage()` on a dead runner and throw (T5). Registering the release one more
-place closes a pre-existing exposure; it adds no noun.
+The schedule handle is kept with the slot and cancelled in two places: when a newer notice replaces
+the showing one (D7), and in the feed's `release`. A notice never expires in the store, so nothing
+else clears it.
+
+`startup.ts` registers a `session_shutdown` handler that runs that same release, because
+`ctx.reload()` emits `session_shutdown` and calls `oldRunner.invalidate()` without ever clearing the
+footer (T5). Without it, a pending callback would request a repaint into a context the host has
+invalidated, and the render's `sample()` would reach `getContextUsage()` on a dead runner and throw.
+
+Registering the release one more place closes a pre-existing exposure; it adds no noun.
 
 Alternatives considered. The store calling `setTimeout` itself loses to D-a: `data/` would name a
 process API, and no test could drive time. An interval that ticks and compares loses twice: it
@@ -222,8 +234,8 @@ forbade "a repaint the extension requests on a timer" (`archive/2026-11-10-instr
 design.md:27`), and the council-accepted feedback in the first store change leaned the same way
 (`archive/2026-11-03-session-data-store/council.md:20, :68`). Neither is Joel's. The living specs
 forbid **polling** — asking the host again whether something changed — by the instrument (`statusline`
-spec :348-353) and by the store for statuses (`session-data-store` spec :299-301). A timer that expires
-a notice Jefferson already holds asks the host nothing: the deadline is known when the notice arrives.
+spec :348-353) and by the store for statuses (`session-data-store` spec :299-301). A timer that hides a notice
+Jefferson already holds asks the host nothing: the instant is known when the notice arrives.
 So the timer revises a non-goal and a council preference, and Joel's 2026-11-10 ruling is the evidence
 that justifies it. One repaint per notice follows from it; that repaint's `sample()` reads context
 usage and statuses as it reads them in any render, and claims no freshness beyond "as of this render".
@@ -281,27 +293,29 @@ Alternatives: a setter on the store after the feed is built, which gives one fac
 lets the store exist for a while without its gate; and `data/` reading configuration, which D-a and
 the layout spec both refuse.
 
-### D5 — A notice's text is six formats keyed by kind, declared once on the instrument
+### D5 — A notice's text is seven formats keyed by kind, declared once on the instrument
 
 **Why one format cannot serve.** pi's four notices differ in words that lie outside every value. A
 miss re-bills; a compaction and a branch summary bill; a miss's label may carry "after model switch"
 or "after 7m idle" (`research-chidi.md` Addendum 1 §1; `council-matt-pass2.md` M4). No single format
 renders all of them.
 
-**Why the miss's variants are kinds.** A variant field would hold the variant's English inside a
-value's rendering. Those are the words Joel's ruling exists to let a user replace. So the variant is
-part of the kind, and each kind owns its text.
+**Why a variant is a kind.** A variant field would hold the variant's English inside a value's
+rendering, and those are the words Joel's ruling exists to let a user replace. The same rule settles
+grammatical number: pi writes `thinking block` for one and `thinking blocks` otherwise, so one is its
+own kind, `thinkingOne`, and no value carries a noun.
 
-**The six default formats**, which render pi's text exactly (`research-chidi.md` Addendum 1 §1):
+**The seven default formats**, which render pi's text exactly (`research-chidi.md` Addendum 1 §1):
 
 | Kind | When | Default format |
 |---|---|---|
 | `miss` | a miss with neither a model change nor an idle | `Cache miss: $tokens tokens re-billed$cost` |
 | `missModelSwitch` | a miss whose variant is a model change | `Cache miss after model switch: $tokens tokens re-billed$cost` |
-| `missIdle` | a miss whose variant is an idle of at least the TTL | `Cache miss after $idle idle: $tokens tokens re-billed$cost` |
+| `missIdle` | a miss whose variant is an idle of at least the TTL | `Cache miss after $idle\m idle: $tokens tokens re-billed$cost` |
 | `compaction` | a compaction entry carrying usage | `Compaction: $tokens tokens billed$cost` |
 | `branchSummary` | a branch-summary entry carrying usage | `Branch summary: $tokens tokens billed$cost` |
-| `thinking` | dropped thinking blocks whose count rose | `Anthropic dropped $blocks (details in session)` |
+| `thinking` | dropped thinking blocks, any count but one | `Anthropic dropped $blocks thinking blocks (details in session)` |
+| `thinkingOne` | exactly one dropped thinking block | `Anthropic dropped $blocks thinking block (details in session)` |
 
 **The variables are two vocabularies, split on purpose.** The cell's format names one variable,
 `$notice`; a kind's format names the four values. `$notice` is the only entry of
@@ -312,8 +326,8 @@ part of the kind, and each kind owns its text.
 | `$notice` | the cell's format | the whole notice, composed from the kind's format | — |
 | `$tokens` | a kind's format | the token count | `formatTokens`: `20k` at 20,000, `125k` at 125,300 (`footer.js:20-30`) |
 | `$cost` | a kind's format | pi's cost suffix, ` (~$0.38)`, and `""` below a cent | `interactive-mode.js:3369`, `:3311` |
-| `$idle` | a kind's format | the idle, `6m` | `${round(idleMs / 60_000)}m` (`interactive-mode.js:3375`) |
-| `$blocks` | a kind's format | the dropped blocks, `2 thinking blocks` or `1 thinking block` | noun by count (`interactive-mode.js:3349`) |
+| `$idle` | a kind's format | the idle in whole minutes, `6` | `${round(idleMs / 60_000)}`, bare (`interactive-mode.js:3375`) |
+| `$blocks` | a kind's format | the dropped blocks, `2` or `1` | the count, bare (`interactive-mode.js:3349`) |
 
 The split is load-bearing. `resolveFormat` walks `declaration.variables` and renders the
 cell as nothing the moment any declared variable resolves `undefined` (`format.ts:190-195`), which the
@@ -330,16 +344,15 @@ is a field of the declaration, the reader validates a kind's format against the 
 defaults live in the instrument's own file; what this change splits is which of the declaration's two
 variable sets a given format may name.
 
-`$idle` and `$blocks` carry pi's unit and noun because the format grammar takes the longest name run
-after `$`, so a literal `m` cannot follow `$idle` (`statusline` spec, "An instrument's format is plain
-text and variables"), and because pi chooses the noun by the count, which is a property of the value.
-The unit inside a value is not new: `$percent` hands out `43.2%` (`statusline` spec, "The context
-instrument"). `$cost` carries pi's leading gap and parentheses for the same reason, so the six default
-formats hold no parentheses of their own and a miss under a cent renders with no suffix at all.
+`$idle` and `$blocks` are the bare quantities, because the ruling names them as values and English
+does not belong inside one (`owner-rulings.md`, "After the docs pass"). The unit and the noun move
+into the default texts: `$idle\m` for pi's `6m`, and the `thinking`/`thinkingOne` pair for its noun.
+`\m` is D11's escape. `$cost` keeps pi's leading gap and parentheses, so the formats hold none and a
+miss under a cent renders without a suffix.
 
 **What has to change, and why each piece is the smallest that carries the requirement.** Eleanor's
 Addendum 2 describes a mechanism with one configured format per instrument name. Per-kind formats do
-not fit that mechanism as it stands. Four changes, each in one place:
+not fit that mechanism as it stands. Five changes, each in one place:
 
 1. **`instrument.ts`** — the declaration may carry a composed format set:
 
@@ -350,7 +363,12 @@ not fit that mechanism as it stands. Four changes, each in one place:
      select: (readings: Readings) => string | undefined;                    // the notice kind
      formats: Record<string, string>;                                      // one default per kind
    }
+   shownUntil?: (readings: Readings) => number | undefined;               // a timed datum's instant
    ```
+
+   `shownUntil` is a sibling field, not part of `composed`: a whole datum shows or hides, where `$bar`
+   places a piece of the prose. Any instrument declaring it is timed, and the notice declares
+   `readings => readings.notice?.shownUntil` and nothing else about time (D10).
 
    (I called the field `composed` and not `formats` because the declaration owns the selection, the
    values and the defaults; a bare `formats` would suggest a list of formats for the cell.) The
@@ -394,6 +412,13 @@ not fit that mechanism as it stands. Four changes, each in one place:
    rule the other instruments already use. Two resolutions per render, no theme in the first, no host
    read in either.
 
+   After the cell's format resolves, a declaration carrying `shownUntil` passes the text through the
+   visual's `timed` call with that instant and `readings.sampledAt` (D10). Nothing to show becomes
+   `""`, so the cell renders the unknown rule's nothing.
+
+5. **`components/visuals/timed.ts`** — the new visual, one pure function of the text and the two
+   instants, importing no file of the package (D10).
+
 **Alternatives considered.** Six sibling option keys instead of one `formats` object: the same
 machinery, more namespace, and the kind vocabulary would live in an option list instead of in the
 declaration's `formats`, where the compiler can tie it to `data/`'s type. The store composing the text
@@ -413,6 +438,10 @@ shape: `seconds must be a whole number from 1 to 60: <JSON value>`. So `0`, `61`
 `null` each reject the document, the default row renders, and the warning names the option and the
 value (`configuration.ts:253-265, 328-344`). An absent key leaves 10.
 
+The option stays on the instrument, not on the visual: the visual has no configuration surface, and
+the duration is how long this instrument's datum shows. The root hands it to the store for that datum
+(D10).
+
 The bounds have reasons, not taste. `1` refuses a value that would place an instrument which never
 shows anything, and omitting the cell from `rows` is the off switch. `60` catches a value typed in
 milliseconds, and keeps one timer's delay far inside a Node timer's range. Nothing in the evidence
@@ -428,9 +457,9 @@ prevent; and allowing `0` as "never", which would make placing the cell mean not
 
 ### D7 — One slot, newest replaces, and the miss wins a same-message collision
 
-The store holds one notice and one schedule handle. A notice arriving replaces the showing one, cancels
-its handle, and takes its whole visible time from its own arrival, so a notice arriving eight seconds
-into a ten-second one still shows for its full ten. In one `message_end` that carries both, the
+The store holds one notice and one schedule handle. A notice arriving replaces the showing one, writes
+its own `shownUntil`, and cancels the handle, so a notice arriving eight seconds into a ten-second one
+still shows for its full ten. Nothing is dropped: the newer datum's instant is what changes. In one `message_end` that carries both, the
 thinking-drop candidate is computed first and the miss second, in pi's own draw order, and resolved in
 memory before anything is scheduled; the miss is what stays, the thinking notice is lost, one timer is
 set and one repaint follows (`research-chidi.md` §1, `interactive-mode.js:3010-3011` at 1.5.2,
@@ -465,21 +494,37 @@ deleted:
   `session-manager.d.ts:178`).
 
 `20k` is the pure rule's measurement and not a default text's: `tests/notice.test.ts` reads it off
-`formatTokens` and off the display gate above, which is where pi's rounding edge sits, while the six
+`formatTokens` and off the display gate above, which is where pi's rounding edge sits, while the seven
 default texts' cases carry `125k`. A default text that rendered `20k` would be asserting a case its own
 tests do not have (`redgreen-derek.md`, "Where the run contradicts the design" 2).
 
-The rest of the suite, one behaviour each: the notice datum and its unknown state, replacement and the
-full visible time, expiry on the injected clock with one repaint, the handle cancelled on `release` and
-by the `session_shutdown` release, no subscription and no timer when no cell is placed, placement
-detected from the rows including the rejected document that installs the default row, the three
-subscriptions and their release, the `seconds` bounds and its rejection message, `formats` defaults and
-its rejections, a value the kind does not carry rendering as nothing rather than blanking the cell, the
-six default texts and their `warning` foreground, the label suppressed while nothing shows, the same
-text at width 0 as at 200, and the notice cell's text sitting at its alignment. That last one lives in
+The rest of the suite, one behaviour each. The notice datum and its unknown state; replacement and the
+full visible time; one repaint at the instant, on the injected clock; the handle cancelled on `release`
+and by the `session_shutdown` release.
+
+No subscription and no timer when no cell is placed; placement detected from the rows, including the
+rejected document that installs the default row; the three subscriptions and their release; the
+`seconds` bounds and its rejection message; `formats` defaults and its rejections.
+
+A value the kind does not carry rendering as nothing rather than blanking the cell; the seven default
+texts and their `warning` foreground; the label suppressed while nothing shows; the same text at width 0
+as at 200; and the notice cell's text sitting at its alignment. That last one lives in
 `tests/row-renderer.test.ts`, because alignment is the row's arithmetic rather than the instrument's,
 and its centre case is the discriminator: it fails when the row's centre branch is deleted, and the
 left and right cases stay green under the same plant (`redgreen-derek.md` §2.29).
+
+**The timed boundary moves out of the store.** The store no longer hides anything, so its sample-time
+drop test goes. `tests/timed.test.ts` straddles the visual's edge instead: one millisecond before the
+instant shows, the instant itself hides, and a missing instant on either side hides. Flipping the
+comparison reds it.
+
+`tests/session-data-store.test.ts` keeps the one-repaint case and asserts the sample still carries the
+notice with its `shownUntil`; the early fire still re-arms. A binding test reds when the `timed` call
+is removed: a timed instrument renders nothing, label included, past its instant.
+
+The bare values add theirs: `$blocks` bare at one and two with the kind chosen by count, `$idle` bare
+and `6m` through the default, `$idle\m` and `a\b` through the parser, and an unknown `formats` key
+still rejected. `sampledAt` joins the sample's keys.
 
 **The spec's two row scenarios ride the row's arithmetic, and one of them needed a test.** "A cell
 narrower than the notice" is clip arithmetic the row already measures twice: "an instrument resolving
@@ -508,35 +553,128 @@ After the implementation gate, the docs pass writes:
 
 - **README** — the `notice` instrument, `seconds`, and `formats`, the contract with pi's
   `showCacheMissNotices` (placing the cell is the switch; a user who also turns pi's setting on sees
-  both lines), and why cache warm is absent (`owner-rulings.md`, 2026-11-10).
+  both lines), and why cache warm is absent (`owner-rulings.md`, 2026-11-10). The values are bare now,
+  so the sentence saying `$idle` and `$blocks` carry pi's unit and noun goes, and `thinkingOne` joins
+  the kinds table.
 - **`ARCHITECTURE.md`** — the notice datum and the events it arrives on, the two injected readers and
-  what each does, the composed-format contract, and the gate.
+  what each does, the composed-format contract, the timed visual and the widened import rule, and the
+  gate.
 - **`AGENTS.md`** — adding a notice kind (one member of the kind type, one default format, and one
   subscription only if a new event carries it), the `shortcut:` pin and the re-check on every pin bump,
   and the two traps: a kind's format is plain (no modifier, no form, styling at the cell), and the
-declaration's two variable sets are not interchangeable (a kind's format names the values, the cell's
-names `$notice`).
-- **`docs/adr/`** — two decisions earn one. The first: the store now keeps time, on a clock and a
-  scheduler the composition root supplies, and what "as of the render" means for a datum the extension
-  itself ages. The second: an instrument's text may be composed from a format chosen by a reading, and
-  the declaration contract that carries it. Both are decisions about structure and patterns that
-  outlive this change; the numbering continues from the existing ADRs.
+  declaration's two variable sets are not interchangeable. A third: a visual imports nothing of the
+  package, and a timed instrument declares `shownUntil` rather than keeping time.
+- **`docs/adr/`** — four decisions earn one, and the numbering continues from the existing ADRs:
+  - the store keeps time on a clock and a scheduler the root supplies, and what "as of the render"
+    means for a datum the extension ages;
+  - an instrument's text may be composed from a format a reading chooses, and the contract that carries
+    it;
+  - a visual is a pure part under `components/visuals/`, mixed in by a declaration or a format, never
+    holding time or a host handle. It narrows ADR 0011: the clock still decides, now in the visual, and
+    the store stamps the instant and asks for the repaint. An accepted body is not edited;
+  - the generalized escape extends ADR 0003, and the docs pass repeats ADR 0003's audit over the tree.
 
 No gate follows the docs pass, by Joel's rulings that documentation gets no review loop and never
 blocks a feature.
 
+### D10 — The timed show-and-hide is a visual, and the store only remembers and repaints
+
+Time has two halves, and Joel's ruling separates them. **Showing or hiding** is a visual: a pure
+function of the datum's text, the instant it shows until, and the render's instant.
+
+**Knowing when something arrived and asking for a repaint when the display will change** is data: the
+store holds the clock and the scheduler the root injects (D2), and the store spec already says the
+store requests its own repaints. So the visual decides, the store remembers and repaints, and no
+instrument subscribes, polls or keeps time.
+
+**The file.** `extensions/jefferson/components/visuals/timed.ts`, beside `bar.ts`, importing no file
+of this package — the rule `bar.ts` already obeys. One export:
+
+```
+/** The text while the render's instant is before the datum's shown-until instant; unknown after it, or when either instant is missing. */
+export function timed(text: string, shownUntil: number | undefined, now: number | undefined): string | undefined
+```
+
+`undefined` is the hidden answer, not `""`, so a hidden datum is unknown to the cell and drops its
+label and gap (the statusline spec's "An unknown datum suppresses the label"). The visual has no
+configuration of its own, as the bar has none. The duration is the datum's, not the visual's.
+
+**How an instrument composes it.** A declaration field, because the whole datum shows or hides where
+`$bar` places a piece of the prose: `shownUntil?: (readings: Readings) => number | undefined`. The
+binding applies it after the format resolves: `timed(text, declaration.shownUntil(readings),
+readings.sampledAt) ?? ""`. The notice declares `readings => readings.notice?.shownUntil` and nothing
+else about time.
+
+A format variable cannot do it: a variable renders a piece of a format, and a hidden datum is not a
+piece. `$notice` is the whole text, and the label must go with it. The ruling puts the time in a
+visual rather than in the words, so no format names a duration.
+
+**The store stamps and repaints; the visual decides.** On a push of a timed datum the store writes
+`shownUntil` once — the one home of the instant — and arms one repaint there, re-arming on an early
+fire; the callback only requests the repaint (D2). Every sample carries `sampledAt`, read once per
+render and `undefined` after dispose, so two timed cells in one render agree.
+
+The store never hides. It holds the datum and its `shownUntil` until a newer one replaces it or the
+session is replaced. Nothing in `components/` reads a clock, and `imports.mjs`'s `CLOCK` rule stays as
+it is.
+
+**The import rule moves one notch.** `components/visuals/` files import nothing of this package, and
+any `components/` file or `format.ts` may import them; today only `format.ts` reaches `bar.ts`. That is
+the layout spec's "Imports between the homes run one way" and an ADR 0009 addendum, and it is what
+"composable into an instrument" means in the tree.
+
+**Alternatives.** A format variable, refused above. An instrument asking the clock: it would subscribe
+or poll, which the statusline spec forbids, and two notice cells could disagree. A store-side drop: it
+hides the datum in the state, so the visual has nothing to decide. A second option key for the
+duration: the visual has no surface, and the instrument already owns `seconds` (D6).
+
+### D11 — A backslash escapes the character after it
+
+**What changes.** `\` followed by any character yields that character, in every format. Today only
+`\$` and `\|` escape, and `\x` is a literal backslash then `x`. One condition leaves `parseFormat`,
+and the guard that needs a character after the backslash stays. The plain parse keeps the same grammar,
+so a kind's format gets the escape for free.
+
+**Why it is needed.** A name runs over `[A-Za-z0-9_]+`, so `$idlem` is one undeclared name, and pi's
+text has no space before its `m`. With `$idle` bare (D5), the `missIdle` default is
+`Cache miss after $idle\m idle`, which renders pi's `Cache miss after 6m idle`.
+
+**The precedent and the cost.** ADR 0003 paid this exact cost for `\|`: a document carrying a
+backslash before a letter changes meaning, silently. Its audit found no such format in the repository,
+and breaks are cheap before 1.0. The implementation repeats that audit over the tree — the specs, the
+ADRs, the README, `AGENTS.md`, and any `pi-jefferson.json` it can see — and records the result.
+
+**What stays a value.** `$tokens` keeps its `k`/`M` and `$cost` its ` (~$X.XX)` suffix. The line: a
+word a translator would write differently belongs in the text, and a numeral's own rendering stays in
+the value. `m` names minutes, where `k` is a magnitude and `$` a currency sign, and the suffix's
+presence below a cent is a rule no format can express.
+
+**Alternatives.** Leaving `6m` inside the value: Joel rejected it, and it is a second answer to the
+same question. A form on `$idle` (`$idle|unit`): a form selects a rendering of a variable and cannot
+put a literal between a variable and its neighbour, and the grammar would still refuse `$idlem`.
+
 ### Consequences
 
-- A row holding a `notice` cell re-seats when a notice arrives and again when it expires: a fill cell
-  in that row gives up the notice's columns and takes them back (ADR 0007;
+- A row holding a `notice` cell re-seats when a notice arrives and again when its instant passes: a
+  fill cell in that row gives up the notice's columns and takes them back (ADR 0007;
   `michael-orientation.md` T7).
 - The extension now requests a repaint on a timer, once per notice. It asks the host for nothing, but
   it is the first timed repaint in this footer, and D2 records the revision that makes.
 - `startup.ts` reads configuration before it builds the feed, which is a reordering of its two first
   steps and no change to what either produces (D4).
-- `InstrumentDeclaration` grows one optional field with four members, and `format.ts` grows a plain
-  parse, a plain resolve and one optional parameter on `resolveFormat`. Every reader of the declaration
-  still reads one declaration per instrument, and the new parameter is passed only by the binding.
+- `InstrumentDeclaration` grows two optional fields: `composed` with four members, and `shownUntil`.
+  `format.ts` grows a plain parse, a plain resolve and one optional parameter on `resolveFormat`. Every
+  reader of the declaration still reads one per instrument, and the parameter is passed only by the
+  binding.
+- `Readings` gains `sampledAt`, and a timed datum carries `shownUntil`, so the sample is the instant
+  every timed cell in one render compares against (D10).
+- `components/visuals/` gains a second file, and the import rule widens: any component or `format.ts`
+  may import a visual, where only `format.ts` reached `bar.ts` before (D10).
+- The store holds a notice past its instant until a newer one arrives or the session is replaced: the
+  hiding is the visual's, and the store's state says what it holds (D10).
+- `$idle` and `$blocks` are bare numbers, so a kind's text carries its unit and its noun (D5).
+- A backslash escapes any character now: a document carrying `\x` renders `x`, where it rendered `\x`
+  (D11).
 - A cell's format may name `$notice` and nothing else; the four values belong to a kind's format (D5).
 - `readConfiguration`'s result grows one field that only `startup.ts` reads.
 - The feed takes one more host read, `getBranch()`, beside `getEntries()`, because pi's thinking-drop
@@ -558,7 +696,8 @@ residual risk is accepted, as Michael's orientation already accepted it for `sta
 **[The first clock in the footer] a timed repaint re-samples the host.** Each render's `sample()` reads
 context usage and statuses as any render does, and claims no freshness beyond "as of this render"
 (`session-data-store` spec :72-75, :299-301). → Mitigation: one repaint per notice, no cadence, nothing
-polled, and no notice held while unplaced (D3). A fade would multiply it, which is why it is not here.
+polled, and no notice held while unplaced (D3). The store never hides, so visibility is decided in one
+place (D10). A fade would multiply it, which is why it is not here.
 
 **[Reload] `ctx.reload()` leaves the old footer installed until the next `session_start`.** A pending
 callback would then repaint a footer whose store holds a dead context, and the render would throw
@@ -567,21 +706,14 @@ release on `session_shutdown` (D2). The scenario is tested.
 
 **[Layout] a notice arriving shifts a row's other cells.** → Mitigation: none needed; it is the
 consequence ADR 0007 records for any cell whose content changes width, and the row returns to its old
-shape on expiry.
+shape when the visual stops showing the notice.
 
 **[A narrow cell] the longest notice is about 68 columns with its label.** → Mitigation: none; the row
 keeps one line and clips, which is the one-line rule every cell already obeys.
 
-**[English inside a value] a translated notice still reads "thinking blocks" and "6m".** `$blocks`
-carries pi's noun and `$idle` pi's unit, so a user writing their own words around them still sees those
-two English fragments. The ruling says a value keeps pi's formatting, so this design does not split
-them. → If Joel wants them separated at the live check, the smallest addition is a second form on those
-two variables (`$blocks|count`, `$idle|amount`), which the existing form mechanism already supports and
-which no datum change needs. Not built now, because nothing asks for it.
-
-**[Six formats to translate] a user writing their own words edits up to six strings.** → Mitigation:
-each is independent and defaulted, and a user who wants English changes nothing. D5 records why fewer
-formats cannot hold the ruling.
+**[Seven formats to translate] a user writing their own words edits up to seven strings.** →
+Mitigation: each is independent and defaulted, and a user who wants English changes nothing. D5 records
+why fewer formats cannot hold the ruling.
 
 **[Two resolutions per render] each `notice` cell composes its text twice over: the kind's format, then
 the cell's.** → Mitigation: both are string joins over values the store already holds, with no host
@@ -610,4 +742,5 @@ read and no theme in the first; two `notice` cells in one render produce the sam
    ruled value. Joel judges them at the live check; each costs one constant
    (`council.md`, Owner Decisions Required; `council-matt-pass2.md` M1).
 2. **Whether a fade follows.** The council deferred a token-step fade to the same live check
-   (`council.md`; `michael-orientation.md` T8, §3.1). Nothing here forecloses it (D2).
+   (`council.md`; `michael-orientation.md` T8, §3.1). Nothing forecloses it: the visual is where it
+   would go (D10).
