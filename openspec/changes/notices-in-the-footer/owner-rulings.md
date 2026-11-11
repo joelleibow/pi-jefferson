@@ -9,6 +9,13 @@ Joel's rulings for this change, quoted and dated. They are binding and newer tha
 
 His question leaves one thing open: *"fade out or disappear"* names two endings. Which one ships, or whether both do, is for the council and the design to settle, and for him at PL2 if they cannot.
 
+## 2026-11-10: After research
+
+Michael's orientation found that pi has no hook an extension can use to stop its own transcript notices, and that a finished cache warm fires no event an extension can hear. Joel was asked both.
+
+- **The contract with pi's setting.** Asked whether the contract is that placing the notice instrument turns the footer version on while pi's `showCacheMissNotices` stays off, its default, he chose **"Footer on, pi setting off"**. **Jefferson never reads or writes pi's settings. A user who also turns pi's setting on sees both, and the README says so.**
+- **Cache warm.** Asked whether to ship the cache-warm notice late, when the next scan finds it, or leave it out, he chose **"Leave it out"**. **The change ships cache misses, compaction and branch-summary usage, and dropped thinking blocks. Cache warm is not shown, and the README says why.**
+
 ## Earlier rulings this change inherits
 
 - **2026-11-05, the source of truth:** *"those all should be able to come from pi, right?"* **pi is the source of truth. Nothing reads the terminal and nothing shells out.** (archive/2026-11-05-configurable-instruments/owner-rulings.md)
