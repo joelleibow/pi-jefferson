@@ -91,3 +91,23 @@ USD cost has no separate helper: the cost variable formats the total as `$${tota
 - $1.84 → `$1.840`
 
 `format.ts` parses and resolves the instrument's configured format, substitutes these already-formatted variable strings, applies string mutations/style modifiers, and renders segments (`extensions/jefferson/format.ts:62-...`, `resolveFormat`); it does not introduce another compact-count or USD format rule. A configured format can select or arrange the variables, but their formatting is owned by these instrument resolvers.
+
+## Addendum 2 — configuration order, instrument options and formats
+
+### Configuration order and inputs
+
+In TUI `session_start`, `startup.ts` releases the previous install, then creates the feed and store with `feedSessionData(...)` (`extensions/jefferson/startup.ts:36-50`). Only after that does it call `readConfiguration(...)`, passing configuration paths derived from `ctx.cwd`, the trust result from `ctx.isProjectTrusted()`, and `ctx.ui.theme` (`startup.ts:51-55`). It then installs the footer with the resulting rows and a sample callback backed by the already-created store (`startup.ts:59-68`). The footer factory later attaches footer-only data, creates the footer renderer, and connects repaint (`extensions/jefferson/footer-setup.ts:24-33`).
+
+`readConfiguration` accepts a `ConfigurationSource` and resolves/reads the agent or trusted-project document; it normalizes using only the document, notices, and `source.theme` (`extensions/jefferson/configuration.ts:41-49, 290-343`). It does not access or consume the feed or store. The theme it validates styles against is supplied directly from `ctx.ui.theme` at startup (`startup.ts:51-55`; style validation in `configuration.ts:115-120`). Moving `readConfiguration` before `feedSessionData` would not change its inputs as presently called or implemented: cwd, trust decision and UI theme are all taken from `ctx` independently, and the configuration reader does not depend on store/feed state.
+
+### Instrument options and formats
+
+`InstrumentDeclaration.options` is a declaration-owned readonly list (`extensions/jefferson/components/instruments/instrument.ts:18-33`). `FOUNDATIONAL_OPTIONS` is the frozen `format`, `style`, `label` list (`instrument.ts:35`). A declaration can supply a different list and therefore declare its own extra option keys; however, no existing shipped instrument demonstrates that: declarations for `path`, `status`, `tokens`, and the other shipped instruments use `FOUNDATIONAL_OPTIONS` (`extensions/jefferson/components/instruments/path.ts:33`, `status.ts:33`, `tokens.ts:16`).
+
+`readInstruments` rejects option keys absent from that declaration's `options` (`extensions/jefferson/configuration.ts:76-92`). It currently gives special treatment to `format`: it must be a string, then `parseFormat(declaration, format ?? declaration.defaultFormat)` parses it (`configuration.ts:92-106`). `parseFormat` recognizes `$name` only when `name` is an own declared variable (or declared `$bar`), and rejects undeclared variables (`extensions/jefferson/format.ts:48-74`). It also processes declared variable forms and modifiers in the format (`format.ts:76-116`).
+
+The existing configuration stores one `ConfiguredInstrument` per instrument name in a map, and the binding caches one bound instrument per declaration name (`configuration.ts:76-123`; `extensions/jefferson/components/instruments/instrument-binding.ts:16-37`). Thus the current `format` option is one configured format per instrument name, not a list of independent formats per cell or notice kind. `variableForms` are different: a declaration may provide multiple named resolvers for one variable, selected inline after that variable as `$variable|form` (`instrument.ts:21-25`; parser implementation at `format.ts:76-94`). The shipped `path` declaration demonstrates `base`, `absolute`, and `relative` forms for its one `path` variable (`components/instruments/path.ts:27-33`). Forms select alternative renderings for an individual variable within the single format; they do not configure multiple whole-instrument formats.
+
+### `rowGap` bound
+
+The reader defaults `rowGap` to 1 and caps its maximum at 3 (`extensions/jefferson/configuration.ts:65-68`). When present, it accepts only a number that is an integer and lies from 0 through 3 inclusive; otherwise it throws a `RejectedConfiguration` with this exact text template: `rowGap must be a whole number from 0 to 3: ${JSON.stringify(value)}` (`configuration.ts:253-265`). The top-level reader catches that rejection and reports it inside `pi-jefferson: <path> was rejected (<message>); rendering the default row` (`configuration.ts:328-344`).

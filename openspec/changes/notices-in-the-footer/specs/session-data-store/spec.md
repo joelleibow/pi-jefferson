@@ -141,8 +141,9 @@ again. The notice MUST carry that count.
 ### Requirement: The notice's subscriptions and its timer exist only for a placed cell
 
 The feed MUST subscribe to the notice events, and the store MUST hold a notice's expiry, only while the
-document places a `notice` cell in some row. With no `notice` cell in any row the extension MUST NOT
-subscribe to those events, MUST NOT scan session entries for a notice, and MUST NOT hold a timer.
+rows the root installs place a `notice` cell in some row. With no `notice` cell in any row the
+extension MUST NOT subscribe to those events, MUST NOT scan session entries for a notice, MUST NOT hold
+a timer, and MUST take no visible time from the composition root.
 
 #### Scenario: No notice cell placed
 
@@ -155,22 +156,27 @@ subscribe to those events, MUST NOT scan session entries for a notice, and MUST 
 - **WHEN** a row places a `notice` cell
 - **THEN** the feed subscribes to `message_end`, `session_compact` and `session_tree` for it
 
+#### Scenario: A document the configuration rejects
+
+- **WHEN** the configuration rejects the document, so the default row renders
+- **THEN** no row places a `notice` cell, the extension takes no visible time, and no notice event is
+  subscribed
+
 ### Requirement: The store's visible time comes from the composition root
 
 The store MUST take its visible time from the composition root, which passes the one value the
 document's `notice` declaration names, or the declared default when the document names none. The data
-home MUST NOT read configuration. A document the configuration rejects MUST still leave the store the
-declared default visible time.
+home MUST NOT read configuration.
 
 #### Scenario: A configured visible time
 
 - **WHEN** the document declares `seconds` and a notice arrives
 - **THEN** the store expires that notice after the declared number of seconds
 
-#### Scenario: A rejected document
+#### Scenario: No visible time configured
 
-- **WHEN** the configuration rejects the document and the default row renders
-- **THEN** the store expires notices after the declared default visible time
+- **WHEN** the document declares no `seconds` and a notice arrives
+- **THEN** the store expires that notice after the declared default
 
 ### Requirement: A notice expires on a clock the composition root supplies
 

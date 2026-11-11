@@ -4,11 +4,11 @@ x-marbleization:
   working_dir_state: existing_project
   runs:
     chidi: "3c603239-3c1a-4d85-9cbd-04bf65c2a82d"
-    eleanor: "8154df4a-3d1f-4c85-ad06-0bbcc17f0b50"
-    michael: "a48c7c73-d35f-4dd0-a396-c83a97fe7e07"
+    eleanor: "950a9f7d-6976-43e5-8c29-99f5ba967973"
+    michael: "5d59f10f-99a3-4303-8c78-2f7dbec23473"
   gates:
     council_owner: approved
-    design: pending
+    design: approved
     tasks: pending
     implement: pending
     validate: pending
@@ -18,3 +18,4 @@ x-marbleization:
     - "2026-11-10 michael: repinned to anthropic/claude-fable-5-1 in his agent file (dotfiles 7217280) by Joel: \"There hasn't been an update to that extension yet so we'll go ahead and just shift them back to fable-5-1 for now.\" Unblocks the orientation."
   progress:
     - "2026-11-10: council converged in 3 passes (neil cbcd62c0->9096582d, matt 43820726->adefade1); no dispute for Michael; Owner Decisions Required: none. PL2 approved. Joel ruled after the council that notice text is configurable (owner-rulings.md), folded into proposal and specs."
+    - "2026-11-10: design drafted (Bambadjan e7b778bd, fixes a2a973be); Michael PL4 changes_requested r1, approve r2 (michael-pl4-r2.json) with two minor findings fixed in the change."
