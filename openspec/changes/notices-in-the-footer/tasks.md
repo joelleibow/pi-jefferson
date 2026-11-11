@@ -1388,7 +1388,7 @@ specs are synced. None of them adds behaviour.
     files among them (§8; the amendment addendum's "The tree at the addendum's head").
   - Boundary: the three new files added to the previous 25, and no test file among them.
   - Files: none.
-- [ ] 9.5 Every assertion line the change edits is one the tasks name
+- [x] 9.5 Every assertion line the change edits is one the tasks name
   - Decision: D8, and the expectation edits task 4.7 names — the eleventh declaration's length and
     options, and the width-0 guard's list (`redgreen-derek.md` §3).
   - Command: `checks/testdiff.sh <repo> b9668d9`, and again
