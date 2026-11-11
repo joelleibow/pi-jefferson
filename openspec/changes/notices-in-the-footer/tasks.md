@@ -1346,15 +1346,16 @@ specs are synced. None of them adds behaviour.
 
 - [x] 9.1 The whole suite passes and the type check is clean
   - Decision: D8 — the suite green with the change in.
-  - Command: `checks/suite.sh <repo> 424`
+  - Command: `checks/suite.sh <repo> 425`
   - Red: with `format.ts`'s plain-mode variable set reverted to the cell's variables:
     ```
     ✖ a plain format parses the composed values and no modifier
       Error: "notice"'s format names a variable it does not declare: "$tokens"
     ```
-  - Green: `tests 424`, `pass 424`, `fail 0`, then `suite: 424 passed, 0 failed (expected 424)` /
-    `PASS` (`redgreen-derek.md`, the amendment addendum's tree: 424 at `a9a9d7d`, 414 at `162ff07`).
-    The pinned count carries it; which tests are new is 7.4's and 8.1 to 8.5's business, by name.
+  - Green: `tests 425`, `pass 425`, `fail 0`, then `suite: 425 passed, 0 failed (expected 425)` /
+    `PASS` (`redgreen-derek.md`, the amendment addendum's tree: 424 at `a9a9d7d`, 414 at `162ff07`;
+    group 10's empty-kind test is the twenty-fifth, and 10.1 moves assertions only). The pinned count
+    carries it; which tests are new is 7.4's, 8.1 to 8.5's and 10.2's business, by name.
   - Boundary: every task above, run together.
   - Files: none.
 - [x] 9.2 The import boundaries hold
@@ -1399,16 +1400,19 @@ specs are synced. None of them adds behaviour.
     with `11 !== 10` (§3).
   - Green, `b9668d9..162ff07`: the removed lines are the three the shipped-declarations test carried,
     and every added line is a new test's own assertion (§3).
-  - Green, `0d6cd85..HEAD`: twenty-one removed assertion lines, every one under `tests/`, measured
+  - Green, `0d6cd85..HEAD`: twenty-five removed assertion lines, every one under `tests/`, measured
     with `checks/testdiff.sh` (`redgreen-derek.md` has no measure of the amendment's range). Michael
     measured the twenty at the implementation gate; the twenty-first is that gate's first finding, the
     store's reworded `the first's handle was cancelled when the second arrived`, where the range held
-    the old wording. The store's `undefined` expectations after the deadline, the `"5m"` idle, the
+    the old wording; and Validate's four are 10.1's, each an expectation the arrival's repaint moves —
+    `the arrival requests nothing; the host renders the event`, `an early fire asks for nothing`,
+    `no expiry repaints after disposal` and `a message after disposal takes no notice`, which now read
+    the arrival's one. The store's `undefined` expectations after the deadline, the `"5m"` idle, the
     `"1 thinking block"` blocks, the `"warm"` key message, the fill cell's last `padEnd(80)`, and the
     notice deep-equals that gain `shownUntil` are the twenty.
   - Each is a shipped fact that moved — the store no longer hides, `shownUntil` joins the datum,
     `$idle` and `$blocks` are bare, and `thinkingOne` exists — so each line is an expectation a task
-    names: 7.4 by file and count, 8.1 to 8.5 by case.
+    names: 7.4 by file and count, 8.1 to 8.5 by case, 10.1 by the arrival's request.
   - Re-run and ticked on the branch. The old green held only for `b9668d9..162ff07` and was false
     against the amended range, which is why the tick had gone back; the spike's `162ff07..a9a9d7d`
     is not this branch's range, because `162ff07` predates the implementation gate's fixes.
@@ -1453,7 +1457,7 @@ kind, which Joel ruled at Validate (`michael-validate.json`, findings 1 and 2; `
 "2026-11-11: At Validate").
 
 The arrival fix adds no test, so its commit stays at 424; the empty-kind fix adds one and takes the
-suite to 425. Michael's re-validation runs `checks/suite.sh . 424`, `checks/scope.sh` over the fix
+suite to 425. Michael's re-validation runs `checks/suite.sh . 425`, `checks/scope.sh` over the fix
 commit, and `testdiff` over `0d6cd85..HEAD`, whose moved counts are 9.5's to name.
 
 - [x] 10.1 A notice's arrival requests a repaint, as every push does
