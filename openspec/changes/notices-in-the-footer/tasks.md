@@ -4,8 +4,9 @@ The first six groups are Derek's six spike commits, in his order (`redgreen-dere
 commits"), and the SHA in a group's heading is that commit. Groups 7 and 8 are the plan amendment's
 two halves, measured in one further spike commit, `a9a9d7d` (`redgreen-derek.md`, "Addendum — bare
 values and the escape"). The ninth group holds the checks that span the change, Joel's live check and
-the sync. Every command below ran in the spike, and the report transcribes each beside its red and
-green.
+the sync. The tenth holds the two fixes Validate asked for; its reds are Derek's to measure in
+Implement, and its commands have not run. Every other command below ran in the spike, and the report
+transcribes each beside its red and green.
 
 **How to read a task.** Each task names the decision it builds, the command that proves it, the red,
 the green, the boundary and the files it touches. A red is a planted mistake in a committed file, and
@@ -1443,6 +1444,47 @@ specs are synced. None of them adds behaviour.
   - Boundary: the real footer, the real clock and the real pi — the three things no check here
     reaches.
   - Files: none.
+
+## 10. The fixes Validate asked for
+
+Two fixes land before Derek re-validates. A notice's arrival requests its own repaint, which the living
+store spec requires and which the change leaned on pi to supply; and an empty kind text silences its
+kind, which Joel ruled at Validate (`michael-validate.json`, findings 1 and 2; `owner-rulings.md`,
+"2026-11-11: At Validate").
+
+The arrival fix adds no test, so its commit stays at 424; the empty-kind fix adds one and takes the
+suite to 425. Michael's re-validation runs `checks/suite.sh . 424`, `checks/scope.sh` over the fix
+commit, and `testdiff` over `0d6cd85..HEAD`, whose moved counts are 9.5's to name.
+
+- [ ] 10.1 A notice's arrival requests a repaint, as every push does
+  - Decision: D1's Flow and the living store spec's "A pushed change that alters displayed data
+    results in a repaint" — the store asks for its own repaint and never leans on the host's.
+  - Test: "a completed assistant message's notice is the store's notice datum" in
+    `tests/session-data-store.test.ts` asserts `repaints() === 1` after `messageEnded`; the expiry
+    tests' counts move from 1 to 2, arrival then expiry; the early-fire test's "asks for nothing"
+    holds for the fire alone with the arrival's request asserted first; "disposal … repaints nothing"
+    and "with no visible time" stay at 0.
+  - Command: `node --test --test-name-pattern="completed assistant message" tests/session-data-store.test.ts`
+  - Plant: `requestRender?.()` removed from `showNotice`, after `armExpiry`.
+  - Red: measured by Derek in Implement.
+  - Green: the arrival's count at 1, each expiry case at 2, and `checks/suite.sh . 424` — no test is
+    added, only assertions moved.
+  - Boundary: the arrival's request against the instant's, which are two and neither may be the only
+    one.
+  - Files: `extensions/jefferson/data/session-data-store.ts`, `tests/session-data-store.test.ts`.
+- [ ] 10.2 An empty kind text silences that kind
+  - Decision: D5's empty-kind sentence, and Joel's 2026-11-11 ruling — a kind whose configured text is
+    empty shows nothing, label and gap included, while that notice would otherwise show.
+  - Test: `formats.miss: ""` with a miss held renders `""`, with no `Notice:` label and no gap, and a
+    whitespace-only text trims to the same. A kind with text still renders.
+  - Command: `node --test --test-name-pattern="an empty kind text" tests/instrument.test.ts`
+  - Plant: the binding's empty-text rule removed, so an empty composed text renders `Notice: ` as any
+    empty value does.
+  - Red: measured by Derek in Implement.
+  - Green: the silenced kind renders nothing and the suite runs 425, one test more than 424.
+  - Boundary: an empty kind text against an absent one: the first silences that kind, and the second is
+    the unknown rule's, not this one.
+  - Files: `extensions/jefferson/components/instruments/instrument-binding.ts`, `tests/instrument.test.ts`.
 
 ## The docs pass — not tasks
 

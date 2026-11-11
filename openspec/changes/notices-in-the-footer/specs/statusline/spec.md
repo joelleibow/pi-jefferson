@@ -92,6 +92,12 @@ numeral rendering MUST keep pi's formatting, and Jefferson MUST ship no translat
 - **WHEN** a user writes `Anthropic a supprimé $blocks` for a notice of two dropped blocks
 - **THEN** the value is `2`, and the user's own words supply the noun pi would have written
 
+#### Scenario: An empty kind text silences it
+
+- **WHEN** the document sets `formats.miss: ""` and the store holds a miss
+- **THEN** the cell renders nothing, with no `Notice:` label and no gap, because a kind whose
+  configured text is empty shows nothing while that notice would show
+
 ### Requirement: The default text is pi's text for its kind
 
 Unconfigured, each kind's default format MUST render exactly the text pi's transcript notice draws for

@@ -189,6 +189,10 @@ this change names it anyway.
   notice.
 - `session_tree` — `summaryEntry?.usage` becomes a `branchSummary` notice; no usage, no notice.
 
+**An arrival requests a repaint.** `showNotice` ends by requesting one, as every push does, because
+the living store spec has the store ask for its own repaint and forbids leaning on the host's. D2's
+instant repaint is a second, separate request.
+
 No notice comes from a read the store schedules (the delta requirement). The three subscriptions join
 the feed's single `release` (D-b).
 
@@ -349,6 +353,11 @@ does not belong inside one (`owner-rulings.md`, "After the docs pass"). The unit
 into the default texts: `$idle\m` for pi's `6m`, and the `thinking`/`thinkingOne` pair for its noun.
 `\m` is D11's escape. `$cost` keeps pi's leading gap and parentheses, so the formats hold none and a
 miss under a cent renders without a suffix.
+
+**An empty kind text silences the kind.** A configured text that resolves empty, and whitespace alone
+trims to that, renders nothing at all, label and gap with it: Joel's 2026-11-11 ruling at Validate, and
+the reading a user writing `formats.miss: ""` intends. The binding treats an empty composed text as
+nothing to compose, so the cell takes the unknown rule's nothing.
 
 **What has to change, and why each piece is the smallest that carries the requirement.** Eleanor's
 Addendum 2 describes a mechanism with one configured format per instrument name. Per-kind formats do

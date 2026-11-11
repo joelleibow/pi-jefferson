@@ -3,7 +3,9 @@
 Date: 2026-11-10
 Status: Accepted. Revises a Non-Goal of the `instruments-for-every-datum` change, which forbade a
 repaint the extension requests on a timer and which never reached a spec. The living specs' rule
-against polling stays in force, and this record says what a poll is.
+against polling stays in force, and this record says what a poll is. Narrowed by
+[ADR 0013](0013-a-visual-shows-and-hides-a-datum-on-the-clock.md): the hiding moved to the timed
+visual; the store stamps the instant and requests the repaint.
 
 ## Context
 

@@ -11,7 +11,7 @@ subscribes to, never from a read the store makes on its own.
 
 - **WHEN** the host reports an event that carries a notice
 - **THEN** the store holds that notice's kind, values and shown-until instant before the next render,
-  and the notice instrument reads them from the store alone
+  requests a repaint for the arrival, and the notice instrument reads them from the store alone
 
 #### Scenario: No notice is showing
 
