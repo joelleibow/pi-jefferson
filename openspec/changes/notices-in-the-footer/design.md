@@ -464,14 +464,38 @@ deleted:
   shows or stays silent depending on which source the thinking step uses (`interactive-mode.js:3338-3346`,
   `session-manager.d.ts:178`).
 
+`20k` is the pure rule's measurement and not a default text's: `tests/notice.test.ts` reads it off
+`formatTokens` and off the display gate above, which is where pi's rounding edge sits, while the six
+default texts' cases carry `125k`. A default text that rendered `20k` would be asserting a case its own
+tests do not have (`redgreen-derek.md`, "Where the run contradicts the design" 2).
+
 The rest of the suite, one behaviour each: the notice datum and its unknown state, replacement and the
 full visible time, expiry on the injected clock with one repaint, the handle cancelled on `release` and
 by the `session_shutdown` release, no subscription and no timer when no cell is placed, placement
 detected from the rows including the rejected document that installs the default row, the three
 subscriptions and their release, the `seconds` bounds and its rejection message, `formats` defaults and
 its rejections, a value the kind does not carry rendering as nothing rather than blanking the cell, the
-six default texts and their `warning` foreground, the label suppressed while nothing shows, and the
-same text at width 0 as at 200.
+six default texts and their `warning` foreground, the label suppressed while nothing shows, the same
+text at width 0 as at 200, and the notice cell's text sitting at its alignment. That last one lives in
+`tests/row-renderer.test.ts`, because alignment is the row's arithmetic rather than the instrument's,
+and its centre case is the discriminator: it fails when the row's centre branch is deleted, and the
+left and right cases stay green under the same plant (`redgreen-derek.md` §2.29).
+
+**The spec's two row scenarios ride the row's arithmetic, and one of them needed a test.** "A cell
+narrower than the notice" is clip arithmetic the row already measures twice: "an instrument resolving
+text wider than its cell is clipped and stays one line" (`tests/row-renderer.test.ts:86`) and "text
+wider than its cell renders identically under any alignment" (`:149`). The notice is a non-fill
+instrument whose text does not depend on the width (the width-0 guard above), so its clip is that same
+arithmetic and it needs no test of its own.
+
+"A notice beside a fill cell" was carried by nothing. The re-seat test shrinks a non-empty text with no
+fill cell beside it, and the fill test and the empty-cell test are both static. The scenario's whole
+content is the empty → text → empty transition beside a `fills: true` cell, which is the ADR 0007
+consequence this design records, so `tests/row-renderer.test.ts` carries it: a fill stub and the bound
+`notice` instrument, rendered at 80 with the notice absent, then showing, then absent, the fill cell's
+width asserted at 80, then 80 minus the notice's, then 80. Michael's tasks-gate ruling settles this
+(`michael-pl7-r1.json`, finding 3), in place of the gap `redgreen-derek.md`'s "Where the run contradicts
+the design" 3 and "Not verified" left to the gate.
 
 The `shortcut:` comment sits above the copied constants (D1). No test reads pi's files, and the reason
 is the council's: such a test asserts pi's behaviour rather than Jefferson's, fails when pi re-bundles,

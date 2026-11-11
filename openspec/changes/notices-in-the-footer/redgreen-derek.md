@@ -2,11 +2,12 @@
 
 Joel's ruling for this pipeline: *before `tasks.md` is drafted, every check a task relies on is run and shown going red and then green*, so each task can cite a measured command, a measured red and a measured green. Derek run on 2026-11-10, worktree `/Users/joelleibow/Projects/pi-jefferson/.pi/marbleization/notices-in-the-footer/spike`, branch `notices-in-the-footer-spike`, base `b9668d9` (clean, `pnpm install` done, 360 passing). Nothing here ships; Implement starts again from `tasks.md` on the real branch. Check scripts are in `openspec/changes/notices-in-the-footer/checks/` and take the repository path as an argument; none defaults to a repository, and nothing writes under `/tmp`. Transcribed verbatim.
 
-**Done so far: the change is built as seven commits, each green, and every check the brief lists is measured and written here.** D9's docs pass is after the implementation gate, so it is not part of this spike and is not measured. The sections below fill in group by group; a group's reds and greens are recorded as it closes.
+**Done so far: the change is built as eight commits, each green, and every check the brief lists is measured and written here.** D9's docs pass is after the implementation gate, so it is not part of this spike and is not measured. The sections below fill in group by group; a group's reds and greens are recorded as it closes.
 
 ## The spike commits
 
 ```
+162ff07 Strengthen the notice tests the tasks gate named
 cf32ed1 Prove the notice cell's text sits at its alignment
 2122d26 Ship the notice instrument: a composed format per kind, and the plain format it needs
 4f0e994 Gate the notice on the rows the root installs, and pass its visible time from the configuration
@@ -27,12 +28,13 @@ b9668d9 Fix Michael's two minor design findings: the timer callback's branches a
 | `2122d26` | D5/D6: `composed`, the plain format, the binding, the notice instrument and its `seconds`/`formats` options | 409 | clean |
 | `4f0e994` | D3: `readConfiguration`'s `noticeSeconds`, the placement detection, and the root's pass | 412 | clean |
 | `cf32ed1` | the brief's alignment check for the notice's cell | 413 | clean |
+| `162ff07` | the tasks gate's six reds: the reset, the two lists, the aborted miss, the store's source, five store tests and the fill cell's columns | 414 | clean |
 
 ## The checks
 
 | Check | Command |
 |---|---|
-| 1 suite | `checks/suite.sh <repo> 413` |
+| 1 suite | `checks/suite.sh <repo> 414` |
 | 2 behavioral tests | `node --test --test-name-pattern=… tests/<file>.test.ts` (the flag before the file), each with a planted mistake |
 | 3 the expectation edits | `checks/testdiff.sh <repo> b9668d9`, and the old expectation planted back |
 | 4 export pin | `node --test --test-name-pattern="exported surface" tests/jefferson.test.ts` (the flag before the file), with a row removed and with a widened export |
@@ -75,7 +77,268 @@ Every red below was produced by a planted mistake in a committed file, run again
 
 The fifteen tests and the edge each straddles, as the file's names report them: `formatTokens` at 9,999/10,000/20,000/99,999/125,300 against `compactCount`; the noise floor at 1,024 against 1,025; the display gate at 19,999 tokens and $0.099 against 20,000 tokens and $0.10; the cost suffix at $0.0099 against $0.01; the idle TTL at exactly five minutes against a millisecond under; a model change beating an idle; the cache-read fallback; no cache activity in a session that reported none; an aborted and an errored message; a compaction and a branch summary resetting the previous request; a cache-warm entry as the previous request; the thinking count rising against repeating; the sibling branch read against the entries; the same-message collision; a compaction's usage sum and cost suffix.
 
-The reds for the pure rule were measured at `65e8478`; they are not re-run here. The group's own reds follow.
+Each of the fifteen is planted in turn: one edit to `extensions/jefferson/data/notice.ts`, then
+`node --test --test-name-pattern='<that test's name>' tests/notice.test.ts`, then
+`git checkout -- extensions/jefferson/data/notice.ts` and the same command again for the green. The tree
+is clean at `cf32ed1` after every pair. Each test gets one plant, and the display gate's gets a second
+for its cost gate. Fourteen of the fifteen tests fail on their plant; the fifteenth cannot fail and its
+block says why and gives its not-yet-built red instead. Paths in the transcripts are elided to
+`.../tests/notice.test.ts` as elsewhere in this report.
+
+**1. `formatTokens`' 10,000 branch.** Plant: `const TEN_THOUSAND = 10_000;` → `9_999;`, so the
+whole-thousands branch starts one token early.
+
+Red:
+
+```
+✖ formatTokens rounds to whole thousands from 10,000 up, and compactCount does not (0.602791ms)
+  AssertionError [ERR_ASSERTION]: 9999
+  '10k' !== '10.0k'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:63:12)
+```
+
+Green: `✔ formatTokens rounds to whole thousands from 10,000 up, and compactCount does not`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**2. The noise floor.** Plant: `const NOISE_FLOOR_TOKENS = 1_024;` → `1_023;`, so 1,024 missed tokens draw
+a notice.
+
+Red:
+
+```
+✖ the noise floor: 1,024 missed tokens draws nothing and 1,025 draws a notice (0.896208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + { kind: 'miss', values: { cost: ' (~$0.10)', tokens: '1.0k' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:72:10)
+```
+
+Green: `✔ the noise floor: 1,024 missed tokens draws nothing and 1,025 draws a notice`, `ℹ pass 1`,
+`ℹ fail 0`.
+
+**3. The display gate's 20,000 tokens.** Plant: `const DISPLAY_GATE_TOKENS = 20_000;` → `20_001;`, so
+20,000 tokens with $0.099 draw nothing.
+
+Red:
+
+```
+✖ the display gate: 19,999 tokens and $0.099 draw nothing; 20,000 tokens or $0.10 draws (0.639541ms)
+  AssertionError [ERR_ASSERTION]: at the token gate
+  actual: undefined, expected: true, operator: '=='
+      at TestContext.<anonymous> (.../tests/notice.test.ts:83:10)
+```
+
+Green: `✔ the display gate: 19,999 tokens and $0.099 draw nothing; 20,000 tokens or $0.10 draws`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+The same test's cost gate, planted second: `const DISPLAY_GATE_COST = 0.1;` → `0.11;`, so $0.10 no longer
+draws. Red:
+
+```
+✖ the display gate: 19,999 tokens and $0.099 draw nothing; 20,000 tokens or $0.10 draws (0.728958ms)
+  AssertionError [ERR_ASSERTION]: at the cost gate
+  actual: undefined, expected: true, operator: '=='
+      at TestContext.<anonymous> (.../tests/notice.test.ts:85:10)
+```
+
+Green after the revert: `✔ the display gate: 19,999 tokens and $0.099 draw nothing; 20,000 tokens or $0.10 draws`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**4. The cost suffix's cent.** Plant: `const COST_SUFFIX_MIN = 0.01;` → `0.011;`, so $0.01 loses its
+suffix.
+
+Red:
+
+```
+✖ the cost suffix appears at a cent and reads to two decimals (0.738ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  '' !== ' (~$0.01)'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:92:10)
+```
+
+Green: `✔ the cost suffix appears at a cent and reads to two decimals`, `ℹ pass 1`, `ℹ fail 0`.
+
+**5. The TTL edge.** Plant: `miss.idleMs >= CACHE_TTL_MS ?` → `miss.idleMs > CACHE_TTL_MS ?`, so exactly
+five minutes reads `miss`, not `missIdle`.
+
+Red:
+
+```
+✖ the idle variant: exactly five minutes reads missIdle and a millisecond under does not (0.741167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  'miss' !== 'missIdle'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:100:10)
+```
+
+Green: `✔ the idle variant: exactly five minutes reads missIdle and a millisecond under does not`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**6. A model change winning over an idle.** Plant: the kind's ternary reversed —
+`miss.modelChanged ? "missModelSwitch" : miss.idleMs >= CACHE_TTL_MS ? "missIdle" : "miss"` →
+`miss.idleMs >= CACHE_TTL_MS ? "missIdle" : miss.modelChanged ? "missModelSwitch" : "miss"`.
+
+Red:
+
+```
+✖ a model change beats an idle of the same turn (0.726166ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + 'missIdle'
+  - 'missModelSwitch'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:109:10)
+```
+
+Green: `✔ a model change beats an idle of the same turn`, `ℹ pass 1`, `ℹ fail 0`.
+
+**7. The cache-read fallback.** Plant: `: readCachePerToken;` → `: 0;`, so a turn that reads no cache is
+priced as if its reads were free.
+
+Red:
+
+```
+✖ the cache-read fallback prices a turn that read no cache (0.732333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + ' (~$0.10)'
+  - ' (~$0.06)'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:119:10)
+```
+
+Green: `✔ the cache-read fallback prices a turn that read no cache`, `ℹ pass 1`, `ℹ fail 0`.
+
+**8. No cache activity where none was reported.** Plant: `&& !previous.reportedCache` →
+`&& previous.reportedCache`, so the session's own silence no longer suppresses the count.
+
+Red:
+
+```
+✖ a turn with no cache activity in a session that reported none counts nothing (1.124583ms)
+  AssertionError [ERR_ASSERTION]: a provider that never reported caching
+  + { kind: 'miss', values: { tokens: '50k', cost: '' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:126:10)
+```
+
+Green: `✔ a turn with no cache activity in a session that reported none counts nothing`, `ℹ pass 1`,
+`ℹ fail 0`.
+
+**9. The aborted/errored skip.** Plant: the skip's line removed from `thinkingNotice`
+(`if (message.stopReason === "aborted" || message.stopReason === "error") return undefined;`).
+
+Red — the thinking half of the test, at the first stop reason:
+
+```
+✖ an aborted or errored message draws nothing, for the miss and for the thinking delta (0.82275ms)
+  AssertionError [ERR_ASSERTION]: aborted
+  + { kind: 'thinking', values: { blocks: '2 thinking blocks' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:134:12)
+```
+
+Green: `✔ an aborted or errored message draws nothing, for the miss and for the thinking delta`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+The test's miss half cannot be caught by a plant: its message is `input: 0, cacheRead: 80_000` against a
+100,000-token prompt, so its missed tokens are `min(100,000, 80,000) − 80,000 = 0`, and `missNotice`
+returns `undefined` with or without the skip. Measured: removing the skip's line from `missNotice`
+instead runs green — `✔ an aborted or errored message draws nothing …`, `ℹ pass 1`, `ℹ fail 0`. The
+test's red for the skip is the thinking half only.
+
+**10. A compaction and a branch summary resetting the previous request.** The plant cannot fail. Removing
+the reset — `if (entry.type === "compaction" || entry.type === "branch_summary") { … }` → `if (false) { … }` —
+runs green: `✔ a compaction and a branch summary each reset the previous request (0.434584ms)`,
+`ℹ pass 1`, `ℹ fail 0`. The test's turn is `input: 0, cacheRead: 80_000` against a
+100,000-token prompt, so its missed tokens are `0` and the answer is `undefined` with or without the
+reset. Its red is the not-yet-built one: with `data/notice.ts` moved out of the tree, the file fails to
+import —
+
+```
+✖ tests/notice.test.ts (44.554583ms)
+  'test failed'
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+code: 'ERR_MODULE_NOT_FOUND',
+url: 'file:///…/extensions/jefferson/data/notice.ts'
+```
+
+Green: `✔ a compaction and a branch summary each reset the previous request`, `ℹ pass 1`, `ℹ fail 0`. A
+red that could fail needs a turn that misses — `input: 20_000, cacheRead: 60_000` against a
+100,000-token prompt would give 20,000 missed tokens and would read `undefined` only while the reset
+holds. The test's numbers are the task's to change; this report does not change them.
+
+**11. The cache-warm entry as the previous request.** Plant: `if (entry.type === "usage" && entry.kind === "cache_warm") {` → `if (false) {`, so the warm entry no longer measures the turn.
+
+Red:
+
+```
+✖ a cache-warm usage entry measures the turn as the previous request, and draws no warm notice (0.627167ms)
+  AssertionError [ERR_ASSERTION]: the warm entry is the previous request
+  actual: undefined, expected: true, operator: '=='
+      at TestContext.<anonymous> (.../tests/notice.test.ts:151:10)
+```
+
+Green: `✔ a cache-warm usage entry measures the turn as the previous request, and draws no warm notice`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**12. The thinking count rising and repeating.** Plant: `if (dropped <= previous) return undefined;` →
+`if (dropped < previous) return undefined;`, so a repeated count shows again.
+
+Red:
+
+```
+✖ the thinking delta shows when the count rises and stays silent when it repeats (1.277917ms)
+  AssertionError [ERR_ASSERTION]: the same count repeating
+  + { kind: 'thinking', values: { blocks: '2 thinking blocks' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:168:10)
+```
+
+Green: `✔ the thinking delta shows when the count rises and stays silent when it repeats`, `ℹ pass 1`,
+`ℹ fail 0`.
+
+**13. The delta read from the branch.** Plant: the guard's line deleted from `thinkingNotice`
+(`if (dropped <= previous) return undefined;`), so a lower count shows too.
+
+Red — the sibling case:
+
+```
+✖ the thinking delta reads the branch, not the entries: a sibling's higher count stays silent (1.051042ms)
+  AssertionError [ERR_ASSERTION]: the entries' sibling count is higher, so nothing rises
+  + { kind: 'thinking', values: { blocks: '1 thinking block' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:178:10)
+```
+
+Green: `✔ the thinking delta reads the branch, not the entries: a sibling's higher count stays silent`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**14. The same-message collision.** Plant: `messageNotice`'s two candidates swapped —
+`missNotice(…) ?? thinkingNotice(…)` → `thinkingNotice(…) ?? missNotice(…)`.
+
+Red:
+
+```
+✖ one message carrying a thinking drop and a miss keeps the miss and loses the thinking notice (0.670708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  'thinking' !== 'miss'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:189:10)
+```
+
+Green: `✔ one message carrying a thinking drop and a miss keeps the miss and loses the thinking notice`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**15. A compaction's usage sum and suffix.** Plant: `usage.input + usage.output + usage.cacheRead + usage.cacheWrite` → `usage.input + usage.cacheRead + usage.cacheWrite`, dropping the output count.
+
+Red:
+
+```
+✖ a compaction's usage reads the token sum and the cost suffix (1.161167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + tokens: '600'
+  - tokens: '1.0k'
+      at TestContext.<anonymous> (.../tests/notice.test.ts:196:10)
+```
+
+Green: `✔ a compaction's usage reads the token sum and the cost suffix`, `ℹ pass 1`, `ℹ fail 0`.
 
 #### 2.2 The store's notice datum — `tests/session-data-store.test.ts`, pattern `completed assistant message`
 
@@ -606,15 +869,22 @@ the validator; a paragraph over 500 characters fails the awk with `<file>:<line>
 3. **D8's "A cell narrower than the notice" and "A notice beside a fill cell" scenarios are not measured
    as notice-specific tests.** The row's own clip and re-seat tests cover the mechanism; the notice's
    text is measured at width 0 and 200. "Not verified" records the gap.
-4. **Nothing else.** D1's three subscriptions, D2's timer and its one repaint, D3's gate, D4's reorder,
+4. **Two tests in `tests/notice.test.ts` cannot fail on a plant.** The compaction-and-branch-summary
+   test and the aborted/errored test's miss half both turn on a message whose own cache read consumes
+   the whole prompt, so their missed tokens are zero and the answer is `undefined` with or without the
+   code under test; the compaction test's red is the module-not-found one, and the aborted test's red is
+   its thinking half. Bambadjan: either give those two assertions numbers that miss (the compaction test
+   `input: 20_000, cacheRead: 60_000`; the aborted test a message whose cache read leaves missed tokens),
+   or drop them as guards and say so.
+5. **Nothing else.** D1's three subscriptions, D2's timer and its one repaint, D3's gate, D4's reorder,
    D5's composed format, D6's plain format, D7's feed's three subscriptions, and the spec deltas'
    scenarios held as written.
 
 ## Questions
 
 None open. The design's silence on the alignment check is the only question, and the brief's §2 list
-answers it; no decision is needed. The prior run's §2.1 reds for the pure rule are recorded as measured
-at `65e8478` and are not re-run here.
+answers it; no decision is needed. The prior run's §2.1 reds for the pure rule were re-measured here,
+one plant per test, and §2.1 carries the fifteen transcripts.
 
 ## My calls
 
@@ -653,11 +923,13 @@ at `65e8478` and are not re-run here.
 - **No live pi**: no `/reload`, no `/jefferson`, no real TUI; the real footer's `Notice: …` line is not
   observed. That is Joel's.
 - **The real clock**: the timer is the injected clock's fake; the real `setTimeout` is not measured.
-- **The prior run's §2.1 reds for the pure rule are not re-run here**; they are recorded as measured at
-  `65e8478`.
+- **§2.1's tenth block and the aborted test's miss half could not go red on a plant** as their inputs
+  stood: both turns missed no tokens. The addendum's A and C change those numbers and measure the reds;
+  §2.1's transcripts stand as the inputs were, not as the tests now are.
 - **CI and the release workflow were not run**; the tarball was checked locally only.
-- **The main checkout's report and `checks/` are written, not committed**, and the main checkout's branch
-  is `notices-in-the-footer`.
+- **The main checkout's report and `checks/` are committed as `c309c74`**; this addendum and the §2.1
+  re-measurement are uncommitted edits to `redgreen-derek.md`, and the main checkout's branch is
+  `notices-in-the-footer`.
 
 ## Tree as I left it
 
@@ -665,13 +937,250 @@ at `65e8478` and are not re-run here.
 $ git status --porcelain --untracked-files=all
 (empty)
 $ git log --oneline -1
-cf32ed1 Prove the notice cell's text sits at its alignment
+162ff07 Strengthen the notice tests the tasks gate named
 $ git branch --show-current
 notices-in-the-footer-spike
 ```
-Checks green at HEAD: `suite: 413 passed, 0 failed (expected 413) PASS`; `imports: files 27, edges 51
+Checks green at HEAD: `suite: 414 passed, 0 failed (expected 414) PASS`; `imports: files 27, edges 51
 PASS`; `terminal PASS`; `tarball: 27 (tracked: 27) PASS`; `specs: longest 441 / 375 / 356, none over
 500 PASS`; `scope PASS` for `cf32ed1`; export pin green, and red with the notice's row removed.
 
-Main checkout, `notices-in-the-footer`: `git status --porcelain --untracked-files=all` lists only the
-seven `checks/` scripts and `redgreen-derek.md`, all untracked. Nothing committed there.
+Main checkout, `notices-in-the-footer`: `c309c74` committed this report and its seven `checks/`
+scripts; the §2.1 re-measurement and this addendum are uncommitted edits to `redgreen-derek.md`, and
+nothing else in this checkout is this spike's. `design.md`'s and `tasks.md`'s current edits are the
+parent's later work.
+
+## Addendum — the tasks gate's reds
+
+Michael's tasks gate (`michael-pl7-r1.json`, findings 2 and 3) ruled that some test inputs change and new
+tests join, and that every red is measured before Implement. Six items, A–F, each test-first: the test is
+written or changed and shown green, the mistake is planted, the command is run, the tree is reverted, the
+command is run again. All six are on the spike branch at commit `162ff07` ("Strengthen the notice tests
+the tasks gate named"), suite 414. Every command is `node --test --test-name-pattern='<pattern>'
+<test file>`, the pattern before the file. Paths are elided to `.../` as elsewhere in this report. Each
+plant's revert is `git checkout -- <the planted file>`; the tree is clean after every pair.
+
+### 1. A — the reset's turn now misses, and the reset still takes it
+
+**Test.** `tests/notice.test.ts`, "a compaction and a branch summary each reset the previous request". The
+turn becomes `message({ input: 20_000, cacheRead: 60_000, cacheWrite: 0, cost: 0.1 })`: against the
+100,000-token prompt its missed tokens are `min(100,000, 80,000) − 60,000 = 20,000`, at the gate's token
+edge, with a compaction and separately a branch summary between the two turns. Green before the plant:
+`✔ a compaction and a branch summary each reset the previous request`, `ℹ pass 1`, `ℹ fail 0`.
+
+**Plant.** `data/notice.ts`'s `previousRequest` reset —
+`if (entry.type === "compaction" || entry.type === "branch_summary") { … }` → `if (false) { … }`.
+
+**Red.** `node --test --test-name-pattern='reset the previous request' tests/notice.test.ts`:
+
+```
+✖ a compaction and a branch summary each reset the previous request (0.835292ms)
+  AssertionError [ERR_ASSERTION]: compaction
+  + actual - expected
+  + { kind: 'miss', values: { cost: ' (~$0.10)', tokens: '20k' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:143:12)
+```
+
+**Green**, after the revert: `✔ a compaction and a branch summary each reset the previous request`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+### 2. B — the pure test's two lists now differ
+
+**Test.** `tests/notice.test.ts`, "the thinking delta reads the branch, not the entries: a sibling's higher
+count stays silent". The last assertion becomes `messageNotice(turn, [sibling], [current], 0)`: `sibling`
+dropped 2, `current` dropped 0, `turn` dropped 1, expecting the thinking notice. Green before the plant:
+`✔ …`, `ℹ pass 1`, `ℹ fail 0`.
+
+**Plant.** `messageNotice`'s two list arguments swapped —
+`missNotice(entries, message, readCachePerToken) ?? thinkingNotice(message, branch)` →
+`missNotice(branch, message, readCachePerToken) ?? thinkingNotice(message, entries)`.
+
+**Red.** `node --test --test-name-pattern='reads the branch' tests/notice.test.ts`:
+
+```
+✖ the thinking delta reads the branch, not the entries: a sibling's higher count stays silent (1.228167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  + undefined
+  - { kind: 'thinking', values: { blocks: '1 thinking block' } }
+      at TestContext.<anonymous> (.../tests/notice.test.ts:181:10)
+```
+
+**Green**, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0`.
+
+### 3. C — the aborted message's miss half now misses
+
+**Test.** `tests/notice.test.ts`, "an aborted or errored message draws nothing, for the miss and for the
+thinking delta". The stopped message becomes
+`message({ input: 20_000, cacheRead: 80_000, cacheWrite: 0, cost: 0.1, stopReason, dropped: 2 })`: 20,000
+missed tokens against the 100,000 prompt, over the gate. Green before the plant: `✔ …`, `ℹ pass 1`,
+`ℹ fail 0`.
+
+**Plant.** the skip's line removed from `missNotice` —
+`if (message.stopReason === "aborted" || message.stopReason === "error") return undefined;`.
+
+**Red.** `node --test --test-name-pattern='aborted' tests/notice.test.ts`:
+
+```
+✖ an aborted or errored message draws nothing, for the miss and for the thinking delta (0.835625ms)
+  AssertionError [ERR_ASSERTION]: aborted
+  + actual - expected
+  + { kind: 'miss', values: { cost: ' (~$0.10)', tokens: '20k' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/notice.test.ts:133:12)
+```
+
+The expected red is `{ kind: 'miss', values: { tokens: '20k', cost: ' (~$0.10)' } }` against `undefined` —
+the miss's own values and its own `$0.10`, not the thinking notice's `2 thinking blocks` the old input gave.
+
+**Green**, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0`.
+
+### 4. D — the store's source choice, entries and branch swapped at the call
+
+**Test.** `tests/session-data-store.test.ts`, "the thinking delta reads the branch, not the entries: a
+sibling's higher count stays silent". `previousEntry` takes `dropped`: `sibling = previousEntry({ dropped: 2 })`,
+`current = previousEntry()`, `entries: [sibling]`, `branch: [current]`, and the turn dropped 1 with
+`cacheRead: 0`. Green before the plant: `✔ …`, `ℹ pass 1`, `ℹ fail 0`.
+
+**Plant.** `session-data-store.ts:194`'s
+`messageNotice(message, readEntries(), readBranch(), readCachePerToken)` →
+`messageNotice(message, readBranch(), readEntries(), readCachePerToken)`.
+
+**Red.** `node --test --test-name-pattern='reads the branch' tests/session-data-store.test.ts`:
+
+```
+✖ the thinking delta reads the branch, not the entries: a sibling's higher count stays silent (1.101541ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  + undefined
+  - { kind: 'thinking', values: { blocks: '1 thinking block' } }
+      at TestContext.<anonymous> (.../tests/session-data-store.test.ts:604:10)
+```
+
+**Green**, after the revert: `✔ …`, `ℹ pass 1`, `ℹ fail 0`.
+
+This is E's third test, and its plant is E's third; it is not repeated there.
+
+### 5. E — the five store tests with no task
+
+Michael's finding 2 named five tests in `00ef4d5` that no task names: "carrying no usage takes no notice",
+"keeps the miss" (store), "reads the branch" (store), "the cache-warm entry is the previous request", "no
+notice, no timer". Each has its own plant and its own red and green. The third is D's, above.
+
+**1. "a compaction or a branch summary carrying no usage takes no notice"** — `tests/session-data-store.test.ts:523`.
+Plant: `usageNotice`'s `if (usage === undefined) return undefined;` →
+`if (usage === undefined) return { kind, values: { tokens: "0", cost: "" } };`, a notice fabricated from
+no usage. Red, `node --test --test-name-pattern='carrying no usage' tests/session-data-store.test.ts`:
+
+```
+✖ a compaction or a branch summary carrying no usage takes no notice (0.955375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  + { kind: 'compaction', values: { cost: '', tokens: '0' } }
+  - undefined
+      at TestContext.<anonymous> (.../tests/session-data-store.test.ts:526:10)
+```
+
+Green, after the revert: `✔ a compaction or a branch summary carrying no usage takes no notice`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**2. "one message carrying a thinking drop and a miss keeps the miss"** — `:589`. Plant: the `??` order in
+`messageNotice` swapped — `thinkingNotice(message, branch) ?? missNotice(entries, message, readCachePerToken)` —
+so the thinking notice wins the collision. Red, `node --test --test-name-pattern='keeps the miss'`:
+
+```
+✖ one message carrying a thinking drop and a miss keeps the miss (0.93925ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  'thinking' !== 'miss'
+      at TestContext.<anonymous> (.../tests/session-data-store.test.ts:592:10)
+```
+
+Green, after the revert: `✔ one message carrying a thinking drop and a miss keeps the miss`, `ℹ pass 1`,
+`ℹ fail 0`.
+
+**3. "the thinking delta reads the branch, not the entries: a sibling's higher count stays silent"** —
+`:596`; D's test and D's plant, above. Red at `:604`, `undefined` against the thinking notice; green after
+the revert.
+
+**4. "the cache-warm entry is the previous request the miss rule measures"** — `:607`. Plant:
+`previousRequest`'s `if (entry.type === "usage" && entry.kind === "cache_warm") {` → `if (false) {`. Red,
+`node --test --test-name-pattern='the cache-warm entry is the previous request'`:
+
+```
+✖ the cache-warm entry is the previous request the miss rule measures (0.871459ms)
+  AssertionError [ERR_ASSERTION]: the warm measures the turn though no warm notice shows
+  + actual - expected
+  + undefined
+  - 'miss'
+      at TestContext.<anonymous> (.../tests/session-data-store.test.ts:610:10)
+```
+
+Green, after the revert: `✔ the cache-warm entry is the previous request the miss rule measures`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+**5. "no notice, no timer: the store holds no pending handle before an arrival"** — `:613`. Plant: the
+store arms its expiry at construction — this line added after `showNotice`:
+`if (noticeSeconds !== undefined && now !== undefined && schedule !== undefined) armExpiry(now() + noticeSeconds * 1_000);`.
+Red, `node --test --test-name-pattern='no notice, no timer'`:
+
+```
+✖ no notice, no timer: the store holds no pending handle before an arrival (0.762084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  1 !== 0
+      at TestContext.<anonymous> (.../tests/session-data-store.test.ts:615:10)
+```
+
+Green, after the revert: `✔ no notice, no timer: the store holds no pending handle before an arrival`,
+`ℹ pass 1`, `ℹ fail 0`.
+
+### 6. F — the fill cell's columns
+
+**Test.** New in `tests/row-renderer.test.ts`, "a fill cell gives up the notice's columns and takes them
+back when it expires": a row with `distribution: "content"` of a `fills: true` stub and the real bound
+`notice` instrument (built as the alignment test builds it), rendered at 80 three times — the notice
+unknown, then present, then unknown again. The notice's text takes 49 columns; the fill's text is `"a"`.
+The assertions: `"a".padEnd(80)` (the fill takes the row and the empty cell takes no column),
+`"a".padEnd(31) + "Notice: Cache miss: 20k tokens re-billed (~$0.10)"` (the fill gives up the 49), and
+`"a".padEnd(80)` again (the fill takes them back), plus the line's width 80. Green before the plant:
+`✔ a fill cell gives up the notice's columns and takes them back when it expires`, `ℹ pass 1`, `ℹ fail 0`.
+
+**Plant.** the `sample !== current` cache reset in `row-renderer.ts`'s `cellView` → `if (false) { … }`, so a
+cell keeps the previous sample's text: the notice's unknown text is cached at width 0 and the second
+render's `contentWidth` stays 0, so the notice's cell never takes its 49 columns.
+
+**Red.** `node --test --test-name-pattern="gives up the notice's columns" tests/row-renderer.test.ts`:
+
+```
+✖ a fill cell gives up the notice's columns and takes them back when it expires (2.483042ms)
+  AssertionError [ERR_ASSERTION]: the fill gives up the notice's 49 columns
+  + actual - expected
+  + "a".padEnd(80)
+  - "a".padEnd(31) + 'Notice: Cache miss: 20k tokens re-billed (~$0.10)'
+      at TestContext.<anonymous> (.../tests/row-renderer.test.ts:210:10)
+```
+
+The two strings are written as the test's own `padEnd` notation; the raw output prints the 80 columns of
+`a` and spaces.
+
+**Green**, after the revert: `✔ a fill cell gives up the notice's columns and takes them back when it
+expires`, `ℹ pass 1`, `ℹ fail 0`.
+
+The plant is shared: "the row re-seats when a cell's basis changes, not only when the window does" (`:915`)
+runs red under the same edit — `AssertionError [ERR_ASSERTION]: the second render lays the row out for the
+shorter text`, the actual keeping the seven `t`s and 45 spaces where the expected has six and 46. The
+finding's other plant, the row's first seat only, is not measured here; this one is the shared one.
+
+### The tree at the addendum's head
+
+```
+$ git log --oneline -1
+162ff07 Strengthen the notice tests the tasks gate named
+$ git status --porcelain --untracked-files=all
+(empty)
+```
+
+`pnpm typecheck` clean. `checks/suite.sh <spike> 414` → `suite: 414 passed, 0 failed (expected 414)` `PASS`.
+`checks/imports.mjs` PASS; `checks/terminal.sh` PASS; `checks/tarball.sh 27` PASS. `checks/scope.sh <spike>
+cf32ed1 162ff07 tests/notice.test.ts tests/session-data-store.test.ts tests/row-renderer.test.ts` → three
+changed paths, `every changed path is one the task names`, `PASS`.
