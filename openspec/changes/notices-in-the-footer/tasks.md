@@ -1456,7 +1456,7 @@ The arrival fix adds no test, so its commit stays at 424; the empty-kind fix add
 suite to 425. Michael's re-validation runs `checks/suite.sh . 424`, `checks/scope.sh` over the fix
 commit, and `testdiff` over `0d6cd85..HEAD`, whose moved counts are 9.5's to name.
 
-- [ ] 10.1 A notice's arrival requests a repaint, as every push does
+- [x] 10.1 A notice's arrival requests a repaint, as every push does
   - Decision: D1's Flow and the living store spec's "A pushed change that alters displayed data
     results in a repaint" — the store asks for its own repaint and never leans on the host's.
   - Test: "a completed assistant message's notice is the store's notice datum" in
@@ -1466,8 +1466,18 @@ commit, and `testdiff` over `0d6cd85..HEAD`, whose moved counts are 9.5's to nam
     and "with no visible time" stay at 0.
   - Command: `node --test --test-name-pattern="completed assistant message" tests/session-data-store.test.ts`
   - Plant: `requestRender?.()` removed from `showNotice`, after `armExpiry`.
-  - Red: measured by Derek in Implement.
-  - Green: the arrival's count at 1, each expiry case at 2, and `checks/suite.sh . 424` — no test is
+  - Red, measured in Implement — the expectations moved and the plant applied:
+    ```
+    ✖ a completed assistant message's notice is the store's notice datum
+      AssertionError [ERR_ASSERTION]: the arrival requests one repaint, as every push does
+      0 !== 1
+          at TestContext.<anonymous> (.../tests/session-data-store.test.ts:508:10)
+    ```
+    and `tests/session-data-store.test.ts` runs `ℹ tests 47`, `ℹ pass 42`, `ℹ fail 5`: the arrival's
+    datum test, the instant's, the read-past's, the early fire's and disposal's. "With no visible time"
+    stays at 0, because no notice is held to request a repaint for.
+  - Green, after the revert: the five pass, the file is `ℹ tests 47` / `ℹ pass 47` / `ℹ fail 0`, and
+    `checks/suite.sh . 424` prints `suite: 424 passed, 0 failed (expected 424)` / `PASS` — no test is
     added, only assertions moved.
   - Boundary: the arrival's request against the instant's, which are two and neither may be the only
     one.

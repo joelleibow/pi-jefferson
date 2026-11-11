@@ -501,10 +501,11 @@ test("a branch push, a name push and a status reader after disposal leave the st
 });
 
 test("a completed assistant message's notice is the store's notice datum", () => {
-  const { store } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
+  const { store, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
   const notice: Timed<Notice> | undefined = store.sample().notice;
   assert.deepEqual(notice, { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 10_000 });
+  assert.equal(repaints(), 1, "the arrival requests one repaint, as every push does");
 });
 
 test("a user message, a non-message event and an aborted or errored message take no notice", () => {
@@ -534,21 +535,22 @@ test("a compaction or a branch summary carrying no usage takes no notice", () =>
 });
 
 test("with no visible time the store takes no notice and holds no timer", () => {
-  const { store, timer } = newNoticeStore({ entries: [previousEntry()] });
+  const { store, timer, repaints } = newNoticeStore({ entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
   store.compactionEnded(usageOf(100, 200, 300, 0.38));
   assert.equal(store.sample().notice, undefined);
   assert.equal(timer.pending(), 0, "no visible time, no timer");
+  assert.equal(repaints(), 0, "and no repaint to ask for");
 });
 
 test("a notice's instant requests exactly one repaint, and the store keeps the notice", () => {
   const { store, timer, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
-  assert.equal(repaints(), 0, "the arrival requests nothing; the host renders the event");
+  assert.equal(repaints(), 1, "the arrival requests the first repaint");
   const held = { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 10_000 };
   assert.deepEqual(store.sample().notice, held, "the notice shows before its instant");
   timer.advance(10_000);
-  assert.equal(repaints(), 1, "the instant requests one repaint");
+  assert.equal(repaints(), 2, "and the instant requests the second");
   assert.deepEqual(store.sample().notice, held, "the store never hides the notice");
   assert.equal(timer.pending(), 0, "and the handle is spent");
 });
@@ -558,21 +560,22 @@ test("a read past the instant keeps the notice and its instant, and asks for not
   store.messageEnded(noticeMessage(), 0);
   timer.move(10_000);
   assert.equal(store.sample().notice?.shownUntil, 10_000, "the store still holds the notice and its instant");
-  assert.equal(repaints(), 0, "a read asks nothing of the store");
+  assert.equal(repaints(), 1, "the arrival asked once and a read asks nothing of the store");
   assert.equal(timer.pending(), 1, "the scheduled repaint is still pending");
 });
 
 test("an early fire re-arms for the time left and requests no repaint", () => {
   const { store, timer, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
+  assert.equal(repaints(), 1, "the arrival requests the first repaint");
   timer.move(4_000);
   timer.fire();
-  assert.equal(repaints(), 0, "an early fire asks for nothing");
+  assert.equal(repaints(), 1, "an early fire asks for nothing of its own");
   assert.equal(timer.pending(), 1, "it re-arms instead");
   assert.deepEqual(timer.arms, [10_000, 6_000], "the re-arm covers the time left");
   assert.ok(store.sample().notice, "the notice still shows");
   timer.advance(6_000);
-  assert.equal(repaints(), 1, "the re-armed timer requests the one repaint at the instant");
+  assert.equal(repaints(), 2, "the re-armed timer requests the repaint at the instant");
   assert.equal(store.sample().notice?.shownUntil, 10_000, "and the store still holds the notice");
 });
 
@@ -625,11 +628,12 @@ test("disposal clears the pending expiry, and a message after it takes no notice
   const { store, timer, repaints } = newNoticeStore({ noticeSeconds: 10, entries: [previousEntry()] });
   store.messageEnded(noticeMessage(), 0);
   assert.equal(timer.pending(), 1);
+  assert.equal(repaints(), 1, "the arrival requests one repaint");
   store.dispose();
   assert.equal(timer.pending(), 0, "the handle is cancelled");
   timer.advance(10_000);
-  assert.equal(repaints(), 0, "no expiry repaints after disposal");
+  assert.equal(repaints(), 1, "no expiry repaints after disposal");
   assert.equal(store.sample().notice, undefined);
   store.messageEnded(noticeMessage(), 0);
-  assert.equal(repaints(), 0, "a message after disposal takes no notice");
+  assert.equal(repaints(), 1, "a message after disposal takes no notice and repaints nothing");
 });

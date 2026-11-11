@@ -137,6 +137,10 @@ export function createSessionDataStore(options: {
     const shownUntil = now() + noticeSeconds * 1_000;
     notice = { ...next, shownUntil };
     armExpiry(shownUntil);
+    // The arrival asks for its own repaint, as every push does: the living store spec has the store
+    // request it and forbids leaning on the host repainting for its own reasons. The instant's is a
+    // second, separate request.
+    requestRender?.();
   };
 
   return {
