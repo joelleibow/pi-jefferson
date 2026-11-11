@@ -2,9 +2,9 @@
 
 ### Requirement: The store holds the notice a notice instrument shows
 
-The store MUST hold the notice the extension shows, its kind and the values its text displays, and
-MUST read it as unknown, not as an empty string, while no notice is showing. A notice MUST arrive
-from a host event the feed subscribes to, never from a read the store makes on its own.
+The store MUST hold the notice the extension shows, its kind and the values its format's variables
+show, and MUST read it as unknown, not as an empty string, while no notice is showing. A notice MUST
+arrive from a host event the feed subscribes to, never from a read the store makes on its own.
 
 #### Scenario: A notice arrives
 
@@ -51,17 +51,61 @@ come from a read the store schedules.
 - **THEN** the store takes no notice for it, because no extension event carries a completed warm and
   this change does not show a warm
 
+### Requirement: One notice shows at a time and a newer replaces it
+
+The store MUST hold one notice at a time. A notice that arrives while another shows MUST replace it,
+MUST take its whole visible time from its own arrival, and MUST leave no pending expiry from the
+notice it replaced. When one `message_end` carries a dropped-thinking notice and a cache miss, the
+cache miss MUST be the one that stays and the dropped-thinking notice is lost.
+
+#### Scenario: A newer notice replaces the shown one
+
+- **WHEN** a second notice arrives while a first is showing
+- **THEN** the store holds the second, and the first's expiry has been cleared
+
+#### Scenario: The newer notice runs its full time
+
+- **WHEN** a second notice arrives 8 seconds into a first notice's 10 seconds
+- **THEN** the second shows for its whole 10 seconds, counted from its own arrival
+
+#### Scenario: One message that carries two notices
+
+- **WHEN** one `message_end` yields a dropped-thinking notice and a cache miss
+- **THEN** the store holds the cache miss, and no thinking notice shows
+
 ### Requirement: A cache-miss notice is the miss pi's own notice names
 
 The store MUST hold a cache-miss notice for the turns pi's transcript notice would flag and for no
-others. pi's noise floor and its display gate both apply, and the notice carries which variant it
-is: a model change, an idle of at least pi's five-minute TTL, or neither, with a model change taking
-precedence.
+others. pi's noise floor, its display gate, its five-minute TTL measured from one request to the next,
+its resets at a compaction and a branch summary, and its price fallback for a turn that read no cache
+MUST all apply, each constant named once beside pi's file and line.
 
 #### Scenario: A miss under the display gate
 
 - **WHEN** a turn's miss clears pi's noise floor but not its display gate
 - **THEN** the store holds no cache-miss notice for it
+
+#### Scenario: A cache-warm entry before the turn
+
+- **WHEN** the previous request in the session is a cache-warm usage entry
+- **THEN** the miss rule measures the turn against that entry, so the turn is not read as the first of
+  a session, though no warm notice shows for it
+
+#### Scenario: A turn with no miss to count
+
+- **WHEN** a turn is the first of a session, follows a reset, or reports no cache activity in a
+  session that never reported any before
+- **THEN** no miss is counted for it
+
+#### Scenario: A compaction between two turns
+
+- **WHEN** a compaction or a branch summary sits between two turns
+- **THEN** no miss is counted across it, because pi's own scan resets there
+
+### Requirement: A cache-miss notice carries the variant pi gives it
+
+A cache-miss notice MUST carry the variant pi gives it: a model change, an idle of at least pi's
+five-minute TTL, or neither. A model change MUST take precedence over an idle.
 
 #### Scenario: A miss after a model switch
 
@@ -78,16 +122,55 @@ precedence.
 - **WHEN** a miss lands after a model change and after an idle longer than pi's TTL
 - **THEN** the notice's variant is the model change
 
-#### Scenario: A turn with no miss to count
+### Requirement: A dropped-thinking notice shows only when its count rises
 
-- **WHEN** a turn is the first of a session, follows a reset, or reports no cache activity in a
-  session that never reported any before
-- **THEN** no miss is counted for it
+A dropped-thinking notice MUST show only when the count pi derives for the message exceeds the count on
+the branch's previous assistant message, so a later turn that repeats the same count MUST NOT show it
+again. The notice MUST carry that count.
 
-#### Scenario: A compaction between two turns
+#### Scenario: The count rises
 
-- **WHEN** a compaction or a branch summary sits between two turns
-- **THEN** no miss is counted across it, because pi's own scan resets there
+- **WHEN** a message drops two thinking blocks and the previous assistant message dropped none
+- **THEN** the store holds a dropped-thinking notice for two blocks
+
+#### Scenario: The count repeats
+
+- **WHEN** a message drops the same count as the previous assistant message
+- **THEN** the store holds no dropped-thinking notice
+
+### Requirement: The notice's subscriptions and its timer exist only for a placed cell
+
+The feed MUST subscribe to the notice events, and the store MUST hold a notice's expiry, only while the
+document places a `notice` cell in some row. With no `notice` cell in any row the extension MUST NOT
+subscribe to those events, MUST NOT scan session entries for a notice, and MUST NOT hold a timer.
+
+#### Scenario: No notice cell placed
+
+- **WHEN** no row places a `notice` cell
+- **THEN** no notice event is subscribed, no session entry is scanned for a notice, and no notice
+  timer is held
+
+#### Scenario: A notice cell placed
+
+- **WHEN** a row places a `notice` cell
+- **THEN** the feed subscribes to `message_end`, `session_compact` and `session_tree` for it
+
+### Requirement: The store's visible time comes from the composition root
+
+The store MUST take its visible time from the composition root, which passes the one value the
+document's `notice` declaration names, or the declared default when the document names none. The data
+home MUST NOT read configuration. A document the configuration rejects MUST still leave the store the
+declared default visible time.
+
+#### Scenario: A configured visible time
+
+- **WHEN** the document declares `seconds` and a notice arrives
+- **THEN** the store expires that notice after the declared number of seconds
+
+#### Scenario: A rejected document
+
+- **WHEN** the configuration rejects the document and the default row renders
+- **THEN** the store expires notices after the declared default visible time
 
 ### Requirement: A notice expires on a clock the composition root supplies
 
