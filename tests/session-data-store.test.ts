@@ -584,7 +584,7 @@ test("a newer notice replaces the shown one and takes its whole visible time fro
   store.compactionEnded(usageOf(100, 200, 300, 0.38));
   assert.equal(store.sample().notice?.kind, "compaction", "the newer replaces the shown");
   assert.equal(timer.pending(), 1, "the first's handle is cleared and one remains");
-  assert.deepEqual(timer.cancels, [first], "the first's handle was cancelled at its own deadline");
+  assert.deepEqual(timer.cancels, [first], "the first's handle was cancelled when the second arrived");
   assert.deepEqual(timer.arms, [10_000, 10_000], "the second's delay is its own full visible time");
   timer.advance(9_999);
   assert.equal(store.sample().notice?.kind, "compaction", "one second short of its full time");

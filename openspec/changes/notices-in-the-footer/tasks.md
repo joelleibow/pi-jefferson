@@ -1392,22 +1392,25 @@ specs are synced. None of them adds behaviour.
   - Decision: D8, and the expectation edits task 4.7 names — the eleventh declaration's length and
     options, and the width-0 guard's list (`redgreen-derek.md` §3).
   - Command: `checks/testdiff.sh <repo> b9668d9`, and again
-    `checks/testdiff.sh <repo> 162ff07 a9a9d7d` for the amendment's range.
+    `checks/testdiff.sh <repo> 0d6cd85` for the amendment's range on this branch.
   - Red: the old expectations planted back fail with
     `+ [ 'format', 'style', 'label', 'seconds', 'formats' ] - [ 'format', 'style', 'label' ]`, and
     with `11 !== 10` (§3).
   - Green, `b9668d9..162ff07`: the removed lines are the three the shipped-declarations test carried,
     and every added line is a new test's own assertion (§3).
-  - Green, `162ff07..a9a9d7d`: twenty removed assertion lines, every one under `tests/`, measured by
-    Michael when he reviewed this group (`redgreen-derek.md` has no measure of the amendment's range).
-    The store's `undefined` expectations after the deadline, the `"5m"` idle, the `"1 thinking block"`
-    blocks, the `"warm"` key message, the fill cell's last `padEnd(80)`, and the notice deep-equals
-    that gain `shownUntil`.
+  - Green, `0d6cd85..HEAD`: twenty-one removed assertion lines, every one under `tests/`, measured
+    with `checks/testdiff.sh` (`redgreen-derek.md` has no measure of the amendment's range). Michael
+    measured the twenty at the implementation gate; the twenty-first is that gate's first finding, the
+    store's reworded `the first's handle was cancelled when the second arrived`, where the range held
+    the old wording. The store's `undefined` expectations after the deadline, the `"5m"` idle, the
+    `"1 thinking block"` blocks, the `"warm"` key message, the fill cell's last `padEnd(80)`, and the
+    notice deep-equals that gain `shownUntil` are the twenty.
   - Each is a shipped fact that moved — the store no longer hides, `shownUntil` joins the datum,
     `$idle` and `$blocks` are bare, and `thinkingOne` exists — so each line is an expectation a task
     names: 7.4 by file and count, 8.1 to 8.5 by case.
-  - Unticked until Derek re-runs the check on the branch. The old green held only for `b9668d9..162ff07`
-    and is false against the amended range, which is why the tick went back.
+  - Re-run and ticked on the branch. The old green held only for `b9668d9..162ff07` and was false
+    against the amended range, which is why the tick had gone back; the spike's `162ff07..a9a9d7d`
+    is not this branch's range, because `162ff07` predates the implementation gate's fixes.
   - Boundary: an expectation edited to fit the new code, against one edited because a shipped fact
     changed.
   - Files: `tests/` only, as the report's diff names.
