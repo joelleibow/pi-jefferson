@@ -406,11 +406,12 @@ test("the exported surface offers no way to supply or replace cell content", asy
     assert.deepEqual(Object.keys(module).sort(), expected, path);
   }
 
-  // The store and the format language are scanned, not pinned: their keys are their own business,
-  // and neither gives a caller a way to supply cell content.
+  // The store, the format language and pi's notice rule are scanned, not pinned: their keys are
+  // their own business, and none gives a caller a way to supply cell content.
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/format.ts");
-  for (const exports of [...pinnedModules.values(), store, format]) {
+  const notice = await import("../extensions/jefferson/data/notice.ts");
+  for (const exports of [...pinnedModules.values(), store, format, notice]) {
     for (const key of Object.keys(exports)) {
       assert.ok(
         !/register|supply|contribute/i.test(key),
@@ -419,8 +420,12 @@ test("the exported surface offers no way to supply or replace cell content", asy
     }
   }
 
-  // Every shipped source file joins the pin: one of its rows, or the scanned-only pair above.
-  const scannedOnly = ["../extensions/jefferson/data/session-data-store.ts", "../extensions/jefferson/format.ts"];
+  // Every shipped source file joins the pin: one of its rows, or the scanned-only set above.
+  const scannedOnly = [
+    "../extensions/jefferson/data/session-data-store.ts",
+    "../extensions/jefferson/format.ts",
+    "../extensions/jefferson/data/notice.ts",
+  ];
   const covered = [...pinned.map(([path]) => path), ...scannedOnly].sort();
   const shippedFiles = readdirSync(join(import.meta.dirname, "..", "extensions"), { recursive: true })
     .map(String)

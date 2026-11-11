@@ -65,7 +65,7 @@ wrong answers differ. Michael's tasks-gate ruling changed those inputs, and Dere
 in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half is §3, 2.11's reset is
 §1 and 2.14's source swap is §2 (`michael-pl7-r1.json`, finding 2).
 
-- [ ] 2.1 The module's types and pi's five constants, with the `shortcut:` comment above them
+- [x] 2.1 The module's types and pi's five constants, with the `shortcut:` comment above them
   - Decision: D1 — `NoticeKind`'s six members, `NoticeValue`'s four, `CACHE_TTL_MS`,
     `NOISE_FLOOR_TOKENS`, `DISPLAY_GATE_TOKENS`, `DISPLAY_GATE_COST` and `COST_SUFFIX_MIN`, each
     beside pi's file and line, under `shortcut: copies pi 1.4.0's rule; drift in the user's global pi
@@ -79,7 +79,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Boundary: the constant values themselves, held by 2.4 (the gate), 2.5 (the suffix's floor) and
     2.6 (the TTL).
   - Files: `extensions/jefferson/data/notice.ts`.
-- [ ] 2.2 The count takes pi's `formatTokens`, not the formatter the cells share
+- [x] 2.2 The count takes pi's `formatTokens`, not the formatter the cells share
   - Decision: D1 — pi's `footer.js:20-30`, copied.
   - Command: `node --test --test-name-pattern="formatTokens" tests/notice.test.ts`
   - Red, §2.1 #1 — plant `const TEN_THOUSAND = 10_000;` as `9_999;`, so the whole-thousands branch
@@ -94,7 +94,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Boundary: 9,999, 10,000, 20,000, 99,999 and 125,300 through `formatTokens` against `compactCount`'s
     answer for the same input — `20k` where `compactCount` draws `20.0k`.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.3 A miss under the noise floor yields no notice
+- [x] 2.3 A miss under the noise floor yields no notice
   - Decision: D1 — `NOISE_FLOOR_TOKENS`, applied as pi applies it (`cache-stats.js:7`, `:24`).
   - Command: `node --test --test-name-pattern="noise floor" tests/notice.test.ts`
   - Red, §2.1 #2 — plant `const NOISE_FLOOR_TOKENS = 1_024;` as `1_023;`, so 1,024 missed tokens draw
@@ -109,7 +109,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     `ℹ pass 1`, `ℹ fail 0` (§2.1 #2).
   - Boundary: 1,024 against 1,025 missed tokens.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.4 A miss under the display gate yields no notice
+- [x] 2.4 A miss under the display gate yields no notice
   - Decision: D1 — `DISPLAY_GATE_TOKENS` and `DISPLAY_GATE_COST` (`interactive-mode.js:3367`).
   - Command: `node --test --test-name-pattern="display gate" tests/notice.test.ts`
   - Red, §2.1 #3 — plant `const DISPLAY_GATE_TOKENS = 20_000;` as `20_001;`, so 20,000 tokens with
@@ -130,7 +130,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Boundary: 19,999 tokens and $0.099 against 20,000 tokens and $0.10 — each side of the gate on its
     own.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.5 The cost suffix appears only at pi's minimum
+- [x] 2.5 The cost suffix appears only at pi's minimum
   - Decision: D1 — `COST_SUFFIX_MIN` and pi's ` (~$X.XX)` suffix (`interactive-mode.js:3369`,
     `:3311`).
   - Command: `node --test --test-name-pattern="appears at a cent" tests/notice.test.ts`
@@ -144,7 +144,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     (§2.1 #4).
   - Boundary: $0.0099 against $0.01.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.6 An idle of pi's TTL yields the idle variant, and a shorter one does not
+- [x] 2.6 An idle of pi's TTL yields the idle variant, and a shorter one does not
   - Decision: D1 and the `missIdle` kind — `CACHE_TTL_MS`, measured start to start
     (`cache-stats.js:38`).
   - Command: `node --test --test-name-pattern="five minutes" tests/notice.test.ts`
@@ -159,7 +159,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     `ℹ pass 1`, `ℹ fail 0` (§2.1 #5).
   - Boundary: exactly five minutes against a millisecond under.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.7 A model change wins over an idle
+- [x] 2.7 A model change wins over an idle
   - Decision: D1 and D5's `missModelSwitch` — the `provider/model` comparison (`cache-stats.js:39`).
   - Command: `node --test --test-name-pattern="model change beats" tests/notice.test.ts`
   - Red, §2.1 #6 — plant the kind's ternary reversed, so the idle branch is tested first:
@@ -172,7 +172,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Green: `✔ a model change beats an idle of the same turn`, `ℹ pass 1`, `ℹ fail 0` (§2.1 #6).
   - Boundary: a model change and an idle together, where the model change wins.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.8 A turn that read no cache is priced with the model's cache-read rate
+- [x] 2.8 A turn that read no cache is priced with the model's cache-read rate
   - Decision: D1 — `readPerToken` falling back to the model's price over a million
     (`cache-stats.js:30-34`).
   - Command: `node --test --test-name-pattern="cache-read fallback" tests/notice.test.ts`
@@ -188,7 +188,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     (§2.1 #7).
   - Boundary: a miss on a turn with no cache read, where the fallback rate is the only one in play.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.9 A session that never reported cache activity counts no miss
+- [x] 2.9 A session that never reported cache activity counts no miss
   - Decision: D1 — pi's guard (`cache-stats.js:20`).
   - Command: `node --test --test-name-pattern="no cache activity" tests/notice.test.ts`
   - Red, §2.1 #8 — plant `&& !previous.reportedCache` as `&& previous.reportedCache`, so the session's
@@ -204,7 +204,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Boundary: a first turn, a turn after a reset, zero prompt tokens, and a session that never
     reported cache activity.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.10 An aborted or errored message yields no notice
+- [x] 2.10 An aborted or errored message yields no notice
   - Decision: D1 — the `stopReason` skip (`interactive-mode.js:2859-2866`), and the store spec's
     "A message that carries no notice".
   - Command: `node --test --test-name-pattern="aborted" tests/notice.test.ts`
@@ -232,7 +232,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     `ℹ pass 1`, `ℹ fail 0` (addendum §3).
   - Boundary: an aborted message and an errored one, each yielding nothing.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.11 A compaction and a branch summary reset the previous request
+- [x] 2.11 A compaction and a branch summary reset the previous request
   - Decision: D1 — the resets at a `compaction` and a `branch_summary` entry
     (`cache-stats.js:59-65`), and the store spec's "A compaction between two turns".
   - Command: `node --test --test-name-pattern="reset the previous request" tests/notice.test.ts`
@@ -255,7 +255,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     behavioural red, and no task cites it.
   - Boundary: a compaction and a branch summary between two turns, which measure no miss across them.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.12 A cache-warm usage entry becomes the previous request
+- [x] 2.12 A cache-warm usage entry becomes the previous request
   - Decision: D1 — `cache_warm` becoming the previous request though no warm notice shows
     (`cache-stats.js:66-76`), and the store spec's "A cache-warm entry before the turn".
   - Command: `node --test --test-name-pattern="cache-warm" tests/notice.test.ts`
@@ -270,7 +270,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     notice`, `ℹ pass 1`, `ℹ fail 0` (§2.1 #11).
   - Boundary: a cache-warm entry before the turn, which measures the turn and shows nothing.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.13 A dropped-thinking notice shows only when its count rises
+- [x] 2.13 A dropped-thinking notice shows only when its count rises
   - Decision: D1 — the delta against the previous assistant message's count, with pi's noun by count
     (`interactive-mode.js:3349`), and the store spec's "A dropped-thinking notice shows only when its
     count rises".
@@ -287,7 +287,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     `ℹ pass 1`, `ℹ fail 0` (§2.1 #12).
   - Boundary: a count rising against one repeating, and one block against two for the noun.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.14 The thinking count comes from the branch, not from the entries
+- [x] 2.14 The thinking count comes from the branch, not from the entries
   - Decision: D1 — the thinking step compares against the branch's last assistant message
     (`interactive-mode.js:3338-3346`), while the miss scan reads `getEntries()`
     (`interactive-mode.js:3362`).
@@ -312,7 +312,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Boundary: an assistant message on a sibling branch carrying a higher dropped count than the
     current branch's — the input that makes the two sources disagree.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.15 One message carrying two notices keeps the miss
+- [x] 2.15 One message carrying two notices keeps the miss
   - Decision: D7 — the thinking candidate first and the miss second, in pi's draw order
     (`interactive-mode.js:3010-3011`), resolved in memory before anything is scheduled.
   - Command: `node --test --test-name-pattern="keeps the miss" tests/notice.test.ts`
@@ -327,7 +327,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     notice`, `ℹ pass 1`, `ℹ fail 0` (§2.1 #14).
   - Boundary: one message that drops thinking blocks and pays for a miss.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.16 A compaction's and a branch summary's usage are summed with pi's suffix
+- [x] 2.16 A compaction's and a branch summary's usage are summed with pi's suffix
   - Decision: D1 — the token sum `input + output + cacheRead + cacheWrite` (`interactive-mode.js:3306-3315`)
     and the cost suffix.
   - Command: `node --test --test-name-pattern="token sum" tests/notice.test.ts`
@@ -342,7 +342,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
     (§2.1 #15).
   - Boundary: a compaction entry's usage and a branch summary's, each summed and suffixed.
   - Files: `extensions/jefferson/data/notice.ts`, `tests/notice.test.ts`.
-- [ ] 2.17 The new file joins the export pin
+- [x] 2.17 The new file joins the export pin
   - Decision: D8 — the pin's scanned-only set beside the store and the format language, and the
     coverage assertion that every shipped source file joins it.
   - Command: `node --test --test-name-pattern="exported surface" tests/jefferson.test.ts`
@@ -351,7 +351,7 @@ in `redgreen-derek.md`'s "Addendum — the tasks gate's reds": 2.10's miss half 
   - Green: `ℹ pass 1 ℹ fail 0` for the pin's run at HEAD (§4).
   - Boundary: the pin's coverage of a shipped file, and nothing it exports.
   - Files: `tests/jefferson.test.ts`.
-- [ ] 2.18 The commit is green and touches only the paths this group names
+- [x] 2.18 The commit is green and touches only the paths this group names
   - Command: `checks/suite.sh <repo> 375` and
     `checks/scope.sh <repo> <base> <head> extensions/jefferson/data/notice.ts tests/notice.test.ts tests/jefferson.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `65e8478`: `suite: 375 passed, 0 failed`, and `changed:` the three paths … `PASS`
