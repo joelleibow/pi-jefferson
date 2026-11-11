@@ -12,8 +12,6 @@ export interface ConfiguredInstrument {
   label?: string;
   /** A composed format set's configured text, by key; the declaration's defaults fill the rest. */
   formats?: Record<string, FormatSegment[]>;
-  /** A composed instrument's visible time in seconds, when the document declares one. */
-  seconds?: number;
 }
 
 export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {

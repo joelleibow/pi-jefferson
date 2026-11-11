@@ -82,9 +82,18 @@ interface Notices {
   unknownInstruments: Set<string>;
 }
 
-function readInstruments(raw: unknown, theme: Theme, notices: Notices): ReadonlyMap<string, ConfiguredInstrument> {
+/** What a document says about its instruments: the binding's inputs, and the reader's own share. */
+interface InstrumentConfiguration {
+  /** Each declaration's parsed format, style, label and kind formats. */
+  configured: ReadonlyMap<string, ConfiguredInstrument>;
+  /** Each declaration's declared visible time, by name: the reader's share, never the binding's. */
+  declaredSeconds: ReadonlyMap<string, number>;
+}
+
+function readInstruments(raw: unknown, theme: Theme, notices: Notices): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
-  if (raw === undefined) return configured;
+  const declaredSeconds = new Map<string, number>();
+  if (raw === undefined) return { configured, declaredSeconds };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration("the instruments value is not an object");
   }
@@ -155,11 +164,12 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
     configured.set(declaration.name, {
       segments, style,
       ...(label === undefined ? {} : { label }),
-      ...(seconds === undefined ? {} : { seconds }),
       ...(formats === undefined ? {} : { formats }),
     });
+    // The visible time is the reader's, not the binding's: the binding renders, the reader gates.
+    if (seconds !== undefined) declaredSeconds.set(declaration.name, seconds);
   }
-  return configured;
+  return { configured, declaredSeconds };
 }
 
 function defaultRow(bind: BindInstrument): Row {
@@ -303,14 +313,14 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     rowGap = value;
   }
 
-  const configured = readInstruments(doc.instruments, theme, notices);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, theme, notices);
   const bind = instrumentBindings(configured);
   if (rawRows.length === 0) return { rows: [defaultRow(bind)], rowGap, noticeSeconds: undefined };
 
   const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
-  const noticeSeconds = placesNotice ? configured.get("notice")?.seconds ?? NOTICE_SECONDS : undefined;
+  const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
   const seen = new Set<string>();
   for (const row of rows) {
     if (seen.has(row.id)) {
