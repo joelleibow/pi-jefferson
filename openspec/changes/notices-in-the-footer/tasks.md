@@ -1058,7 +1058,7 @@ row, and the tests pin the notice's text to both. The suite goes from 412 to 414
 These read the change as a whole, so they run after the six groups are in. Task 7.6 runs before the
 specs are synced. None of them adds behaviour.
 
-- [ ] 7.1 The whole suite passes and the type check is clean
+- [x] 7.1 The whole suite passes and the type check is clean
   - Decision: D8 — the suite green with the change in.
   - Command: `checks/suite.sh <repo> 414`
   - Red: with `format.ts`'s plain-mode variable set reverted to the cell's variables:
@@ -1070,7 +1070,7 @@ specs are synced. None of them adds behaviour.
     `PASS` (`redgreen-derek.md`, the addendum's tree; §1 measured 413 before 6.2's test joined).
   - Boundary: every task above, run together.
   - Files: none.
-- [ ] 7.2 The import boundaries hold
+- [x] 7.2 The import boundaries hold
   - Decision: D-a, D-b and the layout spec's "Imports between the homes run one way"; the clock only
     in `startup.ts` (`michael-pl4-r2.json`, `later_gates`).
   - Command: `node checks/imports.mjs <repo>`
@@ -1083,7 +1083,7 @@ specs are synced. None of them adds behaviour.
   - Boundary: the two leak directions the change could open — a `data/` file reaching out, and a
     process clock reached for outside the root.
   - Files: none.
-- [ ] 7.3 Nothing reads the terminal and nothing shells out
+- [x] 7.3 Nothing reads the terminal and nothing shells out
   - Decision: Joel's 2026-11-05 ruling, "pi is the source of truth".
   - Command: `checks/terminal.sh <repo>`
   - Red: a `child_process` import in `data/notice.ts` fails the scan with the matching line and
@@ -1091,7 +1091,7 @@ specs are synced. None of them adds behaviour.
   - Green: `no spawn and no terminal read under extensions/` … `PASS` (§7).
   - Boundary: none — the scan covers every shipped file.
   - Files: none.
-- [ ] 7.4 The tarball ships both new files and nothing else
+- [x] 7.4 The tarball ships both new files and nothing else
   - Decision: the layout spec's shipped-path rule.
   - Command: `checks/tarball.sh <repo> 27`
   - Red: a `.test.ts` beside the source prints `TEST FILE SHIPPED`, a tracked source file missing
@@ -1101,7 +1101,7 @@ specs are synced. None of them adds behaviour.
     files among them (§8).
   - Boundary: the two new files added to the previous 25, and no test file among them.
   - Files: none.
-- [ ] 7.5 Every assertion line the change edits is one the tasks name
+- [x] 7.5 Every assertion line the change edits is one the tasks name
   - Decision: D8, and the expectation edits task 4.7 names — the eleventh declaration's length and
     options, and the width-0 guard's list (`redgreen-derek.md` §3).
   - Command: `checks/testdiff.sh <repo> b9668d9`
@@ -1113,7 +1113,7 @@ specs are synced. None of them adds behaviour.
   - Boundary: an expectation edited to fit the new code, against one edited because a shipped fact
     changed.
   - Files: `tests/` only, as the report's diff names.
-- [ ] 7.6 Every requirement paragraph stays under the ceiling, and the change validates
+- [x] 7.6 Every requirement paragraph stays under the ceiling, and the change validates
   - Decision: the specs the sync will merge, measured before it.
   - Command: `checks/specs.sh /Users/joelleibow/Projects/pi-jefferson notices-in-the-footer`, run
     from the main checkout.
