@@ -1,0 +1,70 @@
+{
+  "findings": [
+    {
+      "finding": "PR review 'Nice to have' 2 is a valid blocker, not optional. The living store spec :192-198 says 'When a change the store receives alters a datum a cell displays, the store MUST request a repaint itself … and MUST NOT rely on the host repainting for its own reasons.' A notice arriving alters a displayed datum; `showNotice` (session-data-store.ts) stamps, arms the expiry and returns without `requestRender()`, while every sibling push (`modelSelected` :171, `thinkingLevelSelected` :177, `branchChanged` :185, `sessionNamed` :191, `turnEnded` :220) requests one. It works live only because pi's `message_end` handler ends in `this.ui.requestRender()` (interactive-mode.js:2871) after extension handlers ran — exactly the host-repaints-for-its-own-reasons the spec forbids leaning on. The design (D1 Flow, D2) never states the arrival repaint; D2's 'one repaint per notice' is the expiry's. A spec MUST the change violates is a defect the change introduced; it is fixed here, not ticketed.",
+      "location": "extensions/jefferson/data/session-data-store.ts, `showNotice`; design.md D1 'Flow'; living openspec/specs/session-data-store/spec.md:192-198",
+      "required_change": "Derek: `showNotice` ends with `requestRender?.()` (after `armExpiry`), so an arrival and an expiry each request one repaint. Red: the store test 'a completed assistant message's notice is the store's notice datum' asserts `repaints() === 1` after `messageEnded`; the expiry tests' counts move from 1 to 2 (arrival + expiry), the early-fire test's 'asks for nothing' holds for the fire alone with the arrival's one subtracted or asserted first, and 'disposal … repaints nothing' and 'with no visible time' stay at 0. Bambadjan: one sentence in D1 Flow ('the store requests a repaint on arrival, as every push does') and the delta scenario 'A notice arrives' gains 'and requests a repaint'. One commit; re-run `suite.sh . 424` and testdiff over `0d6cd85..HEAD` (the edited counts are expectations a shipped fact moves; name them in 9.5). Not run.",
+      "required_change_ran": false,
+      "severity": "blocking"
+    },
+    {
+      "finding": "PR review 'Should fix' 1 reproduces: with a miss held and `formats.miss` configured as `\"\"`, `\"   \"` or `\"$idle\"`, the cell renders `\"Notice: \"` (label and gap, no text). I ran it through `instrumentBindings` with the shipped declaration. But it violates no spec or decision: the delta's 'render nothing, label included' is for a notice that is unknown or past its instant, and this notice is held and live; D5 ruled that only `$notice`'s absence blanks the cell and an absent value joins as `\"\"`; and the output is the existing semantics for an empty *value* (a `model` whose datum is `\"\"` renders `Model: ` the same way). The gap differs from the living 'An empty format leaves the label alone' scenario (`Model:` with no gap) because that scenario is about the cell's format being empty, and here the cell's format `$notice` is not. What Judge Gen is asking for is a per-kind silence — 'an empty kind text means no notice' — which no ruling asked for; the off switch Joel ruled is omitting the cell (D6). Valid non-blocker: real, useless output, not a defect against the contract.",
+      "location": "extensions/jefferson/components/instruments/instrument-binding.ts:43-50; design.md D5",
+      "required_change": "Joel's call at 9.7, framed as: should an empty kind text silence that kind (the cell renders nothing, label included, for that notice) or render the bare label as any empty value does? I would silence: one line in the binding (`preResolved` text `\"\"` → treat as absent) plus a test with `formats.miss: \"\"` expecting `\"\"`, and a D5 sentence. If he says yes it lands in this change before merge (it adds a rule, so D5 first); if no, the README notes that a kind's text may not be empty to silence it. Not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "Verification suggestion 1 is valid and minor: ADR 0011's body (`:47-49`, `:35`, `:69-71`) describes the store dropping the notice at a read, which the code no longer does; ADR 0013's Status line says it narrows 0011, but 0011's own Status (`:4`) does not point forward. Both ADRs are new in this PR, so a reader meets 0011 first. Documentation remedy, Bambadjan's.",
+      "location": "docs/adr/0011-the-store-keeps-time-on-an-injected-clock.md:4",
+      "required_change": "Append to 0011's Status: 'Narrowed by ADR 0013: the hiding moved to the timed visual; the store stamps the instant and requests the repaint.' No body edit.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "Verification suggestion 2 ('Nothing is asked of the host' has no direct assertion) is invalid as a gap: the store test harness fakes `readUsage`/`readEntries`/`readBranch` as counting readers (session-data-store.test.ts:40-60), and the expiry tests run with those fakes; a callback that read the host would be a reader call the fakes count. The scenario is a structural property the one-repaint and early-fire tests already pin at the boundary that matters (no reader call, one `requestRender`). No change.",
+      "location": "specs/session-data-store/spec.md:224-228; tests/session-data-store.test.ts",
+      "required_change": "None.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Re-validate after the arrival-repaint fix: `suite.sh . 424` (count unchanged unless a test is added — state it), `scope.sh` over the fix commit, testdiff `0d6cd85..HEAD` with the moved counts named in 9.5, and I reproduce the red (`requestRender?.()` removed from `showNotice` → arrival count 0).",
+    "Docs pass: ADR 0011's Status pointer; if Joel rules for silencing, the D5 sentence and README line.",
+    "Joel's live check 9.7, with the empty-kind-text question put to him there."
+  ],
+  "not_covered": [
+    "I did not re-run the five check scripts this round; Judge Gen's verification and my last gate both ran them green at `f3e8712`, and HEAD is that commit.",
+    "`scope.sh` per-group ranges were run at the implementation gate, not here.",
+    "No live pi; the arrival-repaint defect is masked live by pi's own repaint after `message_end`, which is why no gate saw it."
+  ],
+  "requirements": [
+    {
+      "evidence": "Reproduced by reading `showNotice` and the sibling pushes, the living spec :192-198, and pi's `message_end` handler ending in `ui.requestRender()` (IM:2871) after extension handlers. Judge Gen's 'probably fine' understates it: the behaviour is right by accident and the spec forbids the accident. Blocking, routed to Derek with a one-line design sentence for Bambadjan.",
+      "requirement": "PR review finding 2: no repaint on a notice's arrival",
+      "status": "must_change"
+    },
+    {
+      "evidence": "Reproduced: `\"\"`, `\"   \"`, `\"$idle\"` all render `Notice: `. Checked against the delta ('unknown or passed → nothing'), D5 (only `$notice`'s absence blanks), and the existing empty-value semantics (`model` datum `\"\"` renders `Model: `). No contract broken; a product gap (per-kind silence) nobody ruled. Non-blocking; Joel's at 9.7.",
+      "requirement": "PR review finding 1: an empty kind text leaves a bare `Notice:`",
+      "status": "met"
+    },
+    {
+      "evidence": "ADR 0011:47-49 says the store drops the notice at a read; the code never does; 0013:4 narrows 0011 but 0011:4 carries no forward pointer. Valid, documentation-only.",
+      "requirement": "Verification suggestion 1: ADR 0011's stale body",
+      "status": "must_change"
+    },
+    {
+      "evidence": "The store tests' readers are counting fakes at the host boundary; the one-repaint and early-fire tests run under them. A host read in the callback would surface as a reader call. Invalid as a missing test.",
+      "requirement": "Verification suggestion 2: 'Nothing is asked of the host' untested",
+      "status": "met"
+    },
+    {
+      "evidence": "Judge Gen's checks at `f3e8712`: suite 424, imports 28/52, terminal, tarball 28, specs 472/386/480, testdiff 3 and 21 lines (the 21st is the default-row input my gate moved; 9.5 names the branch range as 20 for the amendment plus that one — consistent). 82/83 ticked, 9.7 open. `data/notice.ts` re-compared to pi by Judge Gen and by me at the implementation gate.",
+      "requirement": "Verification pass: completeness, correctness, coherence",
+      "status": "met"
+    }
+  ],
+  "verdict": "changes_requested"
+}

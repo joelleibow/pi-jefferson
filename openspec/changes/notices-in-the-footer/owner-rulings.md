@@ -28,6 +28,10 @@ Michael's orientation found that pi has no hook an extension can use to stop its
 
 - **A visual that shows and hides data on a timer.** Before the bare-values amendment went further, Joel said: *"I wanted to add one thing before we maybe get too far. What we're buidling is a visual that can show and hide data on timed basis. It will be used for the cache miss instrument."* **The timed show-and-hide is a visual in its own right, and the cache-miss notice instrument is the first instrument that uses it.** Asked to confirm the reading, a part under `components/visuals/` beside `bar.ts` that any instrument can mix in, he said: *"I hope that's what the plan includes. I just want to make the abstraction between the two things. Don't bake the visual into the instrument. Let's the visual be reusable, if so desired, and be composable into an instrument. You've got it right. Cool cool!"* **The visual is not baked into the notice instrument. It is reusable and composable into any instrument.**
 
+## 2026-11-11: At Validate
+
+- **An empty kind text silences that kind.** Judge Gen found that an empty text in `formats` left a bare `Notice:` on screen. Asked whether an empty text should silence that kind or show the bare label like other empty values, Joel chose **"Empty text silences it"**. **A kind whose configured text is empty shows nothing, label included, while that notice would show.**
+
 ## Earlier rulings this change inherits
 
 - **2026-11-05, the source of truth:** *"those all should be able to come from pi, right?"* **pi is the source of truth. Nothing reads the terminal and nothing shells out.** (archive/2026-11-05-configurable-instruments/owner-rulings.md)
