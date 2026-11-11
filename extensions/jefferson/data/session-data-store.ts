@@ -123,6 +123,9 @@ export function createSessionDataStore(options: {
         armExpiry(at);
         return;
       }
+      // The handle has fired, so nothing is pending: the slot means a timer still to come, and a
+      // later cancel must call nothing that has already run.
+      cancelExpiry = undefined;
       requestRender?.();
     }, Math.max(0, at - now()));
   };
