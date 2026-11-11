@@ -1363,7 +1363,7 @@ test("a formats value that is not a string, and formats that is not an object, e
 
 test("no notice cell, the default row and a rejected document each take no visible time", () => {
   assert.equal(readDocument({ cells: [{ instrument: "blank" }] }).noticeSeconds, undefined, "no notice cell");
-  assert.equal(readDocument({}).noticeSeconds, undefined, "the default row");
+  assert.equal(readDocument({ rows: [] }).noticeSeconds, undefined, "the default row");
   assert.equal(readDocument({ cells: [{ instrument: "notice" }], rows: [{}] }).noticeSeconds, undefined, "a rejected document");
   assert.equal(readDocument("not json").noticeSeconds, undefined, "an unparseable document");
 });
