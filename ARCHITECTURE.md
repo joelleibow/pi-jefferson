@@ -18,7 +18,7 @@ extensions/jefferson/
   components/                    the parts, each directory holding only its own logic
     instruments/                 the instrument contract, the binding, and one file per instrument
     row/                         a row, its cells' width plan, and the renderer that draws it
-    visuals/                     what an instrument can mix in; today the bar
+    visuals/                     what an instrument can mix in: the bar and the timed show-and-hide
 ```
 
 Logic that many parts share, and the process flow, sit directly under `extensions/jefferson/`. A
@@ -34,8 +34,8 @@ previous install, reads the configuration, installs the data with what it read, 
 footer, in that order: a notice's visible time has to reach the store when it is built, so
 configuration cannot wait until after the feed exists. Startup also wires the repaint callback: the
 footer hands the host's repaint request back out, and the data side calls it. It supplies the data
-side its readers: `node:os`'s `homedir`, `performance.now` for the clock a notice expires on, and a
-closure over `setTimeout` and `clearTimeout` for the repaint that expiry requests. It is the one file
+side its readers: `node:os`'s `homedir`, `performance.now` for the clock a datum's instant is stamped
+from, and a closure over `setTimeout` and `clearTimeout` for the repaint at that instant. It is the one file
 that names a process API. It also runs the release on `session_shutdown`, because a reload shuts the
 session down without clearing the footer. It decides *when* things run; it computes nothing.
 
@@ -48,7 +48,7 @@ document declares, which the root supplies. The branch, its change subscription 
 exist only inside the host's footer factory. So the feed returns an attachment beside the store, and
 the factory hands the footer's data through it. The attachment seeds the branch and subscribes to its
 change, and that subscription joins the one release with the rest. One release undoes the
-subscriptions, clears a pending notice expiry and disposes the store. The store names no host event;
+subscriptions, clears a pending repaint and disposes the store. The store names no host event;
 the feed does.
 
 **Footer setup.** Calls `ctx.ui.setFooter` with a factory that builds the row renderer's footer, and
@@ -64,15 +64,18 @@ model and thinking level, a renamed session pushes its name, and a branch change
 The attachment hands the store a statuses reader; the store calls it once per sample, holds the map as
 the host reported it, and treats an empty one as unknown. Injected readers sample context usage and the
 statuses each render, and scan the whole session's usage-bearing entries only when `(sessionId,
-leafId)` moves. `turn_end` compares the five totals and requests a repaint only when they change, and a
-notice's expiry requests one repaint of its own. The notice arrives only on a push. The store records
-the deadline when it arrives, reads the clock at each sample and drops the notice once it is past, and
-the scheduler's callback requests that one repaint at the deadline, re-arming for the time left when it
-fires early. Nothing is polled: the expiry asks the host nothing. A read is synchronous, total, and
-never throws. The host disposes the footer, and through it the store, before it invalidates the
-session context, so a read cannot outlive its context; disposal clears the readers and cancels a
-pending expiry, and later samples are all-unknown. One sample per render is handed to every cell, so
-cost and tokens share one totals object and two status cells share one text.
+leafId)` moves. `turn_end` compares the five totals and requests a repaint only when they change, and
+a notice's instant requests one repaint of its own. The notice arrives only on a push. The store stamps
+the instant it shows until when it arrives, converting the document's seconds once there, and it never
+hides the notice: the store holds it until a newer one replaces it or the session is replaced. Each
+sample carries `sampledAt`, one clock read per render, which is the instant every timed cell compares
+against. The scheduler's callback requests that one repaint at the instant, re-arming for the time left
+when it fires early, and nothing is polled: the repaint asks the host nothing.
+
+A read is synchronous, total, and never throws. The host disposes the footer, and through it the store,
+before it invalidates the session context, so a read cannot outlive its context; disposal clears the
+readers and cancels a pending repaint, and later samples are all-unknown. One sample per render is
+handed to every cell, so cost and tokens share one totals object and two status cells share one text.
 
 **Configuration.** Resolves where the document lives (the agent directory's, and a trusted project's),
 reads it, validates it, resolves instrument names, and normalizes rows. Its result carries the rows,
@@ -101,7 +104,10 @@ one default per key, the values those formats may name, and the variable the cho
 the cell's format through. The binding resolves the selected format as plain text — no modifier and
 no form, so the notice stays one colour — and passes it to the cell's format as that variable's
 value. The two variable sets are not interchangeable: a plain format names the composed values, and
-the cell's format names the composed variable. The bound `(readings, width, theme) => string` renders
+the cell's format names the composed variable. A declaration may also carry `shownUntil`, the reading
+that says when a timed datum stops showing: binding resolves the text and then hands it to the timed
+visual in `components/visuals/` with the render's `sampledAt`, and nothing to show renders as nothing,
+so the cell drops its label and gap. The bound `(readings, width, theme) => string` renders
 its format with those values.
 A format may carry `|name` modifiers after a variable or after the text
 in front of them, and the language commits to one order: it renders the cell empty when a value it
@@ -111,10 +117,15 @@ leaves, and styles each segment once.
 It also says whether it fills the row's spare columns, which is how a row sizes its cell.
 Instruments know nothing about alignment.
 
-**Bar.** The bar lives in `components/visuals/bar.ts` and stands alone. It imports no file of this
-package, so a change to the format language or to an instrument cannot reach it. The format language
-only places the bar: `format.ts` parses `$bar` and gives it the columns the row left, and `bar.ts`
-draws it.
+**Visuals.** `components/visuals/` holds the parts an instrument can mix in, each in its own file and
+importing no file of this package, so a change to the format language or to an instrument cannot reach
+one. The bar draws a filled track: `format.ts` parses `$bar` and gives it the columns the row left,
+and `bar.ts` draws it.
+
+The timed visual decides whether a timed datum shows. It compares the instant the datum shows until
+against the render's instant. Before that instant the text comes back unchanged; at or after it, or
+when either instant is missing, it hands back nothing, and the cell renders nothing, label included.
+The binding applies it after the format resolves, for a declaration that declares `shownUntil`.
 
 **Row renderer.** Builds one `VStack` at install, retaining every cell component. Its children are one
 `HStack` per row and nothing else, and its `gap` is the configuration's `rowGap`. The stack puts `gap`
@@ -141,11 +152,12 @@ installs. No file imports the entry. Within `extensions/jefferson/`:
 
 - `data/` holds the files that keep session data and take it from the host. It imports host packages
   and its own files, and no file outside `data/`.
-- `components/` holds the parts. Its files import host packages, their own directory, the types of
-  `data/` and `format.ts`. They never import startup, footer setup, configuration or `shipped.ts`.
+- `components/` holds the parts. Its files import host packages, their own directory, a visual, the
+  types of `data/` and `format.ts`. They never import startup, footer setup, configuration or
+  `shipped.ts`.
   - `row/` imports only the type of the instrument contract.
-  - `instruments/` imports `format.ts` only in the binding.
-  - `components/visuals/bar.ts` imports no local file.
+  - `instruments/` imports `format.ts` and a visual only in the binding.
+  - `components/visuals/` files import no local file.
 - `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
   `data/`.
 - `shipped.ts` imports the instrument files.
