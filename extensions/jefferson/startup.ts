@@ -41,6 +41,14 @@ export function startUp(pi: ExtensionAPI): void {
 
     releasePrevious?.();
 
+    // Read first: the store is built with the visible time the document's notice declaration
+    // names, so configuration cannot wait until after the feed exists.
+    const { rows, rowGap, warning } = readConfiguration({
+      ...configurationPaths(ctx.cwd),
+      projectTrusted: ctx.isProjectTrusted(),
+      theme: ctx.ui.theme,
+    });
+
     // The repaint request reaches the host's `tui` only when the host invokes the factory. The
     // factory's call sets it, so every push after the install reaches the host.
     let requestRepaint: (() => void) | undefined;
@@ -48,11 +56,6 @@ export function startUp(pi: ExtensionAPI): void {
     const { store, release, attachFooterData } = feedSessionData(pi, ctx, () => requestRepaint?.(), homedir);
     releasePrevious = release;
 
-    const { rows, rowGap, warning } = readConfiguration({
-      ...configurationPaths(ctx.cwd),
-      projectTrusted: ctx.isProjectTrusted(),
-      theme: ctx.ui.theme,
-    });
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 
     footerRows = rows.length;

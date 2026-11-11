@@ -32,7 +32,7 @@ behaviour: the reader takes its inputs from `ctx` alone, so the order changes no
 test added (`michael-pl4-r2.json`, `later_gates`: "the reorder of `readConfiguration` lands as its own
 green-to-green commit").
 
-- [ ] 1.1 `readConfiguration` runs before the feed and the store are built
+- [x] 1.1 `readConfiguration` runs before the feed and the store are built
   - Decision: D4 — the reader reads nothing the feed or the store creates.
   - Command: `checks/suite.sh <repo> 360` before the move, and again after it.
   - Red: none, by D4's design. The check is the suite on both sides: `pnpm typecheck` clean and
@@ -41,7 +41,7 @@ green-to-green commit").
     table).
   - Boundary: none — the group adds no behaviour.
   - Files: `extensions/jefferson/startup.ts`.
-- [ ] 1.2 The commit is green and touches only the paths this group names
+- [x] 1.2 The commit is green and touches only the paths this group names
   - Command: `checks/suite.sh <repo> 360` and
     `checks/scope.sh <repo> <base> <head> extensions/jefferson/startup.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `1074629`: `changed: extensions/jefferson/startup.ts` … `PASS` (`redgreen-derek.md` §6).
