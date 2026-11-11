@@ -24,6 +24,10 @@ Michael's orientation found that pi has no hook an extension can use to stop its
 
 - **No English inside a value; `\` escapes any character.** The docs pass found that `$blocks` carried `2 thinking blocks` and `$idle` carried `6m`, putting English words inside values against the ruling above. Michael ruled it a defect the change introduced: `$blocks` becomes the bare count, with the thinking notice split by grammatical number into two kinds, and `$idle` becomes the bare minutes. Keeping pi's `6m` default then needs a letter straight after a variable. Asked whether to generalize the format language's escape so `\` escapes any character, or to leave `6m` inside the value, Joel chose **"Generalize the escape"**. **In every format, `\` followed by any character yields that character. The `missIdle` default is written `Cache miss after $idle\m idle`.**
 
+## 2026-11-10: What the timed part is
+
+- **A visual that shows and hides data on a timer.** Before the bare-values amendment went further, Joel said: *"I wanted to add one thing before we maybe get too far. What we're buidling is a visual that can show and hide data on timed basis. It will be used for the cache miss instrument."* **The timed show-and-hide is a visual in its own right, and the cache-miss notice instrument is the first instrument that uses it.** Asked to confirm the reading, a part under `components/visuals/` beside `bar.ts` that any instrument can mix in, he said: *"I hope that's what the plan includes. I just want to make the abstraction between the two things. Don't bake the visual into the instrument. Let's the visual be reusable, if so desired, and be composable into an instrument. You've got it right. Cool cool!"* **The visual is not baked into the notice instrument. It is reusable and composable into any instrument.**
+
 ## Earlier rulings this change inherits
 
 - **2026-11-05, the source of truth:** *"those all should be able to come from pi, right?"* **pi is the source of truth. Nothing reads the terminal and nothing shells out.** (archive/2026-11-05-configurable-instruments/owner-rulings.md)
