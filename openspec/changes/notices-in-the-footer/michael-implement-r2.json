@@ -1,0 +1,46 @@
+{
+  "findings": [],
+  "later_gates": [
+    "Docs pass (Bambadjan): design.md D1 'Flow' line 166 ('brings the store's leaf-keyed scan current') and D3 line 236 ('no previous-request record in the scan') are false against the code and are amended as Derek's report quotes; ARCHITECTURE.md (startup order, the two injected readers, store/feed/configuration sections), README (notice row, `seconds`/`formats`, rejections, the pi-setting contract, cache warm's absence), AGENTS.md (notice kind, `shortcut:` pin, the two traps) and the two ADRs D9 owes. The archived change's references to the old test name are history and stay.",
+    "Validate: the archive's spec sync and `checks/specs.sh` after the sync; the tree stays clean and nothing is pushed until Joel's check.",
+    "Joel's live check 7.7: the real footer and clock, the 10-second default, `Notice:` label, configured `formats`, and whether a fade follows."
+  ],
+  "not_covered": [
+    "No live pi, no real `setTimeout`, no CI run; the tarball check is local.",
+    "The fold's cost on the default-row path (binding `notice`, six plain parses with no host read) is unmeasured; nothing observable depends on it.",
+    "The earlier rounds' ~45 reds I accepted on Derek's transcripts stand; this round I re-ran the three that the four commits touch."
+  ],
+  "requirements": [
+    {
+      "evidence": "Commit 27527bf: `readDocument({})` → `readDocument({ rows: [] })`, the input I measured in round 1. Commit 74d4771 folds the default-row return into one `rows` list and computes `placesNotice`/`noticeSeconds` once over it; the untested literal is gone. I planted the default row as exempt from the gate (`placesNotice || rawRows.length === 0`) in a /tmp worktree: the test reds at 'the default row'; green unplanted. Suite 414 at each of the four commits (checked out and run).",
+      "requirement": "Round-1 finding 1 (major): 5.3's default-row assertion reaches the default-row path; the gate has one home",
+      "status": "met"
+    },
+    {
+      "evidence": "`rg '\"notice\"' extensions/jefferson/configuration.ts` → none; the lookup is `declaredSeconds.get(notice.name)` and placement `bind(notice)`.",
+      "requirement": "Round-1 finding 2 (minor): the instrument's name comes from its declaration",
+      "status": "met"
+    },
+    {
+      "evidence": "`ConfiguredInstrument.seconds` removed (binding diff); `readInstruments` returns `{ configured, declaredSeconds }` keyed by declaration name; structure-only commit 4e3a7b8 touches the two source files alone (scope.sh PASS) with the suite unedited at 414. I planted the lookup away (`NOTICE_SECONDS` always): 5.1's test reds `undefined !== 30`-style on the declared 30; green unplanted.",
+      "requirement": "Round-1 finding 3 (minor): the visible time is the reader's, not carried through the binding's type",
+      "status": "met"
+    },
+    {
+      "evidence": "Test renamed to 'the ten seeded datums, in order, and no notice', assertions unchanged. I planted the store to always emit the `notice` key: the test reds on the keys list; green unplanted. The design.md sentences are routed to the docs pass (later gate), as the finding's remedy allowed.",
+      "requirement": "Round-1 finding 4 (minor): the stale test name; the design's two false sentences",
+      "status": "met"
+    },
+    {
+      "evidence": "suite.sh 414 PASS, imports.mjs PASS, terminal.sh PASS, tarball.sh 27 PASS, specs.sh PASS, testdiff.sh removed set still the three lines (run by me); scope.sh PASS for all four commit ranges; no suppression comments in the diff; no Markdown but tasks.md (unchanged this round); tree clean, nothing pushed. 7.7 alone unticked.",
+      "requirement": "Mechanical checks and contract adherence after the fix-ups",
+      "status": "met"
+    },
+    {
+      "evidence": "Diff 3640973...HEAD: configuration.ts, instrument-binding.ts, two test files; every edit is one of the four findings' remedies; no new noun, hook, cache or option. Findings 2 and 3 share a commit for the churn reason Derek gives, with the evidence separated.",
+      "requirement": "No mechanism beyond the findings; one hat per commit",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}
