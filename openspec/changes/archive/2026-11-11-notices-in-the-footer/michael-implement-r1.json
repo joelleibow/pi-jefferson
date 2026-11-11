@@ -1,0 +1,105 @@
+{
+  "findings": [
+    {
+      "finding": "5.3's \"the default row\" assertion is vacuous. `readDocument({})` normalizes `{}` as one row with no `cells` (ten blank cells), never the `rawRows.length === 0` default-row return, so the literal `noticeSeconds: undefined` on that return (configuration.ts:308) has no test. I planted `noticeSeconds: 10` there in a scratch worktree: the test stays green with the current input and goes red with `readDocument({ rows: [] })`, which is green again unplanted. Derek reported the gap and left the test as the spike wrote it. A test that stays green when the behaviour is removed proves nothing, and the spec's 'No notice cell placed' scenario leans on this path for the default row.",
+      "location": "tests/configuration.test.ts:1366; extensions/jefferson/configuration.ts:308",
+      "required_change": "Change the assertion's input to `readDocument({ rows: [] })` (one line; measured red with the plant and green without, in a /tmp worktree since removed). Optionally fold the default-row return into the rows-based placement so the fact has one home: `const rows = rawRows.length === 0 ? [defaultRow(bind)] : rawRows.map(…)` then compute `placesNotice` once — proposed, unrun. Tick 5.3 again after re-measuring its red.",
+      "required_change_ran": true,
+      "severity": "major"
+    },
+    {
+      "finding": "`configured.get(\"notice\")` restates the instrument's name as a string literal beside the imported `notice` declaration, which already carries it (`notice.name`). Joel's 2026-11-05 ruling: names are not hardcoded and strewn about.",
+      "location": "extensions/jefferson/configuration.ts:313",
+      "required_change": "`configured.get(notice.name)`. Not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "`ConfiguredInstrument.seconds` has no consumer in the binding: it rides the binding's type only so `configuration.ts` can read it back from the map it just built. The fact travels through the wrong noun.",
+      "location": "extensions/jefferson/components/instruments/instrument-binding.ts:16; configuration.ts:159, :313",
+      "required_change": "Return the declared seconds from `readInstruments` beside the map (or read `entry.seconds` where the rows are known) and drop the field from `ConfiguredInstrument`. Not run; a structure-only step with the suite unedited.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "Design D1 Flow says `message_end` 'brings the store's leaf-keyed scan current … then hands the store the message' and D3 says the gate keeps 'no previous-request record in the scan'. The code keeps no record at all: `missNotice` runs `previousRequest(readEntries())` as a fresh pass per assistant `message_end`, exactly as pi's `detectCacheMiss(getEntries(), …)` does. Less mechanism than the design, not more, and once per turn; but the design's sentence is now false. The store test name 'a sample is exactly the ten datums' is likewise stale: a sample carries eleven keys while a notice shows.",
+      "location": "design.md D1 'Flow' and D3; extensions/jefferson/data/notice.ts:98-119; tests/session-data-store.test.ts:166",
+      "required_change": "Docs pass: amend D1's Flow sentence to 'the miss step scans the entries the handler reads, as pi's does' and strike D3's 'no previous-request record in the scan'; rename the store test to 'the ten seeded datums, in order, and no notice'. Documentation remedy.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Validate: 5.3 re-ticked only after its red is re-measured with `{ rows: [] }`; the suite stays 414 and `checks/scope.sh` for the fix-up touches tests/configuration.test.ts and tasks.md only (or configuration.ts too if the fold is taken).",
+    "Docs pass (Bambadjan): Derek's list — ARCHITECTURE.md Startup order and the two injected readers, Store/Data feed/Configuration sections, README's notice row and rejections and the pi-setting contract and cache-warm absence, the two ADRs, AGENTS.md's notice kind and traps — plus the two design.md sentences and the test name in finding 4.",
+    "Joel's live check 7.7: the real footer, the real clock, the 10-second default, the `Notice:` label, configured `formats`, and whether a fade follows."
+  ],
+  "not_covered": [
+    "I re-ran seven mutations (pre-resolved precedence, early-fire re-arm, store source swap, display-gate token edge, `session_shutdown` handler, fill-cell cache reset, and the 5.3 plant) in a detached /tmp worktree; the other ~45 reds I accepted on Derek's report, which matched the artifacts' transcripts where I compared them (groups 2 and 3 spot-checked).",
+    "No live pi, no real `setTimeout`, no CI run; the tarball check is local.",
+    "pi 1.4.0 vs the user's 1.5.2: the rule's equivalence stands on my orientation's diff of the three methods and footer.js, not re-run here."
+  ],
+  "requirements": [
+    {
+      "evidence": "Diff 9e28c0e...HEAD: 10 source files, 8 test files, tasks.md. Every production edit maps to a task (D4 → startup.ts reorder; D1 → data/notice.ts + store/feed events; D2 → now/schedule/session_shutdown; D3 → noticeSeconds/placement; D5/D6 → composed, plain parse/resolve, binding, notice.ts, configuration options; D7 → slot/cancel; D8 → tests). tasks.md diff is 70 ticks and nothing else; 7.7 alone unticked. scope.sh PASS for all seven ranges with the tasks' lists (run).",
+      "requirement": "Contract adherence: every change maps to a task, every deliverable is in the diff, every tick matches code",
+      "status": "met"
+    },
+    {
+      "evidence": "Compared `data/notice.ts` line by line with cache-stats.js:5-52, :59-89 and interactive-mode.js:3316-3380, footer.js:20-30: constants, `asPreviousRequest`'s `reportedCache ||`, the resets, the warm entry, the `cacheRead === 0` fallback via the feed's `find(...).cost.cacheRead / 1_000_000`, the 20k/$0.10 gate, the suffix at a cent, variant precedence, the noun by count, the branch-walk for the previous dropped count — all faithful. `shortcut:` comment present. The one divergence from the design is the per-event scan instead of the leaf-keyed record (finding 4, less mechanism).",
+      "requirement": "D1: pi's rule copied whole, one home per constant, data/ pure",
+      "status": "met"
+    },
+    {
+      "evidence": "Store: `now`/`schedule` injected, deadline set at arrival, sample-time drop at `now() >= deadline`, callback re-arms when early and repaints once otherwise; `cancelNotice` on replace, expiry and `dispose`. `startup.ts` supplies `() => performance.now()` and a `setTimeout`/`clearTimeout` closure and registers `session_shutdown → releasePrevious?.()`. imports.mjs confirms the clock only in startup.ts (run: PASS). Mutations re-run red: re-arm removed `1 !== 0`; shutdown handler removed `no handler registered`.",
+      "requirement": "D2: clock and scheduler at the root, one repaint, release on shutdown",
+      "status": "met"
+    },
+    {
+      "evidence": "`noticeSeconds` computed from the normalized rows via `cell.instrument === bind(notice)` (ceiling applied by `cellsFromNames`), default `NOTICE_SECONDS` from the instrument's file; feed subscribes to the three events only when defined; store's `showNotice` refuses without it. 5.1/5.2/5.4 reds reproduce per Derek; 5.3's default-row assertion cannot fail (finding 1, measured).",
+      "requirement": "D3: the gate follows the rows the root installs",
+      "status": "must_change"
+    },
+    {
+      "evidence": "startup.ts reads configuration before `feedSessionData`; commit 7d13c6e touches startup.ts and tasks.md only; 360 → 360 (I ran the suite at that commit).",
+      "requirement": "D4: the reorder as its own green-to-green step",
+      "status": "met"
+    },
+    {
+      "evidence": "`composed` on the declaration with `variable`, `variables`, `select`, `formats`; `declaration.variables` is `{ notice: () => undefined }`; `parseFormat(…, plain)` validates against `composed.variables`, rejects `|`, `$notice` and `$bar`; `resolvePlain` joins absent as `\"\"`; `resolveFormat`'s `preResolved` checked before the resolver and passed only by the binding (grep). Default texts match the spec scenarios; `variableFg: { notice: () => \"warning\" }`. Mutation re-run: precedence removed reds both the format test and the instrument's default text.",
+      "requirement": "D5: six formats keyed by kind, two variable sets, plain mode, pre-resolved seam",
+      "status": "met"
+    },
+    {
+      "evidence": "`seconds` integer 1..60 with `rowGap`'s message shape; `formats` object/string/kind checks each naming the offender; options `[...FOUNDATIONAL_OPTIONS, \"seconds\", \"formats\"]`. 4.9–4.11 reds per Derek.",
+      "requirement": "D6: `seconds` 1..60 default 10; `formats` rejections",
+      "status": "met"
+    },
+    {
+      "evidence": "`showNotice` cancels the pending handle and sets a fresh deadline; `messageNotice` is `missNotice(…) ?? thinkingNotice(…)`; 3.8 and 3.18 reds per Derek; store source swap re-run red by me.",
+      "requirement": "D7: one slot, newest replaces, miss wins",
+      "status": "met"
+    },
+    {
+      "evidence": "414 tests, all patterns select one test (Derek swept; I re-ran the changed ones in round 3). testdiff removed set = the three lines 4.7 names (run). No test mocks the thing under test; the feed/e2e tests assert on rendered lines and subscription names at the pi boundary via hand-written fakes; the e2e test renders `Notice: Cache miss: 20k …` through the fake host. Six mutations re-run red by me. One vacuous assertion (finding 1).",
+      "requirement": "D8 and Derek's test bar: reds shown, no vacuous or weakened assertions",
+      "status": "must_change"
+    },
+    {
+      "evidence": "`data/` imports only `./notice.ts`; `components/instruments/notice.ts` imports `instrument.ts` and a `data/` type; imports.mjs 27 files / 51 edges PASS; terminal.sh PASS; tarball 27 PASS; specs.sh PASS; suite 414 PASS (all run by me). Per-commit counts 360/375/397/409/412/414 reproduced by checking out each commit.",
+      "requirement": "Architecture and mechanical checks",
+      "status": "met"
+    },
+    {
+      "evidence": "grep over the diff for `ts-ignore|ts-expect-error|eslint-disable|noqa|type: ignore|pyright: ignore`: none. No `.env`, no secrets. No Markdown in the diff other than tasks.md. The repository has no logger and the change adds no entry point; the one error path (rejected document) reports through the existing warning.",
+      "requirement": "Suppressions, secrets, Markdown, logging",
+      "status": "met"
+    },
+    {
+      "evidence": "`startup.ts` names `notice` nowhere; `configuration.ts` imports the declaration but also writes `\"notice\"` as a literal at :313 (finding 2). `ConfiguredInstrument.seconds` carried without a binding consumer (finding 3). `Readings.notice` optional per the design; shape otherwise follows the store's conventions.",
+      "requirement": "Shape: one home per fact, a consumer for every field",
+      "status": "must_change"
+    }
+  ],
+  "verdict": "changes_requested"
+}

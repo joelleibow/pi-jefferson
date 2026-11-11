@@ -1,8 +1,12 @@
 /** Session datums and usage derivations; the session data feed supplies readers, never a host handle. */
-import type { ContextUsage, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { ContextUsage, MessageEndEvent, SessionEntry } from "@earendil-works/pi-coding-agent";
+
+import { messageNotice, usageNotice, type Notice } from "./notice.ts";
 
 /** `undefined` is unknown — never an empty string, zero, or a stale value. */
 export type Reading = string | undefined;
+/** The usage a compaction or branch summary carries. */
+type UsageOf = Extract<SessionEntry, { type: "usage" }>["usage"];
 
 export interface UsageTotals {
   readonly input: number;
@@ -11,6 +15,9 @@ export interface UsageTotals {
   readonly cacheWrite: number;
   readonly cost: number;
 }
+
+/** A datum that shows until an instant: the store stamps the instant once, on arrival. */
+export type Timed<T> = T & { readonly shownUntil: number };
 
 /** One render's values, shared by all its cells. */
 export interface Readings {
@@ -24,6 +31,10 @@ export interface Readings {
   readonly statuses: ReadonlyMap<string, string> | undefined;
   readonly contextUsage: ContextUsage | undefined;
   readonly totals: UsageTotals | undefined;
+  /** The notice a notice instrument shows, with the instant it shows until; unknown while none is held. */
+  readonly notice?: Timed<Notice>;
+  /** The instant this sample read, once per render; unknown after disposal. */
+  readonly sampledAt: number | undefined;
 }
 
 export interface SessionDataStore {
@@ -34,6 +45,12 @@ export interface SessionDataStore {
   sessionNamed(name: string | undefined): void;
   readStatusesFrom(read: () => ReadonlyMap<string, string>): void;
   turnEnded(): void;
+  /** A completed message: its cache miss and its dropped thinking, the miss winning a collision. */
+  messageEnded(message: MessageEndEvent["message"], readCachePerToken: number | undefined): void;
+  /** A compaction's billed usage, or nothing when it carries none. */
+  compactionEnded(usage: UsageOf | undefined): void;
+  /** A branch summary's billed usage, or nothing when it carries none. */
+  branchSummarised(usage: UsageOf | undefined): void;
   dispose(): void;
 }
 
@@ -63,6 +80,11 @@ export function createSessionDataStore(options: {
   requestRender: () => void;
   readUsage: () => { contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null };
   readEntries: () => SessionEntry[];
+  readBranch: () => SessionEntry[];
+  now: () => number;
+  schedule: (callback: () => void, delayMs: number) => () => void;
+  /** The visible time a notice takes from its arrival, or `undefined` when no row places a notice cell. */
+  noticeSeconds?: number;
 }): SessionDataStore {
   let provider = options.seed.provider;
   let model = options.seed.model;
@@ -76,6 +98,50 @@ export function createSessionDataStore(options: {
   let readEntries: typeof options.readEntries | undefined = options.readEntries;
   let readStatuses: (() => ReadonlyMap<string, string>) | undefined;
   let scanCache: { sessionId: string; leafId: string | null; totals: UsageTotals } | undefined;
+  let readBranch: (() => SessionEntry[]) | undefined = options.readBranch;
+  let now: (() => number) | undefined = options.now;
+  let schedule: ((callback: () => void, delayMs: number) => () => void) | undefined = options.schedule;
+  const noticeSeconds = options.noticeSeconds;
+  // One notice at a time: the slot, carrying the instant its arrival stamped, and the pending
+  // repaint's cancel. The instant lives on the datum, so the store has one home for it.
+  let notice: Timed<Notice> | undefined;
+  let cancelExpiry: (() => void) | undefined;
+
+  const cancelNotice = (): void => {
+    cancelExpiry?.();
+    cancelExpiry = undefined;
+  };
+
+  // A timer may not extend or shorten a notice: an early fire re-arms for the time left and
+  // requests nothing, and a fire at or past the instant requests the one repaint. The store never
+  // hides the datum, so the callback changes nothing it holds.
+  const armExpiry = (at: number): void => {
+    if (schedule === undefined || now === undefined) return;
+    cancelExpiry = schedule(() => {
+      if (now === undefined) return;
+      if (now() < at) {
+        armExpiry(at);
+        return;
+      }
+      // The handle has fired, so nothing is pending: the slot means a timer still to come, and a
+      // later cancel must call nothing that has already run.
+      cancelExpiry = undefined;
+      requestRender?.();
+    }, Math.max(0, at - now()));
+  };
+
+  const showNotice = (next: Notice): void => {
+    if (noticeSeconds === undefined || now === undefined || schedule === undefined) return;
+    cancelNotice();
+    // The one home of the instant: stamped on arrival, from the document's seconds.
+    const shownUntil = now() + noticeSeconds * 1_000;
+    notice = { ...next, shownUntil };
+    armExpiry(shownUntil);
+    // The arrival asks for its own repaint, as every push does: the living store spec has the store
+    // request it and forbids leaning on the host repainting for its own reasons. The instant's is a
+    // second, separate request.
+    requestRender?.();
+  };
 
   return {
     sample() {
@@ -83,6 +149,7 @@ export function createSessionDataStore(options: {
         return {
           provider: undefined, model: undefined, thinkingLevel: undefined, cwd: undefined, home: undefined,
           branch: undefined, sessionName: undefined, statuses: undefined, contextUsage: undefined, totals: undefined,
+          sampledAt: undefined,
         };
       }
       const { contextUsage, sessionId, leafId } = readUsage();
@@ -95,6 +162,9 @@ export function createSessionDataStore(options: {
         // The host's map is held raw; a map with nothing in it means no extension set a status.
         statuses: statuses === undefined || statuses.size === 0 ? undefined : statuses,
         contextUsage, totals: scanCache.totals,
+        // One instant per render, so two timed cells in one sample agree on when they are.
+        sampledAt: now === undefined ? undefined : now(),
+        ...(notice === undefined ? {} : { notice }),
       };
     },
     modelSelected(nextProvider, nextModel) {
@@ -127,6 +197,22 @@ export function createSessionDataStore(options: {
     readStatusesFrom(read) {
       readStatuses = read;
     },
+    messageEnded(message, readCachePerToken) {
+      if (requestRender === undefined || readEntries === undefined || readBranch === undefined) return;
+      if (message.role !== "assistant") return;
+      const next = messageNotice(message, readEntries(), readBranch(), readCachePerToken);
+      if (next !== undefined) showNotice(next);
+    },
+    compactionEnded(usage) {
+      if (requestRender === undefined) return;
+      const next = usageNotice("compaction", usage);
+      if (next !== undefined) showNotice(next);
+    },
+    branchSummarised(usage) {
+      if (requestRender === undefined) return;
+      const next = usageNotice("branchSummary", usage);
+      if (next !== undefined) showNotice(next);
+    },
     turnEnded() {
       if (requestRender === undefined) return;
       const previous = scanCache?.totals;
@@ -139,11 +225,16 @@ export function createSessionDataStore(options: {
     },
     dispose() {
       // These callbacks capture the old session; the host disposes us before invalidating it.
+      cancelNotice();
       requestRender = undefined;
       readUsage = undefined;
       readEntries = undefined;
+      readBranch = undefined;
+      now = undefined;
+      schedule = undefined;
       readStatuses = undefined;
       scanCache = undefined;
+      notice = undefined;
     },
   };
 }

@@ -1,0 +1,152 @@
+{
+  "verdict": "changes_requested",
+  "requirements": [
+    {
+      "requirement": "Joel 2026-11-10 'After the council': each notice's words are a configurable format, values are variables, defaults read as pi's English, no translations",
+      "evidence": "D5 declares six per-kind formats with `$tokens`/`$cost`/`$idle`/`$blocks`; the default table matches pi's strings at IM:3306-3315, 3349-3351, 3366-3380 (read in dist). The ruling is honoured in intent, but the mechanism D5 states does not run on the existing `resolveFormat` (see blocking finding).",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Joel 2026-11-10: footer on, pi setting off; Jefferson never reads or writes pi's settings; cache warm out",
+      "evidence": "Non-Goals and D1 flow: no `pi.getSettings()`, no warm subscription; `cache_warm` entry still becomes the previous request (cache-stats.js:66-76, verified). Delta spec scenario 'A cache warm completes' matches.",
+      "status": "met"
+    },
+    {
+      "requirement": "Earlier rulings: pi is the source of truth; don't invent; configure no more than necessary; default label word+colon; vocabulary",
+      "evidence": "Every input is an extension event or `ctx.sessionManager`/`ctx.modelRegistry` read; one new option `seconds` plus `formats`; default label `Notice:`; no 'module'/'widget' in design.md (rg).",
+      "status": "met"
+    },
+    {
+      "requirement": "My orientation D-a (process API injected at the root, `data/` names none) and D-b (datum enters via store+feed, subscriptions join the single release)",
+      "evidence": "D2 injects `now`/`schedule` beside `homedir`; D1 flow puts three subscriptions in the feed's `release`. Consistent with session-data-feed.ts:88-102 as it stands.",
+      "status": "met"
+    },
+    {
+      "requirement": "Living specs: no polling (statusline :348-353, store :299-301); store requests its own repaint (:192-198); freshness never exceeds host delivery (:72-75)",
+      "evidence": "D2 argues the one-shot timer is a scheduled change to held state, not a poll, and names what it revises (archive Non-Goal design.md:27; council.md:20,:68). Matches my orientation §1. Revision is narrow and cited.",
+      "status": "met"
+    },
+    {
+      "requirement": "Layout spec: `data/` imports nothing outside itself; instrument files import only instrument.ts/compact-count.ts/data types; growth follows an established pattern",
+      "evidence": "D1 places pi's rule in `data/notice.ts`; `components/instruments/notice.ts` imports only the `NoticeKind` type from data/. Verified spec text at extension-source-layout/spec.md:121-126, :245, :346-348. `data/notice.ts` is an ordinary module, no new root.",
+      "status": "met"
+    },
+    {
+      "requirement": "Store delta: the store holds the notice as `{kind, values}`, unknown while nothing shows; arrives only from a host event",
+      "evidence": "D1 defines `Readings.notice`, `NoticeKind` (6) and `NoticeValue` (4) in one file; unknown = `undefined`. Matches the delta requirement and existing `Reading` convention (session-data-store.ts:4-27).",
+      "status": "met"
+    },
+    {
+      "requirement": "Store delta: a notice comes from the event that carries its kind (`message_end`, `session_compact`, `session_tree`); aborted/error/non-assistant take none",
+      "evidence": "D1 flow names the three events; types.d.ts:614-615, :665-668, :849 verified. `message_end` fires before persistence (agent-session.js:752-767), so entries end at the previous message as pi's rule needs (cache-stats.js:107-110). The thinking-drop delta's host read is not named (major finding).",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Store delta: cache-miss notice is the miss pi names — noise floor, display gate, TTL, resets, price fallback, each constant once with pi file:line",
+      "evidence": "D1 table: CACHE_TTL_MS :5, NOISE_FLOOR 1024 :7/:24, gate 20_000/0.1 IM:3367, COST_SUFFIX_MIN 0.01 IM:3369/:3311 — all re-read in dist and correct. `ctx.modelRegistry.find` is `runtime.getModel` (model-registry.js:24-26), same object as pi's fallback.",
+      "status": "met"
+    },
+    {
+      "requirement": "Store delta: miss variant (model change over idle); dropped-thinking shows only when the count rises",
+      "evidence": "Variants are kinds in D5 with pi's precedence (IM:3371-3377). Thinking delta is in `data/notice.ts` per D1, but pi reads `getBranch()` (IM:3338-3346) while the store's only reader is `getEntries()`; design is silent on which the delta uses.",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Store delta: one notice at a time, newer replaces, full time from its own arrival, miss wins a same-message collision",
+      "evidence": "D7 states slot+handle, cancel on replace, in-memory resolution before scheduling, pi's order (IM:2864-2865 at 1.4.0, verified).",
+      "status": "met"
+    },
+    {
+      "requirement": "Store delta: subscriptions and timer exist only for a placed cell",
+      "evidence": "D3 gates on `noticeSeconds: number | undefined` computed from the rows the root installs. The reader currently binds cells to a nameless `Instrument` (configuration.ts:139-176; instrument.ts:9-12), so how `readConfiguration` detects a `notice` cell is unstated — folded into the D3 finding.",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Store delta: visible time comes from the root; a rejected document still leaves the declared default",
+      "evidence": "D3's `undefined` gate means a rejected document (default row, no notice cell) gives the store no visible time at all, yet D3's last paragraph and the spec scenario 'A rejected document' say the store holds the default and expires notices by it. No notice can arrive to observe it. Contradiction (major finding).",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Store delta: expiry on a root-supplied clock, one repaint, nothing asked of the host; pending expiry cleared with the release and on `session_shutdown`",
+      "evidence": "D2 clock-decides + one-shot schedule; `session_shutdown` → release closes the `ctx.reload()` gap I measured (agent-session.js:2998-3002 vs IM:366-368/:1898-1908). Measured Node 26: 1,000 `setTimeout` trials, 0 fired before `Date.now() >= deadline`; the clock named (`Date.now`) is not monotonic (minor finding).",
+      "status": "met"
+    },
+    {
+      "requirement": "Statusline delta: `notice` instrument declaring `$notice`, label `Notice:`, nothing (label included) while unknown, width-independent, one line",
+      "evidence": "D5 and the spec agree on `$notice` only, but D5's text puts `$tokens`/`$cost`/`$idle`/`$blocks` 'on the notice declaration' too. `resolveFormat` (format.ts:190-195) returns `\"\"` when ANY declared variable is unknown, and the spec at statusline/spec.md:1130-1133 requires exactly that — so a compaction notice (no `idle`, no `blocks` in `values`) renders nothing even with the default format. Blocking.",
+      "status": "must_change"
+    },
+    {
+      "requirement": "Statusline delta: default text is pi's text, `formatTokens` rounding, cost suffix; `warning` colour for every kind",
+      "evidence": "formatTokens (footer.js:20-30) copied; `$cost` carries pi's leading space and parentheses; `collapse` (format.ts:37) replaces control chars only, so the leading space survives. `variableFg` on `$notice` → `warning` overrides a configured fg (format.ts:232-236), matching the spec's MUST.",
+      "status": "met"
+    },
+    {
+      "requirement": "Statusline delta: `seconds` whole number 1..60, default 10, rejected in `rowGap`'s shape",
+      "evidence": "D6 mirrors configuration.ts:257-263 and the top-level catch at :334-342. Bounds reasoned (1 = never shows; 60 catches milliseconds). Default is an explicit assumption for the live check.",
+      "status": "met"
+    },
+    {
+      "requirement": "D4: `readConfiguration` moves before `feedSessionData` safely",
+      "evidence": "Read configuration.ts:290-343 and startup.ts: the reader takes only `source` (paths from `ctx.cwd`, trust, `ctx.ui.theme`) and builds its own `instrumentBindings()`; no feed or store reference. Addendum 2 is correct.",
+      "status": "met"
+    },
+    {
+      "requirement": "D8: boundary tests on Jefferson's module, no test reads pi's files",
+      "evidence": "Boundary list covers every constant and branch in the D1 table; Matt/Neil's drift-test rejection is cited and sound. Whether each test fails on branch deletion is the tasks/implementation gate's to run.",
+      "status": "met"
+    },
+    {
+      "requirement": "D9: docs pass after the implementation gate; no Markdown task in the build",
+      "evidence": "README/ARCHITECTURE/AGENTS/two ADRs listed for Bambadjan's pass; consistent with the Non-Goal that no ADR retires the archived Non-Goal.",
+      "status": "met"
+    },
+    {
+      "requirement": "Spec alignment both ways: every delta requirement has a design decision and nothing is built unasked",
+      "evidence": "Mapped each of the 9 store and 5 statusline delta requirements to D1-D8; the `composed` field, plain parse/resolve mode and `formats` option trace to Joel's configurable-text ruling; `session_shutdown` traces to T5 and the delta's 'A shutdown that disposes no footer'. `openspec validate --changes --strict` passes (run).",
+      "status": "met"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "blocking",
+      "location": "design.md D5, 'The variables' table and change 1 (`instrument.ts`), against format.ts:190-195 and statusline/spec.md:1130-1133",
+      "finding": "D5 declares `$tokens`, `$cost`, `$idle`, `$blocks` and `$notice` on the `notice` declaration. The existing `resolveFormat` iterates `declaration.variables` and returns `\"\"` the moment any declared variable resolves `undefined`, and the living spec requires exactly that ('the store reads one of its declared data as unknown → the cell renders nothing, whatever the format is'). D1 says a value the kind does not carry is absent from `values`. So every compaction, branch-summary and thinking notice — and every miss, which carries no `blocks` — renders nothing, label included, even with the default `$notice` format. The premise does not run. The design is also silent on how the binding 'hands that text to the cell's format as the value of composed.variable' when resolvers only receive `Readings`.",
+      "required_change": "State the variable contract so it runs: `declaration.variables` carries only `notice`; the four value variables are declared on `composed` (e.g. `composed.variables: Record<string, (readings) => string | undefined>`), the plain parse mode validates a kind's format against that set (and rejects `$notice` there), and the binding supplies the composed text as the `notice` value — name the seam (a `resolveFormat` parameter for pre-resolved values, or the binding wrapping the declaration's `notice` resolver). Say what a value absent from `values` renders in a kind's format (`\"\"`, since only the notice is unknown). Then re-check the delta spec's 'A notice's text is a format with declared variables' wording still fits.",
+      "required_change_ran": false
+    },
+    {
+      "severity": "major",
+      "location": "design.md D3, last two paragraphs; specs/session-data-store/spec.md 'The store's visible time comes from the composition root', scenario 'A rejected document'",
+      "finding": "D3 defines `noticeSeconds` as `undefined` whenever no installed row places a `notice` cell, and `undefined` means no subscription, no scan record, no timer. A rejected document installs the default row, which places none, so the store receives `undefined`. D3 then says 'the store still holds the declared default visible time for a notice it will never see', and the spec requires 'a document the configuration rejects MUST still leave the store the declared default visible time' with a scenario asserting expiry by it. The two statements contradict, and the scenario is unobservable: no notice can arrive. Deletion test: nothing breaks if the clause goes. D3 also never says how the reader knows a cell is `notice` — `Cell` holds a nameless bound `Instrument` (configuration.ts:139-176, instrument.ts:9-12).",
+      "required_change": "Remove the spec clause and the 'A rejected document' scenario, or restate them as 'a rejected document installs the default row, which places no notice cell, so the gate is off' under the gating requirement; strike D3's sentence that the store 'still holds the declared default'. Add to D3 how placement is detected (compare the resolved declaration to the imported `notice` declaration in `cellsFromNames`, counting only cells inside the ceiling, or carry the declaration name on `Cell`) and where the default seconds constant is imported from.",
+      "required_change_ran": false
+    },
+    {
+      "severity": "major",
+      "location": "design.md D1, 'Flow' → `message_end`, and the thinking-drop delta in `data/notice.ts`; against interactive-mode.js:3338-3346 and spec 'A dropped-thinking notice shows only when its count rises'",
+      "finding": "pi derives the previous count from `this.sessionManager.getBranch()` — the branch's last assistant message — while pi's miss scan reads `getEntries()` (IM:3362). The store's only entry reader is `readEntries: () => ctx.sessionManager.getEntries()`. The design states the delta rule but not which host read supplies the previous assistant message; from `getEntries()` the last assistant message may sit on an abandoned branch after `/tree` navigation, so the notice fires when pi's would not, or stays silent when pi's fires. The D8 boundary test ('count rising vs repeating') feeds the module a previous count and cannot catch the wrong source.",
+      "required_change": "Name the read: the feed supplies `readBranch: () => ctx.sessionManager.getBranch()` (on `ReadonlySessionManager`, session-manager.d.ts:178, verified) beside `readEntries`, and the `message_end` handler passes the branch to the thinking-drop step while the miss step keeps `getEntries()`, as pi does. Add the input that makes the two sources differ (an assistant message on a sibling branch with a higher count) to D8.",
+      "required_change_ran": false
+    },
+    {
+      "severity": "minor",
+      "location": "design.md D2, 'Two readers, because they do two jobs' and 'A timer that fires early, late or twice cannot extend or shorten a notice'",
+      "finding": "With the clock deciding and the timer only repainting, a callback that runs while `now() < deadline` leaves the notice showing with no further repaint scheduled until the host renders for its own reasons — the failure D2 rejects the lazy-drop alternative for. I measured 1,000 `setTimeout` trials on Node 26 and none fired before `Date.now() >= deadline`, so the timer is not the exposure; `Date.now` is: it is wall-clock and steps (sleep/NTP), and `performance.now()` is monotonic at the same cost.",
+      "required_change": "Name the root's clock as `performance.now` (monotonic) rather than `Date.now`, and state the early-fire consequence honestly in D2, or have the callback re-arm for `deadline - now()` when it finds the deadline not yet reached. Documentation-plus-one-identifier change; Derek can carry it under D2.",
+      "required_change_ran": false
+    }
+  ],
+  "later_gates": [
+    "PL7: each D8 boundary test names the input that makes right and wrong answers differ, and the branch-deletion red for each is stated; the width-0 guard's expected list in tests/instrument.test.ts:337-361 gains `notice`.",
+    "PL7/implementation: the `readConfiguration` reorder lands as its own commit with the suite green on both sides (D4).",
+    "Implementation: `data/notice.ts` imports nothing outside `data/`; `components/instruments/notice.ts` imports only `instrument.ts` and a `data/` type; the `shortcut:` comment and the five constants carry pi 1.4.0 file:line as the D1 table states.",
+    "Implementation: the `session_shutdown` handler runs the same idempotent release, verified by a test that fires shutdown with a pending expiry and asserts no repaint.",
+    "Joel's live check: the 10-second default, the 1..60 bounds, the `Notice:` label and whether a token-step fade follows."
+  ],
+  "not_covered": [
+    "I did not re-derive pi's `countDroppedThinkingBlocks` body (IM:3316-3329) against `pi-ai`'s diagnostics shape; Chidi's reading stands unchecked by me.",
+    "Render cost of a `notice` row re-seating against a `$bar` cell was not measured; ADR 0007 covers the behaviour.",
+    "The 1.5.2 vs 1.4.0 equivalence of notice code was taken from my orientation's earlier diff of the three methods and footer.js; not re-run this pass."
+  ]
+}

@@ -2,7 +2,8 @@
 import type { ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
-import { collapse, parseFormat, resolveFormat, type FormatSegment } from "../../format.ts";
+import { timed } from "../visuals/timed.ts";
+import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 
@@ -10,6 +11,8 @@ export interface ConfiguredInstrument {
   segments: FormatSegment[];
   style: ThemeStyle;
   label?: string;
+  /** A composed format set's configured text, by key; the declaration's defaults fill the rest. */
+  formats?: Record<string, FormatSegment[]>;
 }
 
 export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
@@ -27,10 +30,32 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
       const gap = label !== "" && segments.length > 0 ? " " : "";
       const labelled: FormatSegment[] = label === "" ? segments
         : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
+      // A composed declaration's kind formats parse once, at the bind: the defaults here and
+      // the document's overrides already parsed by the configuration reader.
+      const composed = declaration.composed;
+      const plain: Readonly<Record<string, FormatSegment[]>> = composed === undefined ? {}
+        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, true)]));
       instrument = {
         // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
         fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),
-        render: (readings, width, renderTheme) => resolveFormat(declaration, labelled, style, readings, width, renderTheme),
+        render: (readings, width, renderTheme) => {
+          let preResolved: Record<string, string> | undefined;
+          if (composed !== undefined) {
+            const key = composed.select(readings);
+            const chosen = key === undefined ? undefined : entry?.formats?.[key] ?? plain[key];
+            const composedText = chosen === undefined ? "" : resolvePlain(declaration, chosen, readings);
+            // An empty kind text silences the kind (D5, Joel's 2026-11-11 ruling): nothing to compose
+            // is the unknown rule's nothing, so the cell drops its label and gap rather than rendering
+            // a bare label, which is what an absent value would otherwise do.
+            if (composedText !== "") preResolved = { [composed.variable]: composedText };
+          }
+          const text = resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
+          // A timed declaration's whole text shows or hides: nothing to show renders as nothing,
+          // so the cell drops its label and gap as it does for an unknown datum.
+          return declaration.shownUntil === undefined
+            ? text
+            : timed(text, declaration.shownUntil(readings), readings.sampledAt) ?? "";
+        },
       };
       bound.set(declaration.name, instrument);
     }

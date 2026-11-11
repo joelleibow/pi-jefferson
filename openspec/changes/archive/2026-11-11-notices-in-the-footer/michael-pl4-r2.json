@@ -1,0 +1,68 @@
+{
+  "findings": [
+    {
+      "finding": "D2 reads 'whose callback requests a repaint and re-arms for the time left when it finds the deadline still ahead'. Read one way, an early fire both repaints (wasted: `sample()` sees `now() < deadline` and keeps the notice) and re-arms, giving two repaints per notice where the delta spec's scenario 'The visible time is over' says one. Read the other way, the early path only re-arms. The sentence must pick one.",
+      "location": "design.md D2, paragraph 'Two readers, because they do two jobs'",
+      "required_change": "Restate the callback as two branches: deadline still ahead → re-arm for `deadline - now()` and request nothing; otherwise → request the one repaint. One sentence; the tasks gate then pins the early-fire test to zero repaints.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "D3 has `configuration.ts` import `components/instruments/notice.ts` for the declaration and `NOTICE_SECONDS`. The living layout spec's scenario 'Who names the instruments' (extension-source-layout/spec.md:360-364) says the importers are `shipped.ts`, `configuration.ts` '(for the fallback `blank`)' and the tests. The set of files is unchanged, as D3 says, but the parenthetical becomes incomplete, and proposal.md states that spec 'needs no delta'.",
+      "location": "design.md D3 'Placement is read from the rows'; openspec/specs/extension-source-layout/spec.md:360-364; proposal.md 'Capabilities'",
+      "required_change": "Either add a one-scenario MODIFIED delta for `extension-source-layout` widening the parenthetical to 'for the fallback `blank` and the `notice` declaration it gates on', or note in proposal.md Impact that the archive's spec sync edits that parenthetical. Spec-text remedy only; ships with it either way.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "PL7: the early-fire test asserts zero repaints and one re-arm on a fake clock; the sibling-branch thinking test names the two sources (entries vs branch) and the count that makes them disagree; each D8 boundary names its deletion red.",
+    "PL7/implementation: `resolveFormat`'s pre-resolved parameter is checked before the declaration's resolver runs (else the `notice` resolver's `undefined` blanks the cell); the parameter has exactly one caller, the binding.",
+    "Implementation: `readConfiguration` returns `noticeSeconds` from installed rows only (cells past the ten-cell ceiling excluded); `data/notice.ts` imports nothing outside `data/`; `components/instruments/notice.ts` imports `instrument.ts` and a `data/` type only; `performance.now` and the `setTimeout` closure appear only in `startup.ts`.",
+    "Implementation: the width-0 guard's expected list gains `notice`; the reorder of `readConfiguration` lands as its own green-to-green commit.",
+    "Joel's live check: the 10-second default, 1..60 bounds, `Notice:` label, and whether a fade follows."
+  ],
+  "not_covered": [
+    "I did not re-run the Node timer measurement from round 1; the re-arm now covers the early case regardless.",
+    "pi's `countDroppedThinkingBlocks` body (IM:3316-3329) against `pi-ai` diagnostics remains Chidi's reading, not re-derived.",
+    "Render cost of row re-seating on notice arrival/expiry was not measured."
+  ],
+  "requirements": [
+    {
+      "evidence": "Re-read D1 datum, D5 'two vocabularies', changes 1, 3, 4 and Consequences. `declaration.variables` = `notice` only (resolver yields `undefined`); four values on `composed.variables`; plain parse validates against that set and rejects `$notice` inside a kind's format; `resolvePlain` joins absent as `\"\"`; `resolveFormat` takes pre-resolved values with precedence. Against format.ts:190-195 and statusline spec :1130-1133 this now runs: the only `undefined` that can blank the cell is `notice` itself. Delta spec wording 'variables the declaration carries' still holds since `composed` is on the declaration.",
+      "requirement": "Round-1 blocking: the variable contract must run on the existing unknown-datum rule",
+      "status": "met"
+    },
+    {
+      "evidence": "D3 drops the 'still holds the declared default' sentence; rejected document → default row → `undefined` → gate off. Spec diff (git diff) moves the rejected case under the gating requirement with a new scenario and 'MUST take no visible time', removes the untestable clause/scenario, adds 'No visible time configured'. Placement detection stated: `cellsFromNames` compares resolved declaration to the imported `notice` declaration within the ceiling; `NOTICE_SECONDS` exported beside the declaration. configuration.ts already imports `blank`'s file (configuration.ts:20), so the importer set is unchanged.",
+      "requirement": "Round-1 major: D3 vs spec contradiction and unobservable scenario; placement detection unstated",
+      "status": "met"
+    },
+    {
+      "evidence": "D1 Flow now names `readBranch: () => ctx.sessionManager.getBranch()` beside `readEntries`, branch to the thinking step and entries to the miss step, citing IM:3362 and :3338-3346 (both verified round 1) and `ReadonlySessionManager` at session-manager.d.ts:178 (verified: `getBranch` is in the Pick). D2 opener and Consequences carry the reader; D8 adds the sibling-branch input.",
+      "requirement": "Round-1 major: the thinking-drop delta's host read",
+      "status": "met"
+    },
+    {
+      "evidence": "D2 names `performance.now` with the wall-clock-steps reason (global in Node, verified `typeof performance.now()` = number) and adds a re-arm on early fire. Sentence ambiguity on whether the early path also repaints — minor finding.",
+      "requirement": "Round-1 minor: monotonic clock / early-fire consequence",
+      "status": "met"
+    },
+    {
+      "evidence": "Diffed `specs/session-data-store/spec.md`: only the gating and visible-time requirements changed, as reported; `openspec validate --changes --strict` passes (run). statusline delta untouched and still consistent with D5 (`$notice` sole cell variable).",
+      "requirement": "Spec alignment both ways after the edits",
+      "status": "met"
+    },
+    {
+      "evidence": "D5 unchanged in intent: six per-kind formats, values as variables with pi's formatting, defaults pi's text; the split only decides which format may name which set.",
+      "requirement": "Joel's configurable-text ruling, footer-on/pi-off, warm out, D-a/D-b, no-polling rules",
+      "status": "met"
+    },
+    {
+      "evidence": "D4, D6, D7, D9, Risks, Migration re-read; no contradiction introduced by the round-2 edits. D6 now points at `NOTICE_SECONDS` in the instrument's file, one home for the default.",
+      "requirement": "Decisions untouched by the findings (D4, D6, D7, D9) still consistent",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

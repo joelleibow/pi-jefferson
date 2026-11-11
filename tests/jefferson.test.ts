@@ -133,11 +133,13 @@ function harness(): Harness {
         model: options.model,
         thinkingLevel: options.thinkingLevel,
         getContextUsage: () => { session.reads.usage++; return session.host.contextUsage; },
+        modelRegistry: { find: () => undefined },
         sessionManager: {
           getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
           getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
           getSessionName: () => session.host.sessionName,
           getEntries: () => { session.reads.entries++; return session.host.entries; },
+          getBranch: () => session.host.entries,
         },
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
@@ -250,6 +252,17 @@ test("outside TUI mode the jefferson command reports that no footer is installed
   const notified: string[] = [];
   await def.handler("", { ui: { notify: (message) => void notified.push(message) } });
   assert.deepEqual(notified, ["pi-jefferson — no statusline footer is installed."]);
+});
+
+test("a session_shutdown runs the release, so the session's subscriptions are taken", async (t) => {
+  const pi = harness();
+  const session = await pi.start();
+  const events = session.subscriptions.map((subscription) => subscription.event);
+  for (const subscription of session.subscriptions) assert.equal(subscription.calls, 0, `${subscription.event} is held`);
+  pi.dispatch({ type: "session_shutdown", reason: "reload" });
+  for (const subscription of session.subscriptions) assert.equal(subscription.calls, 1, `${subscription.event} is released`);
+  assert.ok(events.length > 0, "the session subscribed to its events");
+  t.diagnostic(events.join(", "));
 });
 
 test("the session_start handler installs the footer in TUI mode", async (t) => {
@@ -396,8 +409,10 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/instruments/branch.ts", ["branch"]],
     ["../extensions/jefferson/components/instruments/session.ts", ["session"]],
     ["../extensions/jefferson/components/instruments/status.ts", ["status"]],
+    ["../extensions/jefferson/components/instruments/notice.ts", ["NOTICE_SECONDS", "notice"]],
     ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
+    ["../extensions/jefferson/components/visuals/timed.ts", ["timed"]],
   ];
   const pinnedModules = new Map<string, Record<string, unknown>>();
   for (const [path, expected] of pinned) {
@@ -406,11 +421,12 @@ test("the exported surface offers no way to supply or replace cell content", asy
     assert.deepEqual(Object.keys(module).sort(), expected, path);
   }
 
-  // The store and the format language are scanned, not pinned: their keys are their own business,
-  // and neither gives a caller a way to supply cell content.
+  // The store, the format language and pi's notice rule are scanned, not pinned: their keys are
+  // their own business, and none gives a caller a way to supply cell content.
   const store = await import("../extensions/jefferson/data/session-data-store.ts");
   const format = await import("../extensions/jefferson/format.ts");
-  for (const exports of [...pinnedModules.values(), store, format]) {
+  const notice = await import("../extensions/jefferson/data/notice.ts");
+  for (const exports of [...pinnedModules.values(), store, format, notice]) {
     for (const key of Object.keys(exports)) {
       assert.ok(
         !/register|supply|contribute/i.test(key),
@@ -419,8 +435,12 @@ test("the exported surface offers no way to supply or replace cell content", asy
     }
   }
 
-  // Every shipped source file joins the pin: one of its rows, or the scanned-only pair above.
-  const scannedOnly = ["../extensions/jefferson/data/session-data-store.ts", "../extensions/jefferson/format.ts"];
+  // Every shipped source file joins the pin: one of its rows, or the scanned-only set above.
+  const scannedOnly = [
+    "../extensions/jefferson/data/session-data-store.ts",
+    "../extensions/jefferson/format.ts",
+    "../extensions/jefferson/data/notice.ts",
+  ];
   const covered = [...pinned.map(([path]) => path), ...scannedOnly].sort();
   const shippedFiles = readdirSync(join(import.meta.dirname, "..", "extensions"), { recursive: true })
     .map(String)
@@ -467,6 +487,31 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
     assert.deepEqual(session.notified, []);
   });
 }
+
+test("a session placing a notice cell takes the three notice subscriptions, and the message_end shows it", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "notice" }] });
+  const pi = harness();
+  const session = await pi.start();
+  assert.deepEqual(session.subscriptions.map((subscription) => subscription.event), [
+    "model_select", "thinking_level_select", "turn_end", "session_info_changed",
+    "message_end", "session_compact", "session_tree",
+  ]);
+  const previous = { type: "message", id: "previous", parentId: null, timestamp: "2026-11-10T00:00:00.000Z",
+    message: { role: "assistant", api: "anthropic", provider: "anthropic", model: "claude-opus-4",
+      content: [], stopReason: "stop", timestamp: 0,
+      usage: { input: 20_000, output: 0, cacheRead: 80_000, cacheWrite: 0, totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } } as SessionEntry;
+  session.host.entries = [previous];
+  pi.dispatch({ type: "message_end", message: { role: "assistant", api: "anthropic", provider: "anthropic",
+    model: "claude-opus-4", content: [], stopReason: "stop", timestamp: 0,
+    usage: { input: 20_000, output: 0, cacheRead: 80_000, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0.1, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.1 } } } });
+  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Notice: Cache miss: 20k tokens re-billed (~$0.10)"),
+    "the notice reaches the footer's cell");
+  // The expiry's real timer would hold the process; the shutdown's release clears it.
+  pi.dispatch({ type: "session_shutdown", reason: "test" });
+});
 
 test("in TUI mode a session takes exactly the four subscriptions it names", async (t) => {
   useTempAgentDir(t);

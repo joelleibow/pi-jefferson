@@ -1,0 +1,66 @@
+{
+  "findings": [
+    {
+      "finding": "Assertion message at tests/session-data-store.test.ts:587 says 'the first's handle was cancelled at its own deadline'; the vocabulary is now the instant, and the handle is cancelled on replacement, not at any deadline. Derek flagged it and left it to avoid an unnamed removed line in 9.5's range. A message only, no behaviour.",
+      "location": "tests/session-data-store.test.ts:587",
+      "required_change": "Reword to 'the first's handle was cancelled when the second arrived' in its own one-line commit, with 9.5 re-measured (the range then shows 21 removed lines, the 21st being this message). Ship with it otherwise.",
+      "required_change_ran": false,
+      "severity": "minor"
+    },
+    {
+      "finding": "After the expiry callback fires at the instant and requests the repaint, `cancelExpiry` keeps the fired timer's cancel until the next arrival or dispose. `clearTimeout` on a fired handle is a no-op, so nothing misbehaves, and the spec's 'no pending repaint after release' holds; the closure is simply stale. Noted so no later reader mistakes it for a pending timer.",
+      "location": "extensions/jefferson/data/session-data-store.ts armExpiry callback (:118-127)",
+      "required_change": "Optionally `cancelExpiry = undefined;` before `requestRender?.()` in the fired branch. Documentation-level tidiness; no test moves. Not run.",
+      "required_change_ran": false,
+      "severity": "minor"
+    }
+  ],
+  "later_gates": [
+    "Docs pass (Bambadjan): Derek's list — README:101-102, :184-185, :234/:237 (`missIdle`/`thinking` defaults, `thinkingOne` row), :248-249; ADR 0003's escape claims pointed at the new ADR; ARCHITECTURE.md :21, :37-38, :60, :69, :114-116, :143-149 (visuals/ holds two files, the binding imports a visual, `sampledAt`/`shownUntil`, the store never hides); AGENTS.md's owed additions; ADR 0013 (visual) and ADR 0014 (escape).",
+    "Sync: the statusline delta MODIFIES 'An instrument's format is plain text and variables' (living spec :750 still states the two-character escape); `checks/specs.sh` PASS after the sync.",
+    "Joel's live check 9.7: the notice vanishing at the instant, `6m` through the default, `1 thinking block` singular, and whether a fade follows."
+  ],
+  "not_covered": [
+    "7.4's reverted-file counts I accepted on Derek's table this round (two files were spot-checked on the spike last gate); the branch's testdiff over `0d6cd85..HEAD` I measured myself.",
+    "No live pi, no real `setTimeout`, no CI; row re-seat cost unmeasured.",
+    "I ran no /tmp worktree and no install, per the brief; every plant was in place with a single-file `git checkout --`, and the tree is clean (porcelain 0)."
+  ],
+  "requirements": [
+    {
+      "evidence": "Diff 0d6cd85...HEAD: 17 files — timed.ts new; binding, contract, notice instrument, data/notice.ts, store, format.ts; nine test files; tasks.md ticks only (diff shows no non-tick line); checks/ unchanged (imports.mjs already carried VISUAL IMPORTS). scope.sh PASS for 62cacf5 with 8.7's list and for 0887ffe with tasks.md alone. Groups 7+8 one commit as tasks.md instructs; 9.7 alone unticked. No suppression comments, no Markdown but tasks.md.",
+      "requirement": "Contract adherence: every change maps to a task, ticks match code, scope holds",
+      "status": "met"
+    },
+    {
+      "evidence": "`components/visuals/timed.ts` is the consult's signature, pure, imports nothing (imports.mjs PASS; planted `format.ts` import → `VISUAL IMPORTS … IMPORTS FAIL`, run by me). Declaration gains `shownUntil?`; binding applies `timed(…) ?? \"\"` after `resolveFormat`; notice declares only `readings => readings.notice?.shownUntil`. Mutations re-run red by me: `<=` (2 fail), `return text;`, `shownUntil` line removed.",
+      "requirement": "D10: the timed show-and-hide is a visual, composed by a declaration field",
+      "status": "met"
+    },
+    {
+      "evidence": "Store: `Timed<T>` beside `Readings`; `notice?: Timed<Notice>`; `sampledAt` read once per sample, `undefined` after dispose; `showNotice` stamps `shownUntil = now() + seconds×1000` once and arms; callback re-arms early or only repaints; the sample-time drop and the callback's clear are gone; `cancelNotice` on replacement and dispose. Matches the store delta's two requirements. The fired-handle stale closure is a minor note.",
+      "requirement": "D2/D10: the store stamps and repaints, never hides; `sampledAt` per render",
+      "status": "met"
+    },
+    {
+      "evidence": "`NoticeKind` seven members; `values.idle` bare; `blocks` bare with kind by `dropped === 1`; defaults `thinking`/`thinkingOne` and `missIdle` `$idle\\m`; `$cost`/`$tokens` untouched. Mutations re-run red by me: noun planted back (2 fail), `}m` on idle, plural `thinkingOne` (Derek), `if (false)` on the key check.",
+      "requirement": "D5 and Joel's 'After the docs pass': bare values, kind by grammatical number, `$idle\\m`",
+      "status": "met"
+    },
+    {
+      "evidence": "format.ts: `format[index + 1] !== undefined` with the trailing-backslash comment; old rule planted back → 5 selected, 3 fail, 2 pass (run by me), matching 8.4's corrected count. 8.6's audit re-run over the branch tree (890 lines, none found, five classes, Joel's document read not edited) — accepted on Derek's classification; I did not re-grep.",
+      "requirement": "D11: `\\` escapes any character; the audit",
+      "status": "met"
+    },
+    {
+      "evidence": "suite.sh 424 PASS, imports 28/52 PASS, terminal PASS, tarball 28 PASS, specs.sh PASS (472/386/480), testdiff `b9668d9..HEAD` = the three shipped-declarations lines and `0d6cd85..HEAD` = exactly 20 removed assertion lines, all under tests/ (run by me, matching 9.5's text). 9.5's tick stands on the branch's range, which is the right range: `162ff07` predates the gate fixes.",
+      "requirement": "Group 9 spanning checks and 9.5's tick",
+      "status": "met"
+    },
+    {
+      "evidence": "Derek's seven differences are each a measurement or a range choice, not a decision: one commit for 7+8 (tasks.md's instruction), 9.5's branch range, 472 vs 470, 890 vs 776, 8.7's red over an existing commit (the brief forbade a scratch commit), the merged test name, the stale message he flagged (minor finding 1).",
+      "requirement": "Differences from tasks.md are measurements, not silent scope changes",
+      "status": "met"
+    }
+  ],
+  "verdict": "approve"
+}

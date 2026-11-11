@@ -42,6 +42,37 @@ extension.
    the width unless it fills. The test in `tests/instrument.test.ts` that compares width 0 with width
    200 across the shipped instruments fails when one breaks this.
 5. Add a test that proves the cell renders it, and one that proves alignment still applies.
+6. A visual lives in `extensions/jefferson/components/visuals/` and imports no file of this package;
+   `format.ts` or a declaration mixes it in. An instrument whose datum shows for a time declares
+   `shownUntil` on its declaration rather than keeping time or subscribing: binding hands the resolved
+   text to the timed visual with the render's `sampledAt`, and past that instant the cell renders
+   nothing, label included.
+
+## Adding a notice kind
+
+One notice kind is one line pi's transcript draws. To add one, add a member of `NoticeKind` in
+`extensions/jefferson/data/notice.ts`, one entry in `FORMATS` in
+`extensions/jefferson/components/instruments/notice.ts`, and a subscription in
+`extensions/jefferson/data/session-data-feed.ts` only if a host event carries the kind. Every
+subscription joins the feed's one release, and the whole notice path stays dormant while no row places
+a `notice` cell.
+
+Two things a new kind must not break. **A kind's format is plain:** it names the values (`$tokens`,
+`$cost`, `$idle`, `$blocks`) and takes no modifier and no form, because styling belongs to the cell and
+an inner reset would drop the notice's `warning` foreground. **The declaration's two variable sets are
+not interchangeable:** `variables` holds `$notice`, the cell's format, and `composed.variables` holds
+the values a kind's format names. A `formats` entry that names `$notice`, or a cell's format that names
+`$tokens`, rejects the document. [ADR 0012](docs/adr/0012-a-composed-format-is-chosen-by-a-reading.md)
+says why the sets are split.
+
+A kind's text carries the noun or the unit; a value carries the number. `$blocks` is `2` and `$idle`
+is `6`, because an English word inside a value is what a user writing their own words would have to
+work around, and the notice has two thinking kinds only because pi writes `thinking block` for one.
+
+`data/notice.ts` copies pi's rule. Its header carries the pin, `shortcut: copies pi 1.4.0's rule;
+drift in the user's global pi between pin bumps is invisible, re-check on every pin bump`, so check
+every constant and every rule against pi's own files when the pin moves, and move the pin in that
+comment.
 
 ## Testing the footer's height
 

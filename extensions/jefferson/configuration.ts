@@ -18,6 +18,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import { blank } from "./components/instruments/blank.ts";
+import { NOTICE_SECONDS, notice } from "./components/instruments/notice.ts";
 import { instrumentNamed } from "./shipped.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./components/row/row.ts";
@@ -56,6 +57,11 @@ export interface Configuration {
   /** The empty lines the footer renders between each pair of rows. */
   rowGap: number;
   /**
+   * The visible time a notice takes, or `undefined` when no row places a `notice` cell. The
+   * composition root passes it to the feed, which takes no notice and holds no timer without it.
+   */
+  noticeSeconds: number | undefined;
+  /**
    * Set when a present document was rejected, and also when an accepted document has
    * something to report: instruments the extension does not implement, or a `containers` key.
    */
@@ -76,9 +82,18 @@ interface Notices {
   unknownInstruments: Set<string>;
 }
 
-function readInstruments(raw: unknown, theme: Theme, notices: Notices): ReadonlyMap<string, ConfiguredInstrument> {
+/** What a document says about its instruments: the binding's inputs, and the reader's own share. */
+interface InstrumentConfiguration {
+  /** Each declaration's parsed format, style, label and kind formats. */
+  configured: ReadonlyMap<string, ConfiguredInstrument>;
+  /** Each declaration's declared visible time, by name: the reader's share, never the binding's. */
+  declaredSeconds: ReadonlyMap<string, number>;
+}
+
+function readInstruments(raw: unknown, theme: Theme, notices: Notices): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
-  if (raw === undefined) return configured;
+  const declaredSeconds = new Map<string, number>();
+  if (raw === undefined) return { configured, declaredSeconds };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration("the instruments value is not an object");
   }
@@ -112,6 +127,33 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
     if (label !== undefined && typeof label !== "string") {
       throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has a label that is not a string`);
     }
+    // `seconds` and `formats` are a composed instrument's two options; a plain one cannot carry them.
+    const seconds = entry.seconds;
+    if (seconds !== undefined
+      && (typeof seconds !== "number" || !Number.isInteger(seconds) || seconds < 1 || seconds > 60)) {
+      throw new RejectedConfiguration(`seconds must be a whole number from 1 to 60: ${JSON.stringify(seconds)}`);
+    }
+    let formats: Record<string, FormatSegment[]> | undefined;
+    if (entry.formats !== undefined) {
+      if (typeof entry.formats !== "object" || entry.formats === null || Array.isArray(entry.formats)) {
+        throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has formats that is not an object`);
+      }
+      formats = {};
+      for (const [kind, format] of Object.entries(entry.formats)) {
+        if (declaration.composed === undefined || !Object.hasOwn(declaration.composed.formats, kind)) {
+          throw new RejectedConfiguration(`instrument ${JSON.stringify(name)}'s formats names a kind it does not carry: ${JSON.stringify(kind)}`);
+        }
+        if (typeof format !== "string") {
+          throw new RejectedConfiguration(`instrument ${JSON.stringify(name)}'s formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
+        }
+        try {
+          formats[kind] = parseFormat(declaration, format, true);
+        } catch (error) {
+          if (error instanceof Error) throw new RejectedConfiguration(error.message);
+          throw error;
+        }
+      }
+    }
     let style: ThemeStyle;
     try {
       style = validateStyle(entry.style, theme);
@@ -119,9 +161,15 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Readonly
       if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(declaration.name)} ${error.message}`);
       throw error;
     }
-    configured.set(declaration.name, label === undefined ? { segments, style } : { segments, style, label });
+    configured.set(declaration.name, {
+      segments, style,
+      ...(label === undefined ? {} : { label }),
+      ...(formats === undefined ? {} : { formats }),
+    });
+    // The visible time is the reader's, not the binding's: the binding renders, the reader gates.
+    if (seconds !== undefined) declaredSeconds.set(declaration.name, seconds);
   }
-  return configured;
+  return { configured, declaredSeconds };
 }
 
 function defaultRow(bind: BindInstrument): Row {
@@ -219,10 +267,11 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
   return { id, distribution, cells };
 }
 
-/** A document's rows, and the empty lines its footer renders between them. */
+/** A document's rows, the empty lines its footer renders between them, and its notice's time. */
 interface NormalizedDocument {
   rows: Row[];
   rowGap: number;
+  noticeSeconds: number | undefined;
 }
 
 /** Normalize the document: one top-level row, or a list under `rows`; never both. */
@@ -264,10 +313,15 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     rowGap = value;
   }
 
-  const bind = instrumentBindings(readInstruments(doc.instruments, theme, notices));
-  if (rawRows.length === 0) return { rows: [defaultRow(bind)], rowGap };
-
-  const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, theme, notices);
+  const bind = instrumentBindings(configured);
+  const rows = rawRows.length === 0
+    ? [defaultRow(bind)]
+    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
+  // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
+  // The default row goes through it too, so the gate and the value cannot disagree about it.
+  const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
+  const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
   const seen = new Set<string>();
   for (const row of rows) {
     if (seen.has(row.id)) {
@@ -275,7 +329,7 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     }
     seen.add(row.id);
   }
-  return { rows, rowGap };
+  return { rows, rowGap, noticeSeconds };
 }
 
 /** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
@@ -312,7 +366,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   const bind = instrumentBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
-  if (!existsSync(path)) return { rows: [defaultRow(bind)], rowGap: DEFAULT_ROW_GAP, warning: undefined };
+  if (!existsSync(path)) return { rows: [defaultRow(bind)], rowGap: DEFAULT_ROW_GAP, noticeSeconds: undefined, warning: undefined };
 
   let document: unknown;
   try {
@@ -321,16 +375,18 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
     return {
       rows: [defaultRow(bind)],
       rowGap: DEFAULT_ROW_GAP,
+      noticeSeconds: undefined,
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
     };
   }
 
   try {
     const notices: Notices = { containers: false, unknownInstruments: new Set() };
-    const { rows, rowGap } = normalizeDocument(document, notices, source.theme);
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source.theme);
     return {
       rows,
       rowGap,
+      noticeSeconds,
       warning: acceptedWarning(path, notices),
     };
   } catch (error) {
@@ -338,6 +394,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
       return {
         rows: [defaultRow(bind)],
         rowGap: DEFAULT_ROW_GAP,
+        noticeSeconds: undefined,
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,
       };
     }
