@@ -315,10 +315,11 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
 
   const { configured, declaredSeconds } = readInstruments(doc.instruments, theme, notices);
   const bind = instrumentBindings(configured);
-  if (rawRows.length === 0) return { rows: [defaultRow(bind)], rowGap, noticeSeconds: undefined };
-
-  const rows = rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
+  const rows = rawRows.length === 0
+    ? [defaultRow(bind)]
+    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
+  // The default row goes through it too, so the gate and the value cannot disagree about it.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
   const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
   const seen = new Set<string>();
