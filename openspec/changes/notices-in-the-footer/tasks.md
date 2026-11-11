@@ -1436,7 +1436,7 @@ specs are synced. None of them adds behaviour.
     before the sync.
   - Boundary: 500 characters, measured per requirement paragraph, over the three delta specs.
   - Files: none.
-- [ ] 9.7 **Joel's check** — the footer shows the notice as he wants it
+- [x] 9.7 **Joel's check** — the footer shows the notice as he wants it **Observed 2026-11-11, on this branch in a scratch project with a `notice` row:** Joel: *"I just sent a few messages in the tmp project. I couldn't compact because the session was too small but I saw a cache miss notification show up in the notifications. Works like a charm, it seems."* Asked whether it might have been pi's own transcript line, since his `showCacheMissNotices` is on: *"No it couldn't have been. I know the difference between the two."* No fade was asked for; the notice disappears.
   - Decision: his 2026-11-10 ruling ("Let's /skill:conductor-janet that thing up. I'd love to see it
     in action!!!") and `michael-pl4-r2.json`'s `later_gates`.
   - What it covers: a notice appears in the footer with the `Notice:` label, the 10-second default
