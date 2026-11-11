@@ -1360,3 +1360,17 @@ test("a formats value that is not a string, and formats that is not an object, e
   const notObject = readDocument({ cells: [{ instrument: "notice" }], instruments: { notice: { formats: ["x"] } } });
   assert.ok(notObject.warning?.includes("has formats that is not an object"), notObject.warning ?? "");
 });
+
+test("no notice cell, the default row and a rejected document each take no visible time", () => {
+  assert.equal(readDocument({ cells: [{ instrument: "blank" }] }).noticeSeconds, undefined, "no notice cell");
+  assert.equal(readDocument({}).noticeSeconds, undefined, "the default row");
+  assert.equal(readDocument({ cells: [{ instrument: "notice" }], rows: [{}] }).noticeSeconds, undefined, "a rejected document");
+  assert.equal(readDocument("not json").noticeSeconds, undefined, "an unparseable document");
+});
+
+test("a notice cell past the ten-cell ceiling does not count as placement", () => {
+  const cells = Array.from({ length: 10 }, () => ({ instrument: "blank" }));
+  const { rows, noticeSeconds } = readDocument({ cells: [...cells, { instrument: "notice" }] });
+  assert.equal(rows[0]?.cells.length, 10, "the ceiling truncates the notice cell");
+  assert.equal(noticeSeconds, undefined, "the rows the root installs place no notice");
+});

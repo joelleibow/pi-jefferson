@@ -931,7 +931,7 @@ code, where the spike put it, and Derek's `checks/scope.sh` for `4f0e994` lists 
 alone (`redgreen-derek.md` §6). So the suite counts on both commits are his: 409 at group 4's, 412
 here. The suite goes from 409 to 412.
 
-- [ ] 5.1 A notice cell takes the declared `seconds`, or the declared default of ten
+- [x] 5.1 A notice cell takes the declared `seconds`, or the declared default of ten
   - Decision: D3 — placement read from `cellsFromNames`'s resolved declarations, inside the ten-cell
     ceiling, and `NOTICE_SECONDS` read from the instrument's own file.
   - The behaviour landed in 4.12; this task adds its test.
@@ -945,7 +945,7 @@ here. The suite goes from 409 to 412.
   - Green: `✔ a notice cell takes the declared seconds, or the declared default of ten` (§2.26).
   - Boundary: a declared `seconds` against none, where the default ten must appear.
   - Files: `tests/configuration.test.ts`.
-- [ ] 5.2 A session placing a notice cell takes the three subscriptions, and `message_end` shows it
+- [x] 5.2 A session placing a notice cell takes the three subscriptions, and `message_end` shows it
   - Decision: D3 and D4 — `startup.ts` passes the value it read to `feedSessionData`.
   - The behaviour landed in 4.13; this task adds its test.
   - Command: `node --test --test-name-pattern="placing a notice cell" tests/jefferson.test.ts`
@@ -961,7 +961,7 @@ here. The suite goes from 409 to 412.
     message_end shows it` (§2.26).
   - Boundary: a placed cell against no cell, at the composition root where the gate is set.
   - Files: `tests/jefferson.test.ts`.
-- [ ] 5.3 No notice cell, the default row, and a rejected document each take no visible time
+- [x] 5.3 No notice cell, the default row, and a rejected document each take no visible time
   - Decision: D3 — a rejected document installs the default row, which places no notice cell, so the
     gate and the value cannot disagree.
   - The behaviour landed in 4.12; this task adds its test.
@@ -973,7 +973,7 @@ here. The suite goes from 409 to 412.
     (§2.27).
   - Boundary: the default row and the rejected document, against a row that places the cell (5.1).
   - Files: `tests/configuration.test.ts`.
-- [ ] 5.4 A notice cell past the ten-cell ceiling does not count as placement
+- [x] 5.4 A notice cell past the ten-cell ceiling does not count as placement
   - Decision: D3 — only cells inside the ceiling the reader already applies.
   - The behaviour landed in 4.12; this task adds its test.
   - Command: `node --test --test-name-pattern="past the ten-cell ceiling" tests/configuration.test.ts`
@@ -983,7 +983,7 @@ here. The suite goes from 409 to 412.
   - Green: `✔ a notice cell past the ten-cell ceiling does not count as placement` (§2.28).
   - Boundary: the eleventh cell against the tenth.
   - Files: `tests/configuration.test.ts`.
-- [ ] 5.5 The commit is green and touches only the paths this group names
+- [x] 5.5 The commit is green and touches only the paths this group names
   - Command: `checks/suite.sh <repo> 412` and
     `checks/scope.sh <repo> <base> <head> tests/configuration.test.ts tests/jefferson.test.ts openspec/changes/notices-in-the-footer/tasks.md`
   - Green at `4f0e994`: `suite: 412 passed, 0 failed`, and `changed:` the two test paths … `PASS`

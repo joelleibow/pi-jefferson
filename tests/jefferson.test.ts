@@ -133,11 +133,13 @@ function harness(): Harness {
         model: options.model,
         thinkingLevel: options.thinkingLevel,
         getContextUsage: () => { session.reads.usage++; return session.host.contextUsage; },
+        modelRegistry: { find: () => undefined },
         sessionManager: {
           getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
           getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
           getSessionName: () => session.host.sessionName,
           getEntries: () => { session.reads.entries++; return session.host.entries; },
+          getBranch: () => session.host.entries,
         },
         isProjectTrusted: () => options.trusted ?? false,
         ui: {
@@ -484,6 +486,31 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
     assert.deepEqual(session.notified, []);
   });
 }
+
+test("a session placing a notice cell takes the three notice subscriptions, and the message_end shows it", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "notice" }] });
+  const pi = harness();
+  const session = await pi.start();
+  assert.deepEqual(session.subscriptions.map((subscription) => subscription.event), [
+    "model_select", "thinking_level_select", "turn_end", "session_info_changed",
+    "message_end", "session_compact", "session_tree",
+  ]);
+  const previous = { type: "message", id: "previous", parentId: null, timestamp: "2026-11-10T00:00:00.000Z",
+    message: { role: "assistant", api: "anthropic", provider: "anthropic", model: "claude-opus-4",
+      content: [], stopReason: "stop", timestamp: 0,
+      usage: { input: 20_000, output: 0, cacheRead: 80_000, cacheWrite: 0, totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } } as SessionEntry;
+  session.host.entries = [previous];
+  pi.dispatch({ type: "message_end", message: { role: "assistant", api: "anthropic", provider: "anthropic",
+    model: "claude-opus-4", content: [], stopReason: "stop", timestamp: 0,
+    usage: { input: 20_000, output: 0, cacheRead: 80_000, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0.1, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.1 } } } });
+  assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Notice: Cache miss: 20k tokens re-billed (~$0.10)"),
+    "the notice reaches the footer's cell");
+  // The expiry's real timer would hold the process; the shutdown's release clears it.
+  pi.dispatch({ type: "session_shutdown", reason: "test" });
+});
 
 test("in TUI mode a session takes exactly the four subscriptions it names", async (t) => {
   useTempAgentDir(t);
