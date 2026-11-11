@@ -1,0 +1,15 @@
+schema: marbleization
+created: 2026-11-10
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: "51a7c6e0-fb93-4c19-ab33-d5ce8b8a00cf"
+    eleanor: "cd38e208-bfd8-4f7f-bd05-89f6e1d2fef9"
+  gates:
+    council_owner: pending
+    design: pending
+    tasks: pending
+    implement: pending
+    validate: pending
+  blocked:
+    - "2026-11-10: Michael's orientation (fresh michael-the-architect, pinned anthropic/claude-fable-5-2) failed: \"Anthropic attribution has no Claude Code model policy for claude-fable-5-2\". pi-background-tasks' anthropic-attribution.js (enabled in settings) has policies up to claude-fable-5-1. Waiting on Joel."

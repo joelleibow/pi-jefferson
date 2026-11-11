@@ -1,0 +1,67 @@
+# Research Report
+
+## Question and Scope
+
+Map Jefferson's data path, local timer/polling/freshness/repaint rules, instrument lifecycle and layout, configuration/options, styling, tests, and current baseline for notices-in-the-footer. Repository root: `/Users/joelleibow/Projects/pi-jefferson`; scoped to its source, tests, governing specs/ADRs and change directory. `owner-rulings.md` is binding: this change relocates pi's notices to the footer and makes their visibility configurable; fade versus disappear is unresolved (`openspec/changes/notices-in-the-footer/owner-rulings.md:7-10`). No pi behavior is inferred here.
+
+## Sources / Files Examined
+
+- `AGENTS.md`; `ARCHITECTURE.md`; `package.json`; `openspec/specs/statusline/spec.md`; `openspec/specs/session-data-store/spec.md`; change `owner-rulings.md`.
+- `extensions/jefferson/data/session-data-store.ts`, `data/session-data-feed.ts`, `startup.ts`, `footer-setup.ts`, `components/instruments/instrument.ts`, `instrument-binding.ts`, `configuration.ts`, `format.ts`, `components/row/width-plan.ts`, `row-renderer.ts`, shipped instrument declarations.
+- `tests/session-data-store.test.ts`, `session-data-feed.test.ts`, `instrument.test.ts`, `configuration.test.ts`, `row-renderer.test.ts`, `width-plan.test.ts`, `jefferson.test.ts`.
+- Inspected relevant current specs and timer/repaint/freshness mentions in archived specs and ADR index/files. ADRs are summarized here only where relevant.
+
+## Findings
+
+### 1. Data path
+
+- `createSessionDataStore` (`extensions/jefferson/data/session-data-store.ts:61-164`) stores provider/model/thinking/cwd/home/branch/sessionName, statuses, context usage and usage totals (`:18-29, :69-79`). Four mutable session values are seeded from context; branch is seeded through footer attachment. `sample()` reads context usage every sample, reads extension statuses once per sample, and scans all usage-bearing session entries only when `(sessionId, leafId)` differs from its cached key (`:81-95`). `scanTotals` counts `usage`, assistant/toolResult message usage, `compaction`, and `branch_summary` (`:34-55`).
+- Feed (`extensions/jefferson/data/session-data-feed.ts:34-95`) subscribes to `model_select`, `thinking_level_select`, `turn_end`, and `session_info_changed` (`:61-70`). `turn_end` calls `turnEnded`; it compares five totals and repaints only when changed (`session-data-store.ts:122-131`). Branch and statuses are attached from footer-only data (`session-data-feed.ts:76-86`); branch change subscription pushes the new branch.
+- Exactly one idempotent `release` removes branch, model, thinking, turn and name subscriptions and disposes store (`session-data-feed.ts:88-102`).
+- Repaint seam: startup gives the store a closure that invokes the currently installed callback (`startup.ts:44-47`); `installFooter` sets it inside the host footer factory to `tui.requestRender()` (`footer-setup.ts:24-32`). Factory attaches footer data before first sample. Component `dispose` is the release callback (`footer-setup.ts:32`).
+
+### 2. Time and local rules
+
+Relevant binding statements (exact quotations):
+
+- `openspec/specs/statusline/spec.md:348-353`: “An instrument MUST NOT subscribe to host events, poll, cache host data itself, read the terminal, run a command, or derive data the store can hold.” This rules out instrument polling/data acquisition, not timer-driven repaint of already-held state.
+- `openspec/specs/session-data-store/spec.md:35-37`: “Every read from the store MUST return synchronously. A read MUST NOT block, await, request a repaint, or throw”.
+- `openspec/specs/session-data-store/spec.md:72-75`: “For every datum it holds, the store MUST state how current that value is, and MUST NOT claim freshness greater than the host's own delivery.”
+- `openspec/specs/session-data-store/spec.md:192-198`: “When a change the store receives alters a datum a cell displays, the store MUST request a repaint itself” and a host-read turn-boundary change “MUST likewise request a repaint, and MUST NOT rely on the host repainting for its own reasons.”
+- `openspec/specs/session-data-store/spec.md:299-301`: statuses are read “once per render sample”; store “MUST claim no freshness beyond the last render the host requested, and MUST NOT poll.”
+- Current `ARCHITECTURE.md` data-feed/store/startup descriptions (lines 16-35) describe event/read-driven samples and turn-boundary repaint; `AGENTS.md:36-38` says resolvers “never subscribe, poll, or cache host data.” Neither says the extension cannot repaint a timer that ages a locally stored notice.
+
+Conclusion: current rules prohibit polling for host data (and instruments owning host subscriptions/data), but do not expressly forbid a timer used solely to advance notice visibility/fade and request repaint. Timer behavior and lifecycle/disposal still need design/spec coverage. The statusline layout creates its tree at install and retains cell components (`ARCHITECTURE.md:69-77`); render samples are cached per width/sample and invalidated on repaint (`row-renderer.ts:35-45, 95-116`).
+
+### 3. Instrument whose text changes over time
+
+- Contract: `Instrument` is `{ fills, render(readings, width, theme) }` (`instrument.ts:8-12`); binding memoizes one instance per declaration and resolves variables from the current readings (`instrument-binding.ts:16-37`). Resolvers are store-read-only and preformatted per `AGENTS.md:31-38`.
+- Width-0 sizing: row renderer probes non-fill cells at width 0; test asserts unchanged text at widths 0 and 200 for non-fill shipped instruments (`tests/instrument.test.ts:337-361`). A changing string independent of width can work; if its length changes, row sizing/reseating must notice changed basis. Rendering is called against current sample after repaint.
+- Empty behavior is explicit: statusline spec says “an empty cell MUST otherwise take none” and empty cell occupies 0 columns (`openspec/specs/statusline/spec.md:43-45, 103-110`); all-empty row still assigns slack to first cell (`:112-116`). Width-plan test covers both (`tests/width-plan.test.ts`, search test “empty content cell”).
+- Alignment is applied by cell renderer after clipping: left pads right, right pads left, center splits (`tests/row-renderer.test.ts` tests `left-aligned cell pads`, `right-aligned`, `centred`; implementation `extensions/jefferson/components/row/row-renderer.ts:65-91`).
+- No rule requires a cell to be permanently non-empty. A notice cell becoming text then empty is compatible with the empty-cell rule, provided width plan and alignment behave as existing dynamic samples do. Tests should cover transitions and changed width basis.
+
+### 4. Options
+
+- Each declaration lists accepted string keys in `InstrumentDeclaration.options`; foundational list is frozen `['format','style','label']` (`instrument.ts:15-33`). Shipped instruments generally set `options: FOUNDATIONAL_OPTIONS` (e.g. `components/instruments/status.ts:31-34`).
+- `readInstruments` rejects every key not in that instrument's declaration (`configuration.ts:76-93`); currently reads/validates format string, label string and theme style (`:93-123`). A per-instrument duration belongs in the declaration's `options` (e.g. its file's frozen list including the key), with validation/parsing added to this reader before it is bound; it is not a universal config option by default.
+- Existing bounded number precedent is document-level `rowGap`: default 1, max 3 (`configuration.ts:65-68`); must be numeric integer 0..3, else whole document rejected (`:253-265`). Tests exercise invalid values and accepted 3 (`tests/configuration.test.ts` around rowGap cases). This demonstrates manual finite-bound validation, not a reusable numeric option framework.
+
+### 5. Styling
+
+- Binding captures configured `style` (or `{}`) and passes it through `resolveFormat` (`instrument-binding.ts:23-37`). Config validates style against live theme via `validateStyle(entry.style, theme)` (`configuration.ts:115-120`; `format.ts:132+`). Segment rendering combines configured style and modifiers and calls theme styling; each render gets the passed live theme (`format.ts`, `resolveFormat`; `tests/configuration.test.ts` style/theme cases).
+- Declaration `variableFg` maps variable names and rendered values to `ThemeColor` (`instrument.ts:30-31`); format resolution uses this to override that variable segment's foreground while retaining other styling. Thinking is the concrete example: per-level foreground tokens `thinkingHigh` etc. (`components/instruments/thinking.ts:6-18`), and tests check the level token, configured foreground precedence and live theme resolution (`tests/configuration.test.ts`, tests named `configured foreground...` and `level's token resolves...`). A later fade can use theme token/style machinery, but no existing fade token or alpha/transparency contract was established.
+
+### 6. Tests and baseline
+
+- Feed tests use fake `pi.on` handlers/release tracking and fake `ExtensionContext` (`tests/session-data-feed.test.ts:10-51`), plus fake footer source with controllable branch, statuses, callback and counters (`:99+`). Store tests inject fake readers/repaint counter (`tests/session-data-store.test.ts:36-58`).
+- End-to-end harness is `tests/jefferson.test.ts`: fake extension host/session/UI and `setFooter`, invokes factory with fake TUI/theme/footer data and can dispatch subscribed events (`:1-...`, notably setup around `:113-160`); renders lines and counts repaint requests in integration assertions.
+- `pnpm typecheck`: passed (`tsc --noEmit`). `pnpm test`: passed, 360 tests, 0 failures.
+
+## Assumptions, Differences, and Unknowns
+
+- Joel explicitly leaves “fade out or disappear” unsettled (`owner-rulings.md:9`); no product choice is made here.
+- What exact notice data/events pi exposes, how to suppress transcript notices, and whether APIs permit this are Chidi's responsibility and are not established in this report.
+- No alpha/opacity token support or established fade convention was found; whether fade is feasible in Jefferson's styling/terminal API remains unknown. Disappearance needs only text/state timing; fade requires additional verified rendering support.
+- Timer lifetime/cleanup and policy for overlapping notices are design questions; no existing timer abstraction was found. Existing one-release teardown is the natural place for any subscription/timer cleanup, but not yet implemented.
+- Dynamic width basis changes need explicit row-renderer verification: cached cell values are keyed per sample and width, but tests currently test new samples generally rather than notice expiry driven by clock.
