@@ -5,6 +5,7 @@ x-marbleization:
   runs:
     chidi: "51a7c6e0-fb93-4c19-ab33-d5ce8b8a00cf"
     eleanor: "cd38e208-bfd8-4f7f-bd05-89f6e1d2fef9"
+    michael: "a48c7c73-d35f-4dd0-a396-c83a97fe7e07"
   gates:
     council_owner: pending
     design: pending
@@ -12,4 +13,6 @@ x-marbleization:
     implement: pending
     validate: pending
   blocked:
-    - "2026-11-10: Michael's orientation (fresh michael-the-architect, pinned anthropic/claude-fable-5-2) failed: \"Anthropic attribution has no Claude Code model policy for claude-fable-5-2\". pi-background-tasks' anthropic-attribution.js (enabled in settings) has policies up to claude-fable-5-1. Waiting on Joel."
+    - "2026-11-10: Michael's orientation (fresh michael-the-architect, pinned anthropic/claude-fable-5-2) failed: \"Anthropic attribution has no Claude Code model policy for claude-fable-5-2\". pi-background-tasks' anthropic-attribution.js (enabled in settings) has policies up to claude-fable-5-1. Resolved: Joel repinned Michael to fable-5-1 (routing below); orientation ran as a48c7c73."
+  routing:
+    - "2026-11-10 michael: repinned to anthropic/claude-fable-5-1 in his agent file (dotfiles 7217280) by Joel: \"There hasn't been an update to that extension yet so we'll go ahead and just shift them back to fable-5-1 for now.\" Unblocks the orientation."
