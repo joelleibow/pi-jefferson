@@ -163,7 +163,7 @@ function newNoticeStore(options: { noticeSeconds?: number; branch?: SessionEntry
   return { store, timer, repaints: () => repaints };
 }
 
-test("a sample is exactly the ten datums, in order, carrying the seed", () => {
+test("the ten seeded datums, in order, and no notice", () => {
   const { store } = newStore(seed);
   const sample = store.sample();
   assert.deepEqual(Object.keys(sample), [
