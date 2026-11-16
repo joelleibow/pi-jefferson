@@ -5,8 +5,10 @@ x-marbleization:
   runs:
     chidi: ca446749-6dc2-48e2-a1ad-605502e163b0
     eleanor: 58687ee0-ae68-4a63-8129-0f228067fa05
-    michael: 6da4b14a-9890-407e-a36d-8b9677459d15
+    michael: 62f723bf-f4df-4427-959e-d267d505b79f
     derek_spike: 1bd00692-25cd-4cac-bf1e-31f60d7fb74b
+    judge_gen_verify: e53f68c8-0df2-4f62-af85-526ffa1475d8
+    judge_gen_review: a8c53328-5410-4f17-b19c-22d223bce426
     derek: 9ccfc82c-391f-406a-a785-273b72d8003c
     bambadjan: 0dc56e37-cdce-404f-b63e-3431174b117e
   gates:
@@ -14,6 +16,7 @@ x-marbleization:
     design: approved
     tasks: approved
     implement: approved
+    validate: approved
   progress:
     - "2026-11-15: change opened from card 1 of the extension-provided-instruments Explore session; owner-rulings.md written from Joel's quoted words. Research workflow e23cb839 (Chidi + Eleanor) launched."
     - "2026-11-15: research complete (Chidi ca446749, Eleanor edd6b2ab); Michael orientation 1a939ef3. Joel ruled the orientation questions: one-row shortcut retired (a), warnings count from 1."
@@ -28,3 +31,4 @@ x-marbleization:
     - "2026-11-15: Stage 5 db7a3484 done: r3 needs_fixes (S5R3-1 applied), r4 and r5 clean, no escalations. tasks gate approved. Branch reshape-the-configuration opened from 24ee86b."
     - "2026-11-15: Derek implemented (0007990f), 18/18 boxes. Consult michael-consult-1 (4c31f5a0): delete 9 subsumed tests, keep 2; Bambadjan amended 1.14 (0dc56e37), Derek applied (9ccfc82c) at f55c620: 423/423, typecheck clean. Implementation gate 972fd85a launched."
     - "2026-11-15: implementation gate approved (Michael 6da4b14a) at f55c620, 423/423. Docs pass 940c333b launched (README/docs restructure, ADR 0015/0016, ADR 0007 status, statusline Purpose)."
+    - "2026-11-15: docs pass committed 9e8b98d; PR #23 opened (release:minor). Judge Gen verify + review: no must-fix. Michael Validate 62f723bf: approve, 7 minor text findings (2 Derek, 5 Bambadjan), item 6 settled by owner ruling. Fixes c5a4320e launched."

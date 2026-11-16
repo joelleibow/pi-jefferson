@@ -248,7 +248,7 @@ interface NormalizedDocument {
   noticeSeconds: number | undefined;
 }
 
-/** Normalize the document: one top-level row, or a list under `rows`; never both. */
+/** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
 function normalizeDocument(document: unknown, notices: Notices, theme: Theme): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");

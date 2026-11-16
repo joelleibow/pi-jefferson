@@ -186,7 +186,7 @@ test("a cell that declares no align normalizes to left", () => {
   assert.deepEqual(right.rows[0]?.cells.map((cell) => cell.align), ["right"]);
 });
 
-test("a cells entry past the ceiling that is not an object rejects the document", () => {
+test("an entry past the ceiling that is not an object rejects the document", () => {
   const cells: unknown[] = Array.from({ length: 11 }, () => ({ instrument: "blank" }));
   cells.push(42);
   const { rows, warning } = readDocument({ rows: [cells] });
@@ -196,7 +196,7 @@ test("a cells entry past the ceiling that is not an object rejects the document"
   assert.match(warning, /not an object/);
 });
 
-test("a cells entry past the ceiling naming an unknown instrument warns and renders ten cells", () => {
+test("an entry past the ceiling naming an unknown instrument warns and renders ten cells", () => {
   const { rows, warning } = readDocument({
     rows: [Array.from({ length: 12 }, (_, i) => ({ instrument: i === 11 ? "brnach" : "blank" }))],
   });
@@ -379,7 +379,7 @@ for (const [name, entry] of [
   ["non-integer", 2.5],
   ["null", null],
 ] as const) {
-  test(`a cells entry of ${name} is rejected`, () => {
+  test(`an entry of ${name} is rejected`, () => {
     const { rows, warning } = readDocument({ rows: [[entry]] });
     assert.equal(rows.length, 1);
     assert.equal(rows[0]?.cells.length, 10);
@@ -1076,13 +1076,13 @@ test("all six attributes accept boolean values and empty styles preserve unstyle
   assert.deepEqual(empty.rows[0]?.cells.map(cellText), absent.rows[0]?.cells.map(cellText));
 });
 
-test("error precedence reads the envelope and the rowGap before instruments and instruments before cells", () => {
+test("error precedence reads the envelope and the rowGap before instruments and instruments before a row", () => {
   // The retired-key guard answers first, whatever else the document carries.
   rejected({ cells: [{ instrument: "model" }], rows: 42, rowGap: 1.5, instruments: 42 }, RETIRED);
   rejected({ id: "footer", rows: [[]] }, RETIRED);
   rejected({ instruments: { model: { format: 42 } }, rows: [[{ instrument: "model", align: "middle" }]] }, 'instrument "model" has a format that is not a string');
   // The gap is a document-level key, read before any row and before the instruments section.
-  rejected({ instruments: { model: { format: 42 } }, rows: [blankRows(10)], rowGap: 1.5 }, "rowGap must be a whole number from 0 to 3: 1.5");
+  rejected({ instruments: { model: { format: 42 } }, rows: blankRows(1), rowGap: 1.5 }, "rowGap must be a whole number from 0 to 3: 1.5");
 });
 
 const FRAME = "\x1b[0m\x1b]8;;\x07";
