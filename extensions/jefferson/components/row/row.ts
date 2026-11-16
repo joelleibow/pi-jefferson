@@ -17,7 +17,6 @@ export interface Cell {
 
 /** A normalized statusline row: one footer line, its cells sized by `distribution`. */
 export interface Row {
-  id: string;
   distribution: Distribution;
   cells: Cell[];
 }

@@ -300,7 +300,6 @@ test("two status cells in one render ask the host once and read the same text", 
   const cell = instrumentBindings()(declaration);
   const created = createFooter(
     [{
-      id: "row-0",
       distribution: "equal",
       cells: [{ instrument: cell, align: "left" }, { instrument: cell, align: "left" }],
     }],

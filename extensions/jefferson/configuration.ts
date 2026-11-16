@@ -68,6 +68,15 @@ export const MAX_CELLS = 10;
 const DEFAULT_ROW_GAP = 1;
 const MAX_ROW_GAP = 3;
 
+/**
+ * The keys a 0.12.0 document wrote a row with at its top level. Any of them is a row this change
+ * retired, so the whole document is refused rather than read into a placeholder.
+ */
+const RETIRED_KEYS = ["cells", "id", "distribution"] as const;
+
+/** The shape a document writes its rows in: one row of one entry, which both messages show. */
+const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
+
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
@@ -170,7 +179,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
 }
 
 function defaultRow(bind: BindInstrument): Row {
-  return { id: "row-0", distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
+  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
 }
 
 function blankCells(count: number, bind: BindInstrument): Cell[] {
@@ -229,17 +238,8 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
       cells.push({ instrument: bind(instrument ?? blank), align });
     }
   }
-  return { id: `row-${index}`, distribution: DISTRIBUTIONS[0], cells };
+  return { distribution: DISTRIBUTIONS[0], cells };
 }
-
-/**
- * The keys a 0.12.0 document wrote a row with at its top level. Any of them is a row this change
- * retired, so the whole document is refused rather than read into a placeholder.
- */
-const RETIRED_KEYS = ["cells", "id", "distribution"] as const;
-
-/** The shape a document writes its rows in: one row of one entry, which both messages show. */
-const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
 
 /** A document's rows, the empty lines its footer renders between them, and its notice's time. */
 interface NormalizedDocument {
@@ -275,8 +275,8 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     rawRows = [];
   }
 
-  // Read beside either envelope, before any row: a value the reader cannot use refuses the whole
-  // document, as a bad `distribution` does. pi-tui would floor `1.5` and clamp `-1` in silence.
+  // Read before any row: a value the reader cannot use refuses the whole document. pi-tui would
+  // floor `1.5` and clamp `-1` in silence.
   // shortcut: no unknown row or document key is warned on, so a misspelt `rowGap` renders the
   // default space without a word; upgrade by adding an unknown-key rule when a second misspelling
   // hurts, as its own change.
@@ -298,13 +298,6 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
   // The default row goes through it too, so the gate and the value cannot disagree about it.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
   const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (seen.has(row.id)) {
-      throw new RejectedConfiguration(`two rows share the id ${JSON.stringify(row.id)}`);
-    }
-    seen.add(row.id);
-  }
   return { rows, rowGap, noticeSeconds };
 }
 

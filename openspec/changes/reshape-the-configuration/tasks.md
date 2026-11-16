@@ -285,7 +285,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   — D25 passes and the rewritten test passes. D25 stays red, with the containers notice, until the
   `:296` trigger is deleted here. The old-shape documents stay red until 1.14. `pnpm typecheck` clean.
 
-- [ ] 1.12 **Remove `Row.id`.** Drop the field from `Row`, along with `defaultRow`'s and
+- [x] 1.12 **Remove `Row.id`.** Drop the field from `Row`, along with `defaultRow`'s and
   `normalizeRow`'s handling of it and the duplicate-identifier check. Nothing under
   `components/row/` gains knowledge of the document, and `Row.distribution` stays.
   **Proves:** `design.md` decision 3 and council ruling 7; the check is the compiler for the fixtures
@@ -299,7 +299,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   `tests/row-renderer.test.ts`, and 1 in `tests/session-data-feed.test.ts`. The rest of `pnpm test`
   stays red in the old-shape documents and wherever a fixture still builds an `id`.
 
-- [ ] 1.13 **Strip `id:` from every hand-built row, delete the four id tests, and prove it.** The
+- [x] 1.13 **Strip `id:` from every hand-built row, delete the four id tests, and prove it.** The
   compiler forces the 28 errors task 1.12 records: the 4 `.id` reads in the four id tests at
   `tests/configuration.test.ts:360-391`, which this task deletes — `an unnamed row gets a synthesized
   deterministic id`, `an explicit id is kept`, `two explicit duplicate ids are rejected`, and `an
@@ -316,7 +316,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   lines today: the 26 `Row` literals and one inside an id test); `pnpm test` stays red only in
   documents not yet migrated.
 
-- [ ] 1.14 **Apply every remaining test disposition.** Delete every test in `redgreen-derek.md`'s
+- [x] 1.14 **Apply every remaining test disposition.** Delete every test in `redgreen-derek.md`'s
   deletion table except the four id tests, which task 1.13 deletes. That includes `both shapes at
   once is rejected` (`tests/configuration.test.ts:71`), whose subject A2's multi-key document now
   owns. Beyond the table, also delete four tests whose subject a new test now owns: `a cell object
@@ -384,7 +384,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   **Verify:** `pnpm test` — the whole suite passes; `pnpm typecheck` clean. Every value written here
   is one of decision 10's, not one taken from a failing run.
 
-- [ ] 1.15 **Run the group's green gate.** The end of the atomic migration.
+- [x] 1.15 **Run the group's green gate.** The end of the atomic migration.
   **Proves:** the suite is green after the whole migration.
   **Boundary cases:** none.
   **Verify:** `pnpm test` reports 0 failures and `pnpm typecheck` reports no error. Record the total
@@ -397,7 +397,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
 Each task here changes no behaviour. Its check is the existing suite, and `Test: none` is deliberate:
 the test that would fail does not exist because the behaviour is not touched.
 
-- [ ] 2.1 **Prove the equal branch and the renderer are untouched.**
+- [x] 2.1 **Prove the equal branch and the renderer are untouched.**
   `components/row/width-plan.ts`, `components/row/row-renderer.ts`, `Row.distribution`,
   `DISTRIBUTIONS` and `tests/width-plan.test.ts` are unmodified, and
   `tests/row-renderer.test.ts`'s assertions are unmodified.
@@ -407,13 +407,13 @@ the test that would fail does not exist because the behaviour is not touched.
   `git diff --stat` shows no change under `components/row/row-renderer.ts` or `width-plan.ts`;
   `pnpm typecheck` clean.
 
-- [ ] 2.2 **Prove no export was added.** The export pin at `tests/jefferson.test.ts:392-394` still
+- [x] 2.2 **Prove no export was added.** The export pin at `tests/jefferson.test.ts:392-394` still
   passes, `configuration.ts` exports nothing new, and the shown-form constant is private.
   **Test:** none — the pin is the check, and it fails if an export appears.
   **Boundary cases:** a helper that a later change would like exported; the pin lists exact keys.
   **Verify:** `pnpm test` — the export-pin test passes; `pnpm typecheck` clean.
 
-- [ ] 2.3 **Prove the rest of the boundary is untouched.** `startup.ts`, `shipped.ts`,
+- [x] 2.3 **Prove the rest of the boundary is untouched.** `startup.ts`, `shipped.ts`,
   `instrumentNamed`, `components/instruments/`, `data/`, `/jefferson`, both document paths, the trust
   check and `Configuration.noticeSeconds` are unmodified, and `readInstruments` changed only in the
   one line that records an unknown name.
