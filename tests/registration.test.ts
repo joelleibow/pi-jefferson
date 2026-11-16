@@ -614,7 +614,7 @@ test("A8 jefferson.custom.mine stays free", () => {
   const events = createEventBus();
   const registry = createRegistry();
   createRegistrationListener({
-    events, registry, faults: createFaultLedger(), fields: createProviderFields(),
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
   events.emit("jefferson:registration", registration);
@@ -1116,6 +1116,82 @@ test("A6 every resolver fault part is exact", async (t) => {
   }
 });
 
+test("A7 an accepted registration requests one repaint", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  await h.start({
+    afterSessionStart: (running) => {
+      const before = running.repaints();
+      h.events.emit("jefferson:registration", registration);
+      assert.equal(running.repaints(), before + 1, "one repaint for the accepted registration");
+      // A fields-only registration is accepted too, so it takes its one repaint.
+      h.events.emit("jefferson:registration", { extension: "taiknr", fields: { saved: "string" }, instruments: [] });
+      assert.equal(running.repaints(), before + 2);
+    },
+  });
+});
+
+test("A7 a changed report requests one repaint", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  await h.start({
+    afterSessionStart: (running) => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+      const before = running.repaints();
+      h.events.emit("jefferson:update", saved("$9.99"));
+      assert.equal(running.repaints(), before + 1, "a changed value asks for the render that shows it");
+    },
+  });
+});
+
+test("A7 a same-value report requests none", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  await h.start({
+    afterSessionStart: (running) => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+      const before = running.repaints();
+      h.events.emit("jefferson:update", saved("$4.10"));
+      assert.equal(running.repaints(), before, "reporting what is already held costs no render");
+    },
+  });
+});
+
+test("A7 a refused registration requests no repaint", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  await h.start({
+    afterSessionStart: (running) => {
+      const before = running.repaints();
+      h.events.emit("jefferson:registration", 5);
+      assert.equal(running.repaints(), before, "nothing a row renders changed");
+    },
+  });
+});
+
+test("A7 a field reads unknown before any report", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  const session = await h.start();
+  assert.equal(line(session), "", "an unreported field is unknown, not an empty string");
+});
+
+test("A7 nothing a provider reported survives a session replacement", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  assert.equal(line(await h.start()), "Savings: $4.10");
+
+  h.dispatch({ type: "session_shutdown", reason: "reload" });
+  // The provider registers again in the new session, and reports nothing.
+  h.events.emit("jefferson:registration", registration);
+  assert.equal(line(await h.start()), "", "only the new session's reports are read");
+});
+
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("jeffersonfan.stats"), true, "the comparison is on the whole first part");
   assert.equal(isProvidedName("taiknr.savings"), true);
@@ -1154,7 +1230,7 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
   const events = createEventBus();
   const registry = createRegistry();
   createRegistrationListener({
-    events, registry, faults: createFaultLedger(), fields: createProviderFields(),
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
   for (const declaration of SHIPPED) {

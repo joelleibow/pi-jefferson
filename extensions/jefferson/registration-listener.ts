@@ -212,11 +212,12 @@ function vetReport(payload: unknown, registry: Registry, fields: ProviderFields)
   }
 }
 
-export function createRegistrationListener({ events, registry, faults, fields, own }: {
+export function createRegistrationListener({ events, registry, faults, fields, repaint, own }: {
   events: EventBus;
   registry: Registry;
   faults: FaultLedger;
   fields: ProviderFields;
+  repaint: () => void;
   own: OwnRegistration;
 }): void {
   // The bus carries no sender and replays nothing, so the payload object's identity is what proves
@@ -224,6 +225,7 @@ export function createRegistrationListener({ events, registry, faults, fields, o
   events.on(REGISTRATION, (payload: unknown) => {
     if (payload === own) {
       registry.accept(own.extension, own.instruments);
+      repaint();
       return;
     }
     const accepted = vetRegistration(payload, registry, faults, fields);
@@ -234,6 +236,9 @@ export function createRegistrationListener({ events, registry, faults, fields, o
     }
     registry.accept(accepted.extension, accepted.declarations);
     fields.declare(accepted.extension, accepted.fields);
+    // One repaint, after the registry has run that registration's watches, so the entry a watch
+    // filled is the one that render shows (design 9). A refused registration takes none.
+    repaint();
   });
   events.on(UPDATE, (payload: unknown) => {
     const accepted = vetReport(payload, registry, fields);

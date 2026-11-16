@@ -27,13 +27,15 @@ export function startUp(pi: ExtensionAPI): void {
   const registry = createRegistry();
   // Created here, not in `session_start`: a report that arrives before Jefferson's own handler
   // must still be held (design 11; T2).
-  const fields = createProviderFields();
+  const repaint = (): void => requestRepaint?.();
+  const fields = createProviderFields(repaint);
   const faults = createFaultLedger();
   createRegistrationListener({
     events: pi.events,
     registry,
     faults,
     fields,
+    repaint,
     own: { extension: "jefferson", instruments: SHIPPED },
   });
 
@@ -60,6 +62,11 @@ export function startUp(pi: ExtensionAPI): void {
   // document carried are judged against the registry as it stands then (design 12).
   let latest: Configuration | undefined;
 
+  // The one repaint slot: the host's `tui` is reachable only inside the footer's factory, so its
+  // `receiveRepaint` sets this, and every push — a report, an accepted registration — reads it. The
+  // shutdown clears it, so nothing asks a context the host has invalidated to render again.
+  let requestRepaint: (() => void) | undefined;
+
   // Retained across `session_start` calls: the previous install's release, so a store this
   // install still holds is disposed — and its subscriptions dropped — before its replacement
   // exists.
@@ -81,6 +88,7 @@ export function startUp(pi: ExtensionAPI): void {
     // Third, and never inside the release closure: a fault that arrived before the next
     // `session_start` must queue rather than be dropped with the session before it.
     faults.close();
+    requestRepaint = undefined;
   });
 
   pi.registerCommand("jefferson", {
@@ -119,12 +127,8 @@ export function startUp(pi: ExtensionAPI): void {
     latest = configuration;
     const { rows, rowGap, warning, noticeSeconds } = configuration;
 
-    // The repaint request reaches the host's `tui` only when the host invokes the factory. The
-    // factory's call sets it, so every push after the install reaches the host.
-    let requestRepaint: (() => void) | undefined;
-
     const { store, release, attachFooterData } = feedSessionData(
-      pi, ctx, () => requestRepaint?.(), homedir, () => performance.now(), schedule, noticeSeconds,
+      pi, ctx, repaint, homedir, () => performance.now(), schedule, noticeSeconds,
     );
     // The release drops the store's subscriptions and this read's watches together: a later
     // session's registration never fills a released footer (design 19 item 3).

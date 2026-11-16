@@ -40,7 +40,7 @@ interface Held {
   readonly values: Map<string, FieldValue>;
 }
 
-export function createProviderFields(): ProviderFields {
+export function createProviderFields(repaint?: () => void): ProviderFields {
   const held = new Map<string, Held>();
   const heldBy = (extension: string): Held => {
     const existing = held.get(extension);
@@ -81,7 +81,11 @@ export function createProviderFields(): ProviderFields {
       return typeof value === type ? undefined : { type: "wrong-type", declared: type, given: value };
     },
     report(extension, field, value) {
-      heldBy(extension).values.set(field, value);
+      const target = heldBy(extension);
+      // Reporting what is already held costs no render; a change asks for the one that shows it.
+      const changed = target.values.get(field) !== value;
+      target.values.set(field, value);
+      if (changed) repaint?.();
     },
     view(extension) {
       const target = held.get(extension);
