@@ -185,7 +185,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   which pass; the precedence test fails at its first new assertion; no other test fails.
   `pnpm typecheck` is clean, since `Row` still has `id`.
 
-- [ ] 1.7 **Replace the envelope with the retired-key guard.** One private constant holding the shown
+- [x] 1.7 **Replace the envelope with the retired-key guard.** One private constant holding the shown
   form `{"rows": [[{"instrument": "model"}]]}`, one holding `cells`, `id` and `distribution`, and one
   guard that rejects the document when any retired key sits at the top level — placed immediately
   after the document-is-an-object check and before the `rows` type check, `rowGap`, `instruments` and
@@ -217,7 +217,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   guard's place, and it passes. Moving the guard only past `readInstruments` leaves the second
   assertion green, which is why the check uses the late position.
 
-- [ ] 1.8 **Replace the row-object reader with the list reader.** A row is a list; its first ten
+- [x] 1.8 **Replace the row-object reader with the list reader.** A row is a list; its first ten
   entries are its cells; every entry is validated, including those past the tenth; an empty row is
   rejected; an entry is an object whose `instrument` is a non-empty string and which may carry
   `align`, and an unrecognised key is named. The row-level `cells`, `id`, `distribution` and
@@ -233,7 +233,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   — A1, B14, D26 and E29 pass. B8–B13, B15, B16 and C17–C23 stay red until 1.9 and 1.10, and the
   old-shape documents stay red until 1.14. `pnpm typecheck` clean.
 
-- [ ] 1.9 **Build the message table, with one placement rule.** Every whole-row part begins `row N:`
+- [x] 1.9 **Build the message table, with one placement rule.** Every whole-row part begins `row N:`
   and every entry part begins `row N, instrument M:`, both counting from 1; the align part renders a
   non-string value with `JSON.stringify`, unquoted; no part contains "cell". Delete the parts
   `design.md` decision 5 lists.
