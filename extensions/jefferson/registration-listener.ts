@@ -106,7 +106,7 @@ function vetRegistration(
     }
     named.add(name);
     if (!isPlainObject(raw.variables)) {
-      return { refusal: { scope: name, kind: "no-resolvers", part: `${full} carries no resolvers` } };
+      return { refusal: { scope: name, kind: "no-resolvers", part: `${full} carries no variables` } };
     }
     if (typeof raw.defaultFormat !== "string") {
       return { refusal: { scope: name, kind: "no-default-format", part: `${full} carries no default format` } };
@@ -152,7 +152,7 @@ function vetRegistration(
         case "resolver-not-function":
           return { refusal: {
             scope: name, kind: "resolver-not-function",
-            part: `${full} carries a resolver ${JSON.stringify(adapted.variable)} that is not a function`,
+            part: `${full} carries a variable ${JSON.stringify(adapted.variable)} that is not a function`,
           } };
       }
     }

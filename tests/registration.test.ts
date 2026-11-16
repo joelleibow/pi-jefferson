@@ -345,7 +345,7 @@ test("A2 every registration refusal part is exact", async (t) => {
     ["a repeated name", events => events.emit("jefferson:registration", from({ instruments: [savings, savings] })),
       'registration from "taiknr" carries "savings" twice'],
     ["no resolvers", events => events.emit("jefferson:registration", from({ instruments: [{ name: "savings", defaultFormat: "" }] })),
-      '"taiknr.savings" carries no resolvers'],
+      '"taiknr.savings" carries no variables'],
     ["no default format", events => events.emit("jefferson:registration", from({ instruments: [{ name: "savings", variables: savings.variables }] })),
       '"taiknr.savings" carries no default format'],
     ["unparseable default format", events => events.emit("jefferson:registration",
@@ -354,7 +354,7 @@ test("A2 every registration refusal part is exact", async (t) => {
     ["label not a string", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, defaultLabel: 4 }] })),
       '"taiknr.savings" carries a default label that is not a string'],
     ["resolver not a function", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, variables: { saved: 4 } }] })),
-      '"taiknr.savings" carries a resolver "saved" that is not a function'],
+      '"taiknr.savings" carries a variable "saved" that is not a function'],
     ["a fills that is not a boolean", events => events.emit("jefferson:registration",
       from({ instruments: [{ ...savings, fills: "yes" }] })),
       '"taiknr.savings" carries fills Jefferson cannot use'],
@@ -507,7 +507,7 @@ test("A2 a bad declaration registers none of its registration's instruments", as
   assert.equal(lines[0], placeholder(), "the bad declaration registered nothing of its own");
   assert.equal(lines[2], placeholder(), "and neither did the good one beside it");
   assert.deepEqual(session.notified.at(-1), {
-    message: 'pi-jefferson: "taiknr.savings" carries a resolver "saved" that is not a function',
+    message: 'pi-jefferson: "taiknr.savings" carries a variable "saved" that is not a function',
     type: "warning",
   }, "the first fault is the one part reported");
 
@@ -1288,7 +1288,7 @@ test("A6 every provided member fault part is exact", async (t) => {
       variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
       variableForms: { saved: { short: () => 42 } },
       defaultFormat: "$saved|short",
-    }], [{ extension: "taiknr", field: "saved", value: "x" }], "its resolver returned a number, where text is declared"],
+    }], [{ extension: "taiknr", field: "saved", value: "x" }], "its variable returned a number, where text is declared"],
     ["a select that throws", [{
       name: "usage",
       variables: { state: () => undefined },
@@ -1358,7 +1358,7 @@ test("A6 a resolver that throws costs only its own entry", async (t) => {
   assert.equal(drawn.includes("Savings"), false, "the entry renders nothing, label included");
   await settle();
   assert.deepEqual(session.notified, [
-    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its variable threw', type: "warning" },
   ]);
 });
 
@@ -1369,7 +1369,7 @@ test("A6 a resolver that returns a number loses only its own text", async (t) =>
   assert.equal(drawn.includes("42"), false, "only that entry loses its text");
   await settle();
   assert.deepEqual(session.notified, [{
-    message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver returned a number, where text is declared',
+    message: 'pi-jefferson: "taiknr.savings" failed to render: its variable returned a number, where text is declared',
     type: "warning",
   }]);
 });
@@ -1380,7 +1380,7 @@ test("A6 a resolver that returns a rejected promise costs only its own entry", a
   assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"));
   await settle();
   assert.deepEqual(session.notified, [{
-    message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver returned a promise',
+    message: 'pi-jefferson: "taiknr.savings" failed to render: its variable returned a promise',
     type: "warning",
   }], "the rejection is observed, so the process keeps running");
 });
@@ -1426,7 +1426,7 @@ test("A6 a thenable whose then getter throws is contained, provider-first", asyn
   assert.equal(drawn.includes("Savings"), false);
   await settle();
   assert.deepEqual(session.notified, [
-    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its variable threw', type: "warning" },
   ], "the outer boundary records the threw row, once");
 });
 
@@ -1439,22 +1439,22 @@ test("A6 a thenable whose then getter throws is contained, Jefferson-first", asy
   assert.equal(drawn.includes("Savings"), false);
   await settle();
   assert.deepEqual(session.notified, [
-    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its variable threw', type: "warning" },
   ]);
 });
 
 test("A6 every resolver fault part is exact", async (t) => {
   const cases: Array<[label: string, resolver: (readings: ReadingsView) => unknown, part: string | undefined]> = [
-    ["a throw", () => { throw new Error("provider threw"); }, "its resolver threw"],
-    ["a number", () => 42, "its resolver returned a number, where text is declared"],
-    ["a boolean", () => true, "its resolver returned a boolean, where text is declared"],
-    ["a bigint", () => 42n, "its resolver returned a bigint, where text is declared"],
-    ["a symbol", () => Symbol("saved"), "its resolver returned a symbol, where text is declared"],
-    ["a function", () => () => "text", "its resolver returned a function, where text is declared"],
-    ["an object", () => ({ saved: "$4.10" }), "its resolver returned an object, where text is declared"],
-    ["an array", () => ["$4.10"], "its resolver returned an object, where text is declared"],
-    ["null", () => null, "its resolver returned null, where text is declared"],
-    ["a promise", () => Promise.resolve("$4.10"), "its resolver returned a promise"],
+    ["a throw", () => { throw new Error("provider threw"); }, "its variable threw"],
+    ["a number", () => 42, "its variable returned a number, where text is declared"],
+    ["a boolean", () => true, "its variable returned a boolean, where text is declared"],
+    ["a bigint", () => 42n, "its variable returned a bigint, where text is declared"],
+    ["a symbol", () => Symbol("saved"), "its variable returned a symbol, where text is declared"],
+    ["a function", () => () => "text", "its variable returned a function, where text is declared"],
+    ["an object", () => ({ saved: "$4.10" }), "its variable returned an object, where text is declared"],
+    ["an array", () => ["$4.10"], "its variable returned an object, where text is declared"],
+    ["null", () => null, "its variable returned null, where text is declared"],
+    ["a promise", () => Promise.resolve("$4.10"), "its variable returned a promise"],
     ["undefined", () => undefined, undefined],
   ];
   for (const [label, resolver, part] of cases) {

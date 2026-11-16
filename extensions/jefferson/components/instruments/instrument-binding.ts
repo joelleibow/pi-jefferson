@@ -157,7 +157,7 @@ export function adaptProvidedDeclaration(
 
   const variables: Record<string, (readings: Readings) => string | undefined> = {};
   for (const [variable, resolver] of Object.entries(members.variables as object)) {
-    variables[variable] = () => text("resolver", () => (resolver as (readings: ReadingsView) => unknown)(view()));
+    variables[variable] = () => text("variable", () => (resolver as (readings: ReadingsView) => unknown)(view()));
   }
 
   const formMembers = members.variableForms as Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined;
@@ -166,7 +166,7 @@ export function adaptProvidedDeclaration(
       variable,
       Object.fromEntries(Object.entries(forms).map(([form, resolver]) => [
         form,
-        () => text("resolver", () => (resolver as (readings: ReadingsView) => unknown)(view())),
+        () => text("variable", () => (resolver as (readings: ReadingsView) => unknown)(view())),
       ])),
     ]),
   );
@@ -210,7 +210,7 @@ export function adaptProvidedDeclaration(
     variable: composedMember.variable as string,
     variables: Object.fromEntries(Object.entries(composedMember.variables as object).map(([key, resolver]) => [
       key,
-      () => text("resolver", () => (resolver as (readings: ReadingsView) => unknown)(view())),
+      () => text("variable", () => (resolver as (readings: ReadingsView) => unknown)(view())),
     ])),
     select: () => text("select", () => (composedMember.select as (readings: ReadingsView) => unknown)(view())),
     // A copy, so a provider's later change to its own object cannot reach the binding (M16).
@@ -263,7 +263,7 @@ export function containProvided(instrument: Instrument, name: string, record: (f
       try {
         return instrument.render(readings, width, theme);
       } catch {
-        record({ scope: name, kind: "resolver-threw", part: `${JSON.stringify(name)} failed to render: its resolver threw` });
+        record({ scope: name, kind: "resolver-threw", part: `${JSON.stringify(name)} failed to render: its variable threw` });
         return "";
       }
     },
