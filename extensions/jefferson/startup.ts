@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { configurationPaths, readConfiguration } from "./configuration.ts";
+import { acceptedWarning, configurationPaths, readConfiguration, type Configuration } from "./configuration.ts";
 import { createProviderFields } from "./data/provider-fields.ts";
 import { feedSessionData } from "./data/session-data-feed.ts";
 import { createFaultLedger } from "./faults.ts";
@@ -43,10 +43,22 @@ export function startUp(pi: ExtensionAPI): void {
   // M20), and it is the only marker startup has completed (design 12). Re-check it on every pi bump.
   pi.on("resources_discover", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
+    if (latest !== undefined) {
+      // A name the registry answers by now is not unknown: a provider's own `session_start` handler
+      // may have registered it after the document was read.
+      const unknown = latest.unknownNames.filter(name => registry.instrument(name.normalized) === undefined);
+      const warning = acceptedWarning(latest.path, unknown);
+      if (warning !== undefined) ctx.ui.notify(warning, "warning");
+    }
     // Delivery opens here, and only here: a fault found at any earlier moment waits for this, so a
-    // provider that registers from its own `session_start` handler is not warned about first.
+    // provider that registers from its own `session_start` handler is not warned about first. The
+    // unknown-name notice goes first, then the faults in arrival order.
     faults.open(message => ctx.ui.notify(message, "warning"));
   });
+
+  // The latest read, for the handler that runs once startup is complete: the unknown names the
+  // document carried are judged against the registry as it stands then (design 12).
+  let latest: Configuration | undefined;
 
   // Retained across `session_start` calls: the previous install's release, so a store this
   // install still holds is disposed — and its subscriptions dropped — before its replacement
@@ -94,7 +106,7 @@ export function startUp(pi: ExtensionAPI): void {
 
     // Read first: the store is built with the visible time the document's notice declaration
     // names, so configuration cannot wait until after the feed exists.
-    const { rows, rowGap, warning, noticeSeconds } = readConfiguration({
+    const configuration = readConfiguration({
       ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
@@ -102,6 +114,8 @@ export function startUp(pi: ExtensionAPI): void {
       fallback: FALLBACK,
       noticeGate: NOTICE_GATE,
     });
+    latest = configuration;
+    const { rows, rowGap, warning, noticeSeconds } = configuration;
 
     // The repaint request reaches the host's `tui` only when the host invokes the factory. The
     // factory's call sets it, so every push after the install reaches the host.

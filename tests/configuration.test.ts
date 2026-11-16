@@ -11,6 +11,7 @@ import { createFooter } from "../extensions/jefferson/components/row/row-rendere
 import type { Cell } from "../extensions/jefferson/components/row/row.ts";
 import type { Configuration } from "../extensions/jefferson/configuration.ts";
 import {
+  acceptedWarning,
   DEFAULT_CELLS,
   MAX_CELLS,
   readConfiguration,
@@ -39,7 +40,7 @@ function cellText(cell: Cell): string {
 }
 
 /** Write `document` as the agent file of a fresh temp dir and read the configuration. */
-function readDocument(document: unknown, theme: Theme = fakeTheme()): Configuration & { path: string } {
+function readDocument(document: unknown, theme: Theme = fakeTheme()): Configuration {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
   const agentPath = join(dir, "pi-jefferson.json");
   writeFileSync(agentPath, typeof document === "string" ? document : JSON.stringify(document));
@@ -49,7 +50,7 @@ function readDocument(document: unknown, theme: Theme = fakeTheme()): Configurat
     projectTrusted: false,
     theme,
   });
-  return { ...readConfiguration(source), path: agentPath };
+  return readConfiguration(source);
 }
 
 test("a rows list of entry lists yields one row per member, in order", () => {
@@ -197,11 +198,12 @@ test("an entry past the ceiling that is not an object rejects the document", () 
 });
 
 test("an entry past the ceiling naming an unknown instrument warns and renders ten cells", () => {
-  const { rows, warning } = readDocument({
+  const { rows, path, unknownNames } = readDocument({
     rows: [Array.from({ length: 12 }, (_, i) => ({ instrument: i === 11 ? "brnach" : "blank" }))],
   });
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.cells.length, 10);
+  const warning = acceptedWarning(path, unknownNames);
   assert.ok(warning, "the unknown instrument still warns past the ceiling");
   assert.match(warning, /brnach/);
 });
@@ -228,14 +230,14 @@ test("a configured label replaces the default label", () => {
 });
 
 test("an unknown name warns by its row, and its cell renders blank", () => {
-  const { rows, warning, path } = readDocument({
+  const { rows, path, unknownNames } = readDocument({
     rows: [
       [{ instrument: "blank" }],
       [{ instrument: "blank" }],
       [{ instrument: "model" }, { instrument: "taiknr.savings" }, { instrument: "thinking" }],
     ],
   });
-  assert.equal(warning, `pi-jefferson: ${path} row 3: "taiknr.savings" is not a known instrument`);
+  assert.equal(acceptedWarning(path, unknownNames), `pi-jefferson: ${path} row 3: "taiknr.savings" is not a known instrument`);
   assert.deepEqual(
     rows[2]?.cells.map(cellText),
     ["Model: anthropic/claude-opus-4", DEFAULT_CELL_TEXT, "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })],
@@ -244,65 +246,65 @@ test("an unknown name warns by its row, and its cell renders blank", () => {
 });
 
 test("one unknown name in two rows is reported once for each row, in row order", () => {
-  const { warning, path } = readDocument({
+  const { path, unknownNames } = readDocument({
     rows: [[{ instrument: "taiknr.savings" }], [{ instrument: "blank" }], [{ instrument: "taiknr.savings" }]],
   });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument; row 3: "taiknr.savings" is not a known instrument`,
     "one part per row a user must fix",
   );
 });
 
 test("one unknown name twice in one row is reported once", () => {
-  const { warning, path } = readDocument({ rows: [[{ instrument: "taiknr.savings" }, { instrument: "taiknr.savings" }]] });
-  assert.equal(warning, `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`);
+  const { path, unknownNames } = readDocument({ rows: [[{ instrument: "taiknr.savings" }, { instrument: "taiknr.savings" }]] });
+  assert.equal(acceptedWarning(path, unknownNames), `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`);
 });
 
 test("a name only the instruments block configures is reported by the block, with no row", () => {
-  const { warning, path } = readDocument({ instruments: { nope: {} } });
+  const { path, unknownNames } = readDocument({ instruments: { nope: {} } });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "nope"`,
     "no row holds the name, so the block reports it and claims nothing about a cell",
   );
 });
 
 test("the instruments block names every unknown it configures, in key order", () => {
-  const { warning, path } = readDocument({ instruments: { other: {}, nope: {} } });
+  const { path, unknownNames } = readDocument({ instruments: { other: {}, nope: {} } });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "other", "nope"`,
     "the block's key order, not an alphabetical one",
   );
 });
 
 test("a name a row and the block both name is reported by each, the row's part first", () => {
-  const { warning, path } = readDocument({
+  const { path, unknownNames } = readDocument({
     rows: [[{ instrument: "blank" }], [{ instrument: "nope" }]],
     instruments: { nope: {} },
   });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} row 2: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
   );
 });
 
 test("every placed part joins in row order, then the block's one part", () => {
-  const { warning, path } = readDocument({
+  const { path, unknownNames } = readDocument({
     rows: [[{ instrument: "aa" }], [{ instrument: "bb" }]],
     instruments: { nope: {} },
   });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} row 1: "aa" is not a known instrument; row 2: "bb" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
   );
 });
 
 test("two unknown names in one row follow the position of each name's first entry", () => {
-  const { warning, path } = readDocument({ rows: [[{ instrument: "bb" }, { instrument: "aa" }]] });
+  const { path, unknownNames } = readDocument({ rows: [[{ instrument: "bb" }, { instrument: "aa" }]] });
   assert.equal(
-    warning,
+    acceptedWarning(path, unknownNames),
     `pi-jefferson: ${path} row 1: "bb" is not a known instrument; row 1: "aa" is not a known instrument`,
     "each name keeps the place of its first entry, so a user reads the row left to right",
   );
@@ -368,9 +370,9 @@ test("an entry past the ceiling is still validated and placed by its position", 
 
 test("an unknown name past the ceiling still warns", () => {
   const entries = Array.from({ length: 12 }, (_, index) => ({ instrument: index === 11 ? "brnach" : "blank" }));
-  const { rows, warning, path } = readDocument({ rows: [entries] });
+  const { rows, path, unknownNames } = readDocument({ rows: [entries] });
   assert.equal(rows[0]?.cells.length, MAX_CELLS, "the ceiling still truncates the list");
-  assert.equal(warning, `pi-jefferson: ${path} row 1: "brnach" is not a known instrument`);
+  assert.equal(acceptedWarning(path, unknownNames), `pi-jefferson: ${path} row 1: "brnach" is not a known instrument`);
 });
 
 for (const [name, entry] of [
@@ -965,7 +967,7 @@ test("A8 a bare name does not reach a provided instrument", () => {
     { name: "taiknr.savings", variables: { saved: () => "$4.10" }, defaultFormat: "Savings: $saved", options: FOUNDATIONAL_OPTIONS },
   ]);
   const result = readConfiguration(source);
-  assert.match(result.warning ?? "", /row 1: "savings" is not a known instrument/);
+  assert.match(acceptedWarning(result.path, result.unknownNames) ?? "", /row 1: "savings" is not a known instrument/);
   assert.equal(cellText(result.rows[0]!.cells[0]!), DEFAULT_CELL_TEXT, "the entry renders as an unknown name does");
 });
 
@@ -989,17 +991,17 @@ test("a configured name binds once across cells and rows while unconfigured name
 
 test("an unknown name in the block and in a row each get their part, and its cell renders the configured blank", () => {
   const onlySection = readDocument({ instruments: { nope: {} }, rows: [[{ instrument: "model" }]] });
-  assert.equal(onlySection.warning, `pi-jefferson: ${onlySection.path} the instruments block names instruments the extension does not implement: "nope"`);
+  assert.equal(acceptedWarning(onlySection.path, onlySection.unknownNames), `pi-jefferson: ${onlySection.path} the instruments block names instruments the extension does not implement: "nope"`);
   assert.deepEqual(onlySection.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4"]);
   const both = readDocument({ instruments: { nope: {}, blank: { format: "configured blank" } }, rows: [[{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }]] });
-  assert.equal(both.warning, `pi-jefferson: ${both.path} row 1: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`);
+  assert.equal(acceptedWarning(both.path, both.unknownNames), `pi-jefferson: ${both.path} row 1: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`);
   assert.deepEqual(both.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4", "configured blank", "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })]);
 });
 
 test("several unknown names in the instruments block keep their key order, beside the default row", () => {
   const result = readDocument({ instruments: { nope: {}, other: {} } });
   assert.equal(
-    result.warning,
+    acceptedWarning(result.path, result.unknownNames),
     `pi-jefferson: ${result.path} the instruments block names instruments the extension does not implement: "nope", "other"`,
   );
   assert.equal(result.rows[0]?.cells.length, DEFAULT_CELLS);

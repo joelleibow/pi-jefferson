@@ -53,6 +53,16 @@ export interface ConfigurationSource {
   noticeGate: { name: string; seconds: number };
 }
 
+/** One name the document wrote that no instrument answered, and the row that placed it. */
+export interface UnknownName {
+  /** The spelling the document used, which is the one every message quotes. */
+  written: string;
+  /** The name it means: a bare name is the `jefferson.default.*` one. */
+  normalized: string;
+  /** The 1-based row that placed it, absent for a name only the `instruments` block configures. */
+  row?: number;
+}
+
 export interface Configuration {
   rows: Row[];
   /** The empty lines the footer renders between each pair of rows. */
@@ -62,10 +72,14 @@ export interface Configuration {
    * composition root passes it to the feed, which takes no notice and holds no timer without it.
    */
   noticeSeconds: number | undefined;
+  /** The document path this read chose, which is the one its warnings print. */
+  path: string;
   /**
-   * Set when a present document was rejected, and also when an accepted document has
-   * something to report: instruments the extension does not implement.
+   * Every name the document names that no instrument answered, as data: startup drops the ones the
+   * registry answers by the time startup completes and composes the rest (design 12).
    */
+  unknownNames: readonly UnknownName[];
+  /** Set only when a present document could not be read or was rejected. */
   warning: string | undefined;
 }
 
@@ -86,14 +100,6 @@ const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
-/** What an accepted document still has to say for itself, gathered across all its rows. */
-interface Notices {
-  /** Each distinct (row, name) pair a row's entry names, in row order and first-entry order. */
-  unknownInRow: { row: number; name: string }[];
-  /** Every name the `instruments` block configures that no shipped instrument answers to, in key order. */
-  unknownInBlock: string[];
-}
-
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
 interface InstrumentConfiguration {
   /** Each declaration's parsed format, style, label and kind formats. */
@@ -102,7 +108,7 @@ interface InstrumentConfiguration {
   declaredSeconds: ReadonlyMap<string, number>;
 }
 
-function readInstruments(raw: unknown, source: ConfigurationSource, notices: Notices): InstrumentConfiguration {
+function readInstruments(raw: unknown, source: ConfigurationSource, unknownNames: UnknownName[]): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
   const declaredSeconds = new Map<string, number>();
   if (raw === undefined) return { configured, declaredSeconds };
@@ -126,7 +132,8 @@ function readInstruments(raw: unknown, source: ConfigurationSource, notices: Not
     }
     const declaration = source.resolve(normalized);
     if (declaration === undefined) {
-      notices.unknownInBlock.push(name);
+      // The block's keys are unique and two spellings of one name are refused above, so no dedupe.
+      unknownNames.push({ written: name, normalized });
       continue;
     }
     const entry = value as Record<string, unknown>;
@@ -210,7 +217,7 @@ function blankCells(count: number, bind: BindInstrument, fallback: InstrumentDec
  * places the row by its 1-based position, which is the number a user counts to.
  */
 function normalizeRow(
-  raw: unknown, index: number, notices: Notices, bind: BindInstrument, source: ConfigurationSource,
+  raw: unknown, index: number, unknownNames: UnknownName[], bind: BindInstrument, source: ConfigurationSource,
 ): Row {
   const place = `row ${index + 1}:`;
   if (!Array.isArray(raw)) {
@@ -244,12 +251,15 @@ function normalizeRow(
       throw new RejectedConfiguration(`${at} align is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
-    const declaration = source.resolve(normalizeName(instrumentValue));
+    const normalized = normalizeName(instrumentValue);
+    const declaration = source.resolve(normalized);
     // One typo does not take down the statusline: the cell renders the fallback and the warning
     // names the spelling the document wrote. Collect unknown names before truncating, so a typo past
-    // the ceiling still warns though its cell is not rendered.
-    if (declaration === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
-      notices.unknownInRow.push({ row: index + 1, name: instrumentValue });
+    // the ceiling still warns though its cell is not rendered. A name joins once per row it is
+    // written in, and the first spelling of it is the one every message prints.
+    if (declaration === undefined
+      && !unknownNames.some((unknown) => unknown.row === index + 1 && unknown.normalized === normalized)) {
+      unknownNames.push({ written: instrumentValue, normalized, row: index + 1 });
     }
     // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
     // break keeps every entry past it validated and checked for unknowns.
@@ -269,7 +279,7 @@ interface NormalizedDocument {
 }
 
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
-function normalizeDocument(document: unknown, notices: Notices, source: ConfigurationSource): NormalizedDocument {
+function normalizeDocument(document: unknown, unknownNames: UnknownName[], source: ConfigurationSource): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -309,11 +319,11 @@ function normalizeDocument(document: unknown, notices: Notices, source: Configur
     rowGap = value;
   }
 
-  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, notices);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, unknownNames);
   const bind = instrumentBindings(configured);
   const rows = rawRows.length === 0
     ? [defaultRow(bind, source.fallback)]
-    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind, source));
+    : rawRows.map((raw, index) => normalizeRow(raw, index, unknownNames, bind, source));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
   // The default row goes through it too, so the gate and the value cannot disagree about it.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.name === source.noticeGate.name));
@@ -323,17 +333,22 @@ function normalizeDocument(document: unknown, notices: Notices, source: Configur
   return { rows, rowGap, noticeSeconds };
 }
 
-/** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
-function acceptedWarning(path: string, notices: Notices): string | undefined {
+/**
+ * What an accepted document has to say for itself, or `undefined` when it has nothing to say. The
+ * delivery point hands it the names the registry still does not answer (design 12).
+ */
+export function acceptedWarning(path: string, unknownNames: readonly UnknownName[]): string | undefined {
   const parts: string[] = [];
   // The rows' parts first, then the block's one part: a row's part changes what renders.
-  for (const unknown of notices.unknownInRow) {
-    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.name)} is not a known instrument`);
+  for (const unknown of unknownNames) {
+    if (unknown.row === undefined) continue;
+    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.written)} is not a known instrument`);
   }
-  if (notices.unknownInBlock.length > 0) {
+  const block = unknownNames.filter((unknown) => unknown.row === undefined);
+  if (block.length > 0) {
     parts.push(
-      `the instruments block names instruments the extension does not implement: ${notices.unknownInBlock
-        .map((name) => JSON.stringify(name))
+      `the instruments block names instruments the extension does not implement: ${block
+        .map((unknown) => JSON.stringify(unknown.written))
         .join(", ")}`,
     );
   }
@@ -359,7 +374,14 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
   if (!existsSync(path)) {
-    return { rows: [defaultRow(bind, source.fallback)], rowGap: DEFAULT_ROW_GAP, noticeSeconds: undefined, warning: undefined };
+    return {
+      rows: [defaultRow(bind, source.fallback)],
+      rowGap: DEFAULT_ROW_GAP,
+      noticeSeconds: undefined,
+      path,
+      unknownNames: [],
+      warning: undefined,
+    };
   }
 
   let document: unknown;
@@ -370,25 +392,24 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
       rows: [defaultRow(bind, source.fallback)],
       rowGap: DEFAULT_ROW_GAP,
       noticeSeconds: undefined,
+      path,
+      unknownNames: [],
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
     };
   }
 
   try {
-    const notices: Notices = { unknownInRow: [], unknownInBlock: [] };
-    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source);
-    return {
-      rows,
-      rowGap,
-      noticeSeconds,
-      warning: acceptedWarning(path, notices),
-    };
+    const unknownNames: UnknownName[] = [];
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, unknownNames, source);
+    return { rows, rowGap, noticeSeconds, path, unknownNames, warning: undefined };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {
         rows: [defaultRow(bind, source.fallback)],
         rowGap: DEFAULT_ROW_GAP,
         noticeSeconds: undefined,
+        path,
+        unknownNames: [],
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,
       };
     }

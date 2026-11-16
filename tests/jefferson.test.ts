@@ -236,7 +236,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/row/row-renderer.ts", ["createFooter"]],
     [
       "../extensions/jefferson/configuration.ts",
-      ["DEFAULT_CELLS", "MAX_CELLS", "configurationPaths", "readConfiguration"],
+      ["DEFAULT_CELLS", "MAX_CELLS", "acceptedWarning", "configurationPaths", "readConfiguration"],
     ],
     ["../extensions/jefferson/components/row/row.ts", ["ALIGNMENTS", "DISTRIBUTIONS"]],
     ["../extensions/jefferson/components/row/width-plan.ts", ["planRow"]],

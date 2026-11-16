@@ -13,10 +13,13 @@ import { adaptProvidedDeclaration } from "../extensions/jefferson/components/ins
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { createProviderFields } from "../extensions/jefferson/data/provider-fields.ts";
 import { createFaultLedger } from "../extensions/jefferson/faults.ts";
+import { configurationSource } from "./configuration-source.ts";
+import { fakeTheme } from "./fake-theme.ts";
 import { createRegistrationListener } from "../extensions/jefferson/registration-listener.ts";
 import {
   createRegistry, isNamePart, isProvidedName, normalizeName,
 } from "../extensions/jefferson/registration.ts";
+import { readConfiguration } from "../extensions/jefferson/configuration.ts";
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
 import type { ProvidedDeclaration, Registration, ReadingsView } from "../extensions/jefferson/instrument-contract.ts";
 import { SHIPPED } from "../extensions/jefferson/shipped.ts";
@@ -46,11 +49,11 @@ function saved(value: string): { extension: string; field: string; value: string
   return { extension: "taiknr", field: "saved", value };
 }
 
-/** Write a document whose rows name the instruments given, one row per list. */
-function documentShowing(t: { after(fn: () => void): void }, rows: string[][]): void {
-  writeAgentDocument(useTempAgentDir(t), {
-    rows: rows.map(row => row.map(instrument => ({ instrument }))),
-  });
+/** Write a document whose rows name the instruments given, one row per list; answer its path. */
+function documentShowing(t: { after(fn: () => void): void }, rows: string[][]): string {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: rows.map(row => row.map(instrument => ({ instrument }))) });
+  return join(agentDir, "pi-jefferson.json");
 }
 
 /** The first line the footer draws, without the host's framing or its padding. */
@@ -617,6 +620,139 @@ test("A8 jefferson.custom.mine stays free", () => {
   events.emit("jefferson:registration", registration);
   assert.notEqual(registry.instrument("taiknr.savings"), undefined, "a provider's two-part name registers");
   assert.equal(registry.instrument("jefferson.custom.mine"), undefined, "three parts belong to Jefferson");
+});
+
+test("A5 an unknown name warns once, after startup completes", async (t) => {
+  const path = documentShowing(t, [["nope"]]);
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: (running) => assert.deepEqual(running.notified, [], "an accepted document says nothing at session_start"),
+  });
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 1: "nope" is not a known instrument`, type: "warning" },
+  ]);
+});
+
+test("A5 an unknown name in two rows warns once per row", async (t) => {
+  const path = documentShowing(t, [["nope"], ["nope"]]);
+  const session = await harness().start();
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${path} row 1: "nope" is not a known instrument; row 2: "nope" is not a known instrument`,
+    type: "warning",
+  }]);
+});
+
+test("A5 an unknown name twice in one row warns once", async (t) => {
+  const path = documentShowing(t, [["nope", "nope"]]);
+  const session = await harness().start();
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 1: "nope" is not a known instrument`, type: "warning" },
+  ]);
+});
+
+test("A5 the block form warns after startup, placed by the block", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { "taiknr.savings": {} }, rows: [[{ instrument: "model" }]] });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} the instruments block names instruments the extension does not implement: "taiknr.savings"`,
+    type: "warning",
+  }]);
+});
+
+test("A5 the block and a row each warn once", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { nope: {} },
+    rows: [[{ instrument: "model" }], [{ instrument: "nope" }]],
+  });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} row 2: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+    type: "warning",
+  }]);
+});
+
+test("A5 a registration from beforeFactory leaves its name warned as unknown", async (t) => {
+  const path = documentShowing(t, [["taiknr.savings"]]);
+  const early = harness({ beforeFactory: events => events.emit("jefferson:registration", registration) });
+  const session = await early.start({
+    afterSessionStart: (running) => assert.deepEqual(running.notified, []),
+  });
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`, type: "warning" },
+  ]);
+});
+
+test("A5 a fault recorded before resources_discover is delivered after the unknown-name part", async (t) => {
+  const path = documentShowing(t, [["nope"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", 5);
+  const session = await h.start();
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 1: "nope" is not a known instrument`, type: "warning" },
+    { message: "pi-jefferson: a registration is not an object", type: "warning" },
+  ], "the unknown-name part first, then the faults in arrival order");
+});
+
+test("A5 warning is undefined for an accepted document naming an unknown instrument", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
+  writeAgentDocument(dir, { rows: [[{ instrument: "nope" }]] });
+  const { source } = configurationSource({
+    agentPath: join(dir, "pi-jefferson.json"),
+    projectPath: join(dir, "missing.json"),
+    projectTrusted: false,
+    theme: fakeTheme(),
+  });
+  const result = readConfiguration(source);
+  assert.equal(result.warning, undefined, "an accepted document's unknown names travel as data");
+  assert.deepEqual(result.unknownNames.map(unknown => unknown.written), ["nope"]);
+});
+
+test("A5 a rejected document still warns at session_start", async (t) => {
+  writeAgentDocument(useTempAgentDir(t), { rows: 42 });
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: (running) => assert.equal(running.notified.length, 1, "the rejection warns before startup completes"),
+  });
+  assert.match(session.notified[0]?.message ?? "", /was rejected \(the rows value is not a list\)/);
+});
+
+test("A5 an accepted document naming an unregistered provided instrument notifies nothing at session_start and one warning at resources_discover", async (t) => {
+  const path = documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: (running) => assert.deepEqual(running.notified, [], "a provider may still register it"),
+  });
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`, type: "warning" },
+  ]);
+
+  // The same document once the provider registers before the read: no warning at all.
+  const known = harness();
+  known.events.emit("jefferson:registration", registration);
+  assert.deepEqual((await known.start()).notified, []);
+});
+
+test("A5 a row name registered after Jefferson's session_start is not warned as unknown", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: () => void h.events.emit("jefferson:registration", registration),
+  });
+  assert.equal(session.notified.some(notified => notified.message.includes("taiknr.savings")), false,
+    "the registry answers the name by the time startup completes");
+});
+
+test("A5 a block key registered after Jefferson's session_start is not warned as unknown", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { "taiknr.savings": {} }, rows: [[{ instrument: "model" }]] });
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    afterSessionStart: () => void h.events.emit("jefferson:registration", registration),
+  });
+  assert.equal(session.notified.some(notified => notified.message.includes("taiknr.savings")), false);
 });
 
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
