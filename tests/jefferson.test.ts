@@ -18,9 +18,9 @@ import {
 /**
  * Tests live in `tests/`, never beside the extension.
  *
- * Pi loads every direct `.ts` file in `extensions/` as an extension, so a test file
- * sitting next to one is executed on every pi start. A subdirectory or a sibling tree
- * is not traversed that way.
+ * Pi loads the files `package.json`'s `pi.extensions` names, and nothing else: an entry is a
+ * declared path, never a directory walk. A test here is loaded by `node --test`, which is why the
+ * shipped tree's export surface is pinned below rather than scanned for files.
  */
 
 /** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
@@ -229,7 +229,7 @@ test("a right-aligned cell ends at its cell's right edge end to end", async (t) 
   assert.equal(stripTerminalSequences(line).indexOf("Thinking: High"), 66);
 });
 
-test("the exported surface offers no way to supply or replace cell content", async () => {
+test("every shipped file's exported keys are pinned, and registration is the only contribution surface", async () => {
   // One row per shipped source file that holds an export: the file, and its exact runtime keys.
   const pinned: Array<[string, string[]]> = [
     ["../extensions/jefferson.ts", ["VERSION", "default"]],
@@ -245,8 +245,13 @@ test("the exported surface offers no way to supply or replace cell content", asy
       ["adaptProvidedDeclaration", "containProvided", "describeValue", "instrumentBindings"],
     ],
     ["../extensions/jefferson/data/field-value.ts", []],
+    ["../extensions/jefferson/data/notice.ts",
+      ["CACHE_TTL_MS", "formatTokens", "messageNotice", "missNotice", "thinkingNotice", "usageNotice"]],
     ["../extensions/jefferson/data/provider-fields.ts", ["createProviderFields"]],
     ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
+    ["../extensions/jefferson/data/session-data-store.ts", ["createSessionDataStore"]],
+    ["../extensions/jefferson/format.ts",
+      ["collapse", "parseFormat", "resolveFormat", "resolvePlain", "validateStyle"]],
     ["../extensions/jefferson/faults.ts", ["createFaultLedger"]],
     ["../extensions/jefferson/instrument-contract.ts", []],
     ["../extensions/jefferson/registration.ts", ["createRegistry", "isNamePart", "isProvidedName", "normalizeName"]],
@@ -277,27 +282,9 @@ test("the exported surface offers no way to supply or replace cell content", asy
     assert.deepEqual(Object.keys(module).sort(), expected, path);
   }
 
-  // The store, the format language and pi's notice rule are scanned, not pinned: their keys are
-  // their own business, and none gives a caller a way to supply cell content.
-  const store = await import("../extensions/jefferson/data/session-data-store.ts");
-  const format = await import("../extensions/jefferson/format.ts");
-  const notice = await import("../extensions/jefferson/data/notice.ts");
-  for (const exports of [...pinnedModules.values(), store, format, notice]) {
-    for (const key of Object.keys(exports)) {
-      assert.ok(
-        !/register|supply|contribute/i.test(key),
-        `${key} looks like a contribution interface`,
-      );
-    }
-  }
-
-  // Every shipped source file joins the pin: one of its rows, or the scanned-only set above.
-  const scannedOnly = [
-    "../extensions/jefferson/data/session-data-store.ts",
-    "../extensions/jefferson/format.ts",
-    "../extensions/jefferson/data/notice.ts",
-  ];
-  const covered = [...pinned.map(([path]) => path), ...scannedOnly].sort();
+  // Every shipped source file joins the pin, and the only way to supply a row's text is a
+  // registration through the published contract (the retired 2026-11-03 rule's successor).
+  const covered = pinned.map(([path]) => path).sort();
   const shippedFiles = readdirSync(join(import.meta.dirname, "..", "extensions"), { recursive: true })
     .map(String)
     .filter((name) => name.endsWith(".ts"))
