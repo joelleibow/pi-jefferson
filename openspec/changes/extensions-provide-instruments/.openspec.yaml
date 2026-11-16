@@ -1,0 +1,29 @@
+schema: marbleization
+created: 2026-11-15
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: 43dc6795-2ae2-47b1-9c81-5122ee6f777a
+    eleanor: 5c5a59fa-1c8b-427f-97de-03e4dab4064f
+    michael: 383d2eaa-fdb0-46d3-9b64-6a2495d3c979
+    derek_spike: d7389373-1d82-4436-bd42-d19203168b43
+    bambadjan: d160f8c1-7ad5-48c3-8edb-ea8c107b9fc5
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+  progress:
+    - "2026-11-15: change opened from card 2 of the extension-provided-instruments Explore session, right after 0.13.0 (37a1698). Branch extensions-provide-instruments. owner-rulings.md written from Joel's quoted words. Research workflow (Chidi + Eleanor) launched."
+    - "2026-11-15: research complete (Chidi 43dc6795, Eleanor 5c5a59fa). Michael orientation f86d97e1 launched; asked to decide whether resolver code in the contract is his call or Joel's."
+    - "2026-11-15: Michael orientation 9a603cfa: resolver code settled by him (contract carries functions). Joel ruled J1 (b) and the CONTRIBUTING.md docs split. Proposal + specs launched."
+    - "2026-11-15: proposal + 4 delta specs (new capability instrument-registration) by Bambadjan db543601, strict-valid. Council launched."
+    - "2026-11-15: council 0a212be1: catalyst clean; 6 lenses with findings (CC1, CC2 blocking); 3 owner questions raised. Michael council rulings 9c7bd38d launched."
+    - "2026-11-15: Michael council rulings 98ee22f7: 29 settled. Conductor surfaced the types-only ruling against Joel's earlier helper pick; Joel confirmed types-only. council.md launched."
+    - "2026-11-15: council.md (Bambadjan ed53ef37) written; deltas updated to 29 rulings; strict-valid. PL2 approved (types-only ruled by Joel). Design draft launched."
+    - "2026-11-15: design.md drafted (Bambadjan ae4d8336), 17 decisions, strict-valid. Joel ruled the channel names: jefferson:registration and jefferson:update. Design review Stages 0 (fold ruling) + 1-4 launched."
+    - "2026-11-15: design review 08e961e8 failed at s3-r5-structural (b163230d) timeout 1800000ms. Stages 0-2 done; S3 r1 needs_fixes, r2 clean, r3 needs_fixes, r4 clean. Resumed 44ff4261 at r5 with the completed critic report."
+    - "2026-11-15: design review done (44ff4261): S3 r4+r5 clean, S4 clean, 125 settled, no escalations. design gate approved. design-review.md + Derek red/green spike (own install in mktemp worktree) launched."
+    - "2026-11-15: design-review.md (Bambadjan 90cdb5a9). Derek spike d7389373: 440/440, typecheck clean, own install, main checkout intact (423/423). 9 design gaps to Michael, then fixes and tasks.md."
+    - "2026-11-15: Michael spike-gap resolution da548b4c: 10 fixes (G1-G6, G8-G11), no escalations; applied by Bambadjan 58ce91f9. tasks.md written (ffec9a93), strict-valid. Stage 5 launched with 60-minute lens timeout."
+    - "2026-11-16: Stage 5 feffa730 failed: s5-r3-codebase (72eac24a) timed out at 3600000ms while active (46 turns, 106 tool calls, 1 compaction; not hung). r1, r2 needs_fixes, both applied. Resumed 9262c046 at r3 reusing r3 readiness/structural; codebase rerun with 2h timeout."
+    - "2026-11-16: Stage 5 9262c046 hit the 5-round cap (r3-r5 needs_fixes; r5: 1 blocking + 6 major, all propose_fix by Michael 383d2eaa and applied by Bambadjan d160f8c1, unreviewed). Joel: \"If michael resolved these things lets implement if things surface then Derek should raise them.\" tasks gate approved by Joel's ruling."
