@@ -18,17 +18,17 @@ import {
   type ThemeStyle,
 } from "@earendil-works/pi-coding-agent";
 
-import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
-import type { Fault } from "./faults.ts";
-import { isProvidedName, normalizeName } from "./registration.ts";
-import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
-import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
   containProvided,
   instrumentBindings,
   type BindInstrument,
   type ConfiguredInstrument,
 } from "./components/instruments/instrument-binding.ts";
+import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
+import type { Fault } from "./faults.ts";
+import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { isProvidedName, normalizeName } from "./registration.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
@@ -114,7 +114,7 @@ interface Reading {
   holders: Map<string, Array<Cell["holder"]>>;
   /** Each provided block value whose instrument has not registered, for the watch to check then. */
   held: Map<string, unknown>;
-  /** Each provided name whose settings were refused: its entries render the fallback, not `blank`. */
+  /** Each provided name whose settings were refused: its entries render the fallback instrument. */
   refused: Set<string>;
 }
 

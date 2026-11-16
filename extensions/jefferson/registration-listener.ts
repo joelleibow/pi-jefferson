@@ -9,8 +9,8 @@ import type { EventBus } from "@earendil-works/pi-coding-agent";
 import { adaptProvidedDeclaration, describeValue } from "./components/instruments/instrument-binding.ts";
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
 import type { FieldType, FieldValue } from "./data/field-value.ts";
-import type { Fault, FaultLedger } from "./faults.ts";
 import type { ProviderFields } from "./data/provider-fields.ts";
+import type { Fault, FaultLedger } from "./faults.ts";
 import type { ProvidedDeclaration, RegistrationChannel, UpdateChannel } from "./instrument-contract.ts";
 import { isNamePart, type Registry } from "./registration.ts";
 
