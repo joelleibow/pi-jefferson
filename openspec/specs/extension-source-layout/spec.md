@@ -204,7 +204,7 @@ Every test that passed before a layout change MUST pass after it with its assert
 
 ### Requirement: The export surface stays free of any way to contribute cell content
 
-No shipped source file MUST export a way for third-party code to supply or replace cell content, and a test MUST pin the exported keys of every shipped source file that holds one. If a change moves exports between files, the pin MUST be rewritten for the new files and argued against `statusline`'s "Cell content comes from an instrument". Source: `michael-orientation.md` D-e; `research-eleanor.md` §7.
+No shipped source file MUST export a way for third-party code to supply or replace cell content, and a test MUST pin the exported keys of every shipped source file that holds one. If a change moves exports between files, the pin MUST be rewritten for the new files and argued against `statusline`'s "Cell text is the instrument its entry names". Source: `michael-orientation.md` D-e; `research-eleanor.md` §7.
 
 #### Scenario: A file is separated
 
