@@ -53,13 +53,11 @@ function readDocument(document: unknown, theme: Theme = fakeTheme()): Configurat
   };
 }
 
-
 test("a rows list normalizes to one row per entry in order", () => {
   const { rows, warning } = readDocument({ rows: blankRows(2) });
   assert.equal(rows.length, 2);
   assert.equal(warning, undefined);
 });
-
 
 test("a rows list of entry lists yields one row per member, in order", () => {
   const { rows, warning } = readDocument({
@@ -163,8 +161,6 @@ test("an empty rows list yields the default row with no warning", () => {
   assert.equal(warning, undefined);
 });
 
-
-
 test("a row list is both the count and the placement, in order", () => {
   const { rows, warning } = readDocument({ rows: [[{ instrument: "model" }, { instrument: "thinking" }, { instrument: "blank" }]] });
   assert.deepEqual(
@@ -199,7 +195,6 @@ test("a cell object with an unrecognised key rejects and names the key", () => {
     assert.ok(warning.includes(key));
   }
 });
-
 
 test("an instrument that is not a non-empty string rejects", () => {
   for (const entry of [{ instrument: 4 }, { instrument: "" }]) {
@@ -288,8 +283,6 @@ test("the cell-count constants are named for cells", () => {
   assert.equal(MAX_CELLS, 10);
 });
 
-
-
 test("with a level and nothing configured, the thinking cell renders its default label and capitalized level", () => {
   const { rows, warning } = readDocument({ rows: [[{ instrument: "thinking" }]] });
   assert.equal(warning, undefined);
@@ -298,14 +291,13 @@ test("with a level and nothing configured, the thinking cell renders its default
 });
 
 test("a configured label replaces the default label", () => {
-  const replaced = readDocument({ instruments: { thinking: { label: "🤔" } }, rows: [[{ instrument: "thinking" }]]});
+  const replaced = readDocument({ instruments: { thinking: { label: "🤔" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(replaced.warning, undefined);
   assert.deepEqual(replaced.rows[0]?.cells.map(cellText), ["🤔 " + fakeTheme().style("High", { fg: "thinkingHigh" })]);
   assert.equal(replaced.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme())?.includes("Thinking: "), false, "the default label is not shown beside a configured one");
-  const removed = readDocument({ instruments: { thinking: { label: "" } }, rows: [[{ instrument: "thinking" }]]});
+  const removed = readDocument({ instruments: { thinking: { label: "" } }, rows: [[{ instrument: "thinking" }]] });
   assert.deepEqual(removed.rows[0]?.cells.map(cellText), [fakeTheme().style("High", { fg: "thinkingHigh" })], "an empty label removes the default");
 });
-
 
 test("an instrument the extension does not implement renders blank and warns naming it", () => {
   const { rows, warning } = readDocument({ rows: [[{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }]] });
@@ -399,8 +391,6 @@ test("two unknown names in one row follow the position of each name's first entr
   );
 });
 
-
-
 test("an empty row is rejected and placed by its row alone", () => {
   rejected({ rows: [[{ instrument: "model" }], []] }, "row 2: is empty; a row lists the entries it renders");
 });
@@ -479,11 +469,6 @@ for (const [name, entry] of [
     assert.ok(warning, "a rejected document warns");
   });
 }
-
-
-
-
-
 
 test("a trusted project document replaces the agent document whole", () => {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
@@ -642,7 +627,6 @@ test("a document refused for another reason, and an unparseable one, render the 
   assert.equal(unparseable.rowGap, 1);
 });
 
-
 test("the instruments section alone configures the default row", () => {
   const configured = readDocument({ instruments: { blank: { format: "configured" } } });
   assert.equal(configured.warning, undefined);
@@ -671,27 +655,27 @@ test("the instruments section sits beside a rows list", () => {
 });
 
 test("a configured label is placed in front of a configured format and a default format", () => {
-  const configured = readDocument({ instruments: { model: { label: "🧠 ", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const configured = readDocument({ instruments: { model: { label: "🧠 ", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(configured.warning, undefined);
   assert.deepEqual(configured.rows[0]?.cells.map(cellText), ["🧠 claude-opus-4"]);
-  const defaulted = readDocument({ instruments: { context: { label: "ctx " } }, rows: [[{ instrument: "context" }]]});
+  const defaulted = readDocument({ instruments: { context: { label: "ctx " } }, rows: [[{ instrument: "context" }]] });
   assert.equal(defaulted.warning, undefined);
   assert.deepEqual(defaulted.rows[0]?.cells.map(cellText), ["ctx 43.2%/200k"]);
   const unlabelled = readDocument({ rows: [[{ instrument: "model" }]] });
   assert.deepEqual(unlabelled.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4"], "with no label configured the shipped default label renders");
-  const emptied = readDocument({ instruments: { model: { label: "", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const emptied = readDocument({ instruments: { model: { label: "", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.deepEqual(emptied.rows[0]?.cells.map(cellText), ["claude-opus-4"], 'an empty label leaves the format text unchanged');
 });
 
 test("a label with no trailing whitespace gets a one-column gap before its content", () => {
-  const result = readDocument({ instruments: { model: { label: "🧠", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const result = readDocument({ instruments: { model: { label: "🧠", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(result.warning, undefined);
   assert.deepEqual(result.rows[0]?.cells.map(cellText), ["🧠 claude-opus-4"]);
 });
 
 test("every instrument that has a label gets the gap", () => {
   for (const name of ["blank", "model", "thinking", "path", "context", "tokens", "cost"]) {
-    const result = readDocument({ instruments: { [name]: { label: "L" } }, rows: [[{ instrument: name }]]});
+    const result = readDocument({ instruments: { [name]: { label: "L" } }, rows: [[{ instrument: name }]] });
     assert.equal(result.warning, undefined, name);
     const text = stripTerminalSequences(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()) ?? "");
     assert.ok(text.startsWith("L "), `${name} renders its label, then one blank column: ${JSON.stringify(text)}`);
@@ -702,14 +686,14 @@ test("every instrument that has a label gets the gap", () => {
 
 test("a label that ends in whitespace or in a control character gets one gap, never two", () => {
   for (const label of [" 🧠 ", "🧠\n", "🧠\u0085", "🧠\u00a0"]) {
-    const result = readDocument({ instruments: { model: { label, format: "$model" } }, rows: [[{ instrument: "model" }]]});
+    const result = readDocument({ instruments: { model: { label, format: "$model" } }, rows: [[{ instrument: "model" }]] });
     assert.equal(result.warning, undefined, JSON.stringify(label));
     assert.deepEqual(result.rows[0]?.cells.map(cellText), ["🧠 claude-opus-4"], JSON.stringify(label));
   }
 });
 
 test("a label that is empty after the trim shows no label and no gap", () => {
-  const result = readDocument({ instruments: { model: { label: "  ", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const result = readDocument({ instruments: { model: { label: "  ", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(result.warning, undefined);
   assert.deepEqual(result.rows[0]?.cells.map(cellText), ["claude-opus-4"]);
 });
@@ -737,24 +721,24 @@ test("a document carrying Joel's three labels renders each cell with one gap", (
 test("an unknown datum suppresses the whole cell, label included", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
   for (const format of ["$level", ""]) {
-    const { rows, warning } = readDocument({ instruments: { thinking: { label: "Thinking: ", format } }, rows: [[{ instrument: "thinking" }]]});
+    const { rows, warning } = readDocument({ instruments: { thinking: { label: "Thinking: ", format } }, rows: [[{ instrument: "thinking" }]] });
     assert.equal(warning, undefined);
     assert.equal(rows[0]?.cells[0]?.instrument.render(unknownLevel, 80, fakeTheme()), "", `a format of ${JSON.stringify(format)} does not shield the cell`);
   }
-  const known = readDocument({ instruments: { thinking: { label: "Thinking: ", format: "$level" } }, rows: [[{ instrument: "thinking" }]]});
+  const known = readDocument({ instruments: { thinking: { label: "Thinking: ", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(known.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "Thinking: " + fakeTheme().style("high", { fg: "thinkingHigh" }), "the same label with a known level renders");
 });
 
 test("a known datum with an intentionally empty format renders the label alone", () => {
-  const labelled = readDocument({ instruments: { thinking: { label: "🤔", format: "" } }, rows: [[{ instrument: "thinking" }]]});
+  const labelled = readDocument({ instruments: { thinking: { label: "🤔", format: "" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(labelled.warning, undefined);
   assert.equal(labelled.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔");
-  const bare = readDocument({ instruments: { thinking: { label: "", format: "" } }, rows: [[{ instrument: "thinking" }]]});
+  const bare = readDocument({ instruments: { thinking: { label: "", format: "" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(bare.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "");
 });
 
 test("a whitespace-only format counts as empty and leaves the label alone", () => {
-  const result = readDocument({ instruments: { thinking: { label: "🤔", format: "   " } }, rows: [[{ instrument: "thinking" }]]});
+  const result = readDocument({ instruments: { thinking: { label: "🤔", format: "   " } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(result.warning, undefined);
   assert.equal(result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "🤔");
 });
@@ -762,58 +746,58 @@ test("a whitespace-only format counts as empty and leaves the label alone", () =
 test("an unknown datum leaves no label and no lone gap, whatever the format", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
   for (const format of ["$level", "", "   "]) {
-    const result = readDocument({ instruments: { thinking: { label: "🤔", format } }, rows: [[{ instrument: "thinking" }]]});
+    const result = readDocument({ instruments: { thinking: { label: "🤔", format } }, rows: [[{ instrument: "thinking" }]] });
     assert.equal(result.warning, undefined, JSON.stringify(format));
     assert.equal(result.rows[0]?.cells[0]?.instrument.render(unknownLevel, 80, fakeTheme()), "",
       `an unknown level with ${JSON.stringify(format)} renders no cell, label included: the guard reads the declared variables, not the trimmed segments`);
   }
-  const known = readDocument({ instruments: { thinking: { label: "🤔", format: "$level" } }, rows: [[{ instrument: "thinking" }]]});
+  const known = readDocument({ instruments: { thinking: { label: "🤔", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(known.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()),
     "🤔 " + fakeTheme().style("high", { fg: "thinkingHigh" }), "the same label with a known level renders it after the gap");
 });
 
 test("a label is literal text, never a variable and never parsed", () => {
-  const dollar = readDocument({ instruments: { model: { label: "$level ", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const dollar = readDocument({ instruments: { model: { label: "$level ", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(dollar.warning, undefined);
   assert.deepEqual(dollar.rows[0]?.cells.map(cellText), ["$level claude-opus-4"]);
-  const escaped = readDocument({ instruments: { model: { label: "a\\$b ", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const escaped = readDocument({ instruments: { model: { label: "a\\$b ", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.deepEqual(escaped.rows[0]?.cells.map(cellText), ["a\\$b claude-opus-4"], "an escape inside a label is not consumed");
   rejected({ instruments: { model: { format: "$label" } } }, '"model"\'s format names a variable it does not declare: "$label"');
 });
 
 test("a label's control characters each become one space so the label stays on one line", () => {
-  const result = readDocument({ instruments: { thinking: { label: "A\nB\u0085C ", format: "$level" } }, rows: [[{ instrument: "thinking" }]]});
+  const result = readDocument({ instruments: { thinking: { label: "A\nB\u0085C ", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(result.warning, undefined);
   const text = result.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()) ?? "";
   assert.equal(text, "A B C " + fakeTheme().style("high", { fg: "thinkingHigh" }));
   assert.equal(text.includes("\n"), false);
-  const controls = readDocument({ instruments: { thinking: { label: "T\tB\r", format: "$level" } }, rows: [[{ instrument: "thinking" }]]});
+  const controls = readDocument({ instruments: { thinking: { label: "T\tB\r", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(controls.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme()), "T B " + fakeTheme().style("high", { fg: "thinkingHigh" }), "a tab and a carriage return each become one space");
 });
 
 test("the label takes the instrument's configured style", () => {
   const theme = fakeTheme();
-  const styled = readDocument({ instruments: { model: { label: "Q: ", format: "$model", style: { fg: "accent" } } }, rows: [[{ instrument: "model" }]]}, theme);
+  const styled = readDocument({ instruments: { model: { label: "Q: ", format: "$model", style: { fg: "accent" } } }, rows: [[{ instrument: "model" }]] }, theme);
   assert.equal(styled.warning, undefined);
   assert.deepEqual(styled.rows[0]?.cells.map(cellText), [theme.style("Q: ", { fg: "accent" }) + theme.style("claude-opus-4", { fg: "accent" })]);
-  const plain = readDocument({ instruments: { model: { label: "Q: ", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const plain = readDocument({ instruments: { model: { label: "Q: ", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   assert.deepEqual(plain.rows[0]?.cells.map(cellText), ["Q: claude-opus-4"], "with no style the label is unstyled text");
 });
 
 test("the label's width reduces what the bar has left", () => {
   const theme = fakeTheme();
-  const result = readDocument({ instruments: { context: { label: "ab ", format: "$percent $bar" } }, rows: [[{ instrument: "context" }]]});
+  const result = readDocument({ instruments: { context: { label: "ab ", format: "$percent $bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(result.warning, undefined);
   const text = result.rows[0]?.cells[0]?.instrument.render(seed, 20, theme) ?? "";
   assert.equal(text, "ab 43.2% " + "█".repeat(4) + theme.style("░".repeat(7), { dim: true }));
   assert.equal(visibleWidth(text), 20);
-  const full = readDocument({ instruments: { context: { label: "x".repeat(20), format: "$bar" } }, rows: [[{ instrument: "context" }]]});
+  const full = readDocument({ instruments: { context: { label: "x".repeat(20), format: "$bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(full.rows[0]?.cells[0]?.instrument.render(seed, 20, theme), "x".repeat(20) + " ", "a label as wide as the cell leaves the bar nothing");
 });
 
 test("a label narrower than the cell shrinks the bar by its columns and the gap's one", () => {
   const theme = fakeTheme();
-  const result = readDocument({ instruments: { context: { label: "ab", format: "$percent $bar" } }, rows: [[{ instrument: "context" }]]});
+  const result = readDocument({ instruments: { context: { label: "ab", format: "$percent $bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(result.warning, undefined);
   const text = result.rows[0]?.cells[0]?.instrument.render(seed, 20, theme) ?? "";
   assert.equal(text, "ab 43.2% " + "█".repeat(4) + theme.style("░".repeat(7), { dim: true }));
@@ -840,9 +824,9 @@ test("each of the five shipped default labels renders in front of its default fo
 
 test("a configured label replaces a shipped default and keeps the one gap", () => {
   for (const name of ["path", "context", "tokens", "cost", "model"]) {
-    const labelled = readDocument({ instruments: { [name]: { label: "L" } }, rows: [[{ instrument: name }]]});
+    const labelled = readDocument({ instruments: { [name]: { label: "L" } }, rows: [[{ instrument: name }]] });
     assert.equal(labelled.warning, undefined, name);
-    const bare = readDocument({ instruments: { [name]: { label: "" } }, rows: [[{ instrument: name }]]});
+    const bare = readDocument({ instruments: { [name]: { label: "" } }, rows: [[{ instrument: name }]] });
     assert.equal(bare.warning, undefined, name);
     const [labelledText = ""] = labelled.rows[0]?.cells.map(cellText) ?? [];
     const [bareText = ""] = bare.rows[0]?.cells.map(cellText) ?? [];
@@ -852,7 +836,7 @@ test("a configured label replaces a shipped default and keeps the one gap", () =
 
 test("an empty configured label removes a shipped default and its gap", () => {
   for (const name of ["path", "context", "tokens", "cost", "model"]) {
-    const { rows, warning } = readDocument({ instruments: { [name]: { label: "", format: "x" } }, rows: [[{ instrument: name }]]});
+    const { rows, warning } = readDocument({ instruments: { [name]: { label: "", format: "x" } }, rows: [[{ instrument: name }]] });
     assert.equal(warning, undefined, name);
     assert.deepEqual(rows[0]?.cells.map(cellText), ["x"], `${name} configured with label "" renders its format alone, with no label and no gap`);
   }
@@ -879,7 +863,7 @@ test("blank declares no default label, so its placeholder and its empty format c
   const placeholder = readDocument({ rows: [[{ instrument: "blank" }]] });
   assert.equal(placeholder.warning, undefined);
   assert.deepEqual(placeholder.rows[0]?.cells.map(cellText), [DEFAULT_CELL_TEXT], "nothing configured, and no label in front of the placeholder");
-  const emptied = readDocument({ instruments: { blank: { format: "" } }, rows: [[{ instrument: "blank" }]]});
+  const emptied = readDocument({ instruments: { blank: { format: "" } }, rows: [[{ instrument: "blank" }]] });
   assert.equal(emptied.warning, undefined);
   assert.deepEqual(emptied.rows[0]?.cells.map(cellText), [""], 'a format of "" renders nothing, not a lone label');
 });
@@ -936,13 +920,13 @@ test("a coloured status is measured as its text, so the cell's plan counts '● 
 });
 
 test("a shipped default label precedes a configured format", () => {
-  const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, rows: [[{ instrument: "path" }]]});
+  const { rows, warning } = readDocument({ instruments: { path: { format: "$path!" } }, rows: [[{ instrument: "path" }]] });
   assert.equal(warning, undefined);
   assert.deepEqual(rows[0]?.cells.map(cellText), ["Path: pi-jefferson!"], "no label configured, so the default label comes first");
 });
 
 test("an empty format on a shipped instrument leaves its default label alone", () => {
-  const { rows, warning } = readDocument({ instruments: { context: { format: "" } }, rows: [[{ instrument: "context" }]]});
+  const { rows, warning } = readDocument({ instruments: { context: { format: "" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(warning, undefined);
   assert.deepEqual(rows[0]?.cells.map(cellText), ["Context:"], 'a format of "" renders the default label alone');
 });
@@ -967,7 +951,7 @@ test("a path, model and thinking row at 80 columns keeps every text in its colum
 
 test("a configured foreground does not beat the level's color", () => {
   const theme = fakeTheme();
-  const { rows, warning } = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, rows: [[{ instrument: "thinking" }]]}, theme);
+  const { rows, warning } = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, rows: [[{ instrument: "thinking" }]] }, theme);
   assert.equal(warning, undefined);
   const text = rows[0]?.cells[0]?.instrument.render(seed, 80, theme) ?? "";
   assert.equal(stripTerminalSequences(text), "Thinking: High");
@@ -977,17 +961,17 @@ test("a configured foreground does not beat the level's color", () => {
 test("a configured background and boolean attributes survive on the level", () => {
   const theme = fakeTheme();
   const style = { bg: "selectedBg", bold: true } as const;
-  const { rows } = readDocument({ instruments: { thinking: { style } }, rows: [[{ instrument: "thinking" }]]}, theme);
+  const { rows } = readDocument({ instruments: { thinking: { style } }, rows: [[{ instrument: "thinking" }]] }, theme);
   assert.equal(rows[0]?.cells[0]?.instrument.render(seed, 80, theme), theme.style("Thinking: ", style) + theme.style("High", { ...style, fg: "thinkingHigh" }));
   const italic = { italic: true } as const;
-  const attrs = readDocument({ instruments: { thinking: { style: italic } }, rows: [[{ instrument: "thinking" }]]}, theme);
+  const attrs = readDocument({ instruments: { thinking: { style: italic } }, rows: [[{ instrument: "thinking" }]] }, theme);
   assert.equal(attrs.rows[0]?.cells[0]?.instrument.render(seed, 80, theme), theme.style("Thinking: ", italic) + theme.style("High", { italic: true, fg: "thinkingHigh" }));
 });
 
 test("only the level segment is recolored", () => {
   const theme = fakeTheme();
   const style = { fg: "accent" } as const;
-  const { rows } = readDocument({ instruments: { thinking: { style, format: "[$level]", label: "Q: " } }, rows: [[{ instrument: "thinking" }]]}, theme);
+  const { rows } = readDocument({ instruments: { thinking: { style, format: "[$level]", label: "Q: " } }, rows: [[{ instrument: "thinking" }]] }, theme);
   assert.equal(rows[0]?.cells[0]?.instrument.render(seed, 80, theme),
     theme.style("Q: ", style) + theme.style("[", style) + theme.style("high", { fg: "thinkingHigh" }) + theme.style("]", style));
 });
@@ -995,7 +979,7 @@ test("only the level segment is recolored", () => {
 test("a level outside the seven keeps the instrument's own style", () => {
   const theme = fakeTheme();
   const plain = readDocument({ rows: [[{ instrument: "thinking" }]] }, theme);
-  const styled = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, rows: [[{ instrument: "thinking" }]]}, theme);
+  const styled = readDocument({ instruments: { thinking: { style: { fg: "accent" } } }, rows: [[{ instrument: "thinking" }]] }, theme);
   // An inherited object name is no more a token than a future host level is, so it renders unstyled.
   const levels = [["ultra", "Ultra"], ["toString", "ToString"], ["constructor", "Constructor"], ["__proto__", "__proto__"]] as const;
   for (const [level, capitalized] of levels) {
@@ -1020,8 +1004,8 @@ test("the level's token resolves against the theme passed to each render", () =>
 test("trusted project instruments replace the agent document whole and untrusted instruments are ignored", () => {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
   const agentPath = join(dir, "agent.json"), projectPath = join(dir, "project.json");
-  writeFileSync(agentPath, JSON.stringify({ instruments: { blank: { format: "agent" }, model: { format: "agent-model" } }, rows: [[{ instrument: "blank" }, { instrument: "model" }]]}));
-  writeFileSync(projectPath, JSON.stringify({ instruments: { blank: { format: "project" } }, rows: [[{ instrument: "blank" }, { instrument: "model" }]]}));
+  writeFileSync(agentPath, JSON.stringify({ instruments: { blank: { format: "agent" }, model: { format: "agent-model" } }, rows: [[{ instrument: "blank" }, { instrument: "model" }]] }));
+  writeFileSync(projectPath, JSON.stringify({ instruments: { blank: { format: "project" } }, rows: [[{ instrument: "blank" }, { instrument: "model" }]] }));
   const trusted = readConfiguration({ agentPath, projectPath, projectTrusted: true, theme: fakeTheme() });
   assert.deepEqual(trusted.rows[0]?.cells.map(cellText), ["project", "Model: anthropic/claude-opus-4"]);
   const untrusted = readConfiguration({ agentPath, projectPath, projectTrusted: false, theme: fakeTheme() });
@@ -1078,7 +1062,7 @@ function rejected(document: unknown, message: string): void {
 
 test("the instruments section shape guard rejects non-objects with the exact message", () => {
   for (const instruments of [null, [], 42, "model"]) {
-    rejected({ instruments, rows: [[{ instrument: "model" }]]}, "the instruments value is not an object");
+    rejected({ instruments, rows: [[{ instrument: "model" }]] }, "the instruments value is not an object");
   }
 });
 
@@ -1104,12 +1088,12 @@ test("a label that is not a string rejects the document naming the instrument an
   for (const label of [3, {}]) {
     rejected({ instruments: { model: { label } } }, 'instrument "model" has a label that is not a string');
   }
-  const empty = readDocument({ instruments: { model: { label: "" } }, rows: [[{ instrument: "model" }]]});
+  const empty = readDocument({ instruments: { model: { label: "" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(empty.warning, undefined);
 });
 
 test("an explicitly empty configured format is accepted and leaves the default label alone", () => {
-  const result = readDocument({ instruments: { model: { format: "" } }, rows: [[{ instrument: "model" }]]});
+  const result = readDocument({ instruments: { model: { format: "" } }, rows: [[{ instrument: "model" }]] });
   assert.equal(result.warning, undefined);
   assert.deepEqual(result.rows[0]?.cells.map(cellText), ["Model:"]);
 });
@@ -1162,14 +1146,14 @@ test("the background value guard reports rejected colors, wrong slots and fracti
 
 test("all six attributes accept boolean values and empty styles preserve unstyled bytes", () => {
   const style = { bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true };
-  const result = readDocument({ instruments: { model: { format: "$model", style } }, rows: [[{ instrument: "model" }]]});
+  const result = readDocument({ instruments: { model: { format: "$model", style } }, rows: [[{ instrument: "model" }]] });
   assert.equal(result.warning, undefined);
   assert.deepEqual(result.rows[0]?.cells.map(cellText), [fakeTheme().style("Model: ", style) + fakeTheme().style("claude-opus-4", style)]);
   const falseAttributes = Object.fromEntries(Object.keys(style).map(key => [key, false]));
-  const disabled = readDocument({ instruments: { model: { format: "$model", style: falseAttributes } }, rows: [[{ instrument: "model" }]]});
+  const disabled = readDocument({ instruments: { model: { format: "$model", style: falseAttributes } }, rows: [[{ instrument: "model" }]] });
   assert.equal(disabled.warning, undefined);
   assert.deepEqual(disabled.rows[0]?.cells.map(cellText), ["Model: claude-opus-4"]);
-  const empty = readDocument({ instruments: { model: { style: {} } }, rows: [[{ instrument: "model" }]]});
+  const empty = readDocument({ instruments: { model: { style: {} } }, rows: [[{ instrument: "model" }]] });
   const absent = readDocument({ rows: [[{ instrument: "model" }]] });
   assert.equal(empty.warning, undefined);
   assert.deepEqual(empty.rows[0]?.cells.map(cellText), absent.rows[0]?.cells.map(cellText));
@@ -1215,7 +1199,7 @@ test("configured styled cells reset before every trailing pad, including attribu
 test("the gap takes the label's style, so the background runs unbroken across it", () => {
   const theme = fakeTheme();
   for (const style of [{ bg: "selectedBg" }, { underline: true }] as const) {
-    const document = { instruments: { context: { label: "Q", format: "$percent", style } }, rows: [[{ instrument: "context" }]]};
+    const document = { instruments: { context: { label: "Q", format: "$percent", style } }, rows: [[{ instrument: "context" }]] };
     const { rows } = readDocument(document, theme);
     const text = theme.style("Q ", style) + theme.style("43.2%", style);
     assert.equal(rows[0]?.cells[0]?.instrument.render(seed, 80, theme), text, JSON.stringify(style));
@@ -1226,7 +1210,7 @@ test("the gap takes the label's style, so the background runs unbroken across it
 });
 
 test("a cell narrower than the label, the gap and the content clips them together", () => {
-  const footer = footerFor({ instruments: { model: { label: "ab", format: "$model" } }, rows: [[{ instrument: "model" }]]});
+  const footer = footerFor({ instruments: { model: { label: "ab", format: "$model" } }, rows: [[{ instrument: "model" }]] });
   const lines = footer.render(10);
   assert.equal(lines.length, 1);
   assert.equal(visibleWidth(lines[0] ?? ""), 10);
@@ -1235,7 +1219,7 @@ test("a cell narrower than the label, the gap and the content clips them togethe
 
 test("right-aligned styled cells lead with unstyled pad and exact-fill cells add no reset", () => {
   const theme = fakeTheme();
-  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, rows: [[{ instrument: "blank", align: "right" }]]}, theme);
+  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, rows: [[{ instrument: "blank", align: "right" }]] }, theme);
   for (const width of [7, 2]) {
     const line = footer.render(width)[0] ?? "";
     const cell = line.split(FRAME)[1] ?? "";
@@ -1259,7 +1243,7 @@ test("styled clips retain the clip's own resets around ellipsis before a wide-gl
 test("configured prose around a bar is styled per segment and the dim track retains its background", () => {
   const theme = fakeTheme();
   const style: ThemeStyle = { fg: "accent", bg: "selectedBg" };
-  const footer = footerFor({ instruments: { context: { label: "", format: "[$bar]", style } }, rows: [[{ instrument: "context" }]]}, theme);
+  const footer = footerFor({ instruments: { context: { label: "", format: "[$bar]", style } }, rows: [[{ instrument: "context" }]] }, theme);
   const line = footer.render(12)[0] ?? "";
   const cell = line.split(FRAME)[1] ?? "";
   const filled = theme.style("█".repeat(4), style);
@@ -1288,7 +1272,7 @@ test("theme invalidation re-styles the same footer with no bytes cached from the
     if (key === "style") return (text: string, style: ThemeStyle) => { styles++; return current.style(text, style); };
     return Reflect.get(current, key);
   } });
-  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, rows: [[{ instrument: "blank" }]]}, live);
+  const footer = footerFor({ instruments: { blank: { format: "ab", style: { fg: "accent" } } }, rows: [[{ instrument: "blank" }]] }, live);
   const first = footer.render(10)[0] ?? "";
   assert.equal(first, FRAME + a.style("ab", { fg: "accent" }) + RESET + " ".repeat(8) + FRAME);
   assert.equal(styles, 1);
@@ -1343,9 +1327,6 @@ test("every row the parser writes is sized by content", () => {
   assert.deepEqual(refused.rows.map((row) => row.distribution), ["content"]);
 });
 
-
-
-
 test("blank fills, and so does an instrument whose format takes the width", () => {
   const defaults = readDocument({
     rows: [["blank", "model", "thinking", "path", "tokens", "cost", "context"].map((instrument) => ({ instrument }))],
@@ -1357,11 +1338,11 @@ test("blank fills, and so does an instrument whose format takes the width", () =
     "blank fills; context's default $percent/$window has no bar",
   );
 
-  const configured = readDocument({ instruments: { context: { format: "$percent $bar" } }, rows: [[{ instrument: "context" }]]});
+  const configured = readDocument({ instruments: { context: { format: "$percent $bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(configured.warning, undefined);
   assert.deepEqual(configured.rows[0]?.cells.map((cell) => cell.instrument.fills), [true], "a configured bar fills");
 
-  const escaped = readDocument({ instruments: { context: { format: "\\$percent \\$bar" } }, rows: [[{ instrument: "context" }]]});
+  const escaped = readDocument({ instruments: { context: { format: "\\$percent \\$bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(escaped.warning, undefined);
   assert.deepEqual(escaped.rows[0]?.cells.map((cell) => cell.instrument.fills), [false], "an escaped \\$bar is plain text");
 });

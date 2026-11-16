@@ -11,6 +11,7 @@ import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil
 import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { DEFAULT_CELLS } from "../extensions/jefferson/configuration.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -207,7 +208,7 @@ function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
 
 /** `count` placeholder rows: a row lists the entries it renders, and one `blank` entry fills it. */
 function blankRows(count: number): { instrument: string }[][] {
-  return Array.from({ length: count }, () => Array.from({ length: 10 }, () => ({ instrument: "blank" })));
+  return Array.from({ length: count }, () => Array.from({ length: DEFAULT_CELLS }, () => ({ instrument: "blank" })));
 }
 
 function writeAgentDocument(agentDir: string, document: unknown): void {
@@ -727,10 +728,9 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
   assert.deepEqual(session.notified, []);
 });
 
-
 test("a rejected style warns with its exact envelope and installs the default footer", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, rows: [[{ instrument: "model" }]]});
+  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, rows: [[{ instrument: "model" }]] });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
   assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
