@@ -640,7 +640,7 @@ test("A8 jefferson.custom.mine stays free", () => {
   const events = createEventBus();
   const registry = createRegistry();
   createRegistrationListener({
-    events, registry, faults: createFaultLedger(), fields: createProviderFields(), repaint: () => {},
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(() => {}), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
   events.emit("jefferson:registration", registration);
@@ -1086,6 +1086,9 @@ test("A6 a variable that resolves to nothing renders nothing, with no fault", as
 test("A6 a resolver that throws on every render warns once", async (t) => {
   const session = await providedRow(t, () => { throw new Error("provider threw"); });
   line(session);
+  // A notify raised inside a render schedules another render, and that one another: the fault waits
+  // for the ledger's flush instead (design 7; the spec's "None MUST be raised inside a render").
+  assert.deepEqual(session.notified, [], "nothing is raised inside the render");
   await settle();
   assert.equal(session.notified.length, 1, "one part after the first render's flush");
   for (let frame = 0; frame < 5; frame++) line(session);
@@ -1300,7 +1303,7 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
   const events = createEventBus();
   const registry = createRegistry();
   createRegistrationListener({
-    events, registry, faults: createFaultLedger(), fields: createProviderFields(), repaint: () => {},
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(() => {}), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
   for (const declaration of SHIPPED) {
@@ -1308,8 +1311,41 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
   }
 });
 
+test("A3 a rejected document reports no settings fault, provider-first", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  // Row two is refused after the block's provided name was checked, so the settings fault the check
+  // found belongs to a document that never installed.
+  writeAgentDocument(agentDir, {
+    instruments: { "taiknr.savings": { format: "Spent $spent" } },
+    rows: [[{ instrument: "taiknr.savings" }], [{ instrument: "model", align: "rgiht" }]],
+  });
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.equal(session.notified.length, 1, "one notice, and it is the rejection");
+  assert.match(session.notified[0]?.message ?? "", /was rejected/);
+  assert.equal(session.notified.some(notified => notified.message.includes("is configured with")), false,
+    "a document that never installed says nothing about its settings");
+});
+
+test("A8 no bus handler of Jefferson's raises an error, from the factory through a report", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  // pi's bus catches whatever a handler throws and prints it, so a handler that reads a binding
+  // before it is initialized still runs and the suite still passes: nothing else would notice.
+  const errors = t.mock.method(console, "error");
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: () => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+    },
+  });
+  assert.equal(line(session), "Savings: $4.10");
+  assert.deepEqual(errors.mock.calls.map(call => call.arguments), [], "no bus handler raised");
+});
+
 test("A1 two providers' fields of one name are separate", () => {
-  const fields = createProviderFields();
+  const fields = createProviderFields(() => {});
   fields.declare("taiknr", { saved: "string" });
   fields.declare("other", { saved: "number" });
   fields.report("taiknr", "saved", "$4.10");
@@ -1319,7 +1355,7 @@ test("A1 two providers' fields of one name are separate", () => {
 });
 
 test("A1 the view holds only that provider's declared fields", () => {
-  const fields = createProviderFields();
+  const fields = createProviderFields(() => {});
   fields.declare("taiknr", { saved: "string" });
   fields.declare("other", { saved: "number", working: "boolean" });
   fields.report("other", "saved", 3);
@@ -1330,14 +1366,14 @@ test("A1 the view holds only that provider's declared fields", () => {
 });
 
 test("A1 an undeclared key reads undefined", () => {
-  const fields = createProviderFields();
+  const fields = createProviderFields(() => {});
   fields.declare("taiknr", { saved: "string" });
   assert.equal(fields.view("taiknr").spent, undefined);
   assert.equal(fields.view("taiknr").saved, undefined, "declared and unreported is unknown too");
 });
 
 test("A1 checkFields answers outside and conflict", () => {
-  const fields = createProviderFields();
+  const fields = createProviderFields(() => {});
   fields.declare("taiknr", { saved: "string" });
   assert.equal(fields.checkFields("taiknr", undefined), undefined, "fields are optional");
   assert.equal(fields.checkFields("taiknr", { saved: "string", omitted: "number" }), undefined);
@@ -1349,7 +1385,7 @@ test("A1 checkFields answers outside and conflict", () => {
 });
 
 test("A1 checkReport answers undeclared, wrong-type and not-finite", () => {
-  const fields = createProviderFields();
+  const fields = createProviderFields(() => {});
   fields.declare("taiknr", { saved: "string", working: "boolean", amount: "number" });
   assert.deepEqual(fields.checkReport("taiknr", "spent", "x"), { type: "undeclared" });
   assert.deepEqual(fields.checkReport("taiknr", "saved", 5), { type: "wrong-type", declared: "string", given: 5 });
@@ -1368,7 +1404,7 @@ test("A1 a provider variable reads its view", () => {
     const view = { saved: `$${reads.length + 1}` };
     reads.push(view);
     return view;
-  });
+  }, () => {});
   assert.ok(!("refused" in adapted));
   const readings = {} as Readings;
   assert.equal(adapted.variables.saved?.(readings), "$1");
@@ -1377,20 +1413,20 @@ test("A1 a provider variable reads its view", () => {
 
 test("A1 a resolver that is not a function is refused", () => {
   const declaration = { ...registration.instruments[0]!, variables: { saved: "nope" } } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({})),
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
     { refused: "resolver-not-function", variable: "saved" });
 });
 
 test("A1 a default label that is not a string is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({})), { refused: "label-not-string" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}), { refused: "label-not-string" });
 });
 
 test("A1 a default format Jefferson cannot parse is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultFormat: "Spent $spent" } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({})),
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
     { refused: "unparseable-default-format" });
   // The table's row order decides which fault a payload with two is refused for.
   const twice = { ...declaration, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({})), { refused: "unparseable-default-format" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}), { refused: "unparseable-default-format" });
 });

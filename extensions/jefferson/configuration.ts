@@ -116,6 +116,12 @@ interface Reading {
   held: Map<string, unknown>;
   /** Each provided name whose settings were refused: its entries render the fallback instrument. */
   refused: Set<string>;
+  /**
+   * The settings faults found while the document normalized. They wait here, because a document a
+   * later row or key rejects never installs, and a fault about it would be a warning about something
+   * the user never had (the published rule is that only an accepted document's faults are reported).
+   */
+  faults: Fault[];
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
@@ -228,7 +234,7 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
       const settings = checkProvidedSettings(normalized, value, provided, source.theme);
       if ("part" in settings) {
         reading.refused.add(normalized);
-        source.report({ scope: normalized, kind: settings.kind, part: settings.part });
+        reading.faults.push({ scope: normalized, kind: settings.kind, part: settings.part });
         continue;
       }
       configured.set(normalized, settings);
@@ -455,7 +461,10 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
   const noticeSeconds = placesNotice
     ? declaredSeconds.get(source.noticeGate.name) ?? source.noticeGate.seconds
     : undefined;
-  // Only now, with the whole document normalized: a rejected read registers no watch.
+  // Only now, with the whole document normalized: a rejected read registers no watch and reports no
+  // fault, so a settings fault found above is delivered only for a document that installs.
+  for (const fault of reading.faults) source.report(fault);
+
   for (const [name, holders] of reading.holders) {
     const raw = reading.held.get(name);
     source.watch(name, (declaration) => {
@@ -542,7 +551,9 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   }
 
   try {
-    const reading: Reading = { unknownNames: [], holders: new Map(), held: new Map(), refused: new Set() };
+    const reading: Reading = {
+      unknownNames: [], holders: new Map(), held: new Map(), refused: new Set(), faults: [],
+    };
     const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source);
     return { rows, rowGap, noticeSeconds, path, unknownNames: reading.unknownNames, warning: undefined };
   } catch (error) {

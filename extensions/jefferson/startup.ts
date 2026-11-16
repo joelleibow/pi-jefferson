@@ -22,6 +22,12 @@ function schedule(callback: () => void, delayMs: number): () => void {
 }
 
 export function startUp(pi: ExtensionAPI): void {
+  // The one repaint slot: the host's `tui` is reachable only inside the footer's factory, so its
+  // `receiveRepaint` sets this, and every push — a report, an accepted registration — reads it. The
+  // shutdown clears it, so nothing asks a context the host has invalidated to render again. It is
+  // declared before the listener, which reads it while it emits Jefferson's own payload.
+  let requestRepaint: (() => void) | undefined;
+
   // Registrations outlive a session: the registry is built here, and Jefferson registers its own
   // instruments by the same message a provider posts, before any `session_start` runs (design 6).
   const registry = createRegistry();
@@ -61,11 +67,6 @@ export function startUp(pi: ExtensionAPI): void {
   // The latest read, for the handler that runs once startup is complete: the unknown names the
   // document carried are judged against the registry as it stands then (design 12).
   let latest: Configuration | undefined;
-
-  // The one repaint slot: the host's `tui` is reachable only inside the footer's factory, so its
-  // `receiveRepaint` sets this, and every push — a report, an accepted registration — reads it. The
-  // shutdown clears it, so nothing asks a context the host has invalidated to render again.
-  let requestRepaint: (() => void) | undefined;
 
   // Retained across `session_start` calls: the previous install's release, so a store this
   // install still holds is disposed — and its subscriptions dropped — before its replacement

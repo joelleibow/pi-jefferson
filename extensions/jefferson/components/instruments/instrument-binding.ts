@@ -54,7 +54,7 @@ export function adaptProvidedDeclaration(
   name: string,
   declaration: ProvidedDeclaration,
   view: () => ReadingsView,
-  record?: (fault: Fault) => void,
+  record: (fault: Fault) => void,
 ): InstrumentDeclaration | ProvidedRefusal {
   // The payload crossed a bus as `unknown`, so its members are read as the values they may be.
   const members = declaration as unknown as Record<string, unknown>;
@@ -68,19 +68,19 @@ export function adaptProvidedDeclaration(
         // outside it, so a `then` getter that throws is the outer boundary's to catch (design 10).
         value = (resolver as (readings: ReadingsView) => unknown)(view());
       } catch {
-        record?.({ scope: name, kind: "resolver-threw", part: `${quoted} failed to render: its resolver threw` });
+        record({ scope: name, kind: "resolver-threw", part: `${quoted} failed to render: its resolver threw` });
         return undefined;
       }
       if ((typeof value === "object" && value !== null || typeof value === "function")
         && typeof (value as { then?: unknown }).then === "function") {
         // The rejection is observed, so a provider's promise cannot take pi down with it.
         (value as { then(onFulfilled: undefined, onRejected: () => void): void }).then(undefined, () => {});
-        record?.({ scope: name, kind: "resolver-promise", part: `${quoted} failed to render: its resolver returned a promise` });
+        record({ scope: name, kind: "resolver-promise", part: `${quoted} failed to render: its resolver returned a promise` });
         return undefined;
       }
       // `undefined` is the declaration's own unknown value, not a fault (M8).
       if (value === undefined || typeof value === "string") return value;
-      record?.({
+      record({
         scope: name, kind: "resolver-returned",
         part: `${quoted} failed to render: its resolver returned ${describeValue(value)}, where text is declared`,
       });

@@ -5,9 +5,10 @@ x-marbleization:
   runs:
     chidi: 43dc6795-2ae2-47b1-9c81-5122ee6f777a
     eleanor: 5c5a59fa-1c8b-427f-97de-03e4dab4064f
-    michael: 383d2eaa-fdb0-46d3-9b64-6a2495d3c979
+    michael: 263cadda-bb1f-4f2b-9cb9-01b5c55dc889
     derek_spike: d7389373-1d82-4436-bd42-d19203168b43
-    bambadjan: d160f8c1-7ad5-48c3-8edb-ea8c107b9fc5
+    derek: 5e06ed3f-51ca-446c-847a-26ebea0300fc
+    bambadjan: e9e3e846-a0bb-46ee-8066-14d7670400ff
   gates:
     council_owner: approved
     design: approved
@@ -27,3 +28,5 @@ x-marbleization:
     - "2026-11-15: Michael spike-gap resolution da548b4c: 10 fixes (G1-G6, G8-G11), no escalations; applied by Bambadjan 58ce91f9. tasks.md written (ffec9a93), strict-valid. Stage 5 launched with 60-minute lens timeout."
     - "2026-11-16: Stage 5 feffa730 failed: s5-r3-codebase (72eac24a) timed out at 3600000ms while active (46 turns, 106 tool calls, 1 compaction; not hung). r1, r2 needs_fixes, both applied. Resumed 9262c046 at r3 reusing r3 readiness/structural; codebase rerun with 2h timeout."
     - "2026-11-16: Stage 5 9262c046 hit the 5-round cap (r3-r5 needs_fixes; r5: 1 blocking + 6 major, all propose_fix by Michael 383d2eaa and applied by Bambadjan d160f8c1, unreviewed). Joel: \"If michael resolved these things lets implement if things surface then Derek should raise them.\" tasks gate approved by Joel's ruling."
+    - "2026-11-16: Derek implemented (5e06ed3f): 14 commits, HEAD 1d51698, 60/62 boxes (5.6, 5.7 are Joel's), 516/516, typecheck clean. One consult (describeValue, Michael c93c3055) amended by Bambadjan e9e3e846. Implementation gate launched."
+    - "2026-11-16: implementation gate 263cadda: changes_requested. Blocking: TDZ, Jefferson's own registration reads requestRepaint before init (171 Event handler errors in the suite). Major: 8.1 ticked without its no-notify-in-render assertion. 2 minor. Fix + re-review workflow 819a3f4e."
