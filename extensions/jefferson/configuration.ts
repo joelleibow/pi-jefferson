@@ -465,7 +465,11 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
   // fault, so a settings fault found above is delivered only for a document that installs.
   for (const fault of reading.faults) source.report(fault);
 
-  for (const [name, holders] of reading.holders) {
+  // A name only the `instruments` block configures takes a watch with no holder, so its settings are
+  // checked when it registers: the check runs for every name the document names, not only the ones a
+  // row places (the statusline delta's MUST; M6).
+  for (const name of new Set([...reading.holders.keys(), ...reading.held.keys()])) {
+    const holders = reading.holders.get(name) ?? [];
     const raw = reading.held.get(name);
     source.watch(name, (declaration) => {
       // (a) The same check the reader runs for a name already registered, on the value the document

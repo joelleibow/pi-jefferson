@@ -30,7 +30,9 @@ export const registration: Registration = {
       name: "savings",
       variables: {
         saved: (readings) => {
-          const value = readings.saved;
+          // Bracket access, so the sample compiles under `noPropertyAccessFromIndexSignature` too:
+          // a readings view is an index signature, and authors copy this file.
+          const value = readings["saved"];
           return typeof value === "number" ? `$${value.toFixed(2)}` : undefined;
         },
       },

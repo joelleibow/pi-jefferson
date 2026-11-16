@@ -1270,6 +1270,7 @@ test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("taiknr.savings"), true);
   assert.equal(isProvidedName("jefferson.default.path"), false);
   assert.equal(isProvidedName("jefferson.custom.mine"), false, "three parts belong to Jefferson");
+  assert.equal(isProvidedName("a.b.c"), false, "a provided name is exactly two parts, whatever its first");
 });
 
 test("A8 isNamePart refuses a dotted part", () => {
@@ -1311,6 +1312,24 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
   }
 });
 
+/** The one settings part a block-only provided name takes, whichever came first. */
+const BLOCK_ONLY_PART = 'pi-jefferson: "taiknr.savings" is configured with a format naming "$nope", which the instrument does not declare; its entries render blank';
+
+test("A3 a block-only provided name is checked provider-first", async (t) => {
+  // No row places the name: only the instruments block configures it, so the check must come from
+  // the watch the block's raw value takes.
+  const document = configuredDocument(t, { format: "$nope" }, [[{ instrument: "model" }]]);
+  const session = await document.providerFirst();
+  assert.deepEqual(session.notified, [{ message: BLOCK_ONLY_PART, type: "warning" }]);
+});
+
+test("A3 a block-only provided name is checked Jefferson-first", async (t) => {
+  const document = configuredDocument(t, { format: "$nope" }, [[{ instrument: "model" }]]);
+  const session = await document.jeffersonFirst();
+  assert.deepEqual(session.notified, [{ message: BLOCK_ONLY_PART, type: "warning" }],
+    "the outcome depends on the name, never on the load order");
+});
+
 test("A3 a rejected document reports no settings fault, provider-first", async (t) => {
   const agentDir = useTempAgentDir(t);
   // Row two is refused after the block's provided name was checked, so the settings fault the check
@@ -1342,6 +1361,17 @@ test("A8 no bus handler of Jefferson's raises an error, from the factory through
   });
   assert.equal(line(session), "Savings: $4.10");
   assert.deepEqual(errors.mock.calls.map(call => call.arguments), [], "no bus handler raised");
+});
+
+test("A8 a three-part name outside jefferson keeps the whole-document rule", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  // Three parts belong to Jefferson alone: a name outside its namespace cannot be provided, so this
+  // value takes the whole-document rule, exactly as a name in Jefferson's namespace does.
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }]], instruments: { "a.b.c": 5 } });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.equal(session.notified.length, 1, "one notice, and it is the rejection");
+  assert.match(session.notified[0]?.message ?? "",
+    /was rejected \(the instruments configuration for "a\.b\.c" is not an object\)/);
 });
 
 test("A1 two providers' fields of one name are separate", () => {

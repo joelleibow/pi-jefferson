@@ -5,10 +5,12 @@ x-marbleization:
   runs:
     chidi: 43dc6795-2ae2-47b1-9c81-5122ee6f777a
     eleanor: 5c5a59fa-1c8b-427f-97de-03e4dab4064f
-    michael: a735f4f0-8727-4a7d-9a8f-38bec3a43714
+    michael: 9697d5e7-b22f-42a6-8c8a-530dcb27b1e1
     derek_spike: d7389373-1d82-4436-bd42-d19203168b43
+    judge_gen_verify: 0b7fb0a2-09c4-42d5-a9e6-bd85944ca784
+    judge_gen_review: 6d307f74-9efc-4146-a210-3d14c8a74a44
     derek: 2ec8f864-ebb7-44f9-b686-cf6346c3bca1
-    bambadjan: e9e3e846-a0bb-46ee-8066-14d7670400ff
+    bambadjan: 1d771ec5-b026-4298-b349-0e9a7c0820c2
   gates:
     council_owner: approved
     design: approved
@@ -32,3 +34,6 @@ x-marbleization:
     - "2026-11-16: Derek implemented (5e06ed3f): 14 commits, HEAD 1d51698, 60/62 boxes (5.6, 5.7 are Joel's), 516/516, typecheck clean. One consult (describeValue, Michael c93c3055) amended by Bambadjan e9e3e846. Implementation gate launched."
     - "2026-11-16: implementation gate 263cadda: changes_requested. Blocking: TDZ, Jefferson's own registration reads requestRepaint before init (171 Event handler errors in the suite). Major: 8.1 ticked without its no-notify-in-render assertion. 2 minor. Fix + re-review workflow 819a3f4e."
     - "2026-11-16: Derek fixed the gate findings (2ec8f864, b8786d3); Michael re-review a735f4f0: approve. 518/518, 0 bus errors. Docs pass launched."
+    - "2026-11-16: docs pass (Bambadjan 1d771ec5) committed 999fbc6; conductor removed docs/releasing.md for him. 11/11 doc JSON examples accepted. PR #24 opened (release:minor). Judge Gen validate launched."
+    - "2026-11-16: Judge Gen verify 0b7fb0a2 (0 critical, W1-W3, S1-S3) + review 6d307f74 (0 must-fix, 7 should-fix, 2 nice). Michael Validate adjudication 18ded68a launched."
+    - "2026-11-16: Michael Validate 9697d5e7: changes_requested, 11 findings upheld (2 major code: W2 block-only provided name unwatched Jefferson-first, W3 a.b.c treated as provided; 9 minor, 1 Derek fixture + 8 Bambadjan docs). Withdrew his CR-R2-2. Fixes workflow 2cd68419."

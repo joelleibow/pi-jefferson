@@ -16,9 +16,13 @@ export function normalizeName(written: string): string {
   return written.includes(".") ? written : `${OWN_NAMESPACE}.default.${written}`;
 }
 
-/** Whether a full name belongs to a provider: its first part is not exactly `jefferson`. */
+/**
+ * Whether a full name belongs to a provider: exactly two parts, and the first is not `jefferson`.
+ * Three parts belong to Jefferson alone, so a three-part name outside its namespace is no provider's.
+ */
 export function isProvidedName(name: string): boolean {
-  return name.split(".")[0] !== OWN_NAMESPACE;
+  const parts = name.split(".");
+  return parts.length === 2 && parts[0] !== OWN_NAMESPACE;
 }
 
 /** Whether a text is one name part: the extension's, or an instrument's. */
