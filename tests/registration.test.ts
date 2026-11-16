@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { createEventBus, type EventBus } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
 
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { adaptProvidedDeclaration } from "../extensions/jefferson/components/instruments/instrument-binding.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { createProviderFields } from "../extensions/jefferson/data/provider-fields.ts";
+import { createFaultLedger } from "../extensions/jefferson/faults.ts";
 import { createRegistrationListener } from "../extensions/jefferson/registration-listener.ts";
 import {
   createRegistry, isNamePart, isProvidedName, normalizeName,
@@ -16,7 +21,7 @@ import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instrument
 import type { ProvidedDeclaration, Registration, ReadingsView } from "../extensions/jefferson/instrument-contract.ts";
 import { SHIPPED } from "../extensions/jefferson/shipped.ts";
 import {
-  harness, useTempAgentDir, writeAgentDocument, type FakeSession,
+  harness, useTempAgentDir, writeAgentDocument, type FakeSession, type Harness,
 } from "./session-harness.ts";
 
 /**
@@ -206,6 +211,414 @@ test("A1 a report made before Jefferson's session_start renders once the footer 
   assert.equal(line(await h.start()), "Savings: $4.10");
 });
 
+test("A2 a payload that is not a registration warns once, and a repeat adds nothing", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", 5);
+  h.events.emit("jefferson:registration", 5);
+  const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [
+    { message: "pi-jefferson: a registration is not an object", type: "warning" },
+  ], "one notice for the kind, whatever sent it and however often");
+  assert.equal(line(session), "Model: anthropic/claude-opus-4", "a refused payload changes nothing a row renders");
+});
+
+test("A2 a second claim on a taken name is refused, and the first keeps rendering", async (t) => {
+  documentShowing(t, [["taiknr.savings", "path"], ["taiknr.stolen"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [
+      { ...registration.instruments[0]!, defaultFormat: "Stolen: $saved" },
+      { name: "stolen", variables: { saved: (readings: ReadingsView) => String(readings.saved) }, defaultFormat: "$saved" },
+    ],
+  });
+  h.events.emit("jefferson:update", saved("$4.10"));
+  const session = await h.start({ cwd: join(mkdtempSync(join(tmpdir(), "jefferson-cwd-")), "pi-jefferson") });
+  const lines = session.lines(80).map(drawn => stripTerminalSequences(drawn).trimEnd());
+  assert.equal(lines[0], "Savings: $4.10 Path: pi-jefferson", "the first claim and the built-in keep rendering");
+  assert.equal(lines[2], placeholder(), "the refused registration registered none of its names");
+});
+
+test("A2 a jefferson claim that is not the kept payload is refused", async (t) => {
+  const cwd = join(mkdtempSync(join(tmpdir(), "jefferson-cwd-")), "pi-jefferson");
+  documentShowing(t, [["jefferson.default.path"], ["jefferson.path"]]);
+  const h = harness();
+  // The claim composes jefferson.path, a name no instrument has registered: only the identity check
+  // stands between another extension and a name in Jefferson's namespace.
+  h.events.emit("jefferson:registration", {
+    extension: "jefferson",
+    instruments: [{ name: "path", variables: { path: () => "stolen" }, defaultFormat: "$path" }],
+  });
+  const session = await h.start({ cwd });
+  const lines = session.lines(80).map(drawn => stripTerminalSequences(drawn).trimEnd());
+  assert.equal(lines[0], "Path: pi-jefferson", "Jefferson's own instrument still renders");
+  assert.equal(lines[2], placeholder(), "the claimed name renders as nothing registered");
+});
+
+test("A2 a fault reported in session one warns again in session two", async (t) => {
+  documentShowing(t, [["model"]]);
+  const warning = { message: "pi-jefferson: a registration is not an object", type: "warning" };
+  const h = harness();
+  h.events.emit("jefferson:registration", 5);
+  const first = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(first.notified, [warning]);
+
+  h.dispatch({ type: "session_shutdown", reason: "reload" });
+  h.events.emit("jefferson:registration", 5);
+  const second = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(second.notified, [warning], "the new session has not been told");
+});
+
+test("A2 a fault recorded before resources_discover waits for it", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    afterSessionStart: (running) => {
+      assert.deepEqual(running.notified, [], "delivery has not opened");
+      h.events.emit("jefferson:registration", 5);
+      assert.deepEqual(running.notified, [], "a fault waits for startup to complete");
+    },
+  });
+  assert.deepEqual(session.notified, [
+    { message: "pi-jefferson: a registration is not an object", type: "warning" },
+  ], "and is delivered when it does");
+});
+
+test("A2 a provider-first registration and its fault survive Jefferson's next session_start and are delivered at resources_discover", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  await h.start();
+  h.dispatch({ type: "session_shutdown", reason: "reload" });
+
+  // Between the shutdown and session two's start: the provider state and the ledger belong to the
+  // new session, so what arrives now must survive the `session_start` that follows.
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  h.events.emit("jefferson:registration", 5);
+  const second = await h.start();
+  assert.equal(line(second), "Savings: $4.10", "the registration outlived the session_start");
+  assert.deepEqual(second.notified, [
+    { message: "pi-jefferson: a registration is not an object", type: "warning" },
+  ], "one notice, at resources_discover");
+});
+
+test("A2 outside TUI mode a fault is never delivered", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", 5);
+  const session = await h.start({ mode: "print", model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, []);
+});
+
+test("A2 every registration refusal part is exact", async (t) => {
+  documentShowing(t, [["model"]]);
+  const savings = registration.instruments[0]!;
+  const from = (body: Record<string, unknown>): Record<string, unknown> => ({ extension: "taiknr", ...body });
+  const cases: Array<[label: string, send: (events: EventBus) => void, part: string]> = [
+    ["registration shape", events => events.emit("jefferson:registration", []),
+      "a registration is not an object"],
+    ["no extension name", events => events.emit("jefferson:registration", { instruments: [] }),
+      "a registration carries no extension name"],
+    ["extension grammar", events => events.emit("jefferson:registration", { extension: "Taiknr", instruments: [] }),
+      'a registration names the extension "Taiknr", which is not a lowercase name'],
+    ["empty extension name", events => events.emit("jefferson:registration", { extension: "", instruments: [] }),
+      'a registration names the extension "", which is not a lowercase name'],
+    ["jefferson claim", events => events.emit("jefferson:registration", { extension: "jefferson", instruments: [] }),
+      'a registration claims "jefferson", which belongs to Jefferson'],
+    ["no instruments", events => events.emit("jefferson:registration", { extension: "taiknr" }),
+      'registration from "taiknr" carries no instruments'],
+    ["instruments not a list", events => events.emit("jefferson:registration", { extension: "taiknr", instruments: {} }),
+      'registration from "taiknr" carries no instruments'],
+    ["declaration shape", events => events.emit("jefferson:registration", from({ instruments: [5] })),
+      'registration from "taiknr" carries an instrument that is not a declaration'],
+    ["no declaration name", events => events.emit("jefferson:registration", from({ instruments: [{ variables: {}, defaultFormat: "" }] })),
+      'registration from "taiknr" carries a declaration with no name'],
+    ["declaration name grammar", events => events.emit("jefferson:registration", from({ instruments: [{ name: "Savings" }] })),
+      'registration from "taiknr" carries "Savings", which is not a single lowercase name'],
+    ["a dotted part", events => events.emit("jefferson:registration", from({ instruments: [{ name: "custom.mine" }] })),
+      'registration from "taiknr" carries "custom.mine", which is not a single lowercase name'],
+    ["a taken name", events => {
+      events.emit("jefferson:registration", registration);
+      events.emit("jefferson:registration", registration);
+    }, '"taiknr.savings" is already registered, so this registration is refused'],
+    ["a repeated name", events => events.emit("jefferson:registration", from({ instruments: [savings, savings] })),
+      'registration from "taiknr" carries "savings" twice'],
+    ["no resolvers", events => events.emit("jefferson:registration", from({ instruments: [{ name: "savings", defaultFormat: "" }] })),
+      '"taiknr.savings" carries no resolvers'],
+    ["no default format", events => events.emit("jefferson:registration", from({ instruments: [{ name: "savings", variables: savings.variables }] })),
+      '"taiknr.savings" carries no default format'],
+    ["unparseable default format", events => events.emit("jefferson:registration",
+      from({ instruments: [{ ...savings, defaultFormat: "Spent $spent" }] })),
+      '"taiknr.savings" carries a default format Jefferson cannot parse'],
+    ["label not a string", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, defaultLabel: 4 }] })),
+      '"taiknr.savings" carries a default label that is not a string'],
+    ["resolver not a function", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, variables: { saved: 4 } }] })),
+      '"taiknr.savings" carries a resolver "saved" that is not a function'],
+    ["field type outside the three", events => events.emit("jefferson:registration", from({ fields: { saved: "array" }, instruments: [] })),
+      'registration from "taiknr" declares "saved" as "array", which is not string, number or boolean'],
+    ["one field at two types", events => {
+      events.emit("jefferson:registration", from({ fields: { saved: "string" }, instruments: [] }));
+      events.emit("jefferson:registration", from({ fields: { saved: "number" }, instruments: [] }));
+    }, 'registration from "taiknr" declares "saved" as both string and number'],
+  ];
+  for (const [label, send, part] of cases) {
+    const h = harness();
+    send(h.events);
+    const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+    assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${part}`, type: "warning" }], label);
+  }
+});
+
+test("A2 a registration whose default format names an undeclared variable is refused and the footer installs, in either order", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const broken = { ...registration, instruments: [{ ...registration.instruments[0]!, defaultFormat: "Spent $spent" }] };
+  const orders: Array<[string, (h: Harness) => Promise<FakeSession>]> = [
+    ["provider-first", async (h) => {
+      h.events.emit("jefferson:registration", broken);
+      return h.start();
+    }],
+    ["Jefferson-first", async (h) => h.start({
+      afterSessionStart: () => void h.events.emit("jefferson:registration", broken),
+    })],
+  ];
+  for (const [order, run] of orders) {
+    const session = await run(harness());
+    const messages = session.notified.map(notified => notified.message);
+    assert.equal(line(session), placeholder(), `${order}: the entry renders on blank`);
+    const fault = messages.findIndex(message => message.includes('"taiknr.savings" carries a default format Jefferson cannot parse'));
+    const unknown = messages.findIndex(message => message.includes('row 1: "taiknr.savings" is not a known instrument'));
+    assert.equal(fault, messages.length - 1, `${order}: one part, delivered after startup completes`);
+    assert.ok(unknown >= 0 && unknown < fault, `${order}: the unknown-name part comes first`);
+  }
+});
+
+test("A2 every report refusal part is exact", async (t) => {
+  documentShowing(t, [["model"]]);
+  const amount = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
+  const cases: Array<[label: string, send: (events: EventBus) => void, part: string]> = [
+    ["report shape", events => events.emit("jefferson:update", "nope"), "a report is not an object"],
+    ["no extension name", events => events.emit("jefferson:update", { field: "saved", value: "x" }),
+      "a report carries no extension name"],
+    ["no field name", events => events.emit("jefferson:update", { extension: "taiknr", value: "x" }),
+      "a report carries no field name"],
+    ["no registration", events => events.emit("jefferson:update", saved("$4.10")),
+      'taiknr reports "saved" without a registration'],
+    ["undeclared field", events => {
+      events.emit("jefferson:registration", registration);
+      events.emit("jefferson:update", { extension: "taiknr", field: "spent", value: "2" });
+    }, 'taiknr reports "spent", which it did not declare'],
+    ["wrong type", events => {
+      events.emit("jefferson:registration", registration);
+      events.emit("jefferson:update", { extension: "taiknr", field: "saved", value: 4 });
+    }, 'taiknr reports "saved" as a number, and it declared string'],
+    ["a string where a number was declared", events => {
+      events.emit("jefferson:registration", amount);
+      events.emit("jefferson:update", { extension: "taiknr", field: "amount", value: "4" });
+    }, 'taiknr reports "amount" as a string, and it declared number'],
+    ["a missing value", events => {
+      events.emit("jefferson:registration", registration);
+      events.emit("jefferson:update", { extension: "taiknr", field: "saved" });
+    }, 'taiknr reports "saved" as nothing, and it declared string'],
+    ["a value that is not finite", events => {
+      events.emit("jefferson:registration", amount);
+      events.emit("jefferson:update", { extension: "taiknr", field: "amount", value: Number.NaN });
+    }, 'taiknr reports "amount" as a number that is not finite'],
+  ];
+  for (const [label, send, part] of cases) {
+    const h = harness();
+    send(h.events);
+    const session = await h.start();
+    assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${part}`, type: "warning" }], label);
+  }
+});
+
+test("A2 a report after a fieldless registration takes the undeclared-field row", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  // A registration with no fields and no instruments is accepted (the merge rule), so the report is
+  // not "without a registration": nothing declared the field.
+  h.events.emit("jefferson:registration", { extension: "taiknr", instruments: [] });
+  h.events.emit("jefferson:update", saved("$4.10"));
+  const session = await h.start();
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: taiknr reports "saved", which it did not declare', type: "warning" },
+  ]);
+});
+
+test("A2 a repeated undeclared-field report warns once and changes no row", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  const session = await h.start();
+  assert.equal(line(session), "Savings: $4.10");
+
+  h.events.emit("jefferson:update", { extension: "taiknr", field: "spent", value: "2" });
+  h.events.emit("jefferson:update", { extension: "taiknr", field: "spent", value: "3" });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: taiknr reports "spent", which it did not declare', type: "warning" },
+  ], "one part for the kind, not one per report");
+  assert.equal(line(session), "Savings: $4.10", "nothing a row renders changed");
+});
+
+test("A2 a bad declaration registers none of its registration's instruments", async (t) => {
+  documentShowing(t, [["taiknr.savings"], ["taiknr.stubs"]]);
+  const h = harness();
+  // The second declaration is good, but the first is not: the acceptance unit is the registration.
+  h.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [
+      { name: "savings", variables: { saved: 4 }, defaultFormat: "Savings: $saved" },
+      { name: "stubs", variables: { stubs: () => "3" }, defaultFormat: "Stubs: $stubs" },
+    ],
+  });
+  const session = await h.start();
+  const lines = session.lines(80).map(drawn => stripTerminalSequences(drawn).trimEnd());
+  assert.equal(lines[0], placeholder(), "the bad declaration registered nothing of its own");
+  assert.equal(lines[2], placeholder(), "and neither did the good one beside it");
+  assert.deepEqual(session.notified.at(-1), {
+    message: 'pi-jefferson: "taiknr.savings" carries a resolver "saved" that is not a function',
+    type: "warning",
+  }, "the first fault is the one part reported");
+
+  // And the same registration the other way round: a good declaration does not register beside a
+  // bad one.
+  const reversed = harness();
+  reversed.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    instruments: [
+      { name: "stubs", variables: { stubs: () => "3" }, defaultFormat: "Stubs: $stubs" },
+      { name: "savings", variables: { saved: 4 }, defaultFormat: "Savings: $saved" },
+    ],
+  });
+  const refused = await reversed.start();
+  const refusedLines = refused.lines(80).map(drawn => stripTerminalSequences(drawn).trimEnd());
+  assert.equal(refusedLines[0], placeholder(), "the entry naming the bad declaration renders blank");
+  assert.equal(refusedLines[2], placeholder(), "the good declaration did not register either");
+});
+
+test("A2 a second registration adds a field and an instrument", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", { extension: "taiknr", fields: { saved: "string" }, instruments: [] });
+  h.events.emit("jefferson:update", saved("$4.10"));
+  h.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    fields: { omitted: "string" },
+    instruments: [{
+      name: "savings",
+      variables: {
+        saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined,
+        omitted: (readings: ReadingsView) => typeof readings.omitted === "string" ? readings.omitted : undefined,
+      },
+      defaultFormat: "Saved $saved, omitted $omitted",
+    }],
+  });
+  h.events.emit("jefferson:update", { extension: "taiknr", field: "omitted", value: "2k" });
+  assert.equal(line(await h.start()), "Saved $4.10, omitted 2k");
+});
+
+test("A2 a registration with an empty variables map and an empty default format registers", async (t) => {
+  documentShowing(t, [["taiknr.idle"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [
+      ...registration.instruments,
+      // `{}` and `""` are the contract's own accepted values, not absent keys.
+      { name: "idle", variables: {}, defaultFormat: "Idle" },
+    ],
+  });
+  assert.equal(line(await h.start()), "Idle");
+});
+
+test("A2 a same-type redeclaration keeps the reported value", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  // The field is declared again with the type it already has, and no name is claimed twice.
+  h.events.emit("jefferson:registration", { extension: "taiknr", fields: { saved: "string" }, instruments: [] });
+  const session = await h.start();
+  assert.equal(line(session), "Savings: $4.10", "the value the field already held survived");
+  assert.deepEqual(session.notified, [], "a same-type redeclaration is accepted");
+});
+
+test("A2 a different-type redeclaration is refused and the first stays intact", async (t) => {
+  documentShowing(t, [["taiknr.savings"], ["taiknr.total"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  h.events.emit("jefferson:registration", {
+    extension: "taiknr",
+    fields: { saved: "number" },
+    instruments: [{ name: "total", variables: { saved: () => "hijacked" }, defaultFormat: "$saved" }],
+  });
+  const session = await h.start();
+  const lines = session.lines(80).map(drawn => stripTerminalSequences(drawn).trimEnd());
+  assert.equal(lines[0], "Savings: $4.10", "the earlier declaration and its value keep rendering");
+  assert.equal(lines[2], placeholder(), "the refused registration registered no name");
+  assert.deepEqual(session.notified.at(-1), {
+    message: 'pi-jefferson: registration from "taiknr" declares "saved" as both string and number',
+    type: "warning",
+  });
+});
+
+test("A2 a change made after registering does not reach the render or the check", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  const payload: Registration = {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      defaultFormat: "Savings: $saved",
+    }],
+  };
+  h.events.emit("jefferson:registration", payload);
+  h.events.emit("jefferson:update", saved("$4.10"));
+
+  // The provider mutates what it posted after acceptance: Jefferson copied the plain data and holds
+  // the resolvers by reference (the spec's "A change made after registering").
+  const posted = payload.instruments[0]!;
+  posted.name = "renamed";
+  posted.defaultFormat = "Hijacked $saved";
+  posted.defaultLabel = "Hijacked:";
+  posted.variables = { saved: () => "hijacked" };
+
+  assert.equal(line(await h.start()), "Savings: $4.10", "what Jefferson renders is what it accepted");
+});
+
+test("A8 jeffersonfan.stats registers through the bus and renders", async (t) => {
+  documentShowing(t, [["jeffersonfan.stats"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", {
+    extension: "jeffersonfan",
+    instruments: [{ name: "stats", variables: { stats: () => "4" }, defaultFormat: "Fan $stats" }],
+  });
+  assert.equal(line(await h.start()), "Fan 4", "the comparison is on the whole first part");
+});
+
+test("A8 jefferson.custom.mine stays free", () => {
+  const events = createEventBus();
+  const registry = createRegistry();
+  createRegistrationListener({
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(),
+    own: { extension: "jefferson", instruments: SHIPPED },
+  });
+  events.emit("jefferson:registration", registration);
+  assert.notEqual(registry.instrument("taiknr.savings"), undefined, "a provider's two-part name registers");
+  assert.equal(registry.instrument("jefferson.custom.mine"), undefined, "three parts belong to Jefferson");
+});
+
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("jeffersonfan.stats"), true, "the comparison is on the whole first part");
   assert.equal(isProvidedName("taiknr.savings"), true);
@@ -244,7 +657,8 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
   const events = createEventBus();
   const registry = createRegistry();
   createRegistrationListener({
-    events, registry, fields: createProviderFields(), own: { extension: "jefferson", instruments: SHIPPED },
+    events, registry, faults: createFaultLedger(), fields: createProviderFields(),
+    own: { extension: "jefferson", instruments: SHIPPED },
   });
   for (const declaration of SHIPPED) {
     assert.equal(registry.instrument(declaration.name), declaration, declaration.name);

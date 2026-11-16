@@ -9,6 +9,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { configurationPaths, readConfiguration } from "./configuration.ts";
 import { createProviderFields } from "./data/provider-fields.ts";
 import { feedSessionData } from "./data/session-data-feed.ts";
+import { createFaultLedger } from "./faults.ts";
 import { installFooter } from "./footer-setup.ts";
 import { createRegistry } from "./registration.ts";
 import { createRegistrationListener } from "./registration-listener.ts";
@@ -27,11 +28,24 @@ export function startUp(pi: ExtensionAPI): void {
   // Created here, not in `session_start`: a report that arrives before Jefferson's own handler
   // must still be held (design 11; T2).
   const fields = createProviderFields();
+  const faults = createFaultLedger();
   createRegistrationListener({
     events: pi.events,
     registry,
+    faults,
     fields,
     own: { extension: "jefferson", instruments: SHIPPED },
+  });
+
+  // The pin: pi's `bindExtensions` emits `resources_discover` after every extension's `session_start`
+  // handler, on every path that starts a session, and only when someone handles it, so handling it
+  // is what makes it fire. No pi document promises that order (research-chidi.md §1; T4, corrected by
+  // M20), and it is the only marker startup has completed (design 12). Re-check it on every pi bump.
+  pi.on("resources_discover", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    // Delivery opens here, and only here: a fault found at any earlier moment waits for this, so a
+    // provider that registers from its own `session_start` handler is not warned about first.
+    faults.open(message => ctx.ui.notify(message, "warning"));
   });
 
   // Retained across `session_start` calls: the previous install's release, so a store this
@@ -52,6 +66,9 @@ export function startUp(pi: ExtensionAPI): void {
     // before the next `session_start` survives it (design 19 item 1; M22).
     registry.clearProvided();
     fields.clear();
+    // Third, and never inside the release closure: a fault that arrived before the next
+    // `session_start` must queue rather than be dropped with the session before it.
+    faults.close();
   });
 
   pi.registerCommand("jefferson", {

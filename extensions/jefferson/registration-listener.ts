@@ -6,9 +6,10 @@
  */
 import type { EventBus } from "@earendil-works/pi-coding-agent";
 
-import { adaptProvidedDeclaration } from "./components/instruments/instrument-binding.ts";
+import { adaptProvidedDeclaration, describeValue } from "./components/instruments/instrument-binding.ts";
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
 import type { FieldType, FieldValue } from "./data/field-value.ts";
+import type { Fault, FaultLedger } from "./faults.ts";
 import type { ProviderFields } from "./data/provider-fields.ts";
 import type { ProvidedDeclaration, RegistrationChannel, UpdateChannel } from "./instrument-contract.ts";
 import { isNamePart, type Registry } from "./registration.ts";
@@ -20,6 +21,12 @@ const UPDATE = "jefferson:update" satisfies UpdateChannel;
 
 /** Jefferson's own payload: the one registration the identity check accepts for `jefferson`. */
 type OwnRegistration = { extension: "jefferson"; instruments: readonly InstrumentDeclaration[] };
+
+/**
+ * The scope a payload with no extension name reports under: an extension name cannot be `-`, so no
+ * provider's fault can dedupe against it (decision 7).
+ */
+const ANONYMOUS = "-";
 
 /** A registration that passed: the extension, the adapted declarations, and the fields it declares. */
 interface AcceptedRegistration {
@@ -42,42 +49,94 @@ function vetRegistration(
   payload: unknown,
   registry: Registry,
   fields: ProviderFields,
-): AcceptedRegistration | { refusal: string } {
-  if (!isPlainObject(payload)) return { refusal: "a registration is not an object" };
+): AcceptedRegistration | { refusal: Fault } {
+  if (!isPlainObject(payload)) {
+    return { refusal: { scope: ANONYMOUS, kind: "registration-not-object", part: "a registration is not an object" } };
+  }
   const extension = payload.extension;
-  if (typeof extension !== "string") return { refusal: "a registration carries no extension name" };
+  if (typeof extension !== "string") {
+    return { refusal: { scope: ANONYMOUS, kind: "registration-no-extension", part: "a registration carries no extension name" } };
+  }
   const claimed = JSON.stringify(extension);
-  if (!isNamePart(extension)) return { refusal: `a registration names the extension ${claimed}, which is not a lowercase name` };
-  if (extension === "jefferson") return { refusal: 'a registration claims "jefferson", which belongs to Jefferson' };
-  if (!Array.isArray(payload.instruments)) return { refusal: `registration from ${claimed} carries no instruments` };
+  if (!isNamePart(extension)) {
+    return { refusal: {
+      scope: extension, kind: "extension-grammar",
+      part: `a registration names the extension ${claimed}, which is not a lowercase name`,
+    } };
+  }
+  if (extension === "jefferson") {
+    return { refusal: {
+      scope: extension, kind: "jefferson-claim",
+      part: 'a registration claims "jefferson", which belongs to Jefferson',
+    } };
+  }
+  if (!Array.isArray(payload.instruments)) {
+    return { refusal: { scope: extension, kind: "no-instruments", part: `registration from ${claimed} carries no instruments` } };
+  }
 
   const declarations: InstrumentDeclaration[] = [];
   const named = new Set<string>();
   for (const raw of payload.instruments) {
-    if (!isPlainObject(raw)) return { refusal: `registration from ${claimed} carries an instrument that is not a declaration` };
+    if (!isPlainObject(raw)) {
+      return { refusal: {
+        scope: extension, kind: "declaration-not-object",
+        part: `registration from ${claimed} carries an instrument that is not a declaration`,
+      } };
+    }
     const part = raw.name;
-    if (typeof part !== "string") return { refusal: `registration from ${claimed} carries a declaration with no name` };
+    if (typeof part !== "string") {
+      return { refusal: {
+        scope: extension, kind: "declaration-no-name",
+        part: `registration from ${claimed} carries a declaration with no name`,
+      } };
+    }
     if (!isNamePart(part)) {
-      return { refusal: `registration from ${claimed} carries ${JSON.stringify(part)}, which is not a single lowercase name` };
+      return { refusal: {
+        scope: extension, kind: "declaration-name-grammar",
+        part: `registration from ${claimed} carries ${JSON.stringify(part)}, which is not a single lowercase name`,
+      } };
     }
     // Jefferson composes the name, so a mismatch between an instrument's name and its claim cannot
     // be written (design 5).
     const name = `${extension}.${part}`;
     const full = JSON.stringify(name);
-    if (registry.instrument(name) !== undefined) return { refusal: `${full} is already registered, so this registration is refused` };
-    if (named.has(name)) return { refusal: `registration from ${claimed} carries ${JSON.stringify(part)} twice` };
+    if (registry.instrument(name) !== undefined) {
+      return { refusal: {
+        scope: name, kind: "name-taken",
+        part: `${full} is already registered, so this registration is refused`,
+      } };
+    }
+    if (named.has(name)) {
+      return { refusal: {
+        scope: extension, kind: "name-repeated",
+        part: `registration from ${claimed} carries ${JSON.stringify(part)} twice`,
+      } };
+    }
     named.add(name);
-    if (!isPlainObject(raw.variables)) return { refusal: `${full} carries no resolvers` };
-    if (typeof raw.defaultFormat !== "string") return { refusal: `${full} carries no default format` };
+    if (!isPlainObject(raw.variables)) {
+      return { refusal: { scope: name, kind: "no-resolvers", part: `${full} carries no resolvers` } };
+    }
+    if (typeof raw.defaultFormat !== "string") {
+      return { refusal: { scope: name, kind: "no-default-format", part: `${full} carries no default format` } };
+    }
     const adapted = adaptProvidedDeclaration(name, raw as unknown as ProvidedDeclaration, () => fields.view(extension));
     if ("refused" in adapted) {
       switch (adapted.refused) {
         case "unparseable-default-format":
-          return { refusal: `${full} carries a default format Jefferson cannot parse` };
+          return { refusal: {
+            scope: name, kind: "unparseable-default-format",
+            part: `${full} carries a default format Jefferson cannot parse`,
+          } };
         case "label-not-string":
-          return { refusal: `${full} carries a default label that is not a string` };
+          return { refusal: {
+            scope: name, kind: "label-not-string",
+            part: `${full} carries a default label that is not a string`,
+          } };
         case "resolver-not-function":
-          return { refusal: `${full} carries a resolver ${JSON.stringify(adapted.variable)} that is not a function` };
+          return { refusal: {
+            scope: name, kind: "resolver-not-function",
+            part: `${full} carries a resolver ${JSON.stringify(adapted.variable)} that is not a function`,
+          } };
       }
     }
     declarations.push(adapted);
@@ -85,18 +144,72 @@ function vetRegistration(
 
   const fault = fields.checkFields(extension, payload.fields);
   if (fault !== undefined) {
-    return {
-      refusal: fault.type === "outside"
-        ? `registration from ${claimed} declares ${JSON.stringify(fault.field)} as ${JSON.stringify(fault.given)}, which is not string, number or boolean`
-        : `registration from ${claimed} declares ${JSON.stringify(fault.field)} as both ${fault.declared} and ${String(fault.given)}`,
-    };
+    return { refusal: fault.type === "outside"
+      ? {
+        scope: extension, kind: "field-type-outside",
+        part: `registration from ${claimed} declares ${JSON.stringify(fault.field)} as ${JSON.stringify(fault.given)}, which is not string, number or boolean`,
+      }
+      : {
+        scope: extension, kind: "field-type-conflict",
+        part: `registration from ${claimed} declares ${JSON.stringify(fault.field)} as both ${fault.declared} and ${String(fault.given)}`,
+      } };
   }
   return { extension, declarations, fields: (payload.fields ?? {}) as Readonly<Record<string, FieldType>> };
 }
 
-export function createRegistrationListener({ events, registry, fields, own }: {
+/** A report that passed: the extension, the field and the latest value. */
+interface AcceptedReport {
+  extension: string;
+  field: string;
+  value: FieldValue;
+}
+
+/**
+ * The report a payload carries, or the one part that refuses it. A report is read as tolerantly as a
+ * registration: a key this Jefferson does not know changes nothing (design 11). Which of decision
+ * 15's two report rows a fault takes turns on one fact: whether the extension has an accepted,
+ * uncleared registration this session (G11).
+ */
+function vetReport(payload: unknown, registry: Registry, fields: ProviderFields): AcceptedReport | { refusal: Fault } {
+  if (!isPlainObject(payload)) {
+    return { refusal: { scope: ANONYMOUS, kind: "report-not-object", part: "a report is not an object" } };
+  }
+  const { extension, field } = payload;
+  if (typeof extension !== "string") {
+    return { refusal: { scope: ANONYMOUS, kind: "report-no-extension", part: "a report carries no extension name" } };
+  }
+  if (typeof field !== "string") {
+    return { refusal: { scope: extension, kind: "report-no-field", part: "a report carries no field name" } };
+  }
+  const quoted = JSON.stringify(field);
+  if (!registry.hasRegistration(extension)) {
+    return { refusal: {
+      scope: extension, kind: "report-no-registration",
+      part: `${extension} reports ${quoted} without a registration`,
+    } };
+  }
+  const fault = fields.checkReport(extension, field, payload.value);
+  if (fault === undefined) return { extension, field, value: payload.value as FieldValue };
+  switch (fault.type) {
+    case "undeclared":
+      return { refusal: { scope: extension, kind: "report-undeclared", part: `${extension} reports ${quoted}, which it did not declare` } };
+    case "wrong-type":
+      return { refusal: {
+        scope: extension, kind: "report-wrong-type",
+        part: `${extension} reports ${quoted} as ${describeValue(fault.given)}, and it declared ${fault.declared}`,
+      } };
+    case "not-finite":
+      return { refusal: {
+        scope: extension, kind: "report-not-finite",
+        part: `${extension} reports ${quoted} as a number that is not finite`,
+      } };
+  }
+}
+
+export function createRegistrationListener({ events, registry, faults, fields, own }: {
   events: EventBus;
   registry: Registry;
+  faults: FaultLedger;
   fields: ProviderFields;
   own: OwnRegistration;
 }): void {
@@ -108,23 +221,21 @@ export function createRegistrationListener({ events, registry, fields, own }: {
       return;
     }
     const accepted = vetRegistration(payload, registry, fields);
-    // A refusal changes nothing a row renders.
-    if ("refusal" in accepted) return;
+    // A refusal changes nothing a row renders, and its one part is reported once per session.
+    if ("refusal" in accepted) {
+      faults.record(accepted.refusal);
+      return;
+    }
     registry.accept(accepted.extension, accepted.declarations);
     fields.declare(accepted.extension, accepted.fields);
   });
   events.on(UPDATE, (payload: unknown) => {
-    // A report is read tolerantly, like a registration: a key this Jefferson does not know changes
-    // nothing, and a report it cannot read changes nothing a row renders (design 11).
-    if (!isPlainObject(payload)) return;
-    const { extension, field } = payload;
-    if (typeof extension !== "string") return;
-    if (typeof field !== "string") return;
-    // Which of decision 15's two report rows a fault takes turns on one fact: whether the extension
-    // has an accepted, uncleared registration this session (G11).
-    if (!registry.hasRegistration(extension)) return;
-    if (fields.checkReport(extension, field, payload.value) !== undefined) return;
-    fields.report(extension, field, payload.value as FieldValue);
+    const accepted = vetReport(payload, registry, fields);
+    if ("refusal" in accepted) {
+      faults.record(accepted.refusal);
+      return;
+    }
+    fields.report(accepted.extension, accepted.field, accepted.value);
   });
   events.emit(REGISTRATION, own);
 }

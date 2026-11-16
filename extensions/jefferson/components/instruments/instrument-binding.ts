@@ -18,6 +18,25 @@ export interface ConfiguredInstrument {
   formats?: Record<string, FormatSegment[]>;
 }
 
+/**
+ * The one home of decision 15's `<what>`: one word for each thing a value may be. Both a report that
+ * carries the wrong type and a resolver that returns one answer it, so the two rows cannot drift.
+ */
+export function describeValue(value: unknown): string {
+  if (value === undefined) return "nothing";
+  if (value === null) return "null";
+  switch (typeof value) {
+    case "string": return "a string";
+    case "number": return "a number";
+    case "boolean": return "a boolean";
+    case "bigint": return "a bigint";
+    case "symbol": return "a symbol";
+    case "function": return "a function";
+    // Arrays are objects here, as the table's row says.
+    default: return "an object";
+  }
+}
+
 /** What adapting a provided declaration refuses, in decision 15's row order. */
 export type ProvidedRefusal =
   | { refused: "unparseable-default-format" }
