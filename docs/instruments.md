@@ -109,9 +109,5 @@ row 3: "taiknr.savings" is not a known instrument
 
 The warning holds one part for each row and name, in row order.
 
-When the `instruments` block configures a name that no instrument answers to, the warning names it
-with no row, because no entry names it. That warning also comes after startup completes.
-
-```
-the instruments block names instruments the extension does not implement: "taiknr.savings"
-```
+An `instruments`-block entry for a name no instrument answers to draws no warning. Jefferson checks
+its settings only when that instrument registers.

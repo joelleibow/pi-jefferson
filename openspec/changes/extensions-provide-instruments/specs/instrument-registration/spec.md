@@ -107,32 +107,44 @@ visible from the next render.
 
 ### Requirement: A provided instrument's name is namespaced to its extension
 
-A provided name MUST be exactly two parts separated by one dot: the extension's name, then the
-instrument's. Jefferson's own instruments MUST be named `jefferson.default.<name>`, and three parts
-MUST belong to Jefferson alone, so a later `jefferson.custom.*` needs no migration. The first part
-`jefferson` MUST belong to Jefferson alone, compared exactly, so `jeffersonfan.stats` is free.
-Jefferson MUST accept a `jefferson` claim only from the registration it emitted itself.
+Jefferson MUST register a provided instrument as `<extension>.<name>`, and the extension and the name
+MAY each be any string. Every name under `jefferson.` MUST belong to Jefferson alone: its own
+`jefferson.default.*`, a later `jefferson.custom.*`, and any other. A registration whose names would
+fall under `jefferson.` MUST be refused and reported, the published types MUST fail a provider's type
+check for it, and Jefferson MUST accept its own names only from the registration it emitted itself.
 
 #### Scenario: A provided name in a row
 
 - **WHEN** taiknr provides `savings` and a row's entry names `taiknr.savings`
 - **THEN** that entry renders taiknr's instrument
 
-#### Scenario: A name in Jefferson's namespace
+#### Scenario: A name of any shape
 
-- **WHEN** an extension claims a name whose first part is `jefferson`
-- **THEN** Jefferson refuses that registration and reports it, and Jefferson's own instruments render
-  as before
+- **WHEN** an extension named `Taiknr Pro` provides `savings.total` and a row's entry names
+  `Taiknr Pro.savings.total`
+- **THEN** that entry renders the instrument, because only a name under `jefferson.` is refused
+
+#### Scenario: A name under Jefferson's
+
+- **WHEN** an extension registers as `jefferson` or as `jefferson.custom`
+- **THEN** Jefferson refuses that registration and reports it, none of its names registers, and
+  Jefferson's own instruments render as before
 
 #### Scenario: A name that only looks like Jefferson's
 
 - **WHEN** an extension named `jeffersonfan` registers `jeffersonfan.stats`
-- **THEN** the instrument registers, because the comparison is on the whole first part
+- **THEN** the instrument registers, because `jeffersonfan.stats` is not under `jefferson.`
 
 #### Scenario: A later set of names
 
 - **WHEN** a later version registers `jefferson.custom.mine`
 - **THEN** the name is free, because no provider could take it
+
+#### Scenario: A provider's type check
+
+- **WHEN** a provider types its registration with the published contract and names the extension
+  `jefferson.custom`
+- **THEN** its `tsc` fails before it runs
 
 ### Requirement: A provider's resolver reads only its own declared fields
 

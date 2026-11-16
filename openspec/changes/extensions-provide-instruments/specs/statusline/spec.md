@@ -64,11 +64,11 @@ still register; the warning MUST name it. The row's other cells MUST render thei
 
 ### Requirement: An instrument's configuration lives in the extension's own document
 
-The extension MUST read instrument configuration from a top-level `instruments` object in the
-`pi-jefferson.json` document it already owns, keyed by instrument name, each value carrying any of
-that instrument's declared options. It MUST sit beside `rows`, and a document carrying only
-`instruments` MUST render the default row with those instruments configured. A trusted project's
-document MUST replace the agent document whole, as it does today.
+The extension MUST read instrument configuration from a top-level `instruments` object in its
+`pi-jefferson.json` document, keyed by instrument name, each value carrying any of that instrument's
+declared options. It MUST sit beside `rows`, and a document carrying only `instruments` MUST render
+the default row with those instruments configured. A trusted project's document MUST replace the agent
+document whole. An entry whose instrument never registers MUST draw no warning, whatever it holds.
 
 #### Scenario: An instrument configured once
 
@@ -87,18 +87,17 @@ document MUST replace the agent document whole, as it does today.
 
 #### Scenario: A name the extension does not implement
 
-- **WHEN** the `instruments` object configures a name Jefferson does not implement and no extension
-  has registered, and no row's entry names it
-- **THEN** the document is accepted, and once startup has completed the warning names it in a form of
-  its own that is placed by the `instruments` block rather than by a row, and that claims nothing
-  about any cell's rendering
+- **WHEN** the `instruments` object configures a name no instrument registers, with any value, and no
+  row's entry names it
+- **THEN** the document is accepted, and no warning names it, because its settings are checked only
+  once its instrument registers
 
 #### Scenario: A name the block and a row both name
 
-- **WHEN** the `instruments` object configures a name Jefferson does not implement and no extension
-  has registered, and a row's entry names it too
-- **THEN** the document is accepted, and once startup has completed the name is reported twice: once
-  by the row, and once by the `instruments` block
+- **WHEN** the `instruments` object configures a name no instrument registers, and a row's entry names
+  it too
+- **THEN** the document is accepted, and once startup has completed the name is reported once, by the
+  row, because only the row's entry renders `blank`
 
 #### Scenario: An option the instrument does not declare
 
@@ -161,9 +160,9 @@ those three under its name in the `instruments` block MUST be refused as an opti
 
 Jefferson MUST check everything under a provided name's key in the `instruments` block — shape, format,
 label, option, variable, modifier and style — once both the document and that registration are in hand,
-whichever comes second. A fault MUST refuse that instrument alone: its entries render `blank`, a
-warning names it and the fault, and the rest of the document renders as configured. A name that never
-registers gets only the unknown-name warning.
+whichever comes second, whether or not a row places the name. A fault MUST refuse that instrument
+alone: its entries render `blank`, a warning names it and the fault, and the rest of the document
+renders as configured.
 
 #### Scenario: A variable the registration does not declare
 
@@ -176,6 +175,12 @@ registers gets only the unknown-name warning.
 
 - **WHEN** the `instruments` block gives a provided name a value that is not an object
 - **THEN** only that instrument is refused, and the rest of the document renders as configured
+
+#### Scenario: A name only the block configures
+
+- **WHEN** the `instruments` block configures a provided name no row places, and its provider registers
+  after the document is read
+- **THEN** its settings are checked when it registers, and a fault refuses only that instrument
 
 #### Scenario: A provider that registered before the document was read
 

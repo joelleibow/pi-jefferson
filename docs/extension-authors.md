@@ -104,7 +104,7 @@ A registration carries no first value. You declare the field, then report the va
 ## Declare the instrument
 
 ```ts
-const registration: Registration = {
+const registration: Registration<"taiknr"> = {
   extension: "taiknr",
   fields,
   instruments: [
@@ -129,12 +129,14 @@ The registration holds four things:
 - `instruments`, the instruments you provide. An empty list is allowed.
 - each instrument's `name`, `variables`, `defaultFormat` and optional `defaultLabel`.
 
-`extension` and each instrument `name` start with a lowercase letter, then use lowercase letters,
-digits and hyphens. No dot, no underscore, no scope.
+Type the registration with your extension's name, `Registration<"taiknr">`. An extension of
+`jefferson`, or one that starts with `jefferson.`, fails your type check.
 
-Write the instrument's own name, one word. Jefferson builds the full name for the user:
-`taiknr.savings`. A readings view is an index signature, so read a field with brackets,
-`readings["saved"]`, and the sample compiles under `noPropertyAccessFromIndexSignature` too.
+`extension` and each instrument `name` may be any string. Jefferson registers each instrument as
+`<extension>.<name>`, so taiknr's `savings` is `taiknr.savings`, and a name may hold dots of its own.
+Everything under `jefferson.` belongs to Jefferson. A readings view is an index signature, so read a
+field with brackets, `readings["saved"]`, and the sample compiles under
+`noPropertyAccessFromIndexSignature` too.
 
 Your registration carries no options and no features that Jefferson's own instruments have. An
 instrument of yours takes a format, a style and a label, and nothing else.
@@ -217,9 +219,8 @@ Jefferson checks a registration before it accepts any part of it. The first faul
 registration, and nothing from it registers:
 
 - A registration that is not an object, or that carries no extension name.
-- An extension name outside the rule above, or one that claims `jefferson`.
-- An instrument name outside the rule above, one already registered, or one that appears twice in one
-  registration.
+- An extension of `jefferson`, or one that starts with `jefferson.`.
+- An instrument name already registered, or one that appears twice in one registration.
 - A declaration with no `variables`, no `defaultFormat`, or a default format Jefferson cannot parse.
 - A `defaultLabel` that is not a string, or a resolver that is not a function.
 - A field type that is not one of the three.
@@ -240,12 +241,10 @@ user's document:
 | --- | --- |
 | The payload is not an object | `pi-jefferson: a registration is not an object` |
 | No extension name | `pi-jefferson: a registration carries no extension name` |
-| An extension name outside the grammar | `pi-jefferson: a registration names the extension "Taiknr", which is not a lowercase name` |
-| The extension claims `jefferson` | `pi-jefferson: a registration claims "jefferson", which belongs to Jefferson` |
+| The extension is `jefferson` or starts with `jefferson.` | `pi-jefferson: a registration claims "jefferson.custom", which belongs to Jefferson` (the extension as you wrote it) |
 | `instruments` missing or not an array | `pi-jefferson: registration from "taiknr" carries no instruments` |
 | A declaration that is not an object | `pi-jefferson: registration from "taiknr" carries an instrument that is not a declaration` |
 | A declaration with no name | `pi-jefferson: registration from "taiknr" carries a declaration with no name` |
-| A name with a dot or an uppercase letter | `pi-jefferson: registration from "taiknr" carries "savings.total", which is not a single lowercase name` |
 | A name already registered | `pi-jefferson: "taiknr.savings" is already registered, so this registration is refused` |
 | One instrument named twice | `pi-jefferson: registration from "taiknr" carries "savings" twice` |
 | No resolvers | `pi-jefferson: "taiknr.savings" carries no resolvers` |
@@ -294,6 +293,9 @@ pi-jefferson: <path> row 1: "taiknr.savings" is not a known instrument
 
 That warning comes after startup completes. A name that registers later still renders, and the
 warning stands.
+
+An `instruments`-block entry for an instrument that never registers draws no warning, whatever it
+holds. Jefferson checks its settings only when that instrument registers.
 
 ## Versions and resolution
 

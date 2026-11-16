@@ -72,13 +72,15 @@ Ten new files, and the homes beside them.
 | File | Single responsibility | Depends on |
 |---|---|---|
 | `extensions/jefferson/instrument-contract.ts` (new) | The published contract: the two messages' payload shapes, the declaration both a provider and Jefferson's own instruments write, and the channel names as string-literal types; re-exports `FieldType`, `FieldValue` and `ReadingsView` from `data/field-value.ts`. Type declarations only. | `data/field-value.ts` (types) |
-| `extensions/jefferson/registration.ts` (new) | What a name means and what has registered: the grammar, the reserved namespace, the full-name rule, and the registry that holds registrations, answers a lookup, and keeps the watch table — `watch(name, apply)`, accepting a name runs that name's watches once and drops them, and `releaseWatches()`. Pure; no bus, no pi. | `instrument-contract.ts` (types), `components/instruments/instrument.ts` (types) |
+| `extensions/jefferson/registration.ts` (new) | What a name means and what has registered: the reserved prefix `jefferson.`, the full-name rule, and the registry that holds registrations, answers a lookup, and keeps the watch table — `watch(name, apply)`, accepting a name runs that name's watches once and drops them, and `releaseWatches()`. Pure; no bus, no pi. | `instrument-contract.ts` (types), `components/instruments/instrument.ts` (types) |
 | `extensions/jefferson/registration-listener.ts` (new) | The bus boundary: subscribes `jefferson:registration` and `jefferson:update`, emits Jefferson's own payload on the registration channel, validates each payload, asks the field holding's check, adapts each declaration and parses its default format, hands it to the registry, requests the one repaint an accepted registration takes, and records every refusal. The only file that calls `on` or `emit` on the bus, and the only one that writes the two channel strings at runtime. | `registration.ts`, `faults.ts`, `data/provider-fields.ts`, `instrument-contract.ts`, `components/instruments/instrument.ts` (types), `components/instruments/instrument-binding.ts` (for the adapter, `describeValue` and the parse) |
 | `extensions/jefferson/faults.ts` (new) | The faults this session has reported: dedupes by scope and kind, queues what arrives before delivery opens, and delivers once. | nothing |
 | `data/field-value.ts` (new) | The value a provider's field holds (`FieldValue`: `string`, finite `number` or `boolean`), the three types it takes (`FieldType`), and the view a provided resolver reads (`ReadingsView`). Type declarations only, so the holding reads them without importing the contract (T14) and the store, the holding and the published contract read one declaration (M23). | nothing |
 | `data/provider-fields.ts` (new) | The fields providers declared and the latest value each reported, with every rule about them: one runtime record of the three types, one check that changes nothing for a type outside the three or a conflict with an earlier accepted registration's type, the report value check, then declare, report, view per extension and clear — `declare` commits and decides nothing. Store data, so it sits with the store and imports nothing outside `data/`. | `data/field-value.ts` |
-| `tests/fixtures/sample-provider/provider.mts` (new) | The provider the CI fixture check compiles: it imports the two channel literal types and builds a `Registration` with a boolean and a number field, one resolver and no `defaultLabel`, plus a `Report` of `false`. The `.mts` extension keeps it out of `tsconfig`'s `tests/**/*.ts` and out of `node --test`'s patterns, and fixes ESM without a package.json. | `pi-jefferson/instruments` (types) |
+| `tests/fixtures/sample-provider/provider.mts` (new) | The provider the CI fixture check compiles: it imports the two channel literal types and builds a `Registration<"sample-provider">` with a boolean and a number field, one resolver and no `defaultLabel`, plus a `Report` of `false`. The `.mts` extension keeps it out of `tsconfig`'s `tests/**/*.ts` and out of `node --test`'s patterns, and fixes ESM without a package.json. | `pi-jefferson/instruments` (types) |
 | `tests/fixtures/sample-provider/tsconfig.json` (new) | The provider's own flags: target and lib ES2021, module and moduleResolution `nodenext`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noEmit`, and `types: []`. | nothing |
+| `tests/fixtures/sample-provider/reserved.mts` (new) | A registration under `jefferson.` the packaging check requires to fail its type check with TS2344: `Registration<"jefferson.custom">`. A passing compile is a CI failure. | `pi-jefferson/instruments` (types) |
+| `tests/fixtures/sample-provider/tsconfig.reserved.json` (new) | Extends the fixture's tsconfig and includes `reserved.mts`. | nothing |
 | `tests/session-harness.ts` (new) | `harness()`, moved out of `tests/jefferson.test.ts` unchanged, so both that file and `tests/registration.test.ts` use one fake `pi`. Its fake `pi` gains `events: createEventBus()`; `harness()` takes `beforeFactory` and `start()` takes `afterSessionStart`; `start()` fires `resources_discover` after `session_start` when a handler exists; and the harness exposes `events` (M27). |
 | `tests/shipped-instrument.ts` (new) | The helper M27 requires: it looks a shipped declaration up in `SHIPPED` by its bare name, replacing `instrumentNamed` for the tests. It is not a `*.test.ts`, as `tests/fake-theme.ts` is not, so `node --test` never runs it. | `extensions/jefferson/shipped.ts` |
 
@@ -96,7 +98,7 @@ Modified files:
 | `extensions/jefferson/components/row/row.ts` | A cell holds `{ name, holder: { current: Instrument }, align }`: the resolved full name the notice gate compares, the holder a registration can fill, and its alignment. It carries no `instrument` key (decision 9). |
 | `extensions/jefferson/components/row/row-renderer.ts` | Reads `fills` from the holder on every plan rather than copying it when the tree is built, and reads `render` from the holder (decision 9). |
 | `package.json` | Gains `exports` with `./instruments` alone; `files` does not change (decision 2). |
-| `.github/workflows/ci.yml` | The existing pack step gains its export-target assertion on the packed manifest and the fixture check: copy `tests/fixtures/sample-provider` to `$tmp/provider`, extract the packed tarball into `$tmp/provider/node_modules/pi-jefferson` with `--strip-components=1`, then run `pnpm exec tsc -p "$tmp/provider/tsconfig.json"` (decisions 2, 14). |
+| `.github/workflows/ci.yml` | The existing pack step gains its export-target assertion on the packed manifest and the fixture check: copy `tests/fixtures/sample-provider` to `$tmp/provider`, extract the packed tarball into `$tmp/provider/node_modules/pi-jefferson` with `--strip-components=1`, then run `pnpm exec tsc -p "$tmp/provider/tsconfig.json"`, and the reserved fixture's required failure (decisions 2, 14). |
 | `tests/jefferson.test.ts` | Imports `harness()` from `tests/session-harness.ts`; the export pin gains the contract file with no runtime exports and drops `instrumentNamed` with its stability block; the contribution scan is rewritten (decision 14). |
 | `tests/configuration.test.ts`, `tests/row-renderer.test.ts`, `tests/session-data-feed.test.ts`, `tests/format.test.ts`, `tests/instrument.test.ts` | Cells read `holder.current` and every cell literal takes decision 9's shape; `configuration.test.ts`'s two `Object.keys(cell)` assertions expect `["name", "holder", "align"]`, built in that order, and its `readDocument` and seven direct literals build the source from one real-object helper; `instrument.test.ts`'s inherited-name test moves to the registry's test; `instrument.test.ts`'s name assertions expect `jefferson.default.<name>`; and each of the five files replaces `instrumentNamed` with `tests/shipped-instrument.ts` (M27; decisions 5, 8, 9). |
 
@@ -148,6 +150,11 @@ extracts the packed tarball into `$tmp/provider/node_modules/pi-jefferson` with
 `--strip-components=1`, and runs `pnpm exec tsc -p "$tmp/provider/tsconfig.json"`. As with the
 assertion, the coder shows it failing once in a temporary copy before the PR opens.
 
+The same step then compiles `tsconfig.reserved.json` against the extracted tarball. It fails CI if
+that compile passes, and it fails CI if the log lacks `error TS2344` with
+`a name under jefferson. belongs to Jefferson`. Measured in `mirror-for-bambadjan`: the reserved
+fixture under the contract before this change exited 0, and under it exited 1 with that error.
+
 *Why.* A `tsc` under `nodenext` needs the entry (`research-chidi.md` §4b), pi resolves
 `pi.extensions` by file path so loading is unaffected, and a target missing from a published tarball
 cannot be withdrawn (`ci.yml:33`; M24). The bare string form is the one Chidi measured passing
@@ -179,8 +186,14 @@ type ContractDeclaration<R> = {
 
 type ProvidedDeclaration = ContractDeclaration<ReadingsView>;
 
-type Registration = {                     // posted on jefferson:registration
-  extension: string;                     // the providing extension's own name
+type ReservedExtension = "jefferson" | `jefferson.${string}`;
+
+type ProviderExtension<Extension> = [Extract<Extension, ReservedExtension>] extends [never]
+  ? string
+  : "a name under jefferson. belongs to Jefferson";
+
+type Registration<Extension extends ProviderExtension<Extension>> = {
+  extension: Extension;                  // the providing extension's own name
   fields?: FieldDeclaration;
   instruments: readonly ProvidedDeclaration[];
 };
@@ -202,10 +215,19 @@ its own readings plus its extra members, so change 3's visual mix-in lands once;
 belong to the extension rather than one instrument; M16 fixes the three types and the latest-value
 rule. The member names are this design's; nothing in the rulings names them.
 
+R2 (owner-rulings.md, 2026-11-16) makes the extension a type parameter, because TypeScript cannot
+exclude a literal from `string` without one. The parameter is required, so a bare `Registration` is
+itself an error (TS2314), and the `Extract` inside a tuple catches a union. It is measured on tsc
+7.0.2 and 5.4.5 under the fixture's flags. `Registration<string>` is the accepted bypass, and the
+runtime refusal backstops it.
+
 *Alternatives weighed.* A per-instrument `fields` member (refused by M15: two instruments of one
 provider must read one field). A data-only payload with a formatter vocabulary (refused by
 `michael-orientation.md` §4: it would invent a second declaration language, against D12). Two
-declaration types, one per audience (refused by M14: change 3 would add its mix-in twice).
+declaration types, one per audience (refused by M14: change 3 would add its mix-in twice). A default
+of `= string` (refused: a provider annotating `Registration` would get no check). A conditional on
+the property (refused: the error lands on the value as "not assignable to never"). An exported
+`ProviderExtension` (refused: one more permanent public name).
 
 ### 4. A provider's resolver reads a record, not per-field generics
 
@@ -223,20 +245,25 @@ Typing resolvers as `unknown` (refused: it loses the distinction M17 requires).
 ### 5. Names: the declaration carries its registered name, and a provider writes only its part
 
 Each shipped declaration's `name` becomes `jefferson.default.<name>`. A provider's declaration
-carries the instrument's own part, and Jefferson registers it as `<extension>.<part>`. Each part
-matches `/^[a-z][a-z0-9-]*$/`, so a part is non-empty, lowercase, and contains no dot. The first part
-is compared exactly with `jefferson`, so `jeffersonfan.stats` is legal and an extension named
-`jefferson` provides nothing. Three-part names belong to Jefferson alone.
+carries the instrument's own name, and Jefferson registers it as `<extension>.<name>`; the extension
+and the name may each be any string, dots, capitals and spaces included (owner-rulings.md,
+2026-11-16). Everything under `jefferson.` is Jefferson's: its own `jefferson.default.*`, a later
+`jefferson.custom.*`, and any other. A composed name starts with `jefferson.` exactly when the
+extension is `jefferson` or starts with `jefferson.`, so the listener refuses that registration
+(`isProvidedName(`${extension}.`)`) and the contract's `Registration<Extension>` fails the provider's
+type check (decision 3). `jeffersonfan.stats` is a provider's name, because it is not under
+`jefferson.`.
 
 Every name a document writes is normalized once, at the reader's edge, to the registered name: a bare
-name becomes `jefferson.default.<name>`, and a two-part name is left alone. The spelling the document
-wrote is kept for messages only.
+name becomes `jefferson.default.<name>`, and any name with a dot is left alone. The spelling the
+document wrote is kept for messages only.
 
 *Why.* D6, D7 and M11; M12 requires one normalization point because the configured map, the binding
 memo, the notice gate and `declaredSeconds` all key on the name (`configuration.ts:170`,
 `instrument-binding.ts:21`, `:299-300`). Putting the registered name in the declaration keeps those
 four keying one field instead of gaining a parallel key. Composing the name from the extension plus
-the part makes a mismatch inexpressible, so no refusal rule is needed for one.
+the name makes a mismatch inexpressible, so no refusal rule is needed for one. Joel's 2026-11-16
+ruling replaces the earlier part grammar and two-part rule.
 
 *Alternatives weighed.* Keeping short names and threading a separate registered name through four
 maps (refused: two names for one instrument in every key). Letting a provider write the full name
@@ -247,17 +274,17 @@ maps (refused: two names for one instrument in every key). Letting a provider wr
 `startup.ts` builds the registry in its factory and builds Jefferson's payload from `SHIPPED`, then
 hands it to the listener's constructor. The listener subscribes both channels, emits that payload on
 `jefferson:registration`, and keeps it for the identity check; `startup.ts` passes `pi.events` to the
-listener's constructor and calls nothing on it. The listener accepts a
-`jefferson` claim only when the payload is that exact object; every other claim is refused. For a
+listener's constructor and calls nothing on it. The listener accepts a claim under `jefferson.` (an
+extension of `jefferson`, or one that starts with `jefferson.`) only when the payload is that exact
+object; every other claim is refused. For a
 provided name the first claim wins and a later one is refused. On acceptance Jefferson copies the
 declaration's plain data (name, resolvers map's keys, format, label, field types) and holds the
 resolver functions by reference.
 
 **Jefferson reads its own payload through its full declaration type.** When the payload is the kept
 `own` object, the listener calls `registry.accept("jefferson", own.instruments)` with each
-declaration's `name` as written (`jefferson.default.<name>`); on that branch it skips the envelope and
-part-grammar checks, name composition, `adaptProvidedDeclaration`, `containProvided` and field
-declaration. Every other payload is read through the provider contract. `own` is typed
+declaration's `name` as written (`jefferson.default.<name>`); on that branch it skips the envelope
+checks, name composition, `adaptProvidedDeclaration`, `containProvided` and field declaration. Every other payload is read through the provider contract. `own` is typed
 `OwnRegistration`: `{ extension: "jefferson"; instruments: readonly InstrumentDeclaration[] }`. The
 contract's `Registration` is unchanged (M10).
 
@@ -480,13 +507,13 @@ is a closed host interface, and S2's narrow view is not host data). Holding them
 ### 12. Startup completes at `resources_discover`, with a pin
 
 `readConfiguration` returns its unknown names as data, not as a composed string: `unknownNames`, each
-carrying the spelling the document wrote and the name it normalized to, and, for a name written in a
-row, the row. `startup.ts` registers a `resources_discover` handler in its factory. That handler is
+carrying the spelling the document wrote, the name it normalized to, and the row it was written in. `startup.ts` registers a `resources_discover` handler in its factory. That handler is
 the point where delivery opens (decision 19 has the operation): it takes the latest read's
 `unknownNames`, drops every name the registry answers by then, composes what remains with
 `configuration.ts`'s `acceptedWarning(path, unknownNames)` — the composer it already owns, now taking
-the filtered list, with its two D17 forms unchanged — notifies it, and sends no unknown-name notice
-when nothing remains; then it delivers the queued faults. `Configuration` gains `path`, the document
+the filtered list, with D17's row form unchanged; Joel's 2026-11-16 ruling retires the block form, so
+`unknownNames` holds only names a row places, each with its row — notifies it, and sends no
+unknown-name notice when nothing remains; then it delivers the queued faults. `Configuration` gains `path`, the document
 path the read chose, which is the same path its rejection and accepted warnings already print;
 `startup.ts` passes `configuration.path` to the composer and never calls `configurationPaths` to
 compose a warning. A registration that arrives after it renders from the next render
@@ -516,6 +543,12 @@ render `blank` and one warning names it and the fault. Jefferson's own instrumen
 whole-document rejection. A provided instrument's option list is `FOUNDATIONAL_OPTIONS` in
 `components/instruments/instrument.ts`, the one place that set lives, so the check and the binding
 refuse and accept the same three keys.
+
+An `instruments`-block entry whose instrument never registers draws no warning and is never checked,
+whatever it holds, for a provided name and a name in Jefferson's namespace alike (owner-rulings.md,
+2026-11-16). A provided name's raw value is held for its watch; any other unregistered name is
+skipped. Jefferson's own registered instruments keep the whole-document rule, and two spellings of one
+name are refused only once that name resolves.
 
 *Why.* Joel's answer to J1 was (b), and M6 keys the rule on the name rather than on when the
 registration arrived, because extension load order otherwise decides the user's result. The style
@@ -549,8 +582,8 @@ throws, each costing only its own entry, producing exactly its own table row onc
 process running with no unhandled rejection. Two more cover the unknown-name report in Jefferson-first
 order, with the provider registering in its own `session_start`: a row's entry and an `instruments`
 block key naming a provided instrument each leave the instrument rendering with no unknown-name
-warning naming it, while a provided name that never registers still warns once, at
-`resources_discover`. Two cover a valid configuration in Jefferson-first order, with the provider
+warning naming it, while a provided name that never registers draws no warning from the block, and
+warns once at `resources_discover` only if a row names it. Two cover a valid configuration in Jefferson-first order, with the provider
 registering in its own `session_start`: a row naming `taiknr.savings` whose block entry sets a format,
 a label and a style renders the configured format, label and style once the registration lands,
 identical to the provider-first render of the same document; and the same row with a block format
@@ -561,7 +594,10 @@ registration adds one, a changed report adds one, and a same-value report adds n
 resolver that returns an object whose `then` getter throws renders nothing in both orders, leaves the
 rest of the row rendering, records the "threw" row once, and keeps the process running. A fields-only
 registration followed by a second registration that adds an instrument reading those fields renders
-that instrument, and a report after a fieldless registration takes the undeclared-field row.
+that instrument, and a report after a fieldless registration takes the undeclared-field row. Two more
+pin the block's silence: a block entry for an instrument that never registers draws no warning, and
+the same document with a row naming the name still warns once by the row. The CI pack step's reserved
+fixture check is the test that a registration under `jefferson.` fails a provider's type check.
 
 *Why.* T15 (use the real bus, never a substituted registry), T13 (no second lookup), R1 and S8 (the
 scanned rule is retired, so the pin changes with the delta), M23 (a provider's compiler flags differ
@@ -573,9 +609,9 @@ from this repository's), M27 (the harness and the test files are plan obligation
 ### 15. The message table
 
 Every new string, word for word. Reused unchanged: the rejection wrapper
-`pi-jefferson: <path> was rejected (<part>); rendering the default row`, the accepted-warning wrapper
-`pi-jefferson: <path> <part>[; <part>…]`, `row N: "<name>" is not a known instrument`, and
-`the instruments block names instruments the extension does not implement: "<name>"` (D17).
+`pi-jefferson: <path> was rejected (<part>); rendering the default row`, and the accepted-warning
+wrapper `pi-jefferson: <path> <part>[; <part>…]` with `row N: "<name>" is not a known instrument`
+(D17's row form; its block form is retired by Joel's 2026-11-16 ruling).
 
 Fault parts join under their own wrapper, `pi-jefferson: <part>[; <part>…]`, because a fault is not a
 fault in the user's document. A part is exactly the table's text, with names quoted as written. The
@@ -588,12 +624,10 @@ did not declare; "taiknr.savings" failed to render: its resolver threw`.
 |---|---|
 | The payload is not an object | `a registration is not an object` |
 | No extension name | `a registration carries no extension name` |
-| An extension name outside the grammar | `a registration names the extension "Taiknr", which is not a lowercase name` |
-| The extension claims `jefferson` | `a registration claims "jefferson", which belongs to Jefferson` |
+| The extension is `jefferson` or starts with `jefferson.` | `a registration claims "<extension>", which belongs to Jefferson` — for example `"jefferson"` or `"jefferson.custom"` |
 | `instruments` missing or not an array | `registration from "taiknr" carries no instruments` |
 | A declaration that is not an object | `registration from "taiknr" carries an instrument that is not a declaration` |
 | A declaration with no name | `registration from "taiknr" carries a declaration with no name` |
-| A declaration name with a dot or an uppercase letter | `registration from "taiknr" carries "savings.total", which is not a single lowercase name` |
 | A name already registered | `"taiknr.savings" is already registered, so this registration is refused` |
 | A registration that names one instrument twice | `registration from "taiknr" carries "savings" twice` |
 | No resolvers | `"taiknr.savings" carries no resolvers` |
@@ -619,6 +653,7 @@ did not declare; "taiknr.savings" failed to render: its resolver threw`.
 | A resolver that threw | `"taiknr.savings" failed to render: its resolver threw` |
 | A resolver that returned a non-string | `"<name>" failed to render: its resolver returned <what>, where text is declared`, where `<what>` is `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included) or `null`; a thenable is checked first and takes the promise row |
 | A resolver that returned a promise | `"taiknr.savings" failed to render: its resolver returned a promise` |
+| A provider types an extension under `jefferson.` | `a name under jefferson. belongs to Jefferson`, shown by `tsc` in TS2344 before the provider runs |
 | Both spellings of one instrument | `the instruments block configures "path" and "jefferson.default.path", which are one instrument` — a document rejection, so it travels in the rejection wrapper |
 | The two channel names | `jefferson:registration` and `jefferson:update`, each named for what is posted on it (decision 18) |
 

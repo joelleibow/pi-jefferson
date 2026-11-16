@@ -53,10 +53,9 @@ Every instrument has a registered name.
 
 - A bare name means `jefferson.default.<name>`. So `"model"` and `"jefferson.default.model"` name
   one instrument, take one configuration, and render the same text.
-- An instrument another extension provides is named `<extension>.<instrument>`, with two parts, such
-  as `taiknr.savings`. A bare name never reaches one. Write the two parts.
-- Each part of a name starts with a lowercase letter, then uses lowercase letters, digits and
-  hyphens.
+- An instrument another extension provides is named `<extension>.<instrument>`, such as
+  `taiknr.savings`, and its name may hold more dots. A bare name never reaches one.
+- Every name under `jefferson.` is Jefferson's.
 
 An entry renders `blank` when no instrument answers to its name. See
 [Instruments](instruments.md#a-name-no-instrument-answers-to).
@@ -118,8 +117,12 @@ and `formats`. An option the instrument does not declare rejects the document. T
 [Instruments](instruments.md), and the format language is in [Formats](formats.md).
 
 The name in this block is the registered name, so the shorthand above works here too. Write one name
-once: a block that configures `"model"` and `"jefferson.default.model"` names one instrument twice,
-and that rejects the document. The warning quotes both keys as you wrote them.
+once: for an instrument that has registered, a block that configures `"model"` and
+`"jefferson.default.model"` names one instrument twice, and that rejects the document. The warning
+quotes both keys as you wrote them.
+
+An entry for an instrument that never registers draws no warning, whatever it holds. Jefferson checks
+it only when that instrument registers.
 
 A provided instrument keeps the three settings above and no option. A setting it does not take does
 not reject the document. It refuses that instrument alone: its entries render `blank`, one warning
