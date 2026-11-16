@@ -53,12 +53,6 @@ function readDocument(document: unknown, theme: Theme = fakeTheme()): Configurat
   };
 }
 
-test("a rows list normalizes to one row per entry in order", () => {
-  const { rows, warning } = readDocument({ rows: blankRows(2) });
-  assert.equal(rows.length, 2);
-  assert.equal(warning, undefined);
-});
-
 test("a rows list of entry lists yields one row per member, in order", () => {
   const { rows, warning } = readDocument({
     rows: [[{ instrument: "model" }], [{ instrument: "thinking" }, { instrument: "blank" }]],
@@ -147,20 +141,6 @@ test("an absent configuration yields the default row and the default gap, with n
   assert.equal(warning, undefined);
 });
 
-test("an empty object yields one row of ten with no warning", () => {
-  const { rows, warning } = readDocument({});
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.cells.length, 10);
-  assert.equal(warning, undefined);
-});
-
-test("an empty rows list yields the default row with no warning", () => {
-  const { rows, warning } = readDocument({ rows: [] });
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.cells.length, 10);
-  assert.equal(warning, undefined);
-});
-
 test("a row list is both the count and the placement, in order", () => {
   const { rows, warning } = readDocument({ rows: [[{ instrument: "model" }, { instrument: "thinking" }, { instrument: "blank" }]] });
   assert.deepEqual(
@@ -168,17 +148,6 @@ test("a row list is both the count and the placement, in order", () => {
     ["Model: anthropic/claude-opus-4", "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" }), DEFAULT_CELL_TEXT],
   );
   assert.equal(warning, undefined);
-});
-
-test("a cells entry that is not an object rejects and names the object spelling", () => {
-  for (const entry of ["model", 4, ["model"], null]) {
-    const { rows, warning } = readDocument({ rows: [[entry]] });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]?.cells.length, 10);
-    assert.ok(warning, "a rejected document warns");
-    assert.match(warning, /not an object/);
-    assert.match(warning, /declare \{"instrument": "model"\}/);
-  }
 });
 
 test("a cell object with an unrecognised key rejects and names the key", () => {
@@ -193,31 +162,6 @@ test("a cell object with an unrecognised key rejects and names the key", () => {
     assert.ok(warning, "a rejected document warns");
     assert.match(warning, /unrecognised key/);
     assert.ok(warning.includes(key));
-  }
-});
-
-test("an instrument that is not a non-empty string rejects", () => {
-  for (const entry of [{ instrument: 4 }, { instrument: "" }]) {
-    const { rows, warning } = readDocument({ rows: [[entry]] });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]?.cells.length, 10);
-    assert.ok(warning, "a rejected document warns");
-    assert.match(warning, /not a non-empty string/);
-  }
-});
-
-test("an align outside the three rejects and names the value", () => {
-  for (const [entry, expected] of [
-    [{ instrument: "model", align: "middle" }, '"middle"'],
-    [{ instrument: "model", align: "Center" }, '"Center"'],
-    [{ instrument: "model", align: 4 }, ": 4"],
-  ] as const) {
-    const { rows, warning } = readDocument({ rows: [[entry]] });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]?.cells.length, 10);
-    assert.ok(warning, "a rejected document warns");
-    assert.match(warning, /align/);
-    assert.ok(warning.includes(expected));
   }
 });
 
@@ -242,12 +186,6 @@ test("a cell that declares no align normalizes to left", () => {
   assert.deepEqual(right.rows[0]?.cells.map((cell) => cell.align), ["right"]);
 });
 
-test("cells naming 12 instruments keeps the first 10 and warns nothing", () => {
-  const { rows, warning } = readDocument({ rows: [Array.from({ length: 12 }, () => ({ instrument: "blank" }))] });
-  assert.equal(rows[0]?.cells.length, 10);
-  assert.equal(warning, undefined, "the clamp stays accepted behavior under its truthful name");
-});
-
 test("a cells entry past the ceiling that is not an object rejects the document", () => {
   const cells: unknown[] = Array.from({ length: 11 }, () => ({ instrument: "blank" }));
   cells.push(42);
@@ -266,16 +204,6 @@ test("a cells entry past the ceiling naming an unknown instrument warns and rend
   assert.equal(rows[0]?.cells.length, 10);
   assert.ok(warning, "the unknown instrument still warns past the ceiling");
   assert.match(warning, /brnach/);
-});
-
-test("an align past the ceiling that is outside the three rejects the document", () => {
-  const cells: { instrument: string; align?: string }[] = Array.from({ length: 11 }, () => ({ instrument: "blank" }));
-  cells.push({ instrument: "blank", align: "middle" });
-  const { rows, warning } = readDocument({ rows: [cells] });
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.cells.length, 10);
-  assert.ok(warning, "a rejected document warns");
-  assert.match(warning, /align/);
 });
 
 test("the cell-count constants are named for cells", () => {
@@ -297,17 +225,6 @@ test("a configured label replaces the default label", () => {
   assert.equal(replaced.rows[0]?.cells[0]?.instrument.render(seed, 80, fakeTheme())?.includes("Thinking: "), false, "the default label is not shown beside a configured one");
   const removed = readDocument({ instruments: { thinking: { label: "" } }, rows: [[{ instrument: "thinking" }]] });
   assert.deepEqual(removed.rows[0]?.cells.map(cellText), [fakeTheme().style("High", { fg: "thinkingHigh" })], "an empty label removes the default");
-});
-
-test("an instrument the extension does not implement renders blank and warns naming it", () => {
-  const { rows, warning } = readDocument({ rows: [[{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }]] });
-  assert.deepEqual(
-    rows[0]?.cells.map(cellText),
-    ["Model: anthropic/claude-opus-4", DEFAULT_CELL_TEXT, "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })],
-    "the unknown name renders blank while the rest of the row renders its instruments",
-  );
-  assert.ok(warning);
-  assert.match(warning, /nope/);
 });
 
 test("an unknown name warns by its row, and its cell renders blank", () => {

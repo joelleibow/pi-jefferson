@@ -322,10 +322,25 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   owns. Beyond the table, also delete four tests whose subject a new test now owns: `a cell object
   with no instrument rejects` (`:158`, B11), `a document naming cells and no containers warns nothing
   extra` (`:292`, decision 7 and A1), `two unimplemented instruments in different rows share one
-  warning` (`:309`, C23), and `an empty cells array is rejected` (`:326`, B8). Two tests are split,
-  because half of each loses its subject (rule (e) below). Three are rewritten in place: `unknown
-  instrument names in the section and cells share one exact notice` (`:959`), and the precedence
-  test's `:1085` and `:1087` (both below).
+  warning` (`:309`, C23), and `an empty cells array is rejected` (`:326`, B8).
+
+  Nine more tests go, because a test from tasks 1.1–1.4 subsumes each one: `a cells entry that is not
+  an object rejects and names the object spelling` (B9 owns it), `an instrument that is not a
+  non-empty string rejects` (B12), `an align outside the three rejects and names the value` (B13),
+  `cells naming 12 instruments keeps the first 10 and warns nothing` (B14), `an align past the
+  ceiling that is outside the three rejects the document` (B15), `a rows list normalizes to one row
+  per entry in order` (A1), `an empty object yields one row of ten with no warning` (A5), `an empty
+  rows list yields the default row with no warning` (A4), and `an instrument the extension does not
+  implement renders blank and warns naming it` (C17). Two of those pairs stay. `a cell object with an
+  unrecognised key rejects and names the key` is B10's pair, and its `{text: "x"}` case is the only
+  test pinning the entry check order settled under CB5R2-3, because the unrecognised key is reported
+  before the missing `instrument`. `a cells entry past the ceiling naming an unknown instrument warns
+  and renders ten cells` is B16's pair, and its `rows.length === 1` is the only assertion that entries
+  past the ceiling do not spill into a second row (`michael-consult-1.md`).
+
+  Two tests are split, because half of each loses its subject (rule (e) below). Three are rewritten
+  in place: `unknown instrument names in the section and cells share one exact notice` (`:959`), and
+  the precedence test's `:1085` and `:1087` (both below).
 
   **Rewrite `:959` in place.** Keep both of its `cells.map(cellText)` assertions, including the
   unknown cell's `"configured blank"`, and replace its two exact warnings with decision 5's table and
