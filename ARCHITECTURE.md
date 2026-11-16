@@ -173,16 +173,16 @@ installs. No file imports the entry. Within `extensions/jefferson/`:
 - `instrument-contract.ts` imports only the types of `data/field-value.ts`, and it holds no runtime
   statement.
 - `faults.ts` imports no file of this package.
-- `registration.ts` imports the contract's types and the type `components/instruments/instrument.ts`
-  declares.
-- `registration-listener.ts` imports `registration.ts`, `faults.ts`, the contract, `format.ts`, the
-  types of `data/`, and the binding.
+- `registration.ts` imports the type `components/instruments/instrument.ts` declares.
+- `registration-listener.ts` imports `registration.ts`, the types of `faults.ts`, the contract, the
+  types of `data/`, the `instrument.ts` type, and the binding.
 - `components/` holds the parts. Its files import host packages, their own directory, a visual, the
   types of `data/` and `format.ts`. They never import startup, footer setup, configuration or
   `shipped.ts`.
-  - `row/` imports only the type of the instrument contract.
+  - `row/` imports only the `Instrument` type from `components/instruments/instrument.ts`.
   - `instruments/` imports `format.ts` and a visual only in the binding, and the binding imports the
-    `Fault` type from `faults.ts`.
+    `Fault` type from `faults.ts`. Its files may import the contract's types, and `instrument.ts` and
+    the binding both do.
   - `components/visuals/` files import no local file.
 - `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
   `data/`.

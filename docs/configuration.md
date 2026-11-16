@@ -55,7 +55,8 @@ Every instrument has a registered name.
   one instrument, take one configuration, and render the same text.
 - An instrument another extension provides is named `<extension>.<instrument>`, with two parts, such
   as `taiknr.savings`. A bare name never reaches one. Write the two parts.
-- A name is lowercase: letters, digits and hyphens.
+- Each part of a name starts with a lowercase letter, then uses lowercase letters, digits and
+  hyphens.
 
 An entry renders `blank` when no instrument answers to its name. See
 [Instruments](instruments.md#a-name-no-instrument-answers-to).

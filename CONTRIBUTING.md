@@ -40,6 +40,9 @@ The pull request carries one of three labels:
 No label means a patch. The default is low on purpose, so an unlabelled change never ships a major
 version by accident.
 
+A change that adds a surface, such as a new export, a new instrument or a new configuration key,
+carries `release:minor`. Everything else ships as the patch default.
+
 ### The base comes from the tags
 
 The version's base is the git tags, not `package.json`. `main` accepts no direct pushes, so the

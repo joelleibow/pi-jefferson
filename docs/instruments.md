@@ -97,9 +97,9 @@ data and `"format": ""`, the entry is the label alone.
 A name no instrument answers to does not reject the document. Jefferson accepts it, warns, and
 renders that entry as `blank`, so one typo does not take the statusline down.
 
-The warning comes after startup completes, because an extension may register the name during
-startup. If one does, the entry renders that instrument from the next render on, and the warning
-stays in the transcript.
+The warning waits until startup completes, because an extension may register the name during
+startup. A name registered by then renders and is never warned about. A name that registers after
+the warning renders from the next render on, and the warning stays in the transcript.
 
 The warning places the entry by its row:
 

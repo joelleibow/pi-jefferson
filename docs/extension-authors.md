@@ -112,7 +112,7 @@ const registration: Registration = {
       name: "savings",
       variables: {
         saved: (readings) => {
-          const value = readings.saved;
+          const value = readings["saved"];
           return typeof value === "number" ? `$${value.toFixed(2)}` : undefined;
         },
       },
@@ -129,8 +129,12 @@ The registration holds four things:
 - `instruments`, the instruments you provide. An empty list is allowed.
 - each instrument's `name`, `variables`, `defaultFormat` and optional `defaultLabel`.
 
+`extension` and each instrument `name` start with a lowercase letter, then use lowercase letters,
+digits and hyphens. No dot, no underscore, no scope.
+
 Write the instrument's own name, one word. Jefferson builds the full name for the user:
-`taiknr.savings`.
+`taiknr.savings`. A readings view is an index signature, so read a field with brackets,
+`readings["saved"]`, and the sample compiles under `noPropertyAccessFromIndexSignature` too.
 
 Your registration carries no options and no features that Jefferson's own instruments have. An
 instrument of yours takes a format, a style and a label, and nothing else.
@@ -168,8 +172,10 @@ A resolver returns text, or `undefined`.
 A resolver reads only the fields your extension declared. Jefferson hands it a view of those fields
 and no other datum.
 
-An instrument of yours renders only when every variable resolves. If one resolver returns
-`undefined`, the entry renders nothing, and the rest of the row still renders.
+An instrument of yours renders only when every variable you declare resolves, not only the ones the
+user's format names. One `undefined` empties the entry, label included. If a variable may have no
+value yet while the entry should still show, return text for it, such as `""`. Or split it into its
+own instrument.
 
 ## What your user writes
 
@@ -211,9 +217,9 @@ Jefferson checks a registration before it accepts any part of it. The first faul
 registration, and nothing from it registers:
 
 - A registration that is not an object, or that carries no extension name.
-- An extension name that is not lowercase, or that claims `jefferson`.
-- An instrument name that is already registered, that is not one lowercase word, or that appears
-  twice in one registration.
+- An extension name outside the rule above, or one that claims `jefferson`.
+- An instrument name outside the rule above, one already registered, or one that appears twice in one
+  registration.
 - A declaration with no `variables`, no `defaultFormat`, or a default format Jefferson cannot parse.
 - A `defaultLabel` that is not a string, or a resolver that is not a function.
 - A field type that is not one of the three.
@@ -254,7 +260,7 @@ user's document:
 | A report with no field name | `pi-jefferson: a report carries no field name` |
 | A report for an undeclared field | `pi-jefferson: taiknr reports "spent", which it did not declare` |
 | A report with no registration | `pi-jefferson: taiknr reports "saved" without a registration` |
-| A report of the wrong type | `pi-jefferson: taiknr reports "saved" as a string, and it declared a number` |
+| A report of the wrong type | `pi-jefferson: taiknr reports "saved" as a string, and it declared number` |
 | A report of NaN or an infinity | `pi-jefferson: taiknr reports "saved" as a number that is not finite` |
 | A resolver that threw | `pi-jefferson: "taiknr.savings" failed to render: its resolver threw` |
 | A resolver that returned a non-string | `pi-jefferson: "taiknr.savings" failed to render: its resolver returned a number, where text is declared` |
@@ -265,17 +271,18 @@ The wrong-type rows name the value with one word: `a string`, `a number`, `a boo
 row uses the same words apart from `a string` and `nothing`, because a string is text and
 `undefined` is not a fault.
 
-A warning that concerns the user's configuration carries the document's path and the instrument. Jefferson
-refuses that instrument alone, so the user keeps the rest of the footer:
+A warning about a provided instrument's settings names the instrument and the fault. It carries no
+path, because the fault is the instrument's, not the document's. Jefferson refuses that instrument
+alone, so the user keeps the rest of the footer:
 
 | What the user wrote | The text |
 | --- | --- |
-| A value that is not an object | `pi-jefferson: <path> the instruments block gives "taiknr.savings" a value that is not an object; its entries render blank` |
-| A format that is not a string | `pi-jefferson: <path> "taiknr.savings" is configured with a format that is not a string; its entries render blank` |
-| A format naming a variable you do not declare | `pi-jefferson: <path> "taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; its entries render blank` |
-| An option your instrument does not take | `pi-jefferson: <path> "taiknr.savings" is configured with "width", which the instrument does not declare; its entries render blank` |
-| A format Jefferson cannot parse | `pi-jefferson: <path> "taiknr.savings" is configured with a format Jefferson cannot parse; its entries render blank` |
-| A style the theme refuses | `pi-jefferson: <path> "taiknr.savings" is configured with a style Jefferson cannot use; its entries render blank` |
+| A value that is not an object | `pi-jefferson: the instruments block gives "taiknr.savings" a value that is not an object; its entries render blank` |
+| A format that is not a string | `pi-jefferson: "taiknr.savings" is configured with a format that is not a string; its entries render blank` |
+| A format naming a variable you do not declare | `pi-jefferson: "taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; its entries render blank` |
+| An option your instrument does not take | `pi-jefferson: "taiknr.savings" is configured with "width", which the instrument does not declare; its entries render blank` |
+| A format Jefferson cannot parse | `pi-jefferson: "taiknr.savings" is configured with a format Jefferson cannot parse; its entries render blank` |
+| A style the theme refuses | `pi-jefferson: "taiknr.savings" is configured with a style Jefferson cannot use; its entries render blank` |
 
 The same sentence appears with `label` in place of `format` when the label is not a string.
 
@@ -299,5 +306,7 @@ Jefferson 0.14.0 is the first version that publishes the contract.
 
 ## A whole extension
 
-The sample under `tests/fixtures/sample-provider/` compiles against the published contract on every
-release. Read it for a file you can copy.
+The sample lives at
+[`tests/fixtures/sample-provider/`](https://github.com/joelleibow/pi-jefferson/tree/main/tests/fixtures/sample-provider).
+It compiles against the packed contract on every pull request and push. Read it for a file you can
+copy. The npm package does not ship it.
