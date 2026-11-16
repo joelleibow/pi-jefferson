@@ -289,7 +289,7 @@ Jefferson checks a whole registration before it accepts any of it. The first fau
 
 Jefferson prints warnings in pi's transcript, and none before startup completes. Warnings found together print as one line, joined with `; `, after the "not a known instrument" warning when there is one. Jefferson prints each warning once per session, so a function that throws on every render warns once.
 
-Warnings about your registration and your updates carry no file path, because the fault is not in the user's configuration file. In these warnings, "resolver" means a function under `variables`, `variableForms` or `composed.variables`.
+Warnings about your registration and your updates carry no file path, because the fault is not in the user's configuration file.
 
 | What went wrong | The warning |
 | --- | --- |
@@ -301,14 +301,14 @@ Warnings about your registration and your updates carry no file path, because th
 | An instrument has no name | `pi-jefferson: registration from "taiknr" carries a declaration with no name` |
 | The name is already registered | `pi-jefferson: "taiknr.savings" is already registered, so this registration is refused` |
 | The registration lists a name twice | `pi-jefferson: registration from "taiknr" carries "savings" twice` |
-| No `variables` object | `pi-jefferson: "taiknr.savings" carries no resolvers` |
+| No `variables` object | `pi-jefferson: "taiknr.savings" carries no variables` |
 | No `defaultFormat` | `pi-jefferson: "taiknr.savings" carries no default format` |
 | An optional member of the wrong shape | `pi-jefferson: "taiknr.savings" carries fills Jefferson cannot use`, with `bar`, `variableForms`, `variableFg`, `composed` or `options` in place of `fills` |
 | An option Jefferson does not offer | `pi-jefferson: "taiknr.savings" declares the option "seconds", which Jefferson does not implement` |
 | `formats` without `composed` | `pi-jefferson: "taiknr.savings" declares "formats" without a composed format set` |
 | A default format Jefferson cannot parse | `pi-jefferson: "taiknr.savings" carries a default format Jefferson cannot parse` |
 | A `defaultLabel` that is not a string | `pi-jefferson: "taiknr.savings" carries a default label that is not a string` |
-| A variable that is not a function | `pi-jefferson: "taiknr.savings" carries a resolver "saved" that is not a function` |
+| A variable that is not a function | `pi-jefferson: "taiknr.savings" carries a variable "saved" that is not a function` |
 | A composed text Jefferson cannot parse | `pi-jefferson: "taiknr.savings" carries a composed format "busy" Jefferson cannot parse` |
 | A field type outside the three | `pi-jefferson: registration from "taiknr" declares "saved" as "array", which is not string, number or boolean` |
 | A field declared again with another type | `pi-jefferson: registration from "taiknr" declares "saved" as both string and number` |
@@ -319,11 +319,11 @@ Warnings about your registration and your updates carry no file path, because th
 | An update for a field you did not declare | `pi-jefferson: taiknr reports "spent", which it did not declare` |
 | An update of the wrong type | `pi-jefferson: taiknr reports "saved" as a string, and it declared number` |
 | An update of NaN or an infinity | `pi-jefferson: taiknr reports "saved" as a number that is not finite` |
-| A function that threw | `pi-jefferson: "taiknr.savings" failed to render: its resolver threw` |
-| A function that returned a promise | `pi-jefferson: "taiknr.savings" failed to render: its resolver returned a promise` |
-| A function that returned the wrong kind of value | `pi-jefferson: "taiknr.savings" failed to render: its resolver returned a number, where text is declared` |
+| A function that threw | `pi-jefferson: "taiknr.savings" failed to render: its variable threw` |
+| A function that returned a promise | `pi-jefferson: "taiknr.savings" failed to render: its variable returned a promise` |
+| A function that returned the wrong kind of value | `pi-jefferson: "taiknr.savings" failed to render: its variable returned a number, where text is declared` |
 
-The last three name the function that faulted: `resolver`, `select`, `bar`, or `colour` for a `variableFg` function. The wrong-value warning names what was declared: `text` for a resolver or `select`, `a finite number or null` for `bar`, and `a theme colour` for a colour. A colour token the theme does not have is quoted: `its colour returned "nope", where a theme colour is declared`.
+The last three name the function that faulted: `variable` for a function in `variables`, `variableForms` or `composed.variables`; `select`; `bar`; or `colour` for a `variableFg` function. The wrong-value warning names what was declared: `text` for a variable or `select`, `a finite number or null` for `bar`, and `a theme colour` for a colour. A colour token the theme does not have is quoted: `its colour returned "nope", where a theme colour is declared`.
 
 The wrong-type and wrong-value warnings name a value with one of these: `a string`, `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included), `null`, or `nothing` when an update has no value.
 
