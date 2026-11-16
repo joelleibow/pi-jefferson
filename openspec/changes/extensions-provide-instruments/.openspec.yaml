@@ -9,8 +9,8 @@ x-marbleization:
     derek_spike: d7389373-1d82-4436-bd42-d19203168b43
     judge_gen_verify: 0b7fb0a2-09c4-42d5-a9e6-bd85944ca784
     judge_gen_review: 6d307f74-9efc-4146-a210-3d14c8a74a44
-    derek: 2ec8f864-ebb7-44f9-b686-cf6346c3bca1
-    bambadjan: 1d771ec5-b026-4298-b349-0e9a7c0820c2
+    derek: bbbac359-8006-452d-a33c-a3a6bedd9b82
+    bambadjan: 7f8e70a6-413f-43c0-a827-d5ab5e57a1f1
   gates:
     council_owner: approved
     design: approved
@@ -37,3 +37,4 @@ x-marbleization:
     - "2026-11-16: docs pass (Bambadjan 1d771ec5) committed 999fbc6; conductor removed docs/releasing.md for him. 11/11 doc JSON examples accepted. PR #24 opened (release:minor). Judge Gen validate launched."
     - "2026-11-16: Judge Gen verify 0b7fb0a2 (0 critical, W1-W3, S1-S3) + review 6d307f74 (0 must-fix, 7 should-fix, 2 nice). Michael Validate adjudication 18ded68a launched."
     - "2026-11-16: Michael Validate 9697d5e7: changes_requested, 11 findings upheld (2 major code: W2 block-only provided name unwatched Jefferson-first, W3 a.b.c treated as provided; 9 minor, 1 Derek fixture + 8 Bambadjan docs). Withdrew his CR-R2-2. Fixes workflow 2cd68419."
+    - "2026-11-16: Validate fixes committed (e50263b code, b15e67e docs), 521/521. Joel ruled during Validate: names free except everything under jefferson. (refused at runtime, rejected at compile time by the contract types); unregistered block settings are silent. Workflow d37a05c5: Michael turns rulings into fixes, Derek then Bambadjan apply."

@@ -104,3 +104,16 @@ jobs:
           cp -R tests/fixtures/sample-provider/. "$tmp/provider/"
           tar -xzf "$tmp"/*.tgz -C "$tmp/provider/node_modules/pi-jefferson" --strip-components=1
           pnpm exec tsc -p "$tmp/provider/tsconfig.json"
+
+          # A registration under jefferson. fails a provider's type check (owner-rulings.md,
+          # 2026-11-16), so the reserved fixture must fail, with TS2344 and the contract's words.
+          if pnpm exec tsc -p "$tmp/provider/tsconfig.reserved.json" > "$tmp/reserved.log" 2>&1; then
+            echo "FAIL: a registration under jefferson. type-checks"
+            exit 1
+          fi
+          if ! grep -q 'error TS2344: .*a name under jefferson\. belongs to Jefferson' "$tmp/reserved.log"; then
+            cat "$tmp/reserved.log"
+            echo "FAIL: the reserved fixture failed its type check for another reason"
+            exit 1
+          fi
+          echo "OK: a registration under jefferson. fails the type check"

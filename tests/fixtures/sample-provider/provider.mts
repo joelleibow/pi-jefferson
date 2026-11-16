@@ -22,7 +22,7 @@ export const channels: Readonly<Record<string, string>> = {
 
 const fields: Readonly<Record<string, FieldType>> = { saved: "number", working: "boolean" };
 
-export const registration: Registration = {
+export const registration: Registration<"sample-provider"> = {
   extension: "sample-provider",
   fields,
   instruments: [

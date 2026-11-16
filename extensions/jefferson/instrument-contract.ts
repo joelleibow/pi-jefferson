@@ -30,10 +30,25 @@ export type ContractDeclaration<R> = {
 /** A provided instrument's declaration: the contract's declaration over the provider's view. */
 export type ProvidedDeclaration = ContractDeclaration<ReadingsView>;
 
-/** The registration a provider posts on `jefferson:registration`. */
-export type Registration = {
+/** The names that belong to Jefferson: `jefferson` itself, and every name under `jefferson.`. */
+type ReservedExtension = "jefferson" | `jefferson.${string}`;
+
+/**
+ * What an extension name a provider writes must be: any string that is not Jefferson's. Every
+ * instrument name a registration composes starts with `<extension>.`, so it falls under `jefferson.`
+ * exactly when the extension is `jefferson` or starts with `jefferson.` (owner-rulings.md, 2026-11-16).
+ */
+type ProviderExtension<Extension> = [Extract<Extension, ReservedExtension>] extends [never]
+  ? string
+  : "a name under jefferson. belongs to Jefferson";
+
+/**
+ * The registration a provider posts on `jefferson:registration`, typed with the extension name it
+ * writes: `Registration<"taiknr">`. A name under `jefferson.` fails the provider's type check.
+ */
+export type Registration<Extension extends ProviderExtension<Extension>> = {
   /** The providing extension's own name, which prefixes every name it registers. */
-  extension: string;
+  extension: Extension;
   fields?: Readonly<Record<string, FieldType>>;
   instruments: readonly ProvidedDeclaration[];
 };

@@ -65,8 +65,8 @@ export interface UnknownName {
   written: string;
   /** The name it means: a bare name is the `jefferson.default.*` one. */
   normalized: string;
-  /** The 1-based row that placed it, absent for a name only the `instruments` block configures. */
-  row?: number;
+  /** The 1-based row that placed it: only a row's entry is reported, because only it renders blank. */
+  row: number;
 }
 
 export interface Configuration {
@@ -207,31 +207,33 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration("the instruments value is not an object");
   }
-  // Two spellings of one instrument are one instrument, so configuring both is a mistake the block
-  // cannot settle: the document is refused and the message quotes both keys as written (2.6).
+  // Each key as written, by the name it means: two registered spellings of one instrument are
+  // refused, and two spellings of an unregistered one are two inert entries.
   const written = new Map<string, string>();
   for (const [name, value] of Object.entries(raw)) {
     const normalized = normalizeName(name);
     const earlier = written.get(normalized);
+    written.set(normalized, name);
+    const declaration = source.resolve(normalized);
+    // An entry whose instrument has not registered draws no warning, whatever it holds: its settings
+    // are checked only when that instrument registers (owner-rulings.md, 2026-11-16).
+    if (declaration === undefined) {
+      // Only a provided name can still register, so only its raw value waits for the watch (design 9).
+      if (isProvidedName(normalized)) reading.held.set(normalized, value);
+      continue;
+    }
+    // Two spellings of one registered instrument are a mistake the block cannot settle: the document
+    // is refused and the message quotes both keys as written (2.6).
     if (earlier !== undefined) {
       throw new RejectedConfiguration(
         `the instruments block configures ${JSON.stringify(earlier)} and ${JSON.stringify(name)}, which are one instrument`,
       );
     }
-    written.set(normalized, name);
 
     // A provided name answers to its own instrument alone, so a fault under it refuses that
     // instrument and never the document: one extension's mistake cannot take down a user's footer.
     if (isProvidedName(normalized)) {
-      const provided = source.resolve(normalized);
-      if (provided === undefined) {
-        // Not registered yet: the raw value waits for the watch, whatever its type (design 9), and
-        // the name is reported at startup unless the registry answers it by then.
-        reading.held.set(normalized, value);
-        reading.unknownNames.push({ written: name, normalized });
-        continue;
-      }
-      const settings = checkProvidedSettings(normalized, value, provided, source.theme);
+      const settings = checkProvidedSettings(normalized, value, declaration, source.theme);
       if ("part" in settings) {
         reading.refused.add(normalized);
         reading.faults.push({ scope: normalized, kind: settings.kind, part: settings.part });
@@ -241,15 +243,9 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
       continue;
     }
 
-    // Jefferson's own names, and a three-part name in its namespace, keep the whole-document rule.
+    // Jefferson's own instruments keep the whole-document rule.
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
-    }
-    const declaration = source.resolve(normalized);
-    if (declaration === undefined) {
-      // The block's keys are unique and two spellings of one name are refused above, so no dedupe.
-      reading.unknownNames.push({ written: name, normalized });
-      continue;
     }
     const entry = value as Record<string, unknown>;
     for (const key of Object.keys(entry)) {
@@ -494,20 +490,7 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
  * delivery point hands it the names the registry still does not answer (design 12).
  */
 export function acceptedWarning(path: string, unknownNames: readonly UnknownName[]): string | undefined {
-  const parts: string[] = [];
-  // The rows' parts first, then the block's one part: a row's part changes what renders.
-  for (const unknown of unknownNames) {
-    if (unknown.row === undefined) continue;
-    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.written)} is not a known instrument`);
-  }
-  const block = unknownNames.filter((unknown) => unknown.row === undefined);
-  if (block.length > 0) {
-    parts.push(
-      `the instruments block names instruments the extension does not implement: ${block
-        .map((unknown) => JSON.stringify(unknown.written))
-        .join(", ")}`,
-    );
-  }
+  const parts = unknownNames.map((unknown) => `row ${unknown.row}: ${JSON.stringify(unknown.written)} is not a known instrument`);
   return parts.length === 0 ? undefined : `pi-jefferson: ${path} ${parts.join("; ")}`;
 }
 

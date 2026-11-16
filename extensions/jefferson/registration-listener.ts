@@ -12,7 +12,7 @@ import type { FieldType, FieldValue } from "./data/field-value.ts";
 import type { ProviderFields } from "./data/provider-fields.ts";
 import type { Fault, FaultLedger } from "./faults.ts";
 import type { ProvidedDeclaration, RegistrationChannel, UpdateChannel } from "./instrument-contract.ts";
-import { isNamePart, type Registry } from "./registration.ts";
+import { isProvidedName, type Registry } from "./registration.ts";
 
 // The contract is types-only, so the spelling lives here, against the contract's literal type:
 // a misspelling fails `pnpm typecheck` (G3).
@@ -23,8 +23,8 @@ const UPDATE = "jefferson:update" satisfies UpdateChannel;
 type OwnRegistration = { extension: "jefferson"; instruments: readonly InstrumentDeclaration[] };
 
 /**
- * The scope a payload with no extension name reports under: an extension name cannot be `-`, so no
- * provider's fault can dedupe against it (decision 7).
+ * The scope a payload with no extension name reports under. Only the four kinds a payload with no
+ * extension name takes report under it, so no provider's fault dedupes against it (decision 7).
  */
 const ANONYMOUS = "-";
 
@@ -59,16 +59,13 @@ function vetRegistration(
     return { refusal: { scope: ANONYMOUS, kind: "registration-no-extension", part: "a registration carries no extension name" } };
   }
   const claimed = JSON.stringify(extension);
-  if (!isNamePart(extension)) {
-    return { refusal: {
-      scope: extension, kind: "extension-grammar",
-      part: `a registration names the extension ${claimed}, which is not a lowercase name`,
-    } };
-  }
-  if (extension === "jefferson") {
+  // Every name this registration composes starts with `<extension>.`, so it is Jefferson's exactly
+  // when that prefix is: the extension `jefferson`, or one under `jefferson.` (owner-rulings.md,
+  // 2026-11-16).
+  if (!isProvidedName(`${extension}.`)) {
     return { refusal: {
       scope: extension, kind: "jefferson-claim",
-      part: 'a registration claims "jefferson", which belongs to Jefferson',
+      part: `a registration claims ${claimed}, which belongs to Jefferson`,
     } };
   }
   if (!Array.isArray(payload.instruments)) {
@@ -89,12 +86,6 @@ function vetRegistration(
       return { refusal: {
         scope: extension, kind: "declaration-no-name",
         part: `registration from ${claimed} carries a declaration with no name`,
-      } };
-    }
-    if (!isNamePart(part)) {
-      return { refusal: {
-        scope: extension, kind: "declaration-name-grammar",
-        part: `registration from ${claimed} carries ${JSON.stringify(part)}, which is not a single lowercase name`,
       } };
     }
     // Jefferson composes the name, so a mismatch between an instrument's name and its claim cannot

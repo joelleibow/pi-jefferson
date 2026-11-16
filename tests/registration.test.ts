@@ -17,7 +17,7 @@ import { configurationSource } from "./configuration-source.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import { createRegistrationListener } from "../extensions/jefferson/registration-listener.ts";
 import {
-  createRegistry, isNamePart, isProvidedName, normalizeName,
+  createRegistry, isProvidedName, normalizeName,
 } from "../extensions/jefferson/registration.ts";
 import { readConfiguration } from "../extensions/jefferson/configuration.ts";
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
@@ -32,7 +32,7 @@ import {
  * The field is reported with a value that renders as it was written, so a line proves the report
  * reached the resolver.
  */
-const registration: Registration = {
+const registration: Registration<"taiknr"> = {
   extension: "taiknr",
   fields: { saved: "string" },
   instruments: [
@@ -326,12 +326,10 @@ test("A2 every registration refusal part is exact", async (t) => {
       "a registration is not an object"],
     ["no extension name", events => events.emit("jefferson:registration", { instruments: [] }),
       "a registration carries no extension name"],
-    ["extension grammar", events => events.emit("jefferson:registration", { extension: "Taiknr", instruments: [] }),
-      'a registration names the extension "Taiknr", which is not a lowercase name'],
-    ["empty extension name", events => events.emit("jefferson:registration", { extension: "", instruments: [] }),
-      'a registration names the extension "", which is not a lowercase name'],
     ["jefferson claim", events => events.emit("jefferson:registration", { extension: "jefferson", instruments: [] }),
       'a registration claims "jefferson", which belongs to Jefferson'],
+    ["a name under jefferson.", events => events.emit("jefferson:registration", { extension: "jefferson.custom", instruments: [] }),
+      'a registration claims "jefferson.custom", which belongs to Jefferson'],
     ["no instruments", events => events.emit("jefferson:registration", { extension: "taiknr" }),
       'registration from "taiknr" carries no instruments'],
     ["instruments not a list", events => events.emit("jefferson:registration", { extension: "taiknr", instruments: {} }),
@@ -340,10 +338,6 @@ test("A2 every registration refusal part is exact", async (t) => {
       'registration from "taiknr" carries an instrument that is not a declaration'],
     ["no declaration name", events => events.emit("jefferson:registration", from({ instruments: [{ variables: {}, defaultFormat: "" }] })),
       'registration from "taiknr" carries a declaration with no name'],
-    ["declaration name grammar", events => events.emit("jefferson:registration", from({ instruments: [{ name: "Savings" }] })),
-      'registration from "taiknr" carries "Savings", which is not a single lowercase name'],
-    ["a dotted part", events => events.emit("jefferson:registration", from({ instruments: [{ name: "custom.mine" }] })),
-      'registration from "taiknr" carries "custom.mine", which is not a single lowercase name'],
     ["a taken name", events => {
       events.emit("jefferson:registration", registration);
       events.emit("jefferson:registration", registration);
@@ -577,7 +571,7 @@ test("A2 a different-type redeclaration is refused and the first stays intact", 
 test("A2 a change made after registering does not reach the render or the check", async (t) => {
   documentShowing(t, [["taiknr.savings"]]);
   const h = harness();
-  const payload: Registration = {
+  const payload: Registration<"taiknr"> = {
     extension: "taiknr",
     fields: { saved: "string" },
     instruments: [{
@@ -607,7 +601,7 @@ test("A2 a change made after registering does not reach the render or the check"
     rows: [[{ instrument: "taiknr.savings" }]],
   });
   const checked = harness();
-  const reposted: Registration = {
+  const reposted: Registration<"taiknr"> = {
     extension: "taiknr",
     fields: { saved: "string" },
     instruments: [{
@@ -676,17 +670,14 @@ test("A5 an unknown name twice in one row warns once", async (t) => {
   ]);
 });
 
-test("A5 the block form warns after startup, placed by the block", async (t) => {
+test("A5 a name only the block names draws no warning", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, { instruments: { "taiknr.savings": {} }, rows: [[{ instrument: "model" }]] });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
-  assert.deepEqual(session.notified, [{
-    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} the instruments block names instruments the extension does not implement: "taiknr.savings"`,
-    type: "warning",
-  }]);
+  assert.deepEqual(session.notified, [], "no row holds the name, so nothing renders blank");
 });
 
-test("A5 the block and a row each warn once", async (t) => {
+test("A5 a name the block and a row both name warns once, by its row", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
     instruments: { nope: {} },
@@ -694,9 +685,9 @@ test("A5 the block and a row each warn once", async (t) => {
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
   assert.deepEqual(session.notified, [{
-    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} row 2: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} row 2: "nope" is not a known instrument`,
     type: "warning",
-  }]);
+  }], "only the row renders blank, so only the row reports");
 });
 
 test("A5 a registration from beforeFactory leaves its name warned as unknown", async (t) => {
@@ -958,13 +949,10 @@ test("A3 a non-object value for a provided name stays blank, then refuses it alo
   assert.equal(drawn.includes("Savings"), false, "the refused entry stays blank");
 });
 
-test("A3 a non-object value for a provided name that never registers leaves the document accepted, with only the unknown-name warning", async (t) => {
-  const document = configuredDocument(t, 5, [[{ instrument: "model" }]]);
+test("A3 a non-object value for a provided name that never registers leaves the document accepted, with no warning", async (t) => {
+  configuredDocument(t, 5, [[{ instrument: "model" }]]);
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
-  assert.deepEqual(session.notified, [{
-    message: `pi-jefferson: ${document.path} the instruments block names instruments the extension does not implement: "taiknr.savings"`,
-    type: "warning",
-  }], "no settings are checked for a name that never registered");
+  assert.deepEqual(session.notified, [], "no settings are checked for a name that never registered");
 });
 
 test("A3 a rejected document's names are never checked when they register", async (t) => {
@@ -987,7 +975,7 @@ test("A3 a rejected document's names are never checked when they register", asyn
 });
 
 /** A registration whose one instrument's one resolver is the function given. */
-function faultyRegistration(resolver: (readings: ReadingsView) => unknown): Registration {
+function faultyRegistration(resolver: (readings: ReadingsView) => unknown): Registration<"taiknr"> {
   return {
     extension: "taiknr",
     fields: { saved: "string" },
@@ -1223,7 +1211,7 @@ test("A7 nothing a provider reported survives a session replacement", async (t) 
 
 test("A9 a boolean field reads false as reported, and unknown before the report", async (t) => {
   documentShowing(t, [["taiknr.working"]]);
-  const work: Registration = {
+  const work: Registration<"taiknr"> = {
     extension: "taiknr",
     fields: { working: "boolean" },
     instruments: [{
@@ -1245,7 +1233,7 @@ test("A9 a boolean field reads false as reported, and unknown before the report"
 
 test("A9 a report that is not finite takes its row", async (t) => {
   documentShowing(t, [["model"]]);
-  const amount: Registration = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
+  const amount: Registration<"taiknr"> = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
   for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
     const h = harness();
     h.events.emit("jefferson:registration", amount);
@@ -1270,16 +1258,7 @@ test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("taiknr.savings"), true);
   assert.equal(isProvidedName("jefferson.default.path"), false);
   assert.equal(isProvidedName("jefferson.custom.mine"), false, "three parts belong to Jefferson");
-  assert.equal(isProvidedName("a.b.c"), false, "a provided name is exactly two parts, whatever its first");
-});
-
-test("A8 isNamePart refuses a dotted part", () => {
-  assert.equal(isNamePart("savings"), true);
-  assert.equal(isNamePart("savings-total"), true);
-  assert.equal(isNamePart("custom.mine"), false, "one part carries no dot");
-  assert.equal(isNamePart("Savings"), false);
-  assert.equal(isNamePart(""), false);
-  assert.equal(isNamePart("2savings"), false);
+  assert.equal(isProvidedName("a.b.c"), true, "any name outside jefferson. is a provider's, whatever its parts");
 });
 
 test("A8 normalizeName leaves a written full name and a three-part name alone", () => {
@@ -1314,6 +1293,48 @@ test("A8 Jefferson's own payload registers every shipped name, with no session",
 
 /** The one settings part a block-only provided name takes, whichever came first. */
 const BLOCK_ONLY_PART = 'pi-jefferson: "taiknr.savings" is configured with a format naming "$nope", which the instrument does not declare; its entries render blank';
+
+test("A8 a provider's name may be anything outside jefferson.", async (t) => {
+  documentShowing(t, [["Taiknr Pro.savings.total"]]);
+  const h = harness();
+  const payload: Registration<"Taiknr Pro"> = {
+    extension: "Taiknr Pro",
+    fields: { saved: "string" },
+    instruments: [{ ...registration.instruments[0]!, name: "savings.total" }],
+  };
+  h.events.emit("jefferson:registration", payload);
+  h.events.emit("jefferson:update", { extension: "Taiknr Pro", field: "saved", value: "$4.10" });
+  const session = await h.start();
+  assert.equal(line(session), "Savings: $4.10", "the composed name is Taiknr Pro.savings.total");
+  assert.deepEqual(session.notified, []);
+});
+
+test("A2 a registration under jefferson. is refused, whatever follows the prefix", async (t) => {
+  const path = documentShowing(t, [["model"], ["jefferson.custom.mine"]]);
+  const h = harness();
+  h.events.emit("jefferson:registration", {
+    extension: "jefferson.custom",
+    instruments: [{ ...registration.instruments[0]!, name: "mine" }],
+  });
+  const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} row 2: "jefferson.custom.mine" is not a known instrument`, type: "warning" },
+    { message: 'pi-jefferson: a registration claims "jefferson.custom", which belongs to Jefferson', type: "warning" },
+  ]);
+});
+
+test("A3 an instruments-block entry whose instrument never registers draws no warning", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  // Silent, whatever the entry holds and whoever the name belongs to: its settings are checked only
+  // when the instrument registers (owner-rulings.md, 2026-11-16).
+  writeAgentDocument(agentDir, {
+    instruments: { "taiknr.savings": 5, nope: 5, "a.b.c": { format: "$x" }, "jefferson.custom.mine": [] },
+    rows: [[{ instrument: "model" }]],
+  });
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, []);
+  assert.equal(line(session), "Model: anthropic/claude-opus-4", "the document is accepted");
+});
 
 test("A3 a block-only provided name is checked provider-first", async (t) => {
   // No row places the name: only the instruments block configures it, so the check must come from
@@ -1361,17 +1382,6 @@ test("A8 no bus handler of Jefferson's raises an error, from the factory through
   });
   assert.equal(line(session), "Savings: $4.10");
   assert.deepEqual(errors.mock.calls.map(call => call.arguments), [], "no bus handler raised");
-});
-
-test("A8 a three-part name outside jefferson keeps the whole-document rule", async (t) => {
-  const agentDir = useTempAgentDir(t);
-  // Three parts belong to Jefferson alone: a name outside its namespace cannot be provided, so this
-  // value takes the whole-document rule, exactly as a name in Jefferson's namespace does.
-  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }]], instruments: { "a.b.c": 5 } });
-  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
-  assert.equal(session.notified.length, 1, "one notice, and it is the rejection");
-  assert.match(session.notified[0]?.message ?? "",
-    /was rejected \(the instruments configuration for "a\.b\.c" is not an object\)/);
 });
 
 test("A1 two providers' fields of one name are separate", () => {

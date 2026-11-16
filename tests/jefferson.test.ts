@@ -254,7 +254,7 @@ test("every shipped file's exported keys are pinned, and registration is the onl
       ["collapse", "parseFormat", "resolveFormat", "resolvePlain", "validateStyle"]],
     ["../extensions/jefferson/faults.ts", ["createFaultLedger"]],
     ["../extensions/jefferson/instrument-contract.ts", []],
-    ["../extensions/jefferson/registration.ts", ["createRegistry", "isNamePart", "isProvidedName", "normalizeName"]],
+    ["../extensions/jefferson/registration.ts", ["createRegistry", "isProvidedName", "normalizeName"]],
     ["../extensions/jefferson/registration-listener.ts", ["createRegistrationListener"]],
     ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
     ["../extensions/jefferson/startup.ts", ["startUp"]],

@@ -264,43 +264,33 @@ test("one unknown name twice in one row is reported once", () => {
   assert.equal(acceptedWarning(path, unknownNames), `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`);
 });
 
-test("a name only the instruments block configures is reported by the block, with no row", () => {
-  const { path, unknownNames } = readDocument({ instruments: { nope: {} } });
-  assert.equal(
-    acceptedWarning(path, unknownNames),
-    `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "nope"`,
-    "no row holds the name, so the block reports it and claims nothing about a cell",
-  );
+test("a name only the instruments block configures draws no warning", () => {
+  const { path, unknownNames, warning } = readDocument({ instruments: { other: {}, nope: 5 } });
+  assert.equal(warning, undefined, "the document is accepted");
+  assert.equal(acceptedWarning(path, unknownNames), undefined,
+    "no row holds the name, so nothing renders blank and nothing is reported");
 });
 
-test("the instruments block names every unknown it configures, in key order", () => {
-  const { path, unknownNames } = readDocument({ instruments: { other: {}, nope: {} } });
-  assert.equal(
-    acceptedWarning(path, unknownNames),
-    `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "other", "nope"`,
-    "the block's key order, not an alphabetical one",
-  );
-});
-
-test("a name a row and the block both name is reported by each, the row's part first", () => {
+test("a name a row and the block both name is reported by its row alone", () => {
   const { path, unknownNames } = readDocument({
     rows: [[{ instrument: "blank" }], [{ instrument: "nope" }]],
     instruments: { nope: {} },
   });
   assert.equal(
     acceptedWarning(path, unknownNames),
-    `pi-jefferson: ${path} row 2: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+    `pi-jefferson: ${path} row 2: "nope" is not a known instrument`,
+    "the block's entry draws nothing: only the row renders blank",
   );
 });
 
-test("every placed part joins in row order, then the block's one part", () => {
+test("every placed part joins in row order", () => {
   const { path, unknownNames } = readDocument({
     rows: [[{ instrument: "aa" }], [{ instrument: "bb" }]],
     instruments: { nope: {} },
   });
   assert.equal(
     acceptedWarning(path, unknownNames),
-    `pi-jefferson: ${path} row 1: "aa" is not a known instrument; row 2: "bb" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+    `pi-jefferson: ${path} row 1: "aa" is not a known instrument; row 2: "bb" is not a known instrument`,
   );
 });
 
@@ -955,8 +945,10 @@ test("A8 both spellings in one block reject the document, quoting both keys", ()
     `the instruments block configures ${JSON.stringify(first)} and ${JSON.stringify(second)}, which are one instrument`;
   rejected({ instruments: { path: {}, "jefferson.default.path": {} } }, oneInstrument("path", "jefferson.default.path"));
   rejected({ instruments: { "jefferson.default.path": {}, path: {} } }, oneInstrument("jefferson.default.path", "path"));
-  // Registered or not: the block is refused before anything knows which names answer.
-  rejected({ instruments: { nope: {}, "jefferson.default.nope": {} } }, oneInstrument("nope", "jefferson.default.nope"));
+  // An instrument that never registers is never checked, so two spellings of one draw nothing.
+  const unregistered = readDocument({ instruments: { nope: {}, "jefferson.default.nope": {} } });
+  assert.equal(unregistered.warning, undefined);
+  assert.equal(acceptedWarning(unregistered.path, unregistered.unknownNames), undefined);
 });
 
 test("A8 a bare name does not reach a provided instrument", () => {
@@ -992,21 +984,18 @@ test("a configured name binds once across cells and rows while unconfigured name
   assert.equal(rows[0]?.cells[3]?.holder.current, rows[1]?.cells[1]?.holder.current);
 });
 
-test("an unknown name in the block and in a row each get their part, and its cell renders the configured blank", () => {
+test("an unknown name in the block draws no part, in a row it does, and its cell renders the configured blank", () => {
   const onlySection = readDocument({ instruments: { nope: {} }, rows: [[{ instrument: "model" }]] });
-  assert.equal(acceptedWarning(onlySection.path, onlySection.unknownNames), `pi-jefferson: ${onlySection.path} the instruments block names instruments the extension does not implement: "nope"`);
+  assert.equal(acceptedWarning(onlySection.path, onlySection.unknownNames), undefined);
   assert.deepEqual(onlySection.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4"]);
   const both = readDocument({ instruments: { nope: {}, blank: { format: "configured blank" } }, rows: [[{ instrument: "model" }, { instrument: "nope" }, { instrument: "thinking" }]] });
-  assert.equal(acceptedWarning(both.path, both.unknownNames), `pi-jefferson: ${both.path} row 1: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`);
+  assert.equal(acceptedWarning(both.path, both.unknownNames), `pi-jefferson: ${both.path} row 1: "nope" is not a known instrument`);
   assert.deepEqual(both.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4", "configured blank", "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })]);
 });
 
-test("several unknown names in the instruments block keep their key order, beside the default row", () => {
+test("several unknown names in the instruments block draw no warning, beside the default row", () => {
   const result = readDocument({ instruments: { nope: {}, other: {} } });
-  assert.equal(
-    acceptedWarning(result.path, result.unknownNames),
-    `pi-jefferson: ${result.path} the instruments block names instruments the extension does not implement: "nope", "other"`,
-  );
+  assert.equal(acceptedWarning(result.path, result.unknownNames), undefined);
   assert.equal(result.rows[0]?.cells.length, DEFAULT_CELLS);
 });
 

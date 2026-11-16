@@ -1,12 +1,9 @@
 /**
- * What a name means, and what has registered: the grammar, the reserved namespace, the full-name
- * rule, and the registry that holds registrations, answers a lookup, and keeps the watch table.
+ * What a name means, and what has registered: the reserved prefix, the full-name rule, and the
+ * registry that holds registrations, answers a lookup, and keeps the watch table.
  * Pure — no bus, no pi (design 6, 8; G9).
  */
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
-
-/** The one name part grammar: lowercase, non-empty, and no dot. */
-const NAME_PART = /^[a-z][a-z0-9-]*$/;
 
 /** The first part of every name Jefferson's own instruments carry. */
 const OWN_NAMESPACE = "jefferson";
@@ -17,17 +14,11 @@ export function normalizeName(written: string): string {
 }
 
 /**
- * Whether a full name belongs to a provider: exactly two parts, and the first is not `jefferson`.
- * Three parts belong to Jefferson alone, so a three-part name outside its namespace is no provider's.
+ * Whether a full name belongs to a provider: every name outside `jefferson.` does, whatever its
+ * parts. Everything under `jefferson.` is Jefferson's (owner-rulings.md, 2026-11-16).
  */
 export function isProvidedName(name: string): boolean {
-  const parts = name.split(".");
-  return parts.length === 2 && parts[0] !== OWN_NAMESPACE;
-}
-
-/** Whether a text is one name part: the extension's, or an instrument's. */
-export function isNamePart(text: string): boolean {
-  return NAME_PART.test(text);
+  return !name.startsWith(`${OWN_NAMESPACE}.`);
 }
 
 export interface Registry {
