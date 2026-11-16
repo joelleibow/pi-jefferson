@@ -333,6 +333,31 @@ test("a rejected configuration warns and still installs the default row", async 
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
 });
 
+test("a rows list of entry lists renders one line per row, with the gap between them", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }], [{ instrument: "thinking" }]] });
+
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, thinkingLevel: "high" });
+  const lines = session.lines(80);
+  assert.equal(lines.length, 3, "the two rows and one empty line between them");
+  assert.equal(lines[1], "", "the gap line is a bare empty line");
+  assert.equal(stripTerminalSequences(lines[0] ?? ""), "Model: anthropic/claude-opus-4".padEnd(80));
+  assert.equal(stripTerminalSequences(lines[2] ?? ""), "Thinking: High".padEnd(80));
+  assert.deepEqual(session.notified, [], "the document is accepted without a word");
+});
+
+test("a 0.12.0 document is rejected end to end, in one toast that shows the rows form", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }] });
+
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (a row at the top level is retired; declare rows as {"rows": [[{"instrument": "model"}]]} and drop any top-level id or distribution); rendering the default row`,
+    type: "warning",
+  }]);
+  assert.equal(session.lines(80).length, 1, "the default row renders as one line");
+});
+
 test("the branch, session and status cells render their labels at their alignments end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {

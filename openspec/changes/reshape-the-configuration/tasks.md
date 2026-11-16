@@ -69,7 +69,7 @@ and 1.14.
 One group, ending green. Every test here proves a scenario in `specs/statusline/spec.md`; the check
 labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and green.
 
-- [ ] 1.1 **Add the retired-key and row-shape tests, red, and replace the two precedence pins.**
+- [x] 1.1 **Add the retired-key and row-shape tests, red, and replace the two precedence pins.**
   In `tests/configuration.test.ts`: `a rows list of entry lists yields one row per member, in order`
   (A1); `a retired top-level key rejects alone, beside an empty rows list, and with another retired
   key` (A2 — `{"distribution": "equal"}`, `{"id": "footer"}`, `{"cells": […]}` alone,
@@ -102,7 +102,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   carries both a top-level row and a rows list`; `pnpm typecheck` stays clean, since these tests add
   no `Row` literal.
 
-- [ ] 1.2 **Add the entry and placement tests, red.** In `tests/configuration.test.ts`:
+- [x] 1.2 **Add the entry and placement tests, red.** In `tests/configuration.test.ts`:
   `an empty row is rejected and placed by its row alone` (B8, a later row so the number is 1-based);
   `an entry that is not an object is rejected and named by row and instrument` (B9 — `"model"`, `4`,
   `["model"]`, `null`); `an entry with an unrecognised key is rejected naming the key` (B10 —
@@ -124,7 +124,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   **Verify:** `pnpm test` — each of B8–B16 fails with `row 0 is not an object` today, because a row
   list is not an object (`redgreen-derek.md` § B); `pnpm typecheck` stays clean.
 
-- [ ] 1.3 **Add the unknown-name tests, red, including the in-row order and the block order.** In
+- [x] 1.3 **Add the unknown-name tests, red, including the in-row order and the block order.** In
   `tests/configuration.test.ts`: `an unknown name warns by its row, and its cell renders blank` (C17,
   `row 3: "taiknr.savings" is not a known instrument`); `one unknown name in two rows is reported
   once for each row, in row order` (C18); `one unknown name twice in one row is reported once`
@@ -145,7 +145,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   **Verify:** `pnpm test` — C17–C23 and the in-row order test fail with the pre-change strings quoted
   in `redgreen-derek.md` § C; `pnpm typecheck` stays clean.
 
-- [ ] 1.4 **Add the removal tests, red where the behaviour changes.** In
+- [x] 1.4 **Add the removal tests, red where the behaviour changes.** In
   `tests/configuration.test.ts`: `a row carries a distribution and no id, and the parser writes
   content` (D24, `Object.keys(row).sort()` is exactly `["cells", "distribution"]`); `a top-level
   containers key is an ordinary unknown key and is ignored in silence` (D25 — its document is
@@ -166,7 +166,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   D26 fails on `warning`, because a new-shape document is rejected today; `pnpm typecheck` stays
   clean.
 
-- [ ] 1.5 **Add the end-to-end tests, red.** In `tests/jefferson.test.ts`:
+- [x] 1.5 **Add the end-to-end tests, red.** In `tests/jefferson.test.ts`:
   `a rows list of entry lists renders one line per row, with the gap between them` (E29 — the model
   row, the thinking row and one bare `""` gap line, with `session.notified` empty);
   `a 0.12.0 document is rejected end to end, in one toast that shows the rows form` (E30 — exactly
@@ -177,7 +177,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   **Verify:** `pnpm test` — E29 fails with a rejection toast and E30 with `[]`, as
   `redgreen-derek.md` § E records; `pnpm typecheck` stays clean.
 
-- [ ] 1.6 **Record the red run before touching production code.** Run the whole suite and keep the
+- [x] 1.6 **Record the red run before touching production code.** Run the whole suite and keep the
   output, so the migration's red is on the record rather than asserted.
   **Proves:** the red run the plan's own test list produces.
   **Boundary cases:** none.

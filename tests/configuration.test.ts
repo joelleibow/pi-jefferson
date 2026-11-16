@@ -75,6 +75,80 @@ test("both shapes at once is rejected", () => {
   assert.ok(warning, "a rejected document warns");
 });
 
+test("a rows list of entry lists yields one row per member, in order", () => {
+  const { rows, warning } = readDocument({
+    rows: [[{ instrument: "model" }], [{ instrument: "thinking" }, { instrument: "blank" }]],
+  });
+  assert.equal(warning, undefined);
+  assert.deepEqual(rows.map((row) => row.cells.map(cellText)), [
+    ["Model: anthropic/claude-opus-4"],
+    ["Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" }), DEFAULT_CELL_TEXT],
+  ]);
+});
+
+test("a retired top-level key rejects alone, beside an empty rows list, and with another retired key", () => {
+  // 0.12.0 read a document without `rows` as one row, so each of these renders ten blanks in
+  // silence without the guard, and the guard answers before any other fault in the document.
+  rejected({ distribution: "equal" }, RETIRED);
+  rejected({ id: "footer" }, RETIRED);
+  rejected({ cells: [{ instrument: "model" }] }, RETIRED);
+  rejected({ cells: [{ instrument: "model" }], rows: [] }, RETIRED);
+  rejected({ cells: [{ instrument: "model" }], id: "footer", distribution: "equal" }, RETIRED);
+});
+
+test("rows given as something other than a list is rejected naming rows", () => {
+  for (const rows of [{}, "model", 4, null]) {
+    rejected({ rows }, "the rows value is not a list");
+  }
+});
+
+test("an empty rows list is accepted with no warning, alone and beside settings", () => {
+  for (const document of [
+    { rows: [] },
+    { rows: [], rowGap: 2 },
+    { rows: [], instruments: { blank: { format: "configured" } } },
+  ]) {
+    const { rows, warning } = readDocument(document);
+    assert.equal(warning, undefined, JSON.stringify(document));
+    assert.equal(rows.length, 1, "the default row stands in for no declared row");
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS);
+  }
+});
+
+test("a document with no rows and no retired key renders the default row", () => {
+  for (const [document, gap] of [
+    [{}, 1],
+    [{ instruments: { blank: { format: "configured" } } }, 1],
+    [{ rowGap: 2 }, 2],
+    [{ instruments: {}, rowGap: 3 }, 3],
+  ] as const) {
+    const { rows, rowGap, warning } = readDocument(document);
+    assert.equal(warning, undefined, JSON.stringify(document));
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS);
+    assert.equal(rowGap, gap, "a setting beside no rows still applies");
+  }
+});
+
+test("the configuration document must be an object", () => {
+  for (const document of [42, null, [[]], ["x"]]) {
+    rejected(document, "the configuration document is not an object");
+  }
+});
+
+test("a row written as an object is rejected with the whole rows form, at either mistake", () => {
+  const notARow = (row: number): string =>
+    `row ${row}: is not a list; a row is a list of entries, as {"rows": [[{"instrument": "model"}]]}`;
+  // A row the way it was written before this change, and a flat list of entries one bracket short.
+  rejected({ rows: [{ cells: [{ instrument: "model" }] }] }, notARow(1));
+  rejected({ rows: [{ instrument: "model" }] }, notARow(1));
+  // A member of `rows` of any other kind is placed by its row alone.
+  for (const member of ["model", 4]) {
+    rejected({ rows: [member] }, notARow(1));
+  }
+  rejected({ rows: [[{ instrument: "model" }], null] }, notARow(2));
+});
+
 test("an absent configuration yields the default row and the default gap, with no warning", () => {
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
   const { rows, rowGap, warning } = readConfiguration({
@@ -306,6 +380,87 @@ test("an instrument the extension does not implement renders blank and warns nam
   assert.match(warning, /nope/);
 });
 
+test("an unknown name warns by its row, and its cell renders blank", () => {
+  const { rows, warning, path } = readDocument({
+    rows: [
+      [{ instrument: "blank" }],
+      [{ instrument: "blank" }],
+      [{ instrument: "model" }, { instrument: "taiknr.savings" }, { instrument: "thinking" }],
+    ],
+  });
+  assert.equal(warning, `pi-jefferson: ${path} row 3: "taiknr.savings" is not a known instrument`);
+  assert.deepEqual(
+    rows[2]?.cells.map(cellText),
+    ["Model: anthropic/claude-opus-4", DEFAULT_CELL_TEXT, "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })],
+    "the unknown name renders blank while the rest of the row renders its instruments",
+  );
+});
+
+test("one unknown name in two rows is reported once for each row, in row order", () => {
+  const { warning, path } = readDocument({
+    rows: [[{ instrument: "taiknr.savings" }], [{ instrument: "blank" }], [{ instrument: "taiknr.savings" }]],
+  });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument; row 3: "taiknr.savings" is not a known instrument`,
+    "one part per row a user must fix",
+  );
+});
+
+test("one unknown name twice in one row is reported once", () => {
+  const { warning, path } = readDocument({ rows: [[{ instrument: "taiknr.savings" }, { instrument: "taiknr.savings" }]] });
+  assert.equal(warning, `pi-jefferson: ${path} row 1: "taiknr.savings" is not a known instrument`);
+});
+
+test("a name only the instruments block configures is reported by the block, with no row", () => {
+  const { warning, path } = readDocument({ instruments: { nope: {} } });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "nope"`,
+    "no row holds the name, so the block reports it and claims nothing about a cell",
+  );
+});
+
+test("the instruments block names every unknown it configures, in key order", () => {
+  const { warning, path } = readDocument({ instruments: { other: {}, nope: {} } });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} the instruments block names instruments the extension does not implement: "other", "nope"`,
+    "the block's key order, not an alphabetical one",
+  );
+});
+
+test("a name a row and the block both name is reported by each, the row's part first", () => {
+  const { warning, path } = readDocument({
+    rows: [[{ instrument: "blank" }], [{ instrument: "nope" }]],
+    instruments: { nope: {} },
+  });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} row 2: "nope" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+  );
+});
+
+test("every placed part joins in row order, then the block's one part", () => {
+  const { warning, path } = readDocument({
+    rows: [[{ instrument: "aa" }], [{ instrument: "bb" }]],
+    instruments: { nope: {} },
+  });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} row 1: "aa" is not a known instrument; row 2: "bb" is not a known instrument; the instruments block names instruments the extension does not implement: "nope"`,
+  );
+});
+
+test("two unknown names in one row follow the position of each name's first entry", () => {
+  const { warning, path } = readDocument({ rows: [[{ instrument: "bb" }, { instrument: "aa" }]] });
+  assert.equal(
+    warning,
+    `pi-jefferson: ${path} row 1: "bb" is not a known instrument; row 1: "aa" is not a known instrument`,
+    "each name keeps the place of its first entry, so a user reads the row left to right",
+  );
+});
+
 test("two unimplemented instruments in different rows share one warning", () => {
   const { rows, warning } = readDocument({
     rows: [
@@ -329,6 +484,71 @@ test("an empty cells array is rejected", () => {
   assert.equal(rows[0]?.cells.length, 10);
   assert.ok(warning, "a row of no cells has no geometry");
   assert.match(warning, /empty cells/);
+});
+
+test("an empty row is rejected and placed by its row alone", () => {
+  rejected({ rows: [[{ instrument: "model" }], []] }, "row 2: is empty; a row lists the entries it renders");
+});
+
+test("an entry that is not an object is rejected and named by row and instrument", () => {
+  for (const entry of ["model", 4, ["model"], null]) {
+    rejected({ rows: [[entry]] }, 'row 1, instrument 1: is not an object; declare {"instrument": "model"}');
+  }
+});
+
+test("an entry with an unrecognised key is rejected naming the key", () => {
+  for (const key of ["distribution", "width", "aling"]) {
+    rejected(
+      { rows: [[{ instrument: "model", [key]: 4 }]] },
+      `row 1, instrument 1: has an unrecognised key "${key}"; an entry carries instrument and align`,
+    );
+  }
+});
+
+test("an entry with no instrument is rejected in Joel's words, placed by position", () => {
+  rejected({ rows: [[{ instrument: "model" }, { align: "right" }]] }, 'row 1, instrument 2: no "instrument" named');
+});
+
+test("an instrument that is not a non-empty string is rejected", () => {
+  for (const instrument of [4, ""]) {
+    rejected(
+      { rows: [[{ instrument: "blank" }], [{ instrument: "blank" }], [{ instrument: "blank" }, { instrument }]] },
+      'row 3, instrument 2: "instrument" is not a non-empty string',
+    );
+  }
+});
+
+test("an align outside the three is rejected naming the value", () => {
+  // A value that is not a string is shown unquoted, as 0.12.0 showed it.
+  for (const [align, shown] of [["middle", '"middle"'], ["Center", '"Center"'], [4, "4"]] as const) {
+    rejected(
+      { rows: [[{ instrument: "model", align }]] },
+      `row 1, instrument 1: align is not "left", "right" or "center": ${shown}`,
+    );
+  }
+});
+
+test("a row above the ceiling renders ten cells and is accepted", () => {
+  const entries = Array.from({ length: 12 }, () => ({ instrument: "blank" }));
+  const { rows, warning } = readDocument({ rows: [entries] });
+  assert.equal(warning, undefined, "the ceiling truncates the list, it does not reject it");
+  assert.equal(rows[0]?.cells.length, MAX_CELLS);
+});
+
+test("an entry past the ceiling is still validated and placed by its position", () => {
+  const entries: { instrument: string; align?: string }[] = Array.from({ length: 11 }, () => ({ instrument: "blank" }));
+  entries.push({ instrument: "blank", align: "middle" });
+  rejected(
+    { rows: [[{ instrument: "blank" }], entries] },
+    'row 2, instrument 12: align is not "left", "right" or "center": "middle"',
+  );
+});
+
+test("an unknown name past the ceiling still warns", () => {
+  const entries = Array.from({ length: 12 }, (_, index) => ({ instrument: index === 11 ? "brnach" : "blank" }));
+  const { rows, warning, path } = readDocument({ rows: [entries] });
+  assert.equal(rows[0]?.cells.length, MAX_CELLS, "the ceiling still truncates the list");
+  assert.equal(warning, `pi-jefferson: ${path} row 1: "brnach" is not a known instrument`);
 });
 
 for (const [name, entry] of [
@@ -971,6 +1191,9 @@ test("containers and multiple unknown section names retain the accepted-notice o
   assert.equal(result.rows[0]?.cells.length, 10);
 });
 
+/** Decision 5's one part for a row at the document's top level, shown form and all. */
+const RETIRED = 'a row at the top level is retired; declare rows as {"rows": [[{"instrument": "model"}]]} and drop any top-level id or distribution';
+
 function rejected(document: unknown, message: string): void {
   let result!: ReturnType<typeof readDocument>;
   assert.doesNotThrow(() => { result = readDocument(document); }, `reject with ${message}, not an uncaught exception`);
@@ -1080,8 +1303,9 @@ test("all six attributes accept boolean values and empty styles preserve unstyle
 });
 
 test("error precedence reads the envelope and the rowGap before instruments and instruments before cells", () => {
-  rejected({ instruments: { model: { format: 42 } }, cells: [{ instrument: "model", align: "middle" }] }, 'instrument "model" has a format that is not a string');
-  rejected({ instruments: 42, rows: [{}], cells: [{ instrument: "model" }] }, "the configuration carries both a top-level row and a rows list");
+  // The retired-key guard answers first, whatever else the document carries.
+  rejected({ cells: [{ instrument: "model" }], rows: 42, rowGap: 1.5, instruments: 42 }, RETIRED);
+  rejected({ id: "footer", rows: [[]] }, RETIRED);
   rejected({ instruments: { model: { format: 42 } }, rows: [{ cells: [{ instrument: "model", align: "middle" }] }] }, 'instrument "model" has a format that is not a string');
   // The gap is a document-level key, read before any row and before the instruments section.
   rejected({ instruments: { model: { format: 42 } }, rows: [{}], rowGap: 1.5 }, "rowGap must be a whole number from 0 to 3: 1.5");
@@ -1210,16 +1434,25 @@ test("theme invalidation re-styles the same footer with no bytes cached from the
   assert.equal(styles, 4, "even invalidation without a theme change re-resolves");
 });
 
-test("every row carries a distribution, content by default", () => {
-  // Absent, and each of the two values, side by side in one rows list.
-  const listed = readDocument({ rows: [{}, { distribution: "content" }, { distribution: "equal" }] });
-  assert.equal(listed.warning, undefined);
-  assert.deepEqual(listed.rows.map((row) => row.distribution), ["content", "content", "equal"]);
+test("a row carries a distribution and no id, and the parser writes content", () => {
+  const { rows, warning } = readDocument({ rows: [[{ instrument: "model" }]] });
+  assert.equal(warning, undefined);
+  assert.deepEqual(Object.keys(rows[0] ?? {}).sort(), ["cells", "distribution"]);
+  assert.equal(rows[0]?.distribution, "content");
+});
 
-  // A top-level row document is a row, so the option reads there the same way.
-  const topLevel = readDocument({ cells: [{ instrument: "model" }], distribution: "equal" });
-  assert.equal(topLevel.warning, undefined);
-  assert.deepEqual(topLevel.rows.map((row) => row.distribution), ["equal"]);
+test("a top-level containers key is an ordinary unknown key and is ignored in silence", () => {
+  const { rows, warning } = readDocument({ containers: 3, rows: [] });
+  assert.equal(warning, undefined, "the key has not been read since 2026-11-03, so it says nothing");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.cells.length, DEFAULT_CELLS);
+});
+
+test("every row the parser writes is sized by content", () => {
+  const declared = readDocument({ rows: [[{ instrument: "model" }], [{ instrument: "blank" }, { instrument: "thinking" }]] });
+  assert.equal(declared.warning, undefined);
+  assert.equal(declared.rows.length, 2);
+  assert.deepEqual(declared.rows.map((row) => row.distribution), ["content", "content"], "nothing a document writes changes it");
 
   // Both rows the extension makes for itself: the absent file, and a rejection's default row.
   const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
@@ -1232,9 +1465,9 @@ test("every row carries a distribution, content by default", () => {
   assert.equal(absent.warning, undefined);
   assert.deepEqual(absent.rows.map((row) => row.distribution), ["content"]);
 
-  const rejected = readDocument({ rows: [{ cells: [] }] });
-  assert.ok(rejected.warning, "a rejected document warns");
-  assert.deepEqual(rejected.rows.map((row) => row.distribution), ["content"]);
+  const refused = readDocument({ rows: 42 });
+  assert.ok(refused.warning, "a rejected document warns");
+  assert.deepEqual(refused.rows.map((row) => row.distribution), ["content"]);
 });
 
 test("a distribution that is not one of the two rejects the whole document", () => {
