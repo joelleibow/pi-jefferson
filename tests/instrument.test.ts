@@ -140,8 +140,9 @@ test("each declaration reads only the datums its variables display", async () =>
   assert.equal(await render("cost", unreadable({ totals: seed.totals })), "$0.000");
 });
 
-test("unknown suppresses the whole model declaration even under a model-only format", async () => {
-  assert.equal(await render("model", { ...seed, provider: undefined }, "$model"), "");
+test("an unknown model datum blanks the declaration only when its format names it", async () => {
+  assert.equal(await render("model", { ...seed, provider: undefined }, "$model"), "claude-opus-4");
+  assert.equal(await render("model", { ...seed, provider: undefined }, "$provider"), "");
   assert.equal(await render("model", { ...seed, model: undefined }), "");
   assert.equal(await render("model", unknown), "");
   assert.equal(await render("model", { ...seed, provider: "" }, "$provider: $model"), ": claude-opus-4");
@@ -171,6 +172,19 @@ test("percent and cost variables arrive already formatted without a subscription
   assert.equal(await render("context", { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } }, "$percent"), "?");
   assert.equal(await render("cost", { ...seed, totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.123 } }), "$0.123");
   assert.equal(await render("cost", seed), "$0.000");
+});
+
+test("a $bar-only context renders nothing with no usage, and an unfilled track for a null estimate", async () => {
+  // No usage at all is unknown, so a format that names only $bar renders nothing.
+  assert.equal(await render("context", unknown, "$bar"), "");
+  // A null estimate is a known usage with nothing to fill, so the dim track draws unfilled.
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  assert.equal(
+    stripTerminalSequences(await render("context", {
+      ...seed, contextUsage: { tokens: null, contextWindow: 200000, percent: null },
+    }, "$bar")),
+    "░".repeat(80),
+  );
 });
 
 test("context distinguishes known estimates, null estimates, absent usage and real zero", async () => {
@@ -447,8 +461,8 @@ test("an empty kind text silences that kind", async () => {
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const theme = fakeTheme();
-  const boundWith = (formats: Record<string, string>) => instrumentBindings(new Map([
-    [named("notice").name, { segments: parseFormat(named("notice"), "$notice"), style: {},
+  const boundWith = (formats: Record<string, string>, cell = "$notice") => instrumentBindings(new Map([
+    [named("notice").name, { segments: parseFormat(named("notice"), cell), style: {},
       formats: Object.fromEntries(Object.entries(formats)
         .map(([kind, format]) => [kind, parseFormat(named("notice"), format, true)])) }],
   ]))(named("notice"));
@@ -457,6 +471,8 @@ test("an empty kind text silences that kind", async () => {
   assert.equal(boundWith({ miss: "   " }).render(held, 80, theme), "", "whitespace alone trims to the same");
   assert.equal(boundWith({ miss: "$idle" }).render(held, 80, theme), "",
     "and a text that resolves empty because its only value is one this kind does not carry");
+  assert.equal(boundWith({ miss: "" }, "!").render(held, 80, theme), "",
+    "whatever the cell's format names: silencing does not rest on the format naming $notice");
   assert.equal(stripTerminalSequences(boundWith({ miss: "Spent $tokens" }).render(held, 80, theme)),
     "Notice: Spent 125k", "a kind with text still renders");
 });

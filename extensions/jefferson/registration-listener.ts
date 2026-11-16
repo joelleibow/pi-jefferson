@@ -119,6 +119,26 @@ function vetRegistration(
     );
     if ("refused" in adapted) {
       switch (adapted.refused) {
+        case "member-unusable":
+          return { refusal: {
+            scope: name, kind: "member-unusable",
+            part: `${full} carries ${adapted.member} Jefferson cannot use`,
+          } };
+        case "option-unimplemented":
+          return { refusal: {
+            scope: name, kind: "option-unimplemented",
+            part: `${full} declares the option ${JSON.stringify(adapted.option)}, which Jefferson does not implement`,
+          } };
+        case "formats-without-composed":
+          return { refusal: {
+            scope: name, kind: "formats-without-composed",
+            part: `${full} declares "formats" without a composed format set`,
+          } };
+        case "unparseable-composed-format":
+          return { refusal: {
+            scope: name, kind: "unparseable-composed-format",
+            part: `${full} carries a composed format ${JSON.stringify(adapted.kind)} Jefferson cannot parse`,
+          } };
         case "unparseable-default-format":
           return { refusal: {
             scope: name, kind: "unparseable-default-format",

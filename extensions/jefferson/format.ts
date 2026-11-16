@@ -218,21 +218,27 @@ export function resolveFormat(
   theme: Theme,
   preResolved?: Readonly<Record<string, string>>,
 ): string {
+  // Only what the format names is resolved, so only that can blank the instrument: a declared
+  // variable the format leaves out has no bearing on this render (owner-rulings.md, 2026-11-16).
   const values = new Map<string, string>();
-  for (const [name, resolve] of Object.entries(declaration.variables)) {
-    const value = preResolved !== undefined && Object.hasOwn(preResolved, name)
-      ? preResolved[name]
-      : resolve(readings);
-    if (value === undefined) return "";
-    values.set(name, collapse(value));
-  }
-  // A form is another reading of the same datum, and unknown when its own resolver says so.
   const formValues = new Map<string, string>();
   for (const segment of segments) {
-    if (segment.kind !== "variable" || segment.form === undefined) continue;
-    const value = declaration.variableForms?.[segment.name]?.[segment.form]?.(readings);
-    if (value === undefined) return "";
-    formValues.set(`${segment.name}|${segment.form}`, collapse(value));
+    if (segment.kind !== "variable") continue;
+    if (segment.form === undefined) {
+      if (values.has(segment.name)) continue;
+      const value = preResolved !== undefined && Object.hasOwn(preResolved, segment.name)
+        ? preResolved[segment.name]
+        : declaration.variables[segment.name]?.(readings);
+      if (value === undefined) return "";
+      values.set(segment.name, collapse(value));
+    } else {
+      // A form is another reading of the same datum, and unknown when its own resolver says so.
+      const key = `${segment.name}|${segment.form}`;
+      if (formValues.has(key)) continue;
+      const value = declaration.variableForms?.[segment.name]?.[segment.form]?.(readings);
+      if (value === undefined) return "";
+      formValues.set(key, collapse(value));
+    }
   }
   // The text a variable arrived as, before any modifier changed it: the token reads this one.
   const arrived = segments.map(segment => {
@@ -245,9 +251,11 @@ export function resolveFormat(
     : segment.modifiers.reduce((piece, modifier) => "mutate" in modifier ? modifier.mutate(piece) : piece, arrived[index]!));
   let bar = "";
   if (segments.some(segment => segment.kind === "bar")) {
+    // `$bar` is a variable the format names, so its unknown blanks the instrument as any other's does.
+    const percent = declaration.bar!(readings);
+    if (percent === undefined) return "";
     const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);
     const barWidth = Math.max(0, width - nonBar);
-    const percent = declaration.bar!(readings);
     bar = drawBar(barWidth, percent, style)
       .map(part => styledPiece(part.text, part.style, theme))
       .join("");
@@ -256,7 +264,7 @@ export function resolveFormat(
     if (segment.kind === "bar") return bar;
     const merged = mergedStyle(style, segment.modifiers);
     // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
-    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(arrived[index]!) : undefined;
+    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(arrived[index]!, theme) : undefined;
     return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
   }).join("");
 }

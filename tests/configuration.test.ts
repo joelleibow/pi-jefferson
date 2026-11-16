@@ -33,7 +33,7 @@ const seed: Readings = {
   sampledAt: 0,
 };
 
-/** `count` placeholder rows: a row lists the entries it renders, and one `blank` entry fills it. */
+/** `count` placeholder rows: a row lists the instruments it renders, and one `blank` instrument fills it. */
 function blankRows(count: number): { instrument: string }[][] {
   return Array.from({ length: count }, () => Array.from({ length: DEFAULT_CELLS }, () => ({ instrument: "blank" })));
 }
@@ -113,13 +113,13 @@ test("a document with no rows and no retired key renders the default row", () =>
 
 test("the configuration document must be an object", () => {
   for (const document of [42, null, [[]], ["x"]]) {
-    rejected(document, "the configuration document is not an object");
+    rejected(document, "the configuration file is not an object");
   }
 });
 
 test("a row written as an object is rejected with the whole rows form, at either mistake", () => {
   const notARow = (row: number): string =>
-    `row ${row}: is not a list; a row is a list of entries, as {"rows": [[{"instrument": "model"}]]}`;
+    `row ${row}: is not a list; a row is a list of instruments, as {"rows": [[{"instrument": "model"}]]}`;
   // A row the way it was written before this change, and a flat list of entries one bracket short.
   rejected({ rows: [{ cells: [{ instrument: "model" }] }] }, notARow(1));
   rejected({ rows: [{ instrument: "model" }] }, notARow(1));
@@ -304,7 +304,7 @@ test("two unknown names in one row follow the position of each name's first entr
 });
 
 test("an empty row is rejected and placed by its row alone", () => {
-  rejected({ rows: [[{ instrument: "model" }], []] }, "row 2: is empty; a row lists the entries it renders");
+  rejected({ rows: [[{ instrument: "model" }], []] }, "row 2: is empty; a row lists the instruments it renders");
 });
 
 test("an entry that is not an object is rejected and named by row and instrument", () => {
@@ -317,7 +317,7 @@ test("an entry with an unrecognised key is rejected naming the key", () => {
   for (const key of ["distribution", "width", "aling"]) {
     rejected(
       { rows: [[{ instrument: "model", [key]: 4 }]] },
-      `row 1, instrument 1: has an unrecognised key "${key}"; an entry carries instrument and align`,
+      `row 1, instrument 1: has an unrecognised key "${key}"; an instrument in a row takes only "instrument" and "align"`,
     );
   }
 });
@@ -630,12 +630,13 @@ test("a document carrying Joel's three labels renders each cell with one gap", (
   assert.ok(visibleWidth(cells[2] ?? "") <= 20, "the context cell is no wider than its width");
 });
 
-test("an unknown datum suppresses the whole cell, label included", () => {
+test("an unknown datum the format names suppresses the whole cell, label included", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
-  for (const format of ["$level", ""]) {
+  for (const [format, expected] of [["$level", ""], ["", "Thinking:"]] as const) {
     const { rows, warning } = readDocument({ instruments: { thinking: { label: "Thinking: ", format } }, rows: [[{ instrument: "thinking" }]] });
     assert.equal(warning, undefined);
-    assert.equal(rows[0]?.cells[0]?.holder.current.render(unknownLevel, 80, fakeTheme()), "", `a format of ${JSON.stringify(format)} does not shield the cell`);
+    assert.equal(rows[0]?.cells[0]?.holder.current.render(unknownLevel, 80, fakeTheme()), expected,
+      `a format of ${JSON.stringify(format)}: only a variable the format names can blank the cell`);
   }
   const known = readDocument({ instruments: { thinking: { label: "Thinking: ", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(known.rows[0]?.cells[0]?.holder.current.render(seed, 80, fakeTheme()), "Thinking: " + fakeTheme().style("high", { fg: "thinkingHigh" }), "the same label with a known level renders");
@@ -655,13 +656,13 @@ test("a whitespace-only format counts as empty and leaves the label alone", () =
   assert.equal(result.rows[0]?.cells[0]?.holder.current.render(seed, 80, fakeTheme()), "🤔");
 });
 
-test("an unknown datum leaves no label and no lone gap, whatever the format", () => {
+test("an unknown datum the format names leaves no label and no lone gap, and a format naming none leaves the label alone", () => {
   const unknownLevel: Readings = { ...seed, thinkingLevel: undefined };
-  for (const format of ["$level", "", "   "]) {
+  for (const [format, expected] of [["$level", ""], ["", "🤔"], ["   ", "🤔"]] as const) {
     const result = readDocument({ instruments: { thinking: { label: "🤔", format } }, rows: [[{ instrument: "thinking" }]] });
     assert.equal(result.warning, undefined, JSON.stringify(format));
-    assert.equal(result.rows[0]?.cells[0]?.holder.current.render(unknownLevel, 80, fakeTheme()), "",
-      `an unknown level with ${JSON.stringify(format)} renders no cell, label included: the guard reads the declared variables, not the trimmed segments`);
+    assert.equal(result.rows[0]?.cells[0]?.holder.current.render(unknownLevel, 80, fakeTheme()), expected,
+      `an unknown level with ${JSON.stringify(format)}: only a variable the format names can blank the cell`);
   }
   const known = readDocument({ instruments: { thinking: { label: "🤔", format: "$level" } }, rows: [[{ instrument: "thinking" }]] });
   assert.equal(known.rows[0]?.cells[0]?.holder.current.render(seed, 80, fakeTheme()),

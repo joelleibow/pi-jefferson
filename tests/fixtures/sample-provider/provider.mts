@@ -1,8 +1,8 @@
 /**
  * The sample provider the packaging check compiles: a consumer of the published contract under
  * flags this repository does not use. It writes both channel literals as a provider does, declares
- * a boolean and a number field, registers one instrument with one resolver and no default label,
- * and reports `false`.
+ * a boolean and a number field, registers one instrument with one resolver and no default label, and
+ * a second that uses every other member the contract offers, and reports `false`.
  */
 import type {
   FieldType,
@@ -37,6 +37,49 @@ export const registration: Registration<"sample-provider"> = {
         },
       },
       defaultFormat: "Savings: $saved",
+    },
+    {
+      name: "progress",
+      variables: {
+        state: (readings) => {
+          const working = readings["working"];
+          return working === true ? "busy" : working === false ? "idle" : undefined;
+        },
+        saved: (readings) => {
+          const value = readings["saved"];
+          return typeof value === "number" ? `$${value.toFixed(2)}` : undefined;
+        },
+      },
+      variableForms: {
+        saved: {
+          cents: (readings) => {
+            const value = readings["saved"];
+            return typeof value === "number" ? `${Math.round(value * 100)}¢` : undefined;
+          },
+        },
+      },
+      variableFg: { state: (value) => value === "busy" ? "accent" : undefined },
+      bar: (readings) => {
+        const value = readings["saved"];
+        return typeof value === "number" ? value : null;
+      },
+      fills: true,
+      composed: {
+        variable: "state",
+        variables: {
+          saved: (readings) => {
+            const value = readings["saved"];
+            return typeof value === "number" ? `$${value.toFixed(2)}` : undefined;
+          },
+        },
+        select: (readings) => {
+          const working = readings["working"];
+          return working === true ? "busy" : working === false ? "idle" : undefined;
+        },
+        formats: { busy: "Saving $saved", idle: "Idle" },
+      },
+      options: ["formats"],
+      defaultFormat: "$state $bar",
     },
   ],
 };

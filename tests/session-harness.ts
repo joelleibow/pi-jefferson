@@ -210,7 +210,7 @@ export function useTempAgentDir(t: { after: (fn: () => void) => void }): string 
   return agentDir;
 }
 
-/** `count` placeholder rows: a row lists the entries it renders, and one `blank` entry fills it. */
+/** `count` placeholder rows: a row lists the instruments it renders, and one `blank` instrument fills it. */
 export function blankRows(count: number): { instrument: string }[][] {
   return Array.from({ length: count }, () => Array.from({ length: DEFAULT_CELLS }, () => ({ instrument: "blank" })));
 }

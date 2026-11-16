@@ -16,7 +16,8 @@ const ERROR_PERCENT = 90;
 
 /** The bar's parts, the filled one first: its text and the style each takes. */
 export function drawBar(barWidth: number, percent: number | null, style: ThemeStyle): [BarPart, BarPart] {
-  const filled = percent === null ? 0 : Math.min(barWidth, Math.floor((percent / 100) * barWidth));
+  // A negative fraction is a number of the declared type, not a fault: it draws an empty track.
+  const filled = percent === null ? 0 : Math.max(0, Math.min(barWidth, Math.floor((percent / 100) * barWidth)));
   const filledStyle: ThemeStyle = percent !== null && percent > ERROR_PERCENT ? { ...style, fg: "error" }
     : percent !== null && percent > WARNING_PERCENT ? { ...style, fg: "warning" } : style;
   return [

@@ -142,11 +142,11 @@ interface InstrumentConfiguration {
 function checkProvidedSettings(
   name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme,
 ): ConfiguredInstrument | { kind: string; part: string } {
-  const consequence = "; its entries render blank";
+  const consequence = "; it renders blank";
   if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
     return {
       kind: "settings-shape",
-      part: `the instruments block gives ${JSON.stringify(name)} a value that is not an object${consequence}`,
+      part: `${JSON.stringify(name)} is configured with a value that is not an object${consequence}`,
     };
   }
   const entry = (raw ?? {}) as Record<string, unknown>;
@@ -197,7 +197,43 @@ function checkProvidedSettings(
       part: `${JSON.stringify(name)} is configured with a style Jefferson cannot use${consequence}`,
     };
   }
-  return { segments, style, ...(label === undefined ? {} : { label }) };
+  // The composed set's kinds, checked as the whole-document rule checks Jefferson's own: shape, the
+  // kind it names, the text's type, then the parse — each refusing only this instrument (J1(b)).
+  let formats: Record<string, FormatSegment[]> | undefined;
+  const declaredFormats = entry.formats;
+  if (declaredFormats !== undefined) {
+    if (typeof declaredFormats !== "object" || declaredFormats === null || Array.isArray(declaredFormats)) {
+      return {
+        kind: "settings-formats",
+        part: `${JSON.stringify(name)} is configured with formats that is not an object${consequence}`,
+      };
+    }
+    formats = {};
+    const carried = declaration.composed?.formats;
+    for (const [kind, text] of Object.entries(declaredFormats)) {
+      if (carried === undefined || !Object.hasOwn(carried, kind)) {
+        return {
+          kind: "settings-formats-kind",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)}, which the instrument does not carry${consequence}`,
+        };
+      }
+      if (typeof text !== "string") {
+        return {
+          kind: "settings-formats-string",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format is not a string${consequence}`,
+        };
+      }
+      try {
+        formats[kind] = parseFormat(declaration, text, true);
+      } catch {
+        return {
+          kind: "settings-formats-parse",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format Jefferson cannot parse${consequence}`,
+        };
+      }
+    }
+  }
+  return { segments, style, ...(label === undefined ? {} : { label }), ...(formats === undefined ? {} : { formats }) };
 }
 
 function readInstruments(raw: unknown, source: ConfigurationSource, reading: Reading): InstrumentConfiguration {
@@ -332,10 +368,10 @@ function normalizeRow(
 ): Row {
   const place = `row ${index + 1}:`;
   if (!Array.isArray(raw)) {
-    throw new RejectedConfiguration(`${place} is not a list; a row is a list of entries, as ${ROWS_FORM}`);
+    throw new RejectedConfiguration(`${place} is not a list; a row is a list of instruments, as ${ROWS_FORM}`);
   }
   if (raw.length === 0) {
-    throw new RejectedConfiguration(`${place} is empty; a row lists the entries it renders`);
+    throw new RejectedConfiguration(`${place} is empty; a row lists the instruments it renders`);
   }
 
   const cells: Cell[] = [];
@@ -347,7 +383,9 @@ function normalizeRow(
     }
     const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align");
     if (unknownKey !== undefined) {
-      throw new RejectedConfiguration(`${at} has an unrecognised key ${JSON.stringify(unknownKey)}; an entry carries instrument and align`);
+      throw new RejectedConfiguration(
+        `${at} has an unrecognised key ${JSON.stringify(unknownKey)}; an instrument in a row takes only "instrument" and "align"`,
+      );
     }
     const fields = Object.entries(entry);
     const instrumentValue = fields.find(([key]) => key === "instrument")?.[1];
@@ -403,7 +441,7 @@ interface NormalizedDocument {
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
 function normalizeDocument(document: unknown, reading: Reading, source: ConfigurationSource): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    throw new RejectedConfiguration("the configuration document is not an object");
+    throw new RejectedConfiguration("the configuration file is not an object");
   }
   const doc = document as Record<string, unknown>;
 

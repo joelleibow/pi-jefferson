@@ -9,7 +9,9 @@ export const context: InstrumentDeclaration = {
     window: ({ contextUsage: usage }) => usage === undefined ? undefined : compactCount(usage.contextWindow),
     percent: ({ contextUsage: usage }) => usage === undefined ? undefined : usage.percent === null ? "?" : `${usage.percent.toFixed(1)}%`,
   },
-  bar: r => r.contextUsage?.percent ?? null,
+  // No usage at all is unknown, so a format that names only `$bar` renders nothing; a null estimate
+  // is a known usage with nothing to fill, so the track draws unfilled.
+  bar: r => r.contextUsage === undefined ? undefined : r.contextUsage.percent,
   defaultFormat: "$percent/$window",
   defaultLabel: "Context:",
   options: FOUNDATIONAL_OPTIONS,

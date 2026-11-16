@@ -19,12 +19,34 @@ export type RegistrationChannel = "jefferson:registration";
 /** The channel a provider posts one field's new value on. */
 export type UpdateChannel = "jefferson:update";
 
-/** The declaration a provider writes, over the readings its resolvers receive. */
+/**
+ * A format set a reading chooses: the variable the chosen text fills, the values its texts may name,
+ * the reading that picks a text by its key, and one default text per key.
+ */
+export type ComposedFormat<R> = {
+  variable: string;
+  variables: Readonly<Record<string, (readings: R) => string | undefined>>;
+  select: (readings: R) => string | undefined;
+  formats: Readonly<Record<string, string>>;
+};
+
+/** The declaration a provider writes, over the readings its functions receive. */
 export type ContractDeclaration<R> = {
   name: string;
   variables: Readonly<Record<string, (readings: R) => string | undefined>>;
   defaultFormat: string;
   defaultLabel?: string;
+  /** Named forms of a variable: `$saved|short` renders `variableForms.saved.short`. */
+  variableForms?: Readonly<Record<string, Readonly<Record<string, (readings: R) => string | undefined>>>>;
+  /** `$bar`'s fill as a percentage: `null` draws the track unfilled, `undefined` is unknown. */
+  bar?: (readings: R) => number | null | undefined;
+  /** Whether the instrument takes the columns its row leaves. */
+  fills?: boolean;
+  /** A foreground theme token for a variable, chosen from the text the variable arrived as. */
+  variableFg?: Readonly<Record<string, (value: string) => string | undefined>>;
+  composed?: ComposedFormat<R>;
+  /** The options a user may configure beyond format, style and label. */
+  options?: readonly "formats"[];
 };
 
 /** A provided instrument's declaration: the contract's declaration over the provider's view. */

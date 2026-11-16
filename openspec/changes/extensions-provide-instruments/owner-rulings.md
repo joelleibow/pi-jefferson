@@ -56,6 +56,43 @@ Judge Gen's Validate pass raised two items. W2: the settings of a provided instr
   Joel was told that a throw cannot reach a provider over pi's bus: `safeHandler` catches it and logs it, and `emit` returns normally. He was offered a compile-time check in the published types, with the runtime refusal kept as a backstop. He said: *"yes!  that's perfect"*. **The types in `pi-jefferson/instruments` reject an instrument name that starts with `jefferson.`, so a provider's `tsc` fails before it runs. At runtime, a registration that claims a `jefferson.` name is refused with its warning.**
 - **Unused settings.** Joel asked: *"should we not scan settings at all for instruments we don't know and only check them once we're aware of them? It seems that there's no harm in config for an unknown instrument sitting there that we're never made aware of."* He was offered two choices: Jefferson stays silent about an `instruments`-block entry whose instrument never registers, or Jefferson warns once after startup. He chose *"Silent (Recommended)"*. **An `instruments`-block entry for an instrument that never registers draws no warning. Its settings are checked only when that instrument registers. A row that names an unregistered instrument still warns after startup, because the row renders blank.**
 
+## 2026-11-16: There is no "entry"
+
+While reviewing `docs/extension-authors.md` for task 5.7, Joel read *"A row holds entries. An entry names one instrument. The instrument renders the text for that entry."* He said: *"This isn't accurrate. We don't have anything called an entry."* **"Entry" is not a word that users or extension authors read. A row holds instruments. User-facing text and printed warnings say "instrument", or describe a row's position, and never "entry". The code may keep its internal names.** This corrects the archived 0.13.0 change, whose bolded summary introduced "entry" when Joel had said *"the instrument object"*. It also corrects ADR 0015's line that users read "row, entry and instrument".
+
+He also accepted a correction to the guide's opening line, *"That makes sense"*. The provider supplies the data, meaning its fields, its variables and a default format. The user places the instrument and may change its format in `pi-jefferson.json`. Jefferson draws it. User-facing text says "configuration file", not "document".
+
+## 2026-11-16: The guide describes the contract and does not prescribe code
+
+While reading `docs/extension-authors.md`, Joel quoted *"Write each channel name once, in a constant typed by the contract. TypeScript then rejects a misspelling"* and said: *"There's excessie `\n` in there and also througout the document. Also, I don't think we should be telling others how to write their code. There's no reason to state that they have to use a constant."*
+
+- **The guide states what the contract is and what Jefferson does, and does not tell a provider how to structure its code.** It may mention that a type exists, such as `RegistrationChannel`. It does not instruct the provider to use one.
+- **Markdown prose is not hard-wrapped.** A paragraph is one line, and a list item is one line. Fixed-width line breaks inside a sentence are removed from every Markdown file this project writes.
+
+## 2026-11-16: Internal vocabulary is ours, not the author's
+
+The guide told authors *"Use the words declare and report."* Joel said: *"They can use whatever names they want. They just need to know that they're posting a registration or posting an update. They can call a posted update a \"Flastoidbomsterous\", we don't care whatsoever."* **The guide never tells an author which words to use. It names the two things an author posts, a registration on `jefferson:registration` and an update on `jefferson:update`, and says what each carries. "Declare" and "report" stay the team's internal words (2026-11-15) and are not imposed on authors.**
+
+## 2026-11-16: An unused variable never blanks an instrument
+
+An instrument blanked whenever any variable it declares resolved `undefined`, including variables the user's format does not name. `resolveFormat` resolves every declared variable (`format.ts:222-226`), and this behaviour predates this change. For example, taiknr declares `$saved` and `$stubs`, the user's format is `"$saved"`, and `stubs` has not been reported yet: the whole instrument shows nothing. Joel said: *"That's a bug. Not every variable provided has to be consumed. It doesn't matter if it's in format or not. If the extension provides it the it's the extensions responsibility to provide updates. Whether someone is using it or not should have no bearing on the rendering of instruments that use other provided variables."* **Only the variables a format names can blank its instrument. A declared variable the format does not use is not resolved for that render and has no effect. This applies to Jefferson's own instruments as well as provided ones. It is a defect fix in this change.**
+
+## 2026-11-16: Bare names belong to Jefferson; Jefferson does the namespacing
+
+The guide said *"A name with no dot means one of Jefferson's own instruments. A bare name never reaches yours."* Joel asked whether that was true. When asked whether a bare name in a row should be able to reach a provided instrument, he said: *"Bare names are just Jefferson's. We do not require extensions to name their instruments with a `.` though. We should be doing that namespacing internally, not putting the responsibility onto consumers."* **In `pi-jefferson.json`, a bare name means `jefferson.default.<name>`, and a provided instrument is placed by its full name, `taiknr.savings`. A provider registers a plain name, `savings`, together with its extension name. Jefferson composes `<extension>.<name>` itself. The guide never asks an author to write a dot or to namespace anything.**
+
+## 2026-11-16: User-facing docs get an editorial pass on Opus 5.5
+
+Joel read the whole of `docs/extension-authors.md`, then said: *"I would really like all customer/user facing docs to go through a different model. Is it possible to run those through Opus 5.5 with high thinking and require a complete editorial pass over all user facing documents? The same /skill:what-the-fork and /skill:my-voice requirement with /skill:clear-prose stands."* **Every user-facing document gets a complete editorial pass, not a patch pass, by the documenter seat running `anthropic/claude-opus-5-5` with high thinking. That covers README.md, CONTRIBUTING.md, and docs/ apart from the ADRs. The pass applies the what-the-fork, my-voice and clear-prose skills.** (The seat's default model is DeepSeek Flash at medium thinking, and it wrote the prose Joel rejected.)
+
+## 2026-11-16: Providers get what Jefferson's instruments get
+
+Joel, during taiknr's Explore: *"there was a decision to not allow $bar within an extensions instruments. Why is that? Anything a Jefferson instrument can do should be open to extension authors to do, as well."* Michael's council ruling M14 had left `bar`, `variableForms`, `fills`, `variableFg`, `shownUntil`, `options` and `composed` out of the contract. That was minimalism, and it was never Joel's call. Joel was told that `shownUntil` needs a scheduled expiry repaint for a provider's value, which the store has only for the notice slot, and that change 3's spinner timer is the natural base for it. He said: *"I like that separation. Let's get them the easy parts now and we'll follow up with the showUntil part afterward."*
+
+- **The principle:** anything a Jefferson instrument can do is open to extension authors.
+- **This change:** the contract offers `bar`, `fills`, `variableForms`, `variableFg`, `options` and `composed` to providers, with the same fault containment as variables. It also checks provided options at registration, as J1(b) does for format, label and style. M14 is overruled for these six.
+- **Follow-up:** `shownUntil` for providers, built on change 3's timer. It is not in this change.
+
 ## Earlier rulings this change inherits
 
 - **2026-11-03, vocabulary:** a row holds cells, and a cell holds an instrument. *"`module` and `widget` are rejected words."* Since 2026-11-15, "cell" no longer appears in anything a user reads (ADR 0015).
