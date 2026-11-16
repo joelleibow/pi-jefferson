@@ -5,13 +5,15 @@ x-marbleization:
   runs:
     chidi: ca446749-6dc2-48e2-a1ad-605502e163b0
     eleanor: 58687ee0-ae68-4a63-8129-0f228067fa05
-    michael: ef215cc3-6a78-40f7-a3f4-094aa33c0a80
+    michael: 6da4b14a-9890-407e-a36d-8b9677459d15
     derek_spike: 1bd00692-25cd-4cac-bf1e-31f60d7fb74b
-    bambadjan: 2e583cfa-6b4b-4955-b08d-01a795ca7994
+    derek: 9ccfc82c-391f-406a-a785-273b72d8003c
+    bambadjan: 0dc56e37-cdce-404f-b63e-3431174b117e
   gates:
     council_owner: approved
     design: approved
     tasks: approved
+    implement: approved
   progress:
     - "2026-11-15: change opened from card 1 of the extension-provided-instruments Explore session; owner-rulings.md written from Joel's quoted words. Research workflow e23cb839 (Chidi + Eleanor) launched."
     - "2026-11-15: research complete (Chidi ca446749, Eleanor edd6b2ab); Michael orientation 1a939ef3. Joel ruled the orientation questions: one-row shortcut retired (a), warnings count from 1."
@@ -24,3 +26,5 @@ x-marbleization:
     - "2026-11-15: tasks.md written (Bambadjan 8ac43b4b), validates strict. Stage 5 readiness loop cb73f4cf launched."
     - "2026-11-15: Stage 5 cb73f4cf failed: s5-r3-codebase (45b58c19) timed out at 1800000ms. Rounds 1-2 needs_fixes, both applied (16 settled). Retried through the same Pi workflow path as db7a3484, resuming at round 3 with the completed r3 readiness/structural reports and a fresh codebase lens."
     - "2026-11-15: Stage 5 db7a3484 done: r3 needs_fixes (S5R3-1 applied), r4 and r5 clean, no escalations. tasks gate approved. Branch reshape-the-configuration opened from 24ee86b."
+    - "2026-11-15: Derek implemented (0007990f), 18/18 boxes. Consult michael-consult-1 (4c31f5a0): delete 9 subsumed tests, keep 2; Bambadjan amended 1.14 (0dc56e37), Derek applied (9ccfc82c) at f55c620: 423/423, typecheck clean. Implementation gate 972fd85a launched."
+    - "2026-11-15: implementation gate approved (Michael 6da4b14a) at f55c620, 423/423. Docs pass 940c333b launched (README/docs restructure, ADR 0015/0016, ADR 0007 status, statusline Purpose)."

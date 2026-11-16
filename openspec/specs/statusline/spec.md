@@ -1,8 +1,8 @@
 # statusline Specification
 
 ## Purpose
-The statusline pi-jefferson renders: the rows a user declares in configuration, and the evenly
-divided cells each row renders in the footer.
+The statusline pi-jefferson renders: the rows a user declares in configuration, and the cells each
+row sizes by the width their content needs.
 
 ## Requirements
 
