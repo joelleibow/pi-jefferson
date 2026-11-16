@@ -794,6 +794,172 @@ test("A4 a registration in session two leaves session one's footer untouched", a
   assert.equal(released(), placeholder(), "the released footer took nothing the new session registered");
 });
 
+/** A document configuring one provided name beside the model, and the harness that registers it. */
+function settingsDocument(
+  t: { after(fn: () => void): void }, value: unknown,
+): { session: Promise<FakeSession>; harness: Harness; path: string } {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { "taiknr.savings": value },
+    rows: [[{ instrument: "model" }, { instrument: "taiknr.savings" }]],
+  });
+  const h = harness();
+  // Provider-first: the registration is in hand before the document is read.
+  h.events.emit("jefferson:registration", registration);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  return {
+    session: h.start({ model: { provider: "anthropic", id: "claude-opus-4" } }),
+    harness: h,
+    path: join(agentDir, "pi-jefferson.json"),
+  };
+}
+
+test("A3 a format naming an undeclared variable refuses it alone", async (t) => {
+  const { session } = settingsDocument(t, { format: "Spent $spent" });
+  const started = await session;
+  assert.deepEqual(started.notified, [{
+    message: 'pi-jefferson: "taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; its entries render blank',
+    type: "warning",
+  }]);
+  const drawn = line(started);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), "every other entry renders as configured");
+  assert.equal(drawn.includes("Savings"), false, "the refused instrument's entry renders blank");
+});
+
+test("A3 a value that is not an object refuses it alone", async (t) => {
+  const { session } = settingsDocument(t, 5);
+  const started = await session;
+  assert.deepEqual(started.notified, [{
+    message: 'pi-jefferson: the instruments block gives "taiknr.savings" a value that is not an object; its entries render blank',
+    type: "warning",
+  }]);
+  assert.ok(line(started).startsWith("Model: anthropic/claude-opus-4"));
+});
+
+test("A3 every settings refusal part is exact", async (t) => {
+  const blank = "; its entries render blank";
+  const cases: Array<[label: string, value: unknown, part: string]> = [
+    ["a value that is not an object", 5,
+      `the instruments block gives "taiknr.savings" a value that is not an object${blank}`],
+    ["a format that is not a string", { format: 5 },
+      `"taiknr.savings" is configured with a format that is not a string${blank}`],
+    ["a label that is not a string", { label: 5 },
+      `"taiknr.savings" is configured with a label that is not a string${blank}`],
+    ["an option the instrument does not take", { width: 20 },
+      `"taiknr.savings" is configured with "width", which the instrument does not declare${blank}`],
+    ["a format naming an undeclared variable", { format: "$spent" },
+      `"taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare${blank}`],
+    ["a modifier the format does not allow", { format: "$saved|wobble" },
+      `"taiknr.savings" is configured with a format Jefferson cannot parse${blank}`],
+    ["a style the theme refuses", { style: { fg: "nope" } },
+      `"taiknr.savings" is configured with a style Jefferson cannot use${blank}`],
+  ];
+  for (const [label, value, part] of cases) {
+    const { session } = settingsDocument(t, value);
+    const started = await session;
+    assert.deepEqual(started.notified, [{ message: `pi-jefferson: ${part}`, type: "warning" }], label);
+    assert.ok(line(started).startsWith("Model: anthropic/claude-opus-4"), `${label}: the rest of the row renders`);
+    assert.equal(line(started).includes("Savings"), false, `${label}: the refused entry renders blank`);
+  }
+});
+
+/** A document configuring one provided name, and the two orders a provider may register in. */
+function configuredDocument(
+  t: { after(fn: () => void): void }, value: unknown, rows = [[{ instrument: "taiknr.savings" }]],
+): { path: string; providerFirst: () => Promise<FakeSession>; jeffersonFirst: () => Promise<FakeSession> } {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { "taiknr.savings": value }, rows });
+  const send = (h: Harness): void => {
+    h.events.emit("jefferson:registration", registration);
+    h.events.emit("jefferson:update", saved("$4.10"));
+  };
+  return {
+    path: join(agentDir, "pi-jefferson.json"),
+    providerFirst: async () => {
+      const h = harness();
+      send(h);
+      return h.start();
+    },
+    jeffersonFirst: async () => {
+      const h = harness();
+      return h.start({ afterSessionStart: () => send(h) });
+    },
+  };
+}
+
+test("A3 both orders render the same configured document", async (t) => {
+  const document = configuredDocument(t, { format: "Saved: $saved", label: "T:", style: { fg: "accent" } });
+  const before = await document.providerFirst();
+  const after = await document.jeffersonFirst();
+  assert.equal(stripTerminalSequences(after.lines(80)[0] ?? "").trimEnd(), "T: Saved: $4.10");
+  assert.equal(after.lines(80)[0], before.lines(80)[0], "the same document renders the same, whichever came first");
+  assert.deepEqual([...before.notified, ...after.notified], [], "a valid configuration says nothing");
+});
+
+test("A3 a Jefferson-first fault stays blank", async (t) => {
+  const document = configuredDocument(t, { format: "Spent $spent" });
+  const session = await document.jeffersonFirst();
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? "").trimEnd(), placeholder(),
+    "the refused instrument's entry renders blank");
+});
+
+test("A3 the same document in Jefferson-first order refuses the same instrument", async (t) => {
+  const document = configuredDocument(t, { format: "Spent $spent" });
+  const before = await document.providerFirst();
+  const after = await document.jeffersonFirst();
+  assert.equal(before.notified.length, 1);
+  assert.deepEqual(after.notified, before.notified, "the outcome depends on the name, not the load order");
+  assert.match(after.notified[0]?.message ?? "",
+    /"taiknr\.savings" is configured with a format naming "\$spent", which the instrument does not declare; its entries render blank/);
+});
+
+test("A3 a non-object value for a provided name stays blank, then refuses it alone when it registers", async (t) => {
+  const document = configuredDocument(t, 5, [[{ instrument: "model" }, { instrument: "taiknr.savings" }]]);
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    afterSessionStart: () => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+    },
+  });
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: the instruments block gives "taiknr.savings" a value that is not an object; its entries render blank',
+    type: "warning",
+  }]);
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), "the rest of the row renders");
+  assert.equal(drawn.includes("Savings"), false, "the refused entry stays blank");
+});
+
+test("A3 a non-object value for a provided name that never registers leaves the document accepted, with only the unknown-name warning", async (t) => {
+  const document = configuredDocument(t, 5, [[{ instrument: "model" }]]);
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${document.path} the instruments block names instruments the extension does not implement: "taiknr.savings"`,
+    type: "warning",
+  }], "no settings are checked for a name that never registered");
+});
+
+test("A3 a rejected document's names are never checked when they register", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  // The row naming the provided instrument normalizes before the second row refuses the document.
+  writeAgentDocument(agentDir, {
+    instruments: { "taiknr.savings": { format: "Spent $spent" } },
+    rows: [[{ instrument: "taiknr.savings" }], []],
+  });
+  const h = harness();
+  const session = await h.start({
+    afterSessionStart: () => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+    },
+  });
+  assert.match(session.notified[0]?.message ?? "", /was rejected \(row 2: is empty; a row lists the entries it renders\)/);
+  assert.equal(session.notified.some(notified => notified.message.includes("is configured with")), false,
+    "a rejected read registered no watch");
+});
+
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("jeffersonfan.stats"), true, "the comparison is on the whole first part");
   assert.equal(isProvidedName("taiknr.savings"), true);

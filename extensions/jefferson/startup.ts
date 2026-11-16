@@ -114,6 +114,7 @@ export function startUp(pi: ExtensionAPI): void {
       fallback: FALLBACK,
       noticeGate: NOTICE_GATE,
       watch: registry.watch,
+      report: fault => faults.record(fault),
     });
     latest = configuration;
     const { rows, rowGap, warning, noticeSeconds } = configuration;

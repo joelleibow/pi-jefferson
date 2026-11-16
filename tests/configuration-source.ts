@@ -7,6 +7,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import type { ConfigurationSource } from "../extensions/jefferson/configuration.ts";
+import type { Fault } from "../extensions/jefferson/faults.ts";
 import { createRegistry, type Registry } from "../extensions/jefferson/registration.ts";
 import { FALLBACK, NOTICE_GATE, SHIPPED } from "../extensions/jefferson/shipped.ts";
 
@@ -15,7 +16,9 @@ export function configurationSource({ agentPath, projectPath, projectTrusted, th
   projectPath: string;
   projectTrusted: boolean;
   theme: Theme;
-}): { source: ConfigurationSource; registry: Registry } {
+}): { source: ConfigurationSource; registry: Registry; reported: Fault[] } {
+  // What the reader reports, in arrival order: a test asserts the parts without a session.
+  const reported: Fault[] = [];
   const registry = createRegistry();
   registry.accept("jefferson", SHIPPED);
   return {
@@ -28,7 +31,9 @@ export function configurationSource({ agentPath, projectPath, projectTrusted, th
       fallback: FALLBACK,
       noticeGate: NOTICE_GATE,
       watch: registry.watch,
+      report: fault => reported.push(fault),
     },
     registry,
+    reported,
   };
 }

@@ -19,6 +19,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
+import type { Fault } from "./faults.ts";
 import { isProvidedName, normalizeName } from "./registration.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
@@ -53,6 +54,8 @@ export interface ConfigurationSource {
   noticeGate: { name: string; seconds: number };
   /** Hold `apply` until the name registers, or until the install whose read asked is released. */
   watch(name: string, apply: (declaration: InstrumentDeclaration) => void): void;
+  /** Record a fault this read found, which the composition root delivers after startup completes. */
+  report(fault: Fault): void;
 }
 
 /** One name the document wrote that no instrument answered, and the row that placed it. */
@@ -108,14 +111,86 @@ interface Reading {
   unknownNames: UnknownName[];
   /** Each unresolved provided name, and every cell of this read that names it. */
   holders: Map<string, Array<Cell["holder"]>>;
+  /** Each provided block value whose instrument has not registered, for the watch to check then. */
+  held: Map<string, unknown>;
+  /** Each provided name whose settings were refused: its entries render the fallback, not `blank`. */
+  refused: Set<string>;
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
 interface InstrumentConfiguration {
-  /** Each declaration's parsed format, style, label and kind formats. */
-  configured: ReadonlyMap<string, ConfiguredInstrument>;
+  /** Each declaration's parsed format, style, label and kind formats; a watch adds to it. */
+  configured: Map<string, ConfiguredInstrument>;
   /** Each declaration's declared visible time, by name: the reader's share, never the binding's. */
   declaredSeconds: ReadonlyMap<string, number>;
+}
+
+/**
+ * Everything under a provided name's key — its shape, format, label, option, variable, modifier and
+ * style — checked against what its registration declared, or the one part that refuses it. It runs
+ * when the document and the registration are both in hand, whichever came second (design 13; J1(b)).
+ * A provided instrument takes `FOUNDATIONAL_OPTIONS` and nothing else, so the check and the binding
+ * accept the same keys.
+ */
+function checkProvidedSettings(
+  name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme,
+): ConfiguredInstrument | { kind: string; part: string } {
+  const consequence = "; its entries render blank";
+  if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
+    return {
+      kind: "settings-shape",
+      part: `the instruments block gives ${JSON.stringify(name)} a value that is not an object${consequence}`,
+    };
+  }
+  const entry = (raw ?? {}) as Record<string, unknown>;
+  const format = entry.format;
+  if (format !== undefined && typeof format !== "string") {
+    return {
+      kind: "settings-format",
+      part: `${JSON.stringify(name)} is configured with a format that is not a string${consequence}`,
+    };
+  }
+  const label = entry.label;
+  if (label !== undefined && typeof label !== "string") {
+    return {
+      kind: "settings-label",
+      part: `${JSON.stringify(name)} is configured with a label that is not a string${consequence}`,
+    };
+  }
+  for (const key of Object.keys(entry)) {
+    if (!declaration.options.includes(key)) {
+      return {
+        kind: "settings-option",
+        part: `${JSON.stringify(name)} is configured with ${JSON.stringify(key)}, which the instrument does not declare${consequence}`,
+      };
+    }
+  }
+  let segments: FormatSegment[];
+  try {
+    segments = parseFormat(declaration, format ?? declaration.defaultFormat);
+  } catch (error) {
+    // The table separates a format naming a variable the instrument lacks from one the language
+    // refuses; the parse error is the only place that difference is visible.
+    const variable = error instanceof Error
+      ? /names a variable it does not declare: (".*")$/.exec(error.message)?.[1]
+      : undefined;
+    return variable === undefined
+      ? { kind: "settings-parse", part: `${JSON.stringify(name)} is configured with a format Jefferson cannot parse${consequence}` }
+      : {
+        kind: "settings-variable",
+        part: `${JSON.stringify(name)} is configured with a format naming ${variable}, which the instrument does not declare${consequence}`,
+      };
+  }
+  let style: ThemeStyle;
+  try {
+    style = validateStyle(entry.style, theme);
+  } catch {
+    return {
+      kind: "settings-style",
+      part: `${JSON.stringify(name)} is configured with a style Jefferson cannot use${consequence}`,
+    };
+  }
+  return { segments, style, ...(label === undefined ? {} : { label }) };
 }
 
 function readInstruments(raw: unknown, source: ConfigurationSource, reading: Reading): InstrumentConfiguration {
@@ -137,6 +212,29 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
       );
     }
     written.set(normalized, name);
+
+    // A provided name answers to its own instrument alone, so a fault under it refuses that
+    // instrument and never the document: one extension's mistake cannot take down a user's footer.
+    if (isProvidedName(normalized)) {
+      const provided = source.resolve(normalized);
+      if (provided === undefined) {
+        // Not registered yet: the raw value waits for the watch, whatever its type (design 9), and
+        // the name is reported at startup unless the registry answers it by then.
+        reading.held.set(normalized, value);
+        reading.unknownNames.push({ written: name, normalized });
+        continue;
+      }
+      const settings = checkProvidedSettings(normalized, value, provided, source.theme);
+      if ("part" in settings) {
+        reading.refused.add(normalized);
+        source.report({ scope: normalized, kind: settings.kind, part: settings.part });
+        continue;
+      }
+      configured.set(normalized, settings);
+      continue;
+    }
+
+    // Jefferson's own names, and a three-part name in its namespace, keep the whole-document rule.
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
     }
@@ -262,12 +360,15 @@ function normalizeRow(
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
     const normalized = normalizeName(instrumentValue);
-    const declaration = source.resolve(normalized);
+    // A provided instrument whose settings were refused renders the fallback: the instrument
+    // exists, its settings do not, and the one warning already named it (design 13).
+    const refused = reading.refused.has(normalized);
+    const declaration = refused ? undefined : source.resolve(normalized);
     // One typo does not take down the statusline: the cell renders the fallback and the warning
     // names the spelling the document wrote. Collect unknown names before truncating, so a typo past
     // the ceiling still warns though its cell is not rendered. A name joins once per row it is
     // written in, and the first spelling of it is the one every message prints.
-    if (declaration === undefined
+    if (declaration === undefined && !refused
       && !reading.unknownNames.some((unknown) => unknown.row === index + 1 && unknown.normalized === normalized)) {
       reading.unknownNames.push({ written: instrumentValue, normalized, row: index + 1 });
     }
@@ -279,7 +380,7 @@ function normalizeRow(
       cells.push({ name: resolved.name, holder, align });
       // An entry naming a provided instrument that has not registered joins that name's watch: when
       // it registers, this read's bind fills the holder (design 9).
-      if (declaration === undefined && isProvidedName(normalized)) {
+      if (declaration === undefined && !refused && isProvidedName(normalized)) {
         const recorded = reading.holders.get(normalized);
         if (recorded === undefined) reading.holders.set(normalized, [holder]);
         else recorded.push(holder);
@@ -350,7 +451,18 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
     : undefined;
   // Only now, with the whole document normalized: a rejected read registers no watch.
   for (const [name, holders] of reading.holders) {
+    const raw = reading.held.get(name);
     source.watch(name, (declaration) => {
+      // (a) The same check the reader runs for a name already registered, on the value the document
+      // held for it — so the outcome depends on the name and never on the load order.
+      const settings = checkProvidedSettings(name, raw, declaration, source.theme);
+      if ("part" in settings) {
+        // (c) The fault refuses that instrument alone: every holder stays on the fallback.
+        source.report({ scope: name, kind: settings.kind, part: settings.part });
+        return;
+      }
+      // (b) The entry goes into the read's Map before the bind reads it, then every holder follows.
+      configured.set(name, settings);
       const bound = bind(declaration);
       for (const holder of holders) holder.current = bound;
     });
@@ -424,7 +536,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   }
 
   try {
-    const reading: Reading = { unknownNames: [], holders: new Map() };
+    const reading: Reading = { unknownNames: [], holders: new Map(), held: new Map(), refused: new Set() };
     const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source);
     return { rows, rowGap, noticeSeconds, path, unknownNames: reading.unknownNames, warning: undefined };
   } catch (error) {

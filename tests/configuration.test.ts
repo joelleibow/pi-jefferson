@@ -1019,6 +1019,14 @@ function rejected(document: unknown, message: string): void {
   assert.deepEqual(result.rows[0]?.cells.map(cellText), Array<string>(10).fill(DEFAULT_CELL_TEXT));
 }
 
+test("A3 Jefferson's own instrument still rejects the document", () => {
+  // J1(b) is the provided instruments' rule; Jefferson's own keep the whole-document rejection.
+  rejected({ instruments: { path: { frmát: "x" } } },
+    'instrument "path" carries an option its declaration does not have: "frmát"');
+  rejected({ instruments: { context: { width: 20 } } },
+    'instrument "context" carries an option its declaration does not have: "width"');
+});
+
 test("the instruments section shape guard rejects non-objects with the exact message", () => {
   for (const instruments of [null, [], 42, "model"]) {
     rejected({ instruments, rows: [[{ instrument: "model" }]] }, "the instruments value is not an object");
