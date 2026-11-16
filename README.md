@@ -56,7 +56,9 @@ instrument:
 
 Every key and every rule is in
 [Configuration](https://github.com/joelleibow/pi-jefferson/blob/main/docs/configuration.md),
-including what a rejected document renders.
+including what a rejected document renders. A document written for an earlier version is rejected.
+[Upgrading](https://github.com/joelleibow/pi-jefferson/blob/main/docs/configuration.md#upgrading)
+says what to change.
 
 ## Documentation
 
@@ -77,7 +79,7 @@ including what a rejected document renders.
 string with a fixed set of presets, which means segment spacing is fixed by construction, a segment
 cannot carry another segment's value, and its groups are one flat list rather than rows.
 
-This package is for the case where you want a layout (rows, alignment, a per-row gap, a stated
+This package is for the case where you want a layout (rows, alignment, a gap between rows, a stated
 truncation rule) and per-instrument formatting, with the pi session's own data behind each
 instrument.
 

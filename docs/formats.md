@@ -124,8 +124,11 @@ The two variable sets are not interchangeable. A composed format names its own v
 Jefferson rejects the whole document, renders the default row, and warns with a message naming the
 offender when it cannot use a format. The faults are:
 
+- a bare `$` (write `\$` for a literal dollar);
 - a modifier it does not implement;
 - a form on an instrument that declares none, or in a position that has none;
 - a modifier on `$bar`;
+- a second `$bar`;
 - a modifier with nothing before it;
-- a `$name` the instrument does not declare.
+- a `$name` the instrument does not declare;
+- a modifier inside a composed format.

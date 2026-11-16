@@ -82,9 +82,9 @@ reads it, validates it, resolves instrument names, and normalizes rows. The docu
 holds `rows`, `instruments` and `rowGap`: `rows` is a list of rows, a row is a list of entries, and an
 entry carries `instrument` and optionally `align`. A row is placed by its position, and it no longer
 carries an identifier. The retired top-level keys — `cells`, `id` and `distribution` — reject the
-whole document before any other check, and so does a row written as an object; one fixed message
-shows the shape to write, because that message is the only migration help a user gets. Its result
-carries the rows, the `rowGap`, a warning and the visible time a notice takes. That last is `undefined` unless the rows
+whole document before any other check, with one fixed message that shows the shape to write. A row
+written as an object rejects too, and its message shows the same shape. Its result carries the rows,
+the `rowGap`, a warning and the visible time a notice takes. That last is `undefined` unless the rows
 it is about to install place a `notice` cell, so a default row and a rejected document take no visible
 time. The optional `instruments` section configures each name once; formats, labels, styles and a
 composed instrument's `seconds` and `formats` are validated at read time against its declaration and
@@ -205,5 +205,7 @@ is [ADR 0007](docs/adr/0007-a-cell-takes-the-width-its-content-needs.md).
 ## Tests
 
 `node --test`, source executed directly with type stripping — erasable TypeScript only, no build step.
-Tests live under `tests/` and never beside a source file. The renderer's expectations state the host's
+Tests live under `tests/` and never beside a source file. pi loads only the entry the `pi.extensions`
+manifest in `package.json` names, `extensions/jefferson.ts`, but `files` ships all of `extensions/`,
+so a test file beside a source file would ship in the package. The renderer's expectations state the host's
 per-child framing once, in a helper, and assert visible text where the framing is not the subject.

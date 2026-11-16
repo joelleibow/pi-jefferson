@@ -47,8 +47,9 @@ optional key, `align`:
 
 An entry carries no other key.
 
-A row holds at most ten entries. Jefferson renders the first ten and does not render the rest. It
-checks every entry, so a fault after the tenth entry still rejects the document.
+Jefferson renders a row's first ten entries and does not render the rest. It checks every entry, so
+a fault after the tenth entry still rejects the document. An unknown name after the tenth entry
+still warns.
 
 A row with no entries rejects the document.
 
@@ -116,12 +117,14 @@ The warning names the file and places the fault:
 
 Both numbers count from 1.
 
-A document Jefferson accepts can still carry a warning, when an entry names an instrument the
-extension does not implement. Jefferson joins the parts of that warning with `; `.
+A document Jefferson accepts can still carry a warning, when an entry, or the `instruments` block,
+names an instrument the extension does not implement. Jefferson joins the parts of that warning
+with `; `.
 
 These faults reject the document:
 
 - The document is not an object.
+- `instruments` is not an object, or one instrument's value is not an object.
 - A retired top-level key is present. See [Upgrading](#upgrading). The warning shows the form to
   write in place of it:
 
@@ -138,8 +141,12 @@ These faults reject the document:
 - `instrument` is not a non-empty string.
 - `align` is not `left`, `right` or `center`.
 - `rowGap` is not a whole number from 0 to 3.
+- A `format` or a `label` is not a string.
 - An option the instrument does not declare, a format Jefferson cannot parse, a style it cannot
   use, a `seconds` outside 1 to 60, or a `formats` entry it cannot use.
+
+A file that is not valid JSON renders the default row, and its warning says the file could not be
+read or parsed.
 
 ## Upgrading
 
@@ -152,7 +159,9 @@ instruments. Write the list itself:
 { "rows": [[{ "instrument": "model" }, { "instrument": "path" }]] }
 ```
 
-A row written as an object rejects the document, and the warning shows the form to write.
+A row written as an object rejects the document, and the warning shows the form to write. A row
+written as `{}` rendered ten `blank` placeholders. Write it as a list of ten
+`{"instrument": "blank"}` entries to keep them.
 
 **2. Declare rows only in `rows`.** Earlier versions accepted one row at the top level of the
 document. Now `rows` is the only way, and a document that declares a row at the top level rejects.
