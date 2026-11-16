@@ -21,7 +21,7 @@ import { blank } from "./components/instruments/blank.ts";
 import { NOTICE_SECONDS, notice } from "./components/instruments/notice.ts";
 import { instrumentNamed } from "./shipped.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
-import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./components/row/row.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
   instrumentBindings,
   type BindInstrument,
@@ -31,11 +31,6 @@ import {
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
   return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
-}
-
-/** Whether a configuration value is one of `DISTRIBUTIONS`. */
-function isDistribution(value: unknown): value is Distribution {
-  return typeof value === "string" && DISTRIBUTIONS.some((distribution) => distribution === value);
 }
 
 /** A tuple's values as a message spells them: `"content" or "equal"`. */
@@ -63,7 +58,7 @@ export interface Configuration {
   noticeSeconds: number | undefined;
   /**
    * Set when a present document was rejected, and also when an accepted document has
-   * something to report: instruments the extension does not implement, or a `containers` key.
+   * something to report: instruments the extension does not implement.
    */
   warning: string | undefined;
 }
@@ -78,8 +73,10 @@ class RejectedConfiguration extends Error {}
 
 /** What an accepted document still has to say for itself, gathered across all its rows. */
 interface Notices {
-  containers: boolean;
-  unknownInstruments: Set<string>;
+  /** Each distinct (row, name) pair a row's entry names, in row order and first-entry order. */
+  unknownInRow: { row: number; name: string }[];
+  /** Every name the `instruments` block configures that no shipped instrument answers to, in key order. */
+  unknownInBlock: string[];
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
@@ -103,7 +100,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
     }
     const declaration = instrumentNamed(name);
     if (declaration === undefined) {
-      notices.unknownInstruments.add(name);
+      notices.unknownInBlock.push(name);
       continue;
     }
     const entry = value as Record<string, unknown>;
@@ -223,7 +220,9 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
     // One typo does not take down the statusline: the cell renders blank and the warning names it.
     // Collect unknown names before truncating, so a typo past the ceiling still warns though its
     // cell is not rendered.
-    if (instrument === undefined) notices.unknownInstruments.add(instrumentValue);
+    if (instrument === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
+      notices.unknownInRow.push({ row: index + 1, name: instrumentValue });
+    }
     // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
     // break keeps every entry past it validated and checked for unknowns.
     if (cells.length < MAX_CELLS) {
@@ -269,9 +268,6 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     if (!Array.isArray(doc.rows)) {
       throw new RejectedConfiguration("the rows value is not a list");
     }
-    // A top-level `containers` beside a `rows` list used to be rejected outright; the key is
-    // unread either way, so it now takes the same once-per-document warning as a row's own.
-    if ("containers" in doc) notices.containers = true;
     rawRows = doc.rows;
   } else {
     // No `rows` means no declared row, so the default row renders; the shortcut that read the
@@ -315,14 +311,15 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
 /** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
 function acceptedWarning(path: string, notices: Notices): string | undefined {
   const parts: string[] = [];
-  if (notices.containers) {
-    parts.push("carries the containers key, which is no longer read; declare cells instead");
+  // The rows' parts first, then the block's one part: a row's part changes what renders.
+  for (const unknown of notices.unknownInRow) {
+    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.name)} is not a known instrument`);
   }
-  if (notices.unknownInstruments.size > 0) {
+  if (notices.unknownInBlock.length > 0) {
     parts.push(
-      `names instruments the extension does not implement: ${[...notices.unknownInstruments].join(
-        ", ",
-      )}; those cells render blank`,
+      `the instruments block names instruments the extension does not implement: ${notices.unknownInBlock
+        .map((name) => JSON.stringify(name))
+        .join(", ")}`,
     );
   }
   return parts.length === 0 ? undefined : `pi-jefferson: ${path} ${parts.join("; ")}`;
@@ -361,7 +358,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   }
 
   try {
-    const notices: Notices = { containers: false, unknownInstruments: new Set() };
+    const notices: Notices = { unknownInRow: [], unknownInBlock: [] };
     const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source.theme);
     return {
       rows,

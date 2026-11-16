@@ -250,7 +250,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   — A7, B8–B13 and B15 pass. B16 and C17–C23 stay red until 1.10, and the old-shape documents stay
   red until 1.14. `pnpm typecheck` clean.
 
-- [ ] 1.10 **Hold the unknown names as data and join them once.** `Notices` carries `(row, name)`
+- [x] 1.10 **Hold the unknown names as data and join them once.** `Notices` carries `(row, name)`
   pairs in row order and the block's unknown names in key order; the parts join with `"; "` after
   `pi-jefferson: <path> `, rows first and the single block part last; `Configuration.warning` stays
   `string | undefined`; `startup.ts` keeps one `notify`. The block list is fed from inside
@@ -267,7 +267,7 @@ labels (`A1`, `B8`, …) are `redgreen-derek.md`'s, where each went red and gree
   red at its order assertion, because `"aa"` now comes before `"bb"`. Restore the order and it
   passes.
 
-- [ ] 1.11 **Delete what is left, and rewrite the block-order test.** `isDistribution`, whose last
+- [x] 1.11 **Delete what is left, and rewrite the block-order test.** `isDistribution`, whose last
   caller went with task 1.8's reader; the `containers` notice — its document-level trigger (`:296`),
   the `Notices.containers` flag and its part in `acceptedWarning`; and the phrase "or a `containers`
   key" from the `Configuration.warning` doc comment (`:64-67`). Nothing here claims the `cells`, `id`

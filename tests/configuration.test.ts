@@ -1185,10 +1185,13 @@ test("unknown instrument names in the section and cells share one exact notice",
   assert.deepEqual(both.rows[0]?.cells.map(cellText), ["Model: anthropic/claude-opus-4", "configured blank", "Thinking: " + fakeTheme().style("High", { fg: "thinkingHigh" })]);
 });
 
-test("containers and multiple unknown section names retain the accepted-notice order", () => {
-  const result = readDocument({ containers: 3, instruments: { nope: {}, other: {} } });
-  assert.equal(result.warning, `pi-jefferson: ${result.path} carries the containers key, which is no longer read; declare cells instead; names instruments the extension does not implement: nope, other; those cells render blank`);
-  assert.equal(result.rows[0]?.cells.length, 10);
+test("several unknown names in the instruments block keep their key order, beside the default row", () => {
+  const result = readDocument({ instruments: { nope: {}, other: {} } });
+  assert.equal(
+    result.warning,
+    `pi-jefferson: ${result.path} the instruments block names instruments the extension does not implement: "nope", "other"`,
+  );
+  assert.equal(result.rows[0]?.cells.length, DEFAULT_CELLS);
 });
 
 /** Decision 5's one part for a row at the document's top level, shown form and all. */
