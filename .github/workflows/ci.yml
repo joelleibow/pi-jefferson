@@ -76,3 +76,31 @@ jobs:
               process.exit(1);
             }
           ' "$tmp/shipping.json" "$tmp/packed-package.json"
+
+          # The published contract resolves for a consumer of an installed package. The manifest
+          # is the packed one, because a target missing from the tarball cannot be withdrawn once
+          # it ships.
+          node -e '
+            const fs = require("node:fs");
+            const shipped = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).files.map((f) => f.path);
+            const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+            const target = manifest.exports?.["./instruments"];
+            if (typeof target !== "string") {
+              console.error("FAIL: the packed manifest declares no ./instruments export");
+              process.exit(1);
+            }
+            const path = target.replace(/^\.\//, "");
+            if (!shipped.includes(path)) {
+              console.error(`FAIL: the export\u0027s target ${target} is not in the packed file list`);
+              process.exit(1);
+            }
+            console.log(`OK: ${target} is in the packed file list`);
+          ' "$tmp/shipping.json" "$tmp/packed-package.json"
+
+          # A provider consumes the contract under flags this repository does not use, so a sample
+          # provider is compiled against the extracted tarball: nodenext resolution, its own lib,
+          # and no ambient types.
+          mkdir -p "$tmp/provider/node_modules/pi-jefferson"
+          cp -R tests/fixtures/sample-provider/. "$tmp/provider/"
+          tar -xzf "$tmp"/*.tgz -C "$tmp/provider/node_modules/pi-jefferson" --strip-components=1
+          pnpm exec tsc -p "$tmp/provider/tsconfig.json"

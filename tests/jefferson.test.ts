@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -427,7 +428,9 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/row/row.ts", ["ALIGNMENTS", "DISTRIBUTIONS"]],
     ["../extensions/jefferson/components/row/width-plan.ts", ["planRow"]],
     ["../extensions/jefferson/components/instruments/instrument-binding.ts", ["instrumentBindings"]],
+    ["../extensions/jefferson/data/field-value.ts", []],
     ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
+    ["../extensions/jefferson/instrument-contract.ts", []],
     ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
     ["../extensions/jefferson/startup.ts", ["startUp"]],
     ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
@@ -489,6 +492,16 @@ test("the exported surface offers no way to supply or replace cell content", asy
   assert.equal(shipped.instrumentNamed("nope"), undefined);
   assert.equal(shipped.instrumentNamed("nope"), undefined);
   assert.deepEqual([Object.keys(shipped).sort(), Object.keys(store).sort()], surface);
+});
+
+test("the contract and field-value strip to nothing", () => {
+  // A provider imports the contract with `import type`, so the published entry must erase to
+  // nothing: a runtime statement here would force it to carry this package as a full dependency
+  // (design 1; Joel's types-only ruling). The comments alone are what survives stripping.
+  const root = join(import.meta.dirname, "..", "extensions", "jefferson");
+  for (const path of [join(root, "instrument-contract.ts"), join(root, "data", "field-value.ts")]) {
+    assert.equal(stripTypeScriptTypes(readFileSync(path, "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").trim(), "", path);
+  }
 });
 
 test("an untrusted project's document is ignored end to end", async (t) => {
