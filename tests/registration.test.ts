@@ -1192,6 +1192,50 @@ test("A7 nothing a provider reported survives a session replacement", async (t) 
   assert.equal(line(await h.start()), "", "only the new session's reports are read");
 });
 
+test("A9 a boolean field reads false as reported, and unknown before the report", async (t) => {
+  documentShowing(t, [["taiknr.working"]]);
+  const work: Registration = {
+    extension: "taiknr",
+    fields: { working: "boolean" },
+    instruments: [{
+      name: "working",
+      variables: {
+        state: (readings: ReadingsView) => readings.working === false ? "idle"
+          : readings.working === true ? "busy" : undefined,
+      },
+      defaultFormat: "Working: $state",
+    }],
+  };
+  const h = harness();
+  h.events.emit("jefferson:registration", work);
+  const session = await h.start();
+  assert.equal(line(session), "", "unknown before the report");
+  h.events.emit("jefferson:update", { extension: "taiknr", field: "working", value: false });
+  assert.equal(line(session), "Working: idle", "false is a value, distinct from unknown");
+});
+
+test("A9 a report that is not finite takes its row", async (t) => {
+  documentShowing(t, [["model"]]);
+  const amount: Registration = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
+  for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const h = harness();
+    h.events.emit("jefferson:registration", amount);
+    h.events.emit("jefferson:update", { extension: "taiknr", field: "amount", value });
+    const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+    assert.deepEqual(session.notified, [
+      { message: 'pi-jefferson: taiknr reports "amount" as a number that is not finite', type: "warning" },
+    ], String(value));
+  }
+  // A number where a string was declared takes the wrong-type row instead.
+  const wrong = harness();
+  wrong.events.emit("jefferson:registration", registration);
+  wrong.events.emit("jefferson:update", { extension: "taiknr", field: "saved", value: 4 });
+  const session = await wrong.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: taiknr reports "saved" as a number, and it declared string', type: "warning" },
+  ]);
+});
+
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("jeffersonfan.stats"), true, "the comparison is on the whole first part");
   assert.equal(isProvidedName("taiknr.savings"), true);

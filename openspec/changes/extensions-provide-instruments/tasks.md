@@ -357,9 +357,9 @@ row, each asserting the exact part.
 
 ## 10. The boolean field (`A9`) — mutation-proved tests; no production change
 
-- [ ] 10.1 Write the test `A9 a boolean field reads false as reported, and unknown before the report`. Boundary cases: `false` distinct from unknown; a field name declared with two types. Test: `A9` — red under a `view` that maps `false` to `undefined` (`value || undefined`), then green on revert. Verify: `pnpm test --test-name-pattern "^A9 " tests/registration.test.ts`, red then green.
-- [ ] 10.2 Test `A9 a report that is not finite takes its row`, shown red by removing `Number.isFinite` from `checkReport`. Boundary cases: `NaN`, `Infinity`, `-Infinity`, a number where a string was declared. Test: `A9 a report that is not finite takes its row`. Verify: `pnpm test --test-name-pattern "^A9 " tests/registration.test.ts`.
-- [ ] 10.3 Group-end: `pnpm test` must be green.
+- [x] 10.1 Write the test `A9 a boolean field reads false as reported, and unknown before the report`. Boundary cases: `false` distinct from unknown; a field name declared with two types. Test: `A9` — red under a `view` that maps `false` to `undefined` (`value || undefined`), then green on revert. Verify: `pnpm test --test-name-pattern "^A9 " tests/registration.test.ts`, red then green.
+- [x] 10.2 Test `A9 a report that is not finite takes its row`, shown red by removing `Number.isFinite` from `checkReport`. Boundary cases: `NaN`, `Infinity`, `-Infinity`, a number where a string was declared. Test: `A9 a report that is not finite takes its row`. Verify: `pnpm test --test-name-pattern "^A9 " tests/registration.test.ts`.
+- [x] 10.3 Group-end: `pnpm test` must be green.
 
 ## 11. The finished tree (`A12`)
 
