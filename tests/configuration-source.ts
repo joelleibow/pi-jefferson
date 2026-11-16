@@ -27,6 +27,7 @@ export function configurationSource({ agentPath, projectPath, projectTrusted, th
       resolve: name => registry.instrument(name),
       fallback: FALLBACK,
       noticeGate: NOTICE_GATE,
+      watch: registry.watch,
     },
     registry,
   };

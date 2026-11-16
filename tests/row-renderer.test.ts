@@ -171,6 +171,25 @@ test("text wider than its cell renders identically under any alignment", () => {
   assert.equal(visible(left), "provider\x1b[0m...provide\x1b[0m...");
 });
 
+test("A4 a holder swapped between two renders shows the new instrument under a fresh sample", () => {
+  const leading: Instrument = { fills: false, render: () => "a" };
+  const filling: Instrument = { fills: true, render: () => "A" };
+  const plain: Instrument = { fills: false, render: () => "BBBB" };
+  const held: Row["cells"][number] = { name: "test", holder: { current: filling }, align: "left" };
+  // The sampler answers a fresh object every render, as the store does, so nothing is cached across
+  // the swap but the plan and the fill flag the renderer keeps.
+  const footer = createFooter(
+    [{ distribution: "content", cells: [{ name: "lead", holder: { current: leading }, align: "left" }, held] }],
+    () => ({ ...readings }),
+    fakeTheme(),
+    0,
+  );
+  assert.equal(visible(footer.render(10)[0] ?? "").trimEnd(), "aA", "the filling holder takes the slack");
+  held.holder.current = plain;
+  assert.equal(visible(footer.render(10)[0] ?? "").trimEnd(), "a BBBB",
+    "the first render after the swap reads the new instrument, fills included");
+});
+
 test("the notice cell's text sits at its alignment", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const declaration = shippedInstrument("notice");

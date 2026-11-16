@@ -19,7 +19,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
-import { normalizeName } from "./registration.ts";
+import { isProvidedName, normalizeName } from "./registration.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
@@ -51,6 +51,8 @@ export interface ConfigurationSource {
   fallback: InstrumentDeclaration;
   /** The notice declaration's registered name, and the visible time it takes when unconfigured. */
   noticeGate: { name: string; seconds: number };
+  /** Hold `apply` until the name registers, or until the install whose read asked is released. */
+  watch(name: string, apply: (declaration: InstrumentDeclaration) => void): void;
 }
 
 /** One name the document wrote that no instrument answered, and the row that placed it. */
@@ -100,6 +102,14 @@ const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
+/** What one read gathers as it walks the document: the names nothing answered, and the holders a
+ * late registration fills. */
+interface Reading {
+  unknownNames: UnknownName[];
+  /** Each unresolved provided name, and every cell of this read that names it. */
+  holders: Map<string, Array<Cell["holder"]>>;
+}
+
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
 interface InstrumentConfiguration {
   /** Each declaration's parsed format, style, label and kind formats. */
@@ -108,7 +118,7 @@ interface InstrumentConfiguration {
   declaredSeconds: ReadonlyMap<string, number>;
 }
 
-function readInstruments(raw: unknown, source: ConfigurationSource, unknownNames: UnknownName[]): InstrumentConfiguration {
+function readInstruments(raw: unknown, source: ConfigurationSource, reading: Reading): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
   const declaredSeconds = new Map<string, number>();
   if (raw === undefined) return { configured, declaredSeconds };
@@ -133,7 +143,7 @@ function readInstruments(raw: unknown, source: ConfigurationSource, unknownNames
     const declaration = source.resolve(normalized);
     if (declaration === undefined) {
       // The block's keys are unique and two spellings of one name are refused above, so no dedupe.
-      unknownNames.push({ written: name, normalized });
+      reading.unknownNames.push({ written: name, normalized });
       continue;
     }
     const entry = value as Record<string, unknown>;
@@ -217,7 +227,7 @@ function blankCells(count: number, bind: BindInstrument, fallback: InstrumentDec
  * places the row by its 1-based position, which is the number a user counts to.
  */
 function normalizeRow(
-  raw: unknown, index: number, unknownNames: UnknownName[], bind: BindInstrument, source: ConfigurationSource,
+  raw: unknown, index: number, reading: Reading, bind: BindInstrument, source: ConfigurationSource,
 ): Row {
   const place = `row ${index + 1}:`;
   if (!Array.isArray(raw)) {
@@ -258,14 +268,22 @@ function normalizeRow(
     // the ceiling still warns though its cell is not rendered. A name joins once per row it is
     // written in, and the first spelling of it is the one every message prints.
     if (declaration === undefined
-      && !unknownNames.some((unknown) => unknown.row === index + 1 && unknown.normalized === normalized)) {
-      unknownNames.push({ written: instrumentValue, normalized, row: index + 1 });
+      && !reading.unknownNames.some((unknown) => unknown.row === index + 1 && unknown.normalized === normalized)) {
+      reading.unknownNames.push({ written: instrumentValue, normalized, row: index + 1 });
     }
     // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
     // break keeps every entry past it validated and checked for unknowns.
     if (cells.length < MAX_CELLS) {
       const resolved = declaration ?? source.fallback;
-      cells.push({ name: resolved.name, holder: { current: bind(resolved) }, align });
+      const holder = { current: bind(resolved) };
+      cells.push({ name: resolved.name, holder, align });
+      // An entry naming a provided instrument that has not registered joins that name's watch: when
+      // it registers, this read's bind fills the holder (design 9).
+      if (declaration === undefined && isProvidedName(normalized)) {
+        const recorded = reading.holders.get(normalized);
+        if (recorded === undefined) reading.holders.set(normalized, [holder]);
+        else recorded.push(holder);
+      }
     }
   }
   return { distribution: DISTRIBUTIONS[0], cells };
@@ -279,7 +297,7 @@ interface NormalizedDocument {
 }
 
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
-function normalizeDocument(document: unknown, unknownNames: UnknownName[], source: ConfigurationSource): NormalizedDocument {
+function normalizeDocument(document: unknown, reading: Reading, source: ConfigurationSource): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -319,17 +337,24 @@ function normalizeDocument(document: unknown, unknownNames: UnknownName[], sourc
     rowGap = value;
   }
 
-  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, unknownNames);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, reading);
   const bind = instrumentBindings(configured);
   const rows = rawRows.length === 0
     ? [defaultRow(bind, source.fallback)]
-    : rawRows.map((raw, index) => normalizeRow(raw, index, unknownNames, bind, source));
+    : rawRows.map((raw, index) => normalizeRow(raw, index, reading, bind, source));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
   // The default row goes through it too, so the gate and the value cannot disagree about it.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.name === source.noticeGate.name));
   const noticeSeconds = placesNotice
     ? declaredSeconds.get(source.noticeGate.name) ?? source.noticeGate.seconds
     : undefined;
+  // Only now, with the whole document normalized: a rejected read registers no watch.
+  for (const [name, holders] of reading.holders) {
+    source.watch(name, (declaration) => {
+      const bound = bind(declaration);
+      for (const holder of holders) holder.current = bound;
+    });
+  }
   return { rows, rowGap, noticeSeconds };
 }
 
@@ -399,9 +424,9 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   }
 
   try {
-    const unknownNames: UnknownName[] = [];
-    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, unknownNames, source);
-    return { rows, rowGap, noticeSeconds, path, unknownNames, warning: undefined };
+    const reading: Reading = { unknownNames: [], holders: new Map() };
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source);
+    return { rows, rowGap, noticeSeconds, path, unknownNames: reading.unknownNames, warning: undefined };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {

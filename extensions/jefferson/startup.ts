@@ -113,6 +113,7 @@ export function startUp(pi: ExtensionAPI): void {
       resolve: name => registry.instrument(name),
       fallback: FALLBACK,
       noticeGate: NOTICE_GATE,
+      watch: registry.watch,
     });
     latest = configuration;
     const { rows, rowGap, warning, noticeSeconds } = configuration;
@@ -124,7 +125,12 @@ export function startUp(pi: ExtensionAPI): void {
     const { store, release, attachFooterData } = feedSessionData(
       pi, ctx, () => requestRepaint?.(), homedir, () => performance.now(), schedule, noticeSeconds,
     );
-    releasePrevious = release;
+    // The release drops the store's subscriptions and this read's watches together: a later
+    // session's registration never fills a released footer (design 19 item 3).
+    releasePrevious = () => {
+      release();
+      registry.releaseWatches();
+    };
 
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 

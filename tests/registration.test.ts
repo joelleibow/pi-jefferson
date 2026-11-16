@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createEventBus, type EventBus } from "@earendil-works/pi-coding-agent";
-import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui";
+import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { adaptProvidedDeclaration } from "../extensions/jefferson/components/instruments/instrument-binding.ts";
@@ -753,6 +753,45 @@ test("A5 a block key registered after Jefferson's session_start is not warned as
     afterSessionStart: () => void h.events.emit("jefferson:registration", registration),
   });
   assert.equal(session.notified.some(notified => notified.message.includes("taiknr.savings")), false);
+});
+
+test("A4 a late registration reaches its entry, with its width behaviour", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    rows: [[{ instrument: "taiknr.savings" }, { instrument: "model", align: "right" }], [{ instrument: "taiknr.never" }]],
+  });
+  const h = harness();
+  const session = await h.start({
+    model: { provider: "anthropic", id: "claude-opus-4" },
+    afterSessionStart: () => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+    },
+  });
+  const lines = session.lines(80).map(drawn => stripTerminalSequences(drawn));
+  // Before the registration the entry held the fallback, which fills; after it, the provided
+  // instrument takes its own columns and the right-aligned model keeps the row's edge (M21).
+  assert.equal(lines[0], "Savings: $4.10" + " ".repeat(80 - 14 - "Model: anthropic/claude-opus-4".length) + "Model: anthropic/claude-opus-4");
+  assert.equal(visibleWidth(lines[0] ?? ""), 80);
+  assert.equal(lines[2]?.trimEnd(), placeholder(), "a name that never registers stays blank");
+});
+
+test("A4 a registration in session two leaves session one's footer untouched", async (t) => {
+  documentShowing(t, [["taiknr.savings"]]);
+  const h = harness();
+  const first = await h.start();
+  const released = (): string => stripTerminalSequences(first.lines(80)[0] ?? "").trimEnd();
+  assert.equal(released(), placeholder(), "nothing is registered in session one");
+
+  h.dispatch({ type: "session_shutdown", reason: "reload" });
+  const second = await h.start({
+    afterSessionStart: () => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", saved("$4.10"));
+    },
+  });
+  assert.equal(stripTerminalSequences(second.lines(80)[0] ?? "").trimEnd(), "Savings: $4.10");
+  assert.equal(released(), placeholder(), "the released footer took nothing the new session registered");
 });
 
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
