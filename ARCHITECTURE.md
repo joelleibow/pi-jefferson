@@ -13,8 +13,12 @@ extensions/jefferson/
   configuration.ts               where pi-jefferson.json lives, reads it, validates it, normalizes rows
   footer-setup.ts                pi's footer factory and the component it returns
   format.ts                      the format language every instrument shares: parses a format and places $bar
-  shipped.ts                     the shipped instruments, and instrumentNamed to look one up
-  data/                          the session data and how the host's session and events reach it
+  shipped.ts                     the list Jefferson registers, and the fallback and notice gate the reader needs
+  instrument-contract.ts         the published types an extension imports: the two messages and a declaration
+  registration.ts                what a name means, and what has registered
+  registration-listener.ts       the two channels, the payload checks, and Jefferson's own registration
+  faults.ts                      the faults this session has reported, one warning each
+  data/                          the session data, the provider fields, and how the host's session and events reach it
   components/                    the parts, each directory holding only its own logic
     instruments/                 the instrument contract, the binding, and one file per instrument
     row/                         a row, its cells' width plan, and the renderer that draws it
@@ -90,8 +94,14 @@ time. The optional `instruments` section configures each name once; formats, lab
 composed instrument's `seconds` and `formats` are validated at read time against its declaration and
 the live theme, then one bound instrument per name is shared across the document. The binding itself
 lives in `components/instruments/`. Every failure mode rejects the whole document, renders the default
-row, and warns with a message that names what was wrong. An unknown instrument *name* is different: it
-warns and renders `blank` in that cell.
+row, and warns with a message that names what was wrong. That rule covers Jefferson's own instruments.
+
+A name resolves through the registry, so it behaves differently. A name no instrument answers to
+rejects nothing: Jefferson warns once session startup completes, renders `blank` until an extension
+registers the name, and renders that instrument from the next render on. A *provided* instrument's
+settings are checked when the document and its registration are both in hand, whichever came second,
+and a fault refuses that instrument alone: its entries render `blank`, one warning names it and the
+fault, and the rest of the document renders as configured.
 
 **Instrument.** One declaration owns its name, variables, default format and options, and may carry a
 default label and a per-variable foreground token. Variables read the store and arrive already
@@ -157,13 +167,22 @@ in [ADR 0007](docs/adr/0007-a-cell-takes-the-width-its-content-needs.md).
 One way only, and no cycles. The entry imports startup and nothing else. Startup imports what it
 installs. No file imports the entry. Within `extensions/jefferson/`:
 
-- `data/` holds the files that keep session data and take it from the host. It imports host packages
-  and its own files, and no file outside `data/`.
+- `data/` holds the files that keep session data, the fields a provider declared, and the view those
+  fields are read through. It imports host packages and its own files, and no file outside `data/`.
+  `data/provider-fields.ts` imports only `data/field-value.ts`.
+- `instrument-contract.ts` imports only the types of `data/field-value.ts`, and it holds no runtime
+  statement.
+- `faults.ts` imports no file of this package.
+- `registration.ts` imports the contract's types and the type `components/instruments/instrument.ts`
+  declares.
+- `registration-listener.ts` imports `registration.ts`, `faults.ts`, the contract, `format.ts`, the
+  types of `data/`, and the binding.
 - `components/` holds the parts. Its files import host packages, their own directory, a visual, the
   types of `data/` and `format.ts`. They never import startup, footer setup, configuration or
   `shipped.ts`.
   - `row/` imports only the type of the instrument contract.
-  - `instruments/` imports `format.ts` and a visual only in the binding.
+  - `instruments/` imports `format.ts` and a visual only in the binding, and the binding imports the
+    `Fault` type from `faults.ts`.
   - `components/visuals/` files import no local file.
 - `format.ts` imports `components/visuals/bar.ts` and the types of `components/instruments/` and
   `data/`.

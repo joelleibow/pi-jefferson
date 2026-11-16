@@ -47,6 +47,19 @@ optional key, `align`:
 
 An entry carries no other key.
 
+### The instrument's name
+
+Every instrument has a registered name.
+
+- A bare name means `jefferson.default.<name>`. So `"model"` and `"jefferson.default.model"` name
+  one instrument, take one configuration, and render the same text.
+- An instrument another extension provides is named `<extension>.<instrument>`, with two parts, such
+  as `taiknr.savings`. A bare name never reaches one. Write the two parts.
+- A name is lowercase: letters, digits and hyphens.
+
+An entry renders `blank` when no instrument answers to its name. See
+[Instruments](instruments.md#a-name-no-instrument-answers-to).
+
 Jefferson renders a row's first ten entries and does not render the rest. It checks every entry, so
 a fault after the tenth entry still rejects the document. An unknown name after the tenth entry
 still warns.
@@ -103,6 +116,14 @@ Every instrument takes `format`, `label` and `style`. The `notice` instrument al
 and `formats`. An option the instrument does not declare rejects the document. The options are in
 [Instruments](instruments.md), and the format language is in [Formats](formats.md).
 
+The name in this block is the registered name, so the shorthand above works here too. Write one name
+once: a block that configures `"model"` and `"jefferson.default.model"` names one instrument twice,
+and that rejects the document. The warning quotes both keys as you wrote them.
+
+A provided instrument keeps the three settings above and no option. A setting it does not take does
+not reject the document. It refuses that instrument alone: its entries render `blank`, one warning
+names the instrument and the fault, and the rest of the document renders as configured.
+
 An instrument the block does not configure renders its declared defaults.
 
 ## What a rejected document renders
@@ -118,8 +139,9 @@ The warning names the file and places the fault:
 Both numbers count from 1.
 
 A document Jefferson accepts can still carry a warning, when an entry, or the `instruments` block,
-names an instrument the extension does not implement. Jefferson joins the parts of that warning
-with `; `.
+names an instrument that no instrument answers to. Jefferson joins the parts of that warning with
+`; `, and it prints them after startup completes. An extension may register the name during startup,
+and then the entry renders it.
 
 These faults reject the document:
 
@@ -144,6 +166,9 @@ These faults reject the document:
 - A `format` or a `label` is not a string.
 - An option the instrument does not declare, a format Jefferson cannot parse, a style it cannot
   use, a `seconds` outside 1 to 60, or a `formats` entry it cannot use.
+
+A setting inside a provided instrument's entry refuses that instrument alone, not the document. The
+list above is the rule for Jefferson's own instruments.
 
 A file that is not valid JSON renders the default row, and its warning says the file could not be
 read or parsed.

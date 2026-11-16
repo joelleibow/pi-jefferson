@@ -70,8 +70,8 @@ says what to change.
   instrument's text is composed: variables, forms, modifiers, styles and the bar.
 - [Notices](https://github.com/joelleibow/pi-jefferson/blob/main/docs/notices.md): the notice
   instrument, its kinds, their texts and their seconds.
-- [Releasing](https://github.com/joelleibow/pi-jefferson/blob/main/docs/releasing.md): the three
-  labels, the patch default, and where a release runs.
+- [Writing an extension](https://github.com/joelleibow/pi-jefferson/blob/main/docs/extension-authors.md):
+  give the footer your own instruments, from your own package.
 
 ## Why another statusline
 
@@ -83,18 +83,10 @@ This package is for the case where you want a layout (rows, alignment, a gap bet
 truncation rule) and per-instrument formatting, with the pi session's own data behind each
 instrument.
 
-## Development
+## Contributing
 
-Trunk-based: `main` is the only long-lived branch, and every merge to it is a release.
-
-```bash
-pnpm typecheck
-pnpm test
-```
-
-Tests live in `tests/`, never beside a source file. `@earendil-works/pi-coding-agent` and
-`@earendil-works/pi-tui` are `peerDependencies`, not `dependencies`, because pi supplies them at
-runtime: a physical copy bypasses pi's module mapping and duplicates classes and registries.
+Development and release steps are in
+[CONTRIBUTING.md](https://github.com/joelleibow/pi-jefferson/blob/main/CONTRIBUTING.md).
 
 ## License
 
