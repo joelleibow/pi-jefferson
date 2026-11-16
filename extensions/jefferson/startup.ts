@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { configurationPaths, readConfiguration } from "./configuration.ts";
+import { createProviderFields } from "./data/provider-fields.ts";
 import { feedSessionData } from "./data/session-data-feed.ts";
 import { installFooter } from "./footer-setup.ts";
 import { createRegistry } from "./registration.ts";
@@ -23,9 +24,13 @@ export function startUp(pi: ExtensionAPI): void {
   // Registrations outlive a session: the registry is built here, and Jefferson registers its own
   // instruments by the same message a provider posts, before any `session_start` runs (design 6).
   const registry = createRegistry();
+  // Created here, not in `session_start`: a report that arrives before Jefferson's own handler
+  // must still be held (design 11; T2).
+  const fields = createProviderFields();
   createRegistrationListener({
     events: pi.events,
     registry,
+    fields,
     own: { extension: "jefferson", instruments: SHIPPED },
   });
 
@@ -42,6 +47,11 @@ export function startUp(pi: ExtensionAPI): void {
   // a pending expiry must not repaint a context the host has invalidated.
   pi.on("session_shutdown", () => {
     releasePrevious?.();
+    // Provider state belongs to the session that accepted it; Jefferson's own keeps for the
+    // factory's life. This runs after the release and never inside it, so a report that arrived
+    // before the next `session_start` survives it (design 19 item 1; M22).
+    registry.clearProvided();
+    fields.clear();
   });
 
   pi.registerCommand("jefferson", {

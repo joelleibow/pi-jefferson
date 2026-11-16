@@ -1,6 +1,11 @@
-/** Each instrument owns its name, variables, default format and accepted options. */
+/**
+ * Each instrument owns its name, variables, default format and accepted options. The declaration is
+ * the published contract's declaration over Jefferson's own readings, plus the members only a
+ * shipped instrument takes, so change 3's visual mix-in lands once (design 3; M14).
+ */
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 
+import type { ContractDeclaration } from "../../instrument-contract.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 
 export const DEFAULT_CELL_TEXT =
@@ -27,9 +32,7 @@ export interface ComposedFormat {
   readonly formats: Readonly<Record<string, string>>;
 }
 
-export interface InstrumentDeclaration {
-  readonly name: string;
-  readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
+export type InstrumentDeclaration = ContractDeclaration<Readings> & {
   /**
    * The named forms a variable accepts, by variable and then by name; `|name` after that variable
    * selects one. A bare `$name` renders `variables`, which a form may also be named for.
@@ -38,8 +41,6 @@ export interface InstrumentDeclaration {
   readonly bar?: (readings: Readings) => number | null;
   /** A declaration that fills in every format. A `$bar` in the format fills without saying so. */
   readonly fills?: boolean;
-  readonly defaultFormat: string;
-  readonly defaultLabel?: string;
   readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
   /** A format set chosen by a reading, composed into the variable it names. */
   readonly composed?: ComposedFormat;
@@ -49,6 +50,6 @@ export interface InstrumentDeclaration {
    */
   readonly shownUntil?: (readings: Readings) => number | undefined;
   readonly options: readonly string[];
-}
+};
 
 export const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style", "label"] as const);

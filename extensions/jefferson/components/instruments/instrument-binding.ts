@@ -1,9 +1,12 @@
 /** Binds a configured format and style to an instrument declaration: the instrument that renders. */
 import type { ThemeStyle } from "@earendil-works/pi-coding-agent";
 
-import type { Instrument, InstrumentDeclaration } from "./instrument.ts";
+import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
 import { timed } from "../visuals/timed.ts";
 import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
+import type { Readings } from "../../data/session-data-store.ts";
+import type { FieldValue, ReadingsView } from "../../data/field-value.ts";
+import type { ProvidedDeclaration } from "../../instrument-contract.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 
@@ -13,6 +16,48 @@ export interface ConfiguredInstrument {
   label?: string;
   /** A composed format set's configured text, by key; the declaration's defaults fill the rest. */
   formats?: Record<string, FormatSegment[]>;
+}
+
+/** What adapting a provided declaration refuses, in decision 15's row order. */
+export type ProvidedRefusal =
+  | { refused: "unparseable-default-format" }
+  | { refused: "label-not-string" }
+  | { refused: "resolver-not-function"; variable: string };
+
+/**
+ * Adapt one provided declaration to a Jefferson declaration over `Readings`, or refuse it. The
+ * refusals are checked in decision 15's row order — the default format first, then the label, then
+ * the resolvers — so the part the listener reports is the first fault the table names. Each adapted
+ * variable calls the provider's resolver with the provider's own view, and nothing else.
+ */
+export function adaptProvidedDeclaration(
+  name: string,
+  declaration: ProvidedDeclaration,
+  view: () => ReadingsView,
+): InstrumentDeclaration | ProvidedRefusal {
+  // The payload crossed a bus as `unknown`, so its members are read as the values they may be.
+  const members = declaration as unknown as Record<string, unknown>;
+  const variables: Record<string, (readings: Readings) => string | undefined> = {};
+  for (const [variable, resolver] of Object.entries(members.variables as object)) {
+    variables[variable] = () => (resolver as (readings: ReadingsView) => FieldValue | undefined)(view()) as string | undefined;
+  }
+  const adapted: InstrumentDeclaration = {
+    name,
+    variables,
+    defaultFormat: members.defaultFormat as string,
+    ...(members.defaultLabel === undefined ? {} : { defaultLabel: members.defaultLabel as string }),
+    options: FOUNDATIONAL_OPTIONS,
+  };
+  try {
+    parseFormat(adapted, adapted.defaultFormat);
+  } catch {
+    return { refused: "unparseable-default-format" };
+  }
+  if (members.defaultLabel !== undefined && typeof members.defaultLabel !== "string") return { refused: "label-not-string" };
+  for (const [variable, resolver] of Object.entries(members.variables as object)) {
+    if (typeof resolver !== "function") return { refused: "resolver-not-function", variable };
+  }
+  return adapted;
 }
 
 export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
