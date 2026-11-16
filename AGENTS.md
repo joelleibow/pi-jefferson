@@ -5,9 +5,14 @@ handful of things that are easy to get wrong.
 
 ## Words
 
-A row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). Never call the statusline
-concept a "module" or a "widget". Where the extension-source-layout spec uses "module" as a term of
-art, it means a source file, and new prose says "source file".
+A row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). That is the code's
+vocabulary. Users read "row", "entry" and "instrument": a row is a list of entries, and an entry names
+the instrument it renders (Joel's ruling, 2026-11-15;
+[ADR 0015](docs/adr/0015-cell-is-no-longer-a-word-users-see.md)). So a configuration key, a warning,
+the README and a `docs/` page never say "cell", and prose here may say it about the model.
+
+Never call the statusline concept a "module" or a "widget". Where the extension-source-layout spec
+uses "module" as a term of art, it means a source file, and new prose says "source file".
 
 ## Running things
 

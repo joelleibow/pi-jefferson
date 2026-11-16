@@ -1,8 +1,10 @@
 # 7. A cell takes the width its content needs, and a row option restores equal shares
 
 Date: 2026-11-07
-Status: Accepted. Narrows [ADR 0002](0002-rows-span-the-full-width.md): both stay in force, and the
-equal rule it records now applies where a row asks for it.
+Status: Accepted. Narrows [ADR 0002](0002-rows-span-the-full-width.md): both stay in force. The
+equal rule it records is reachable only from code now, because no configuration selects it
+([ADR 0016](0016-the-equal-distribution-stays-in-the-code.md)); the content rule alone is what a
+document gets.
 
 ## Context
 

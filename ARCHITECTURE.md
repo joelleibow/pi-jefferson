@@ -78,7 +78,12 @@ readers and cancels a pending repaint, and later samples are all-unknown. One sa
 handed to every cell, so cost and tokens share one totals object and two status cells share one text.
 
 **Configuration.** Resolves where the document lives (the agent directory's, and a trusted project's),
-reads it, validates it, resolves instrument names, and normalizes rows. Its result carries the rows,
+reads it, validates it, resolves instrument names, and normalizes rows. The document's top level
+holds `rows`, `instruments` and `rowGap`: `rows` is a list of rows, a row is a list of entries, and an
+entry carries `instrument` and optionally `align`. A row is placed by its position, and it no longer
+carries an identifier. The retired top-level keys — `cells`, `id` and `distribution` — reject the
+whole document before any other check, with one fixed message that shows the shape to write. A row
+written as an object rejects too, and its message shows the same shape. Its result carries the rows,
 the `rowGap`, a warning and the visible time a notice takes. That last is `undefined` unless the rows
 it is about to install place a `notice` cell, so a default row and a rejected document take no visible
 time. The optional `instruments` section configures each name once; formats, labels, styles and a
@@ -137,7 +142,9 @@ cells fill. The joint is one column owned by the right-hand cell, drawn as a lea
 Every cell is `shrink: 1` with `minSize: 0`, so a row over its width loses columns to the host's
 allocator and stays one line; the allocator also spends any remainder (the `HStack`'s `gap: 0`). A row with
 `distribution: "equal"` skips the probe: every cell gets `floor(W / N)` and `grow: 1`, as
-[ADR 0002](docs/adr/0002-rows-span-the-full-width.md) recorded. The same components are re-seated with
+[ADR 0002](docs/adr/0002-rows-span-the-full-width.md) recorded. No configuration reaches that path
+now: the parser writes `"content"` for every row, and
+[ADR 0016](docs/adr/0016-the-equal-distribution-stays-in-the-code.md) keeps the branch for the code. The same components are re-seated with
 `clear()` plus `addChild` when the width changes or any plan field the cells read does: the basis, the
 grow or the joint. Every cell reads the current render's sample from the footer's slot, and its memo
 holds one text per width per sample, so a repeated render of the same sample resolves nothing new;
@@ -190,12 +197,15 @@ be computed from the clipped result.
 Rows span the full width. The leftover columns go to the fill cells, split evenly with the odd
 columns to the earliest; with no fill cell, to the last left-aligned non-empty cell, else the first
 non-empty cell, else the first cell. Under `distribution: "equal"` they go to the earliest cells, one
-each. A right-aligned last cell ends at the window's edge. This replaces the former blank-right-edge
+each — a path no configuration selects now, since the parser writes `"content"` for every row
+([ADR 0016](docs/adr/0016-the-equal-distribution-stays-in-the-code.md)). A right-aligned last cell ends at the window's edge. This replaces the former blank-right-edge
 property, recorded in [ADR 0002](docs/adr/0002-rows-span-the-full-width.md); the content-sized default
 is [ADR 0007](docs/adr/0007-a-cell-takes-the-width-its-content-needs.md).
 
 ## Tests
 
 `node --test`, source executed directly with type stripping — erasable TypeScript only, no build step.
-Tests live under `tests/` and never beside a source file. The renderer's expectations state the host's
+Tests live under `tests/` and never beside a source file. pi loads only the entry the `pi.extensions`
+manifest in `package.json` names, `extensions/jefferson.ts`, but `files` ships all of `extensions/`,
+so a test file beside a source file would ship in the package. The renderer's expectations state the host's
 per-child framing once, in a helper, and assert visible text where the framing is not the subject.

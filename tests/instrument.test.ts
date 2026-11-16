@@ -309,7 +309,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
   const { fakeTheme } = await import("./fake-theme.ts");
   const dir = mkdtempSync(join(tmpdir(), "jefferson-agreement-"));
   const agentPath = join(dir, "pi-jefferson.json");
-  writeFileSync(agentPath, JSON.stringify({ distribution: "equal", cells: [{ instrument: "cost" }, { instrument: "tokens" }] }));
+  writeFileSync(agentPath, JSON.stringify({ rows: [[{ instrument: "cost" }, { instrument: "tokens" }]] }));
   const { rows, warning } = readConfiguration({ agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme: fakeTheme() });
   assert.equal(warning, undefined);
   let scans = 0;
@@ -335,9 +335,9 @@ test("a footer's bound cost and tokens read one identical totals object from one
   }
   const footer = createFooter(rows, () => store.sample(), fakeTheme(), 0);
   const line = footer.render(80)[0] ?? "";
-  assert.equal(stripTerminalSequences(line), "Cost: $0.123".padEnd(40) + "Tokens: 212".padEnd(40));
+  assert.equal(stripTerminalSequences(line), "Cost: $0.123 Tokens: 212".padEnd(80));
   assert.equal(scans, 1);
-  assert.equal(seen.length, 4);
+  assert.equal(seen.length, 6, "each cell is rendered at its probe, the host's measure and its allocation");
   for (const totals of seen) assert.equal(totals, seen[0]);
   assert.deepEqual(seen[0], { input: 118, output: 59, cacheRead: 23, cacheWrite: 12, cost: 0.123 });
 });

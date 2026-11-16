@@ -1,8 +1,8 @@
 # statusline Specification
 
 ## Purpose
-The statusline pi-jefferson renders: the rows a user declares in configuration, and the evenly
-divided cells each row renders in the footer.
+The statusline pi-jefferson renders: the rows a user declares in configuration, and the cells each
+row sizes by the width their content needs.
 
 ## Requirements
 
@@ -22,187 +22,6 @@ mode it MUST NOT install a footer, and loading MUST NOT fail.
 
 - **WHEN** the extension loads in print, JSON, or RPC mode
 - **THEN** no footer is installed and loading does not fail
-
-### Requirement: Both configuration shapes normalize to a list of rows
-
-The configuration MUST accept a single row object at the top level, which implies one row, or a
-list of row objects; the extension MUST normalize both shapes to a list of rows at parse time. A
-configuration that carries both shapes at once MUST be rejected.
-
-#### Scenario: A single row at the top level
-
-- **WHEN** the configuration is a row object at the top level
-- **THEN** parsing yields exactly one row
-
-#### Scenario: A list of rows
-
-- **WHEN** the configuration carries a list of row objects
-- **THEN** parsing yields one row per entry, in the order given
-
-#### Scenario: Both shapes at once
-
-- **WHEN** the configuration carries a top-level row and a list of rows
-- **THEN** the configuration is rejected and none of it is rendered
-
-### Requirement: Row identifiers
-
-Each row MAY declare an `id`. The extension MUST synthesize an identifier for a row that declares
-none, and identifiers MUST be unique within a configuration: two rows sharing one MUST be
-rejected.
-
-#### Scenario: An unnamed row
-
-- **WHEN** a declared row omits `id`
-- **THEN** parsing gives it a synthesized identifier that is non-empty and unique among the
-  configuration's rows
-
-#### Scenario: Duplicate identifiers
-
-- **WHEN** two declared rows carry the same `id`
-- **THEN** the configuration is rejected and none of it is rendered
-
-### Requirement: Cells are evenly distributed across the width
-
-By default a cell MUST take the width its content needs, except a `blank` or `$bar` cell, which MUST fill and
-share the spare columns, the remainder to the earliest. With none, they go to the last left-aligned
-non-empty cell, else the first non-empty one, else the first cell, even when empty; an empty cell MUST otherwise
-take none. `distribution` MUST be `"content"` (absent) or `"equal"` (`floor(W / N)` each); any other value MUST
-be rejected. The joint MUST give way before any content does.
-
-#### Scenario: The default gives each cell what its content needs
-
-- **WHEN** a row of `path`, `model` and `thinking` renders at 132 columns with no row option, `path`
-  left-aligned and the other two right-aligned
-- **THEN** `model` and `thinking` each occupy the width of their text, and `path` takes every other
-  column except the one between `model` and `thinking`
-
-#### Scenario: Joel's second row keeps its thirds
-
-- **WHEN** a row of two `blank` cells and a right-aligned `context` cell holding `$bar` renders at 100
-  columns with no row option
-- **THEN** the cells occupy 34, 33 and 33 columns, and the bar fills the width its own third leaves
-
-#### Scenario: A blank cell and a bar cell fill
-
-- **WHEN** a row of a `blank` cell, a `model` cell and a `$bar` cell renders at 90 columns
-- **THEN** the `model` cell occupies only its text's width, and the `blank` and `$bar` cells share every
-  other column, differing by at most one
-
-#### Scenario: A width that divides evenly
-
-- **WHEN** a row of 8 cells renders at 80 columns with the row option that restores equal shares
-- **THEN** each cell occupies 10 columns
-
-#### Scenario: A width that does not divide evenly
-
-- **WHEN** a row of 3 cells renders at 100 columns with the row option that restores equal shares
-- **THEN** the first cell occupies 34 columns and the other two 33 each, whatever their content, so the
-  row spans all 100 columns with nothing left blank at the right edge
-
-#### Scenario: A row of ten cells at a width that does not divide evenly
-
-- **WHEN** the default row of ten cells renders at 132 columns with the row option that restores equal
-  shares
-- **THEN** the first two cells occupy 14 columns and the other eight 13 each, so the row spans all 132
-  columns
-
-#### Scenario: The row option's values
-
-- **WHEN** a row declares `distribution` `"content"`, or declares none
-- **THEN** its cells are sized by their content; and `"equal"` gives the equal shares of the scenarios
-  below
-
-#### Scenario: A distribution that is not one of the two
-
-- **WHEN** a row declares `distribution` as `"equl"`, `"Equal"`, `4` or `null`
-- **THEN** the configuration is rejected, the default row renders, and the warning names the key and the
-  value and lists the two valid ones, `"content"` and `"equal"`
-
-#### Scenario: A distribution beside rows
-
-- **WHEN** a document carries a top-level `distribution` and a `rows` list together
-- **THEN** the configuration is rejected like a top-level `cells` or `id` beside `rows`, the default row
-  renders, and the warning says the document carries both a top-level row and a rows list
-
-#### Scenario: An empty cell takes no column
-
-- **WHEN** a row of a left-aligned `path` cell, a right-aligned `model` cell and a last left-aligned cell
-  whose instrument renders nothing is rendered at 80 columns
-- **THEN** the empty cell occupies 0 columns, and the spare columns go to the `path` cell, the last
-  left-aligned non-empty cell, so the empty cell's presence does not change where any text sits
-
-#### Scenario: A row whose cells all render nothing
-
-- **WHEN** a row of `model` and `thinking` cells, with no fill cell, renders at 80 columns before either
-  datum is known
-- **THEN** the first cell, though empty, takes the spare columns, and the row renders one line 80 columns
-  wide
-
-#### Scenario: No joint beside an absorbing cell
-
-- **WHEN** a left-aligned `path` cell absorbs the spare columns beside a right-aligned `model` cell
-- **THEN** only those spare columns separate their texts, and the `model` cell occupies exactly its
-  text's width
-
-#### Scenario: No joint beside a fill cell
-
-- **WHEN** a row of a `model` cell, a `blank` cell and a `thinking` cell renders at a width equal to the
-  sum of the two texts' widths
-- **THEN** the two texts abut, no joint is added beside the `blank` cell, and neither text is shortened
-
-#### Scenario: A joint beside an absorbing cell at the margin
-
-- **WHEN** a row of a left-aligned `path`, a right-aligned `model` and a right-aligned `thinking` renders
-  at one column more than its three texts' widths
-- **THEN** the `thinking` text keeps its joint, the `path` text abuts the `model` text, and no text is
-  shortened
-
-#### Scenario: The joints collapse together
-
-- **WHEN** the same row renders at exactly its three texts' widths
-- **THEN** no joint remains anywhere in it, no text is shortened, and the row is one line
-
-#### Scenario: The joint collapses before content does
-
-- **WHEN** two adjacent content-sized cells have text that fits the row only without the one column
-  between them
-- **THEN** the row is one line, the joint is gone, and neither cell's text is shortened for it
-
-#### Scenario: The terminal is resized
-
-- **WHEN** the same row renders again at a different width
-- **THEN** its cells take the widths that rule gives at the new width, and no cell keeps a width it
-  was given at the previous one
-
-#### Scenario: Composition and allocation are the host's
-
-- **WHEN** a row's cells are composed into a line
-- **THEN** the composition, the child iteration and the allocation of the columns are pi-tui's, and the
-  extension pads nothing onto the composed line
-
-### Requirement: Cell content comes from an instrument
-
-Every cell MUST hold an instrument, and a cell's content MUST be what its instrument renders: its
-format with its variables substituted. `blank` is an instrument whose default format is the fixed
-placeholder text; it is what the default row's ten cells hold, and it is what a row that declares
-no `cells` renders. The extension MUST NOT expose an API by which third-party code supplies or
-replaces cell content — configuration names instruments and their formats, and the extension
-implements them.
-
-#### Scenario: Rendering a row
-
-- **WHEN** a row renders
-- **THEN** every cell in it holds an instrument and contains the text that instrument resolves to
-
-#### Scenario: Contributing cell content
-
-- **WHEN** the extension's exported surface is inspected
-- **THEN** no API exists by which third-party code can supply or replace cell content
-
-#### Scenario: A row that declares no cells
-
-- **WHEN** a declared row declares no `cells`
-- **THEN** every cell in it holds `blank` and renders its default format, the fixed placeholder text
 
 ### Requirement: A row is one line tall
 
@@ -250,98 +69,6 @@ per-extension settings block, because none exists.
 
 - **WHEN** the extension's configuration reading is inspected
 - **THEN** no host-provided per-extension settings block supplies the rows
-
-### Requirement: A row's cells are its count and its placement
-
-A row's `cells` array MUST be both the number of cells in the row and the cell object at each
-position. An absent value MUST mean ten cells and the ceiling MUST be ten: a longer array MUST be
-truncated to ten, not rejected. Each entry MUST be an object whose `instrument` is a non-empty
-string. A key on a cell object that the extension does not recognise MUST be rejected, naming that key.
-No other key states a cell count.
-
-#### Scenario: cells absent
-
-- **WHEN** a declared row omits `cells` and renders at 80 columns
-- **THEN** the row renders 10 cells, none of them without content, on one line 80 columns wide
-
-#### Scenario: cells within the ceiling
-
-- **WHEN** a declared row places 3 cell objects in `cells`
-- **THEN** the row renders 3 cells, each holding the instrument its object names
-
-#### Scenario: cells above the ceiling
-
-- **WHEN** a declared row places 12 cell objects in `cells`
-- **THEN** the row renders the first 10 cells and the configuration is accepted
-
-#### Scenario: cells empty
-
-- **WHEN** a declared row carries an empty `cells` list
-- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
-
-#### Scenario: a cells entry that is not a string
-
-- **WHEN** a declared row carries a `cells` entry that is not an object — the string this key took
-  before this change, a number, an array, or null (the heading predates this change, and OpenSpec
-  refuses a scenario rename inside a MODIFIED block)
-- **THEN** the configuration is rejected, the default row renders, and the warning says the entry
-  is not an object and names the spelling to declare, `{"instrument": "model"}`
-
-#### Scenario: entries past the ceiling are still validated
-
-- **WHEN** a declared row carries more than ten entries and an entry past the tenth is malformed, or
-  names an instrument the extension does not implement
-- **THEN** the ceiling applies to the array's length only: a malformed entry is still rejected, and
-  an unknown instrument name still warns though its cell does not render
-
-#### Scenario: an entry that carries no instrument
-
-- **WHEN** a declared row carries a `cells` entry object with no `instrument` key
-- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
-
-#### Scenario: an instrument that is not a name
-
-- **WHEN** a declared row carries a cell object whose `instrument` is not a string, or is an empty
-  string
-- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
-
-#### Scenario: a cell object with an unrecognised key
-
-- **WHEN** a declared row carries a cell object with a key the extension does not recognise — the
-  declined `width`, or a misspelling such as `aling`
-- **THEN** the configuration is rejected, the default row renders, and the warning names the key
-
-### Requirement: Configuration designates each cell's instrument
-
-A row MAY declare `cells`, the cell objects in cell order. The `instrument` of the object at a
-position MUST name the instrument that cell renders, as the document configures that name or with
-its declared defaults, and the extension MUST NOT take a cell's instrument from any other source. An
-instrument name the extension does not implement MUST produce a configuration warning naming that
-instrument, and MUST render that cell as `blank`; the row's other cells MUST still render their
-instruments.
-
-#### Scenario: A row that names its instruments
-
-- **WHEN** a declared row carries a `cells` list of cell objects
-- **THEN** each cell renders the instrument its object names, in the order given
-
-#### Scenario: A row that names none
-
-- **WHEN** a declared row carries no `cells` list
-- **THEN** the row renders as it does today: the placeholder text in each of its cells, with no
-  cell left without content
-
-#### Scenario: An instrument the extension does not implement
-
-- **WHEN** a declared row names an instrument the extension does not implement
-- **THEN** the configuration warns, naming the unknown instrument, and that cell renders `blank`
-  while the row's other cells render theirs
-
-#### Scenario: One configuration, two cells holding it
-
-- **WHEN** the document configures an instrument once and two cells in two rows hold it
-- **THEN** both cells render it as configured, because a cell takes its instrument's configuration
-  from the instrument's name and not from the cell
 
 ### Requirement: An instrument resolves a cell's text by reading the store
 
@@ -450,14 +177,13 @@ promise says which loses first or by what ratio. `align` in a cell with no spare
 
 #### Scenario: A right-aligned last cell at a width that does not divide evenly
 
-- **WHEN** the last cell of a row declares `align` `right`, the row option restores equal shares, and
-  the width does not divide by the cell count
-- **THEN** its text ends at its own cell's right edge, which is the row's right edge — at 132 with ten
-  cells the last cell occupies 13 columns and its text ends at the window's edge
+- **WHEN** a row of ten `blank` cells renders at 132 columns with `align` `right` on its last cell
+- **THEN** its text ends at its own cell's right edge, which is the row's right edge — at 132 columns
+  the last cell occupies 13 columns and its text ends at the window's edge
 
 #### Scenario: A row of instruments at a width that does not divide evenly
 
-- **WHEN** a row of 3 instrument cells renders at 100 columns with no row option
+- **WHEN** a row of 3 instrument cells renders at 100 columns
 - **THEN** the row spans all 100 columns with nothing blank at the right edge, and the cells that are
   not filling occupy only their text's width
 
@@ -468,10 +194,10 @@ promise says which loses first or by what ratio. `align` in a cell with no spare
 
 ### Requirement: A cell's alignment is the padding side inside it
 
-A cell MAY declare `align`, whose value MUST be `left`, `right` or `center`; an absent value MUST
-mean `left`. Clipping stays at the text's end with the ellipsis the row already uses, and the space
-the text leaves in its cell, whether or not clipping occurred, MUST become padding that puts the
-text against the side `align` names — `center` splits it across both sides. The pad MUST be
+A row's entry MAY declare `align`, whose value MUST be `left`, `right` or `center`; an absent `align`
+MUST mean `left`. Clipping stays at the text's end with the ellipsis the row already uses, and the
+space the text leaves in its cell, whether or not clipping occurred, MUST become padding that puts
+the text against the side `align` names — `center` splits it across both sides. The pad MUST be
 measured in visible terminal columns, after clipping, never in code units.
 
 #### Scenario: A cell that declares no align
@@ -708,9 +434,9 @@ instrument's own shape does not require.
 
 The extension MUST read instrument configuration from a top-level `instruments` object in the
 `pi-jefferson.json` document it already owns, keyed by instrument name, each value carrying any of
-that instrument's declared options. It MUST sit beside either envelope shape, and a document
-carrying only `instruments` MUST render the default row with those instruments configured. A trusted
-project's document MUST replace the agent document whole, as it does today.
+that instrument's declared options. It MUST sit beside `rows`, and a document carrying only
+`instruments` MUST render the default row with those instruments configured. A trusted project's
+document MUST replace the agent document whole, as it does today.
 
 #### Scenario: An instrument configured once
 
@@ -729,8 +455,17 @@ project's document MUST replace the agent document whole, as it does today.
 
 #### Scenario: A name the extension does not implement
 
-- **WHEN** the `instruments` object configures a name the extension does not implement
-- **THEN** the document is accepted, the warning names it, and no cell renders it
+- **WHEN** the `instruments` object configures a name the extension does not implement, and no
+  row's entry names it
+- **THEN** the document is accepted, and the warning names it in a form of its own that is placed by
+  the `instruments` block rather than by a row, and that claims nothing about any cell's rendering
+
+#### Scenario: A name the block and a row both name
+
+- **WHEN** the `instruments` object configures a name the extension does not implement and a row's
+  entry names it too
+- **THEN** the document is accepted, and the name is reported twice: once by the row, and once by
+  the `instruments` block
 
 #### Scenario: An option the instrument does not declare
 
@@ -1385,49 +1120,6 @@ footer of one row MUST render that row alone, one line.
   `rowGap`
 - **THEN** the footer renders that row alone, one line, with no empty line above it
 
-### Requirement: rowGap sets the space between rows
-
-The configuration document MAY carry a top-level `rowGap`, beside either envelope, whose value MUST be
-a whole number from 0 to 3 and sets the empty lines between each pair of rows and nothing above row
-one; absent leaves the default space. `rowGap: 0` MUST render the footer as it rendered before this
-change. Any other value MUST reject the document, name `rowGap` and the value in the warning, and
-render the default row.
-
-#### Scenario: A larger gap
-
-- **WHEN** the document sets `rowGap` to `2` and declares two rows
-- **THEN** the footer renders row one, two empty lines, row two, four lines
-
-#### Scenario: The largest gap
-
-- **WHEN** the document sets `rowGap` to `3` and declares two rows
-- **THEN** the configuration is accepted and the footer renders three empty lines between the rows
-  and none above row one
-
-#### Scenario: A gap of zero
-
-- **WHEN** the document sets `rowGap` to `0` and declares two rows, or one
-- **THEN** the footer renders the rows and nothing else, exactly the lines it rendered before this
-  change
-
-#### Scenario: A gap beside either shape
-
-- **WHEN** `rowGap` sits beside a `rows` list, or beside a single top-level row
-- **THEN** the document is accepted and the gap applies, and `rowGap` beside `rows` is not a conflict
-  like a top-level `cells`
-
-#### Scenario: A gap that is not a whole number from 0 to 3
-
-- **WHEN** the document sets `rowGap` to `-1`, `1.5`, `"1"`, `null`, `4` or `1e21`
-- **THEN** the configuration is rejected, the default row renders, and the
-  warning names `rowGap` and the value
-
-#### Scenario: A misspelt key
-
-- **WHEN** the document carries `rowgap` or another key the reader does not know
-- **THEN** it is ignored without a warning, as every unknown row or document key is today and the
-  default space renders
-
 ### Requirement: A variable can declare forms
 
 An instrument MAY declare forms for a variable: named ways of showing one datum. The bare variable hands out its `variables` entry, which may also be named as a form. A form MUST be written `|name` directly after its variable, before any other modifier, once. A form name after literal text, after a variable that declares no such form, after another modifier or twice MUST reject the document when it is read, naming the instrument and the modifier. A form selects a value and changes no text.
@@ -1718,3 +1410,329 @@ composition root hands it to the store, and the visual keeps no configuration.
 - **WHEN** the document sets `seconds` to 0, 61, 1.5, `"10"` or null
 - **THEN** the document is rejected, the default row renders, and the warning names the option and the
   value
+
+### Requirement: A rows list is the only way to declare rows
+
+The configuration document MAY carry a top-level `rows` list, the only way to declare rows; each
+member MUST be a row written as a list of entries, and a member written as an object MUST be
+rejected. A top-level `cells`, `id` or `distribution` MUST be rejected with or without `rows`, and
+the message MUST show the `rows` form. A document with neither `rows` nor one of those keys MUST
+render the default row.
+
+#### Scenario: Rows in a list
+
+- **WHEN** the configuration carries a `rows` list of row lists
+- **THEN** parsing yields one row per member, in the order given
+
+#### Scenario: A row written as an object
+
+- **WHEN** a member of `rows` is an object rather than a list — a row the way it was written before
+  this change, or a flat list of entries written one bracket short
+- **THEN** the configuration is rejected, the default row renders, and the warning says each row is
+  a list and shows the whole form `{"rows": [[{"instrument": "model"}]]}`
+
+#### Scenario: A lone `distribution`
+
+- **WHEN** the document carries a top-level `distribution` and no `rows`, which 0.12.0 read as a
+  one-row document
+- **THEN** the configuration is rejected, the default row renders, and one warning shows the `rows`
+  form and says to drop the top-level `id` or `distribution` it carries
+
+#### Scenario: A lone `id`
+
+- **WHEN** the document carries a top-level `id` and no `rows`
+- **THEN** the configuration is rejected, the default row renders, and the warning shows the `rows`
+  form and says to drop the top-level `id` or `distribution` it carries
+
+#### Scenario: A lone `cells`
+
+- **WHEN** the document carries a top-level `cells` and no `rows`
+- **THEN** the configuration is rejected, the default row renders, and the warning shows the `rows`
+  form, so the user sees the shape that replaces the key
+
+#### Scenario: A top-level `cells` beside `rows`
+
+- **WHEN** the document carries a top-level `cells` and a `rows` list together
+- **THEN** the configuration is rejected, the default row renders, and the warning shows the `rows`
+  form
+
+#### Scenario: One message for every retired key
+
+- **WHEN** the document carries more than one retired top-level key, such as `cells` beside a
+  top-level `id`
+- **THEN** the configuration is rejected, and a single warning serves them all — the `rows` form it
+  shows replaces the retired row key, and it says to drop the top-level `id` or `distribution` — so
+  a user fixes every retired key in one edit
+
+#### Scenario: rows is not a list
+
+- **WHEN** the document's `rows` value is not a list — an object, a string, a number or null
+- **THEN** the configuration is rejected, the default row renders, and the warning names `rows` and
+  the reason
+
+#### Scenario: An empty rows list
+
+- **WHEN** the document's `rows` list is empty, alone or beside settings
+- **THEN** the document is accepted with no warning, and the default row renders
+
+#### Scenario: No rows declared
+
+- **WHEN** the document carries no `rows` and no retired key — nothing at all, only `instruments`,
+  only `rowGap`, or both
+- **THEN** the default row renders
+
+### Requirement: A row's entries are its cells and their places
+
+A row MUST be a list of entries, and the first ten of them MUST be the row's cells, in their order.
+An entry MUST be an object whose `instrument` is a non-empty string, and MAY carry `align`; a key it
+carries that the extension does not recognise MUST be rejected, naming that key. An empty row MUST
+be rejected. A list longer than ten MUST be truncated to ten, not rejected, and every entry in it
+MUST still be validated.
+
+#### Scenario: A row of three entries
+
+- **WHEN** a declared row places 3 entry objects in its list
+- **THEN** the row renders 3 cells, each holding the instrument its entry names
+
+#### Scenario: A row above the ceiling
+
+- **WHEN** a declared row places 12 entry objects in its list
+- **THEN** the row renders the first 10 cells and the configuration is accepted
+
+#### Scenario: An empty row
+
+- **WHEN** a declared row is an empty list
+- **THEN** the configuration is rejected, the default row renders, and the warning says the row is
+  empty
+
+#### Scenario: An entry that is not an object
+
+- **WHEN** a declared row carries an entry that is not an object — a string, a number, an array or
+  null
+- **THEN** the configuration is rejected, the default row renders, and the warning says the entry is
+  not an object and names the spelling to write, `{"instrument": "model"}`
+
+#### Scenario: Entries past the ceiling are still validated
+
+- **WHEN** a declared row carries more than ten entries and an entry past the tenth is malformed, or
+  names an instrument the extension does not implement
+- **THEN** the ceiling applies to the list's length only: a malformed entry is still rejected, and an
+  unknown instrument name still warns though its cell does not render
+
+#### Scenario: An entry that carries no instrument
+
+- **WHEN** a declared row carries an entry object with no `instrument` key
+- **THEN** the configuration is rejected, the default row renders, and the warning says no
+  `instrument` is named
+
+#### Scenario: An instrument that is not a name
+
+- **WHEN** a declared row carries an entry whose `instrument` is not a string, or is an empty string
+- **THEN** the configuration is rejected, the default row renders, and the warning names the reason
+
+#### Scenario: An entry with a key the extension does not recognise
+
+- **WHEN** a declared row carries an entry with a key the extension does not recognise — the retired
+  `distribution`, the declined `width`, or a misspelling such as `aling`
+- **THEN** the configuration is rejected, the default row renders, and the warning names the key
+
+### Requirement: An entry names the instrument its cell renders
+
+A row's entries are in cell order. The `instrument` of an entry MUST name the instrument its cell
+renders, as the document configures that name or with its declared defaults, and the extension MUST
+NOT take a cell's instrument from any other source. An instrument name the extension does not
+implement MUST produce a configuration warning naming that instrument and MUST render that cell as
+`blank`; the row's other cells MUST still render theirs.
+
+#### Scenario: A row that names its instruments
+
+- **WHEN** a declared row's list holds entry objects
+- **THEN** each cell renders the instrument its entry names, in the order given
+
+#### Scenario: An instrument the extension does not implement
+
+- **WHEN** a declared row's entry names `taiknr.savings`, which no shipped instrument answers to
+- **THEN** the document is accepted, the warning reads `row 3: "taiknr.savings" is not a known
+  instrument`, placed by its row and never by the entry's position, and that cell renders `blank`
+  while the row's other cells render theirs
+
+#### Scenario: One unknown name in two rows
+
+- **WHEN** two rows each carry an entry naming `taiknr.savings`
+- **THEN** the document is accepted, and the name is reported once for each row, in row order
+
+#### Scenario: One unknown name twice in one row
+
+- **WHEN** one row carries `taiknr.savings` at two positions, and nothing else names it
+- **THEN** the document is accepted, and the name is reported once for that row
+
+#### Scenario: One configuration, two cells holding it
+
+- **WHEN** the document configures an instrument once and two entries in two rows name it
+- **THEN** both cells render it as configured, because a cell takes its instrument's configuration
+  from the instrument's name and not from the entry that names it
+
+### Requirement: A rejection locates its offender by row and position
+
+A message that rejects one entry MUST place it by its row and by its position in that row, written
+`row 1, instrument 2`. A message that rejects a row rather than one entry MUST place it by its row
+alone, written `row 3`. Both numbers MUST count from 1, so the first row is row 1 and its first
+entry is instrument 1.
+
+#### Scenario: The first row and its first entry
+
+- **WHEN** the first entry of the first row is malformed
+- **THEN** the warning carries the placement `row 1, instrument 1:`
+
+#### Scenario: A later row and a later entry
+
+- **WHEN** the second entry of the third row is malformed
+- **THEN** the warning carries the placement `row 3, instrument 2:`
+
+#### Scenario: An entry past the tenth
+
+- **WHEN** the twelfth entry of the second row is malformed
+- **THEN** the warning carries the placement `row 2, instrument 12:`, because the position counts
+  every entry in the list
+
+#### Scenario: A row with no one entry to blame
+
+- **WHEN** a row is malformed as a whole, because it is an empty list or not a list
+- **THEN** the warning carries the placement `row 2:` for the second row, and names no entry
+
+### Requirement: Cell text is the instrument its entry names
+
+Every cell MUST hold an instrument, and a cell's content MUST be what its instrument renders: its
+format with its variables substituted. `blank` is an instrument whose default format is the fixed
+placeholder text; it is what the default row's ten cells hold. The extension MUST NOT expose an API
+by which third-party code supplies or replaces cell content — configuration names instruments and
+their formats, and the extension implements them.
+
+#### Scenario: Rendering a row
+
+- **WHEN** a row renders
+- **THEN** every cell in it holds an instrument and contains the text that instrument resolves to
+
+#### Scenario: Contributing cell content
+
+- **WHEN** the extension's exported surface is inspected
+- **THEN** no API exists by which third-party code can supply or replace cell content
+
+### Requirement: A cell takes the width its content needs
+
+By default a cell MUST take the width its content needs, except a `blank` or `$bar` cell, which MUST
+fill and share the spare columns, the remainder to the earliest. With none, they go to the last
+left-aligned non-empty cell, else the first non-empty one, else the first cell, even when empty; an
+empty cell MUST otherwise take none. The joint MUST give way before any content does.
+
+#### Scenario: The default gives each cell what its content needs
+
+- **WHEN** a row of `path`, `model` and `thinking` renders at 132 columns, `path` left-aligned and
+  the other two right-aligned
+- **THEN** `model` and `thinking` each occupy the width of their text, and `path` takes every other
+  column except the one between `model` and `thinking`
+
+#### Scenario: Joel's second row keeps its thirds
+
+- **WHEN** a row of two `blank` cells and a right-aligned `context` cell holding `$bar` renders at
+  100 columns
+- **THEN** the cells occupy 34, 33 and 33 columns, and the bar fills the width its own third leaves
+
+#### Scenario: A blank cell and a bar cell fill
+
+- **WHEN** a row of a `blank` cell, a `model` cell and a `$bar` cell renders at 90 columns
+- **THEN** the `model` cell occupies only its text's width, and the `blank` and `$bar` cells share
+  every other column, differing by at most one
+
+#### Scenario: An empty cell takes no column
+
+- **WHEN** a row of a left-aligned `path` cell, a right-aligned `model` cell and a last left-aligned
+  cell whose instrument renders nothing is rendered at 80 columns
+- **THEN** the empty cell occupies 0 columns, and the spare columns go to the `path` cell, the last
+  left-aligned non-empty cell, so the empty cell's presence does not change where any text sits
+
+#### Scenario: A row whose cells all render nothing
+
+- **WHEN** a row of `model` and `thinking` cells, with no fill cell, renders at 80 columns before
+  either datum is known
+- **THEN** the first cell, though empty, takes the spare columns, and the row renders one line 80
+  columns wide
+
+#### Scenario: No joint beside an absorbing cell
+
+- **WHEN** a left-aligned `path` cell absorbs the spare columns beside a right-aligned `model` cell
+- **THEN** only those spare columns separate their texts, and the `model` cell occupies exactly its
+  text's width
+
+#### Scenario: No joint beside a fill cell
+
+- **WHEN** a row of a `model` cell, a `blank` cell and a `thinking` cell renders at a width equal to
+  the sum of the two texts' widths
+- **THEN** the two texts abut, no joint is added beside the `blank` cell, and neither text is
+  shortened
+
+#### Scenario: A joint beside an absorbing cell at the margin
+
+- **WHEN** a row of a left-aligned `path`, a right-aligned `model` and a right-aligned `thinking`
+  renders at one column more than its three texts' widths
+- **THEN** the `thinking` text keeps its joint, the `path` text abuts the `model` text, and no text
+  is shortened
+
+#### Scenario: The joints collapse together
+
+- **WHEN** the same row renders at exactly its three texts' widths
+- **THEN** no joint remains anywhere in it, no text is shortened, and the row is one line
+
+#### Scenario: The joint collapses before content does
+
+- **WHEN** two adjacent content-sized cells have text that fits the row only without the one column
+  between them
+- **THEN** the row is one line, the joint is gone, and neither cell's text is shortened for it
+
+#### Scenario: The terminal is resized
+
+- **WHEN** the same row renders again at a different width
+- **THEN** its cells take the widths that rule gives at the new width, and no cell keeps a width it
+  was given at the previous one
+
+#### Scenario: Composition and allocation are the host's
+
+- **WHEN** a row's cells are composed into a line
+- **THEN** the composition, the child iteration and the allocation of the columns are pi-tui's, and
+  the extension pads nothing onto the composed line
+
+### Requirement: rowGap sets the space between declared rows
+
+The configuration document MAY carry a top-level `rowGap` beside `rows`, whose value MUST be a whole
+number from 0 to 3 and sets the empty lines between each pair of rows and nothing above row one;
+absent leaves the default space. `rowGap: 0` MUST render no empty line between rows. Any other
+value MUST reject the document, name `rowGap` and the value in the warning, and render the default
+row.
+
+#### Scenario: A larger gap
+
+- **WHEN** the document sets `rowGap` to `2` and declares two rows
+- **THEN** the footer renders row one, two empty lines, row two, four lines
+
+#### Scenario: The largest gap
+
+- **WHEN** the document sets `rowGap` to `3` and declares two rows
+- **THEN** the configuration is accepted and the footer renders three empty lines between the rows
+  and none above row one
+
+#### Scenario: A gap of zero
+
+- **WHEN** the document sets `rowGap` to `0` and declares two rows, or one
+- **THEN** the footer renders the rows and no empty line between them, and nothing above row one
+
+#### Scenario: A gap that is not a whole number from 0 to 3
+
+- **WHEN** the document sets `rowGap` to `-1`, `1.5`, `"1"`, `null`, `4` or `1e21`
+- **THEN** the configuration is rejected, the default row renders, and the warning names `rowGap`
+  and the value
+
+#### Scenario: A misspelt key
+
+- **WHEN** the document carries `rowgap` or another key the reader does not know
+- **THEN** it is ignored without a warning, as every unknown document key is, and the default space
+  renders

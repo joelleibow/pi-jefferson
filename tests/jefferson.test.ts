@@ -11,6 +11,7 @@ import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil
 import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
+import { DEFAULT_CELLS } from "../extensions/jefferson/configuration.ts";
 import jefferson, { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -205,6 +206,11 @@ function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
   return agentDir;
 }
 
+/** `count` placeholder rows: a row lists the entries it renders, and one `blank` entry fills it. */
+function blankRows(count: number): { instrument: string }[][] {
+  return Array.from({ length: count }, () => Array.from({ length: DEFAULT_CELLS }, () => ({ instrument: "blank" })));
+}
+
 function writeAgentDocument(agentDir: string, document: unknown): void {
   writeFileSync(join(agentDir, "pi-jefferson.json"), JSON.stringify(document));
 }
@@ -233,7 +239,7 @@ test("the jefferson command reports the installed footer and how many rows it re
   assert.deepEqual(await notifiedBy({}), [
     "pi-jefferson — the statusline footer is installed, 1 row.",
   ]);
-  assert.deepEqual(await notifiedBy({ rows: [{}, {}, {}] }), [
+  assert.deepEqual(await notifiedBy({ rows: blankRows(3) }), [
     "pi-jefferson — the statusline footer is installed, 3 rows.",
   ]);
 
@@ -295,7 +301,7 @@ test("a trusted project's document wins end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {});
   const cwd = mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
-  writeProjectDocument(cwd, { rows: [{}, {}] });
+  writeProjectDocument(cwd, { rows: blankRows(2) });
 
   const session = await harness().start({ cwd, trusted: true });
   assert.equal(session.footers.length, 1);
@@ -306,7 +312,7 @@ test("a trusted project's document wins end to end", async (t) => {
 
 test("a rowGap read from the document reaches the footer startUp installs", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { rows: [{}, {}], rowGap: 2 });
+  writeAgentDocument(agentDir, { rows: blankRows(2), rowGap: 2 });
 
   const session = await harness().start();
   const lines = session.lines(80);
@@ -333,15 +339,41 @@ test("a rejected configuration warns and still installs the default row", async 
   assert.equal(visibleWidth(lines[0] ?? ""), 80);
 });
 
+test("a rows list of entry lists renders one line per row, with the gap between them", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }], [{ instrument: "thinking" }]] });
+
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, thinkingLevel: "high" });
+  const lines = session.lines(80);
+  assert.equal(lines.length, 3, "the two rows and one empty line between them");
+  assert.equal(lines[1], "", "the gap line is a bare empty line");
+  assert.equal(stripTerminalSequences(lines[0] ?? ""), "Model: anthropic/claude-opus-4".padEnd(80));
+  assert.equal(stripTerminalSequences(lines[2] ?? ""), "Thinking: High".padEnd(80));
+  assert.deepEqual(session.notified, [], "the document is accepted without a word");
+});
+
+test("a 0.12.0 document is rejected end to end, in one toast that shows the rows form", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }] });
+
+  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.deepEqual(session.notified, [{
+    message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (a row at the top level is retired; declare rows as {"rows": [[{"instrument": "model"}]]} and drop any top-level id or distribution); rendering the default row`,
+    type: "warning",
+  }]);
+  assert.equal(session.lines(80).length, 1, "the default row renders as one line");
+});
+
 test("the branch, session and status cells render their labels at their alignments end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
+  // Content sizing gives spare columns only to a row's absorber, so each entry is its own row's
+  // only cell and takes the whole row: that is the spare room each alignment needs to show.
   writeAgentDocument(agentDir, {
-    // Equal shares, so each cell owns columns its content does not fill and its alignment shows.
-    distribution: "equal",
-    cells: [
-      { instrument: "branch", align: "left" },
-      { instrument: "session", align: "center" },
-      { instrument: "status", align: "right" },
+    rowGap: 0,
+    rows: [
+      [{ instrument: "branch", align: "left" }],
+      [{ instrument: "session", align: "center" }],
+      [{ instrument: "status", align: "right" }],
     ],
   });
 
@@ -352,15 +384,16 @@ test("the branch, session and status cells render their labels at their alignmen
     statuses: [["b", "idle"], ["a", "3 tasks"]],
   });
 
-  const line = session.lines(80)[0] ?? "";
-  assert.equal(visibleWidth(line), 80);
-  const text = stripTerminalSequences(line);
-  // The left cell is flush with the row's edge, the centred one sits away from its cell's left
-  // edge, and the right one ends at the row's right edge.
-  assert.equal(text.indexOf("Branch: main"), 0, "the left cell is flush with the row's left edge");
-  assert.equal(text.indexOf("Session: docs"), 34, "the centred cell is centred in its own cell");
+  const lines = session.lines(80);
+  assert.equal(lines.length, 3, "one line per row, and no empty line between them");
+  for (const line of lines) assert.equal(visibleWidth(line), 80);
+  const [left = "", centred = "", right = ""] = lines.map(stripTerminalSequences);
+  // The left cell is flush with the row's edge, the centred one splits its pad across both sides,
+  // and the right one ends at the row's right edge.
+  assert.equal(left.indexOf("Branch: main"), 0, "the left cell is flush with the row's left edge");
+  assert.equal(centred.indexOf("Session: docs"), 33, "the centred cell splits 67 columns of pad, 33 to the left");
   assert.equal(
-    text.indexOf("Status: 3 tasks idle") + "Status: 3 tasks idle".length,
+    right.indexOf("Status: 3 tasks idle") + "Status: 3 tasks idle".length,
     80,
     "the right cell ends at the row's right edge",
   );
@@ -368,7 +401,7 @@ test("the branch, session and status cells render their labels at their alignmen
 
 test("a right-aligned cell ends at its cell's right edge end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking", align: "right" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking", align: "right" }]] });
 
   const session = await harness().start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -462,7 +495,7 @@ test("an untrusted project's document is ignored end to end", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {});
   const cwd = mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
-  writeProjectDocument(cwd, { rows: [{}, {}] });
+  writeProjectDocument(cwd, { rows: blankRows(2) });
 
   const session = await harness().start({ cwd, trusted: false });
   assert.equal(session.footers.length, 1);
@@ -472,7 +505,7 @@ test("an untrusted project's document is ignored end to end", async (t) => {
 for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
   test(`a ${reason} session renders the model and thinking level it was seeded with`, async (t) => {
     const agentDir = useTempAgentDir(t);
-    writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+    writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
 
     // The host reports no selection when it restores, so nothing here is dispatched.
     const session = await harness().start({
@@ -490,7 +523,7 @@ for (const reason of ["startup", "new", "resume", "fork", "reload"]) {
 
 test("a session placing a notice cell takes the three notice subscriptions, and the message_end shows it", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "notice" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "notice" }]] });
   const pi = harness();
   const session = await pi.start();
   assert.deepEqual(session.subscriptions.map((subscription) => subscription.event), [
@@ -531,7 +564,7 @@ test("outside TUI mode a session takes no subscription", async (t) => {
 
 test("a model selection push changes the line and requests one repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -546,7 +579,7 @@ test("a model selection push changes the line and requests one repaint", async (
 
 test("a thinking-level push changes the line and requests one repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -561,7 +594,7 @@ test("a thinking-level push changes the line and requests one repaint", async (t
 
 test("the thinking cell follows the host through the label path", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "thinking" }]] });
   const h = harness();
   const session = await h.start({ reason: "startup", thinkingLevel: "high" });
   assert.ok(stripTerminalSequences(session.lines(80)[0] ?? "").includes("Thinking: High"));
@@ -577,7 +610,7 @@ test("the thinking cell follows the host through the label path", async (t) => {
 
 test("a push carrying the values the store already holds requests no repaint", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
   const h = harness();
   const session = await h.start({
     model: { provider: "anthropic", id: "claude-opus-4" },
@@ -593,7 +626,7 @@ test("a push carrying the values the store already holds requests no repaint", a
 
 test("a second session_start releases the first install before installing its own", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
   const h = harness();
 
   const first = await h.start({
@@ -632,7 +665,7 @@ test("a second session_start releases the first install before installing its ow
 
 test("disposing a footer then replacing the session releases the first install once", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "model" }, { instrument: "thinking" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "thinking" }]] });
   const h = harness();
 
   const first = await h.start({
@@ -680,7 +713,7 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
     instruments: { model: { label: "", format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { label: "", format: "$percent $bar", style: { fg: "accent" } } },
-    cells: [{ instrument: "model" }, { instrument: "context" }],
+    rows: [[{ instrument: "model" }, { instrument: "context" }]],
   });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
   const line = session.lines(80)[0] ?? "";
@@ -695,24 +728,9 @@ test("configured formats, styles and a width-taking bar render end to end", asyn
   assert.deepEqual(session.notified, []);
 });
 
-test("configured formats, styles and a width-taking bar render end to end under equal distribution", async (t) => {
-  const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, {
-    instruments: { model: { label: "", format: "🧠: $model from $provider", style: { fg: "accent" } }, context: { label: "", format: "$percent $bar", style: { fg: "accent" } } },
-    distribution: "equal",
-    cells: [{ instrument: "model" }, { instrument: "context" }],
-  });
-  const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" }, contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
-  const line = session.lines(80)[0] ?? "";
-  assert.equal(stripTerminalSequences(line), "🧠: claude-opus-4 from anthropic".padEnd(40) + "43.2% " + "█".repeat(14) + "░".repeat(20));
-  assert.equal(visibleWidth(line), 80);
-  assert.ok(line.includes(fakeTheme().getFgAnsi("accent")));
-  assert.deepEqual(session.notified, []);
-});
-
 test("a rejected style warns with its exact envelope and installs the default footer", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, cells: [{ instrument: "model" }] });
+  writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, rows: [[{ instrument: "model" }]] });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
   assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
@@ -737,15 +755,15 @@ function usageEntry(input: number, cost: number): SessionEntry {
 
 test("a dispatched turn boundary repaints only changed totals and its scan is reused by the footer", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }, { instrument: "cost" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "tokens" }, { instrument: "cost" }]] });
   const h = harness();
   const session = await h.start();
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 0".padEnd(40) + "Cost: $0.000".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 0 Cost: $0.000".padEnd(80));
   session.host.entries.push(usageEntry(212, 0.125));
   session.host.leafId = "turn-1";
   h.dispatch({ type: "turn_end" });
   assert.equal(session.repaints(), 1);
-  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 212".padEnd(40) + "Cost: $0.125".padEnd(40));
+  assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), "Tokens: 212 Cost: $0.125".padEnd(80));
   assert.equal(session.reads.entries, 2, "the render reuses the boundary's scan");
   session.host.entries.push(usageEntry(0, 0));
   session.host.leafId = "turn-2";
@@ -757,7 +775,7 @@ test("a dispatched turn boundary repaints only changed totals and its scan is re
 
 test("an unchanged turn boundary before the first render leaves the install-time cache filled without repainting", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { distribution: "equal", cells: [{ instrument: "tokens" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "tokens" }]] });
   const h = harness();
   const session = await h.start();
   h.dispatch({ type: "turn_end" });
@@ -775,18 +793,17 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
         path: { label: "" }, model: { label: "", format: "$model" },
         tokens: { label: "" }, cost: { label: "" }, thinking: { format: "$level", label: "" },
       },
-      distribution: "equal",
-      cells: Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] })),
+      rows: [Array.from({ length: 10 }, (_, index) => ({ instrument: ["path", "model", "tokens", "cost", "thinking"][index % 5] }))],
     });
     const root = mkdtempSync(join(tmpdir(), "jefferson-replacement-"));
     const oldCwd = join(root, "old"), newCwd = join(root, "new");
     mkdirSync(oldCwd); mkdirSync(newCwd);
     const h = harness();
     const first = await h.start({ cwd: oldCwd, model: { provider: "old-provider", id: "old-id" }, thinkingLevel: "high", entries: [usageEntry(17, 0.125)] });
-    assert.equal(stripTerminalSequences(first.lines(80)[0] ?? ""), ["old", "old-id", "17", "$0.125", "high"].map(text => text.padEnd(8)).join("").repeat(2));
+    assert.equal(stripTerminalSequences(first.lines(80)[0] ?? ""), "old old-id 17 $0.125 high old old-id 17 $0.125 high".padEnd(80));
     const oldReads = { ...first.reads };
     const second = await h.start({ reason, cwd: newCwd, model: { provider: "new-provider", id: "new-id" }, thinkingLevel: "low", entries: [usageEntry(212, 0.25)] });
-    assert.equal(stripTerminalSequences(second.lines(80)[0] ?? ""), ["new", "new-id", "212", "$0.250", "low"].map(text => text.padEnd(8)).join("").repeat(2));
+    assert.equal(stripTerminalSequences(second.lines(80)[0] ?? ""), "new new-id 212 $0.250 low new new-id 212 $0.250 low".padEnd(80));
     assert.equal(stripTerminalSequences(first.footers[0]?.render(80)[0] ?? ""), " ".repeat(80));
     assert.deepEqual(first.reads, oldReads, "nothing reads the old context again after release");
     assert.equal(second.reads.entries, 1, "the new install owns a new scan");
@@ -795,7 +812,7 @@ for (const reason of ["new", "resume", "fork", "reload"]) {
 
 test("a session without context usage renders its context cell empty", async (t) => {
   const agentDir = useTempAgentDir(t);
-  writeAgentDocument(agentDir, { cells: [{ instrument: "context" }] });
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "context" }]] });
   const session = await harness().start();
   assert.equal(stripTerminalSequences(session.lines(80)[0] ?? ""), " ".repeat(80));
   assert.deepEqual(session.notified, []);
@@ -809,11 +826,11 @@ test("Joel's top row puts the working directory at the left and two instruments 
       model: { label: "🧠", format: "$model via $provider" },
       thinking: { label: "🤔" },
     },
-    cells: [
+    rows: [[
       { instrument: "path" },
       { instrument: "model", align: "right" },
       { instrument: "thinking", align: "right" },
-    ],
+    ]],
   });
   const root = mkdtempSync(join(tmpdir(), "jefferson-top-row-"));
   const cwd = join(root, "pi-jefferson");
@@ -857,7 +874,7 @@ test("Joel's second row keeps its thirds, with a real bar", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
     instruments: { context: { label: "", format: "$percent $bar" } },
-    cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "context", align: "right" }],
+    rows: [[{ instrument: "blank" }, { instrument: "blank" }, { instrument: "context", align: "right" }]],
   });
   const session = await harness().start({ contextUsage: { tokens: 86400, percent: 43.2, contextWindow: 200000 } });
 
@@ -879,7 +896,7 @@ test("a bar takes only what its own cell leaves, and draws nothing with no room"
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
     instruments: { path: { label: "" }, context: { label: "", format: "$percent $bar" } },
-    cells: [{ instrument: "path" }, { instrument: "context" }],
+    rows: [[{ instrument: "path" }, { instrument: "context" }]],
   });
   const root = mkdtempSync(join(tmpdir(), "jefferson-bar-"));
   const cwd = join(root, "pi-jefferson");
@@ -919,28 +936,23 @@ test("the default row of ten blank cells is unchanged", async (t) => {
   );
 });
 
-test("distribution equal restores equal shares end to end", async (t) => {
+test("a right-aligned last cell at a width that does not divide evenly ends at the window's edge", async (t) => {
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, {
-    distribution: "equal",
-    cells: [{ instrument: "blank" }, { instrument: "blank" }, { instrument: "thinking", align: "right" }],
+    rows: [[
+      ...Array.from({ length: 9 }, () => ({ instrument: "blank" })),
+      { instrument: "blank", align: "right" },
+    ]],
   });
-  const session = await harness().start({ thinkingLevel: "max" });
-  const clipped = (width: number): string => stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, width));
-  const three = session.lines(100)[0] ?? "";
-  assert.equal(visibleWidth(three), 100);
-  assert.equal(
-    stripTerminalSequences(three),
-    clipped(34) + clipped(33) + "Thinking: Max".padStart(33),
-    "34, 33 and 33, whatever the content",
-  );
 
-  writeAgentDocument(agentDir, { distribution: "equal", cells: Array.from({ length: 10 }, () => ({ instrument: "thinking", align: "right" })) });
-  const ten = await harness().start({ thinkingLevel: "max" });
-  const line = ten.lines(132)[0] ?? "";
+  const session = await harness().start();
+  const line = session.lines(132)[0] ?? "";
   assert.equal(visibleWidth(line), 132);
   const cells = line.split(FRAME).slice(1, -1);
   assert.equal(cells.length, 10, "ten cells");
   assert.equal(visibleWidth(cells.at(-1) ?? ""), 13, "the last cell occupies 13 columns");
-  assert.ok(stripTerminalSequences(line).endsWith("Thinking: Max"), "a right-aligned last cell's text ends at the window's edge");
+  assert.ok(
+    stripTerminalSequences(line).endsWith(stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 13))),
+    "its text ends at its own cell's right edge, which is the window's",
+  );
 });

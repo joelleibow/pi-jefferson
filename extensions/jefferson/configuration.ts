@@ -1,10 +1,10 @@
 /**
  * The configuration reader: owns the extension's `pi-jefferson.json` surface.
  *
- * It resolves where the two documents live, then reads and parses the one that applies,
- * normalizes both envelope shapes to a list of rows, applies the default row and the cells
- * ceiling, synthesizes row ids, and resolves each cell's instrument at parse time. A document
- * it refuses renders the default row and warns; that is the whole of its error handling.
+ * It resolves where the two documents live, then reads and parses the one that applies, reads the
+ * `rows` list as rows of entries, applies the default row and the cells ceiling, and resolves each
+ * cell's instrument at parse time. A document it refuses renders the default row and warns; that is
+ * the whole of its error handling.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -21,7 +21,7 @@ import { blank } from "./components/instruments/blank.ts";
 import { NOTICE_SECONDS, notice } from "./components/instruments/notice.ts";
 import { instrumentNamed } from "./shipped.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
-import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Distribution, type Row } from "./components/row/row.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
   instrumentBindings,
   type BindInstrument,
@@ -31,11 +31,6 @@ import {
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
   return typeof value === "string" && ALIGNMENTS.some((align) => align === value);
-}
-
-/** Whether a configuration value is one of `DISTRIBUTIONS`. */
-function isDistribution(value: unknown): value is Distribution {
-  return typeof value === "string" && DISTRIBUTIONS.some((distribution) => distribution === value);
 }
 
 /** A tuple's values as a message spells them: `"content" or "equal"`. */
@@ -63,7 +58,7 @@ export interface Configuration {
   noticeSeconds: number | undefined;
   /**
    * Set when a present document was rejected, and also when an accepted document has
-   * something to report: instruments the extension does not implement, or a `containers` key.
+   * something to report: instruments the extension does not implement.
    */
   warning: string | undefined;
 }
@@ -73,13 +68,24 @@ export const MAX_CELLS = 10;
 const DEFAULT_ROW_GAP = 1;
 const MAX_ROW_GAP = 3;
 
+/**
+ * The keys a 0.12.0 document wrote a row with at its top level. Any of them is a row this change
+ * retired, so the whole document is refused rather than read into a placeholder.
+ */
+const RETIRED_KEYS = ["cells", "id", "distribution"] as const;
+
+/** The shape a document writes its rows in: one row of one entry, which both messages show. */
+const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
+
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
 /** What an accepted document still has to say for itself, gathered across all its rows. */
 interface Notices {
-  containers: boolean;
-  unknownInstruments: Set<string>;
+  /** Each distinct (row, name) pair a row's entry names, in row order and first-entry order. */
+  unknownInRow: { row: number; name: string }[];
+  /** Every name the `instruments` block configures that no shipped instrument answers to, in key order. */
+  unknownInBlock: string[];
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
@@ -103,7 +109,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
     }
     const declaration = instrumentNamed(name);
     if (declaration === undefined) {
-      notices.unknownInstruments.add(name);
+      notices.unknownInBlock.push(name);
       continue;
     }
     const entry = value as Record<string, unknown>;
@@ -173,7 +179,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
 }
 
 function defaultRow(bind: BindInstrument): Row {
-  return { id: "row-0", distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
+  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
 }
 
 function blankCells(count: number, bind: BindInstrument): Cell[] {
@@ -181,90 +187,58 @@ function blankCells(count: number, bind: BindInstrument): Cell[] {
 }
 
 /**
- * The row's cells, from its `cells` entries in order, clamped to the ceiling. Each entry is
- * narrowed before it is resolved, so a name reaches `instrumentNamed` as the `string` it takes.
- * An empty list is rejected: a row of no cells has no `floor(W / N)` geometry.
+ * One row, from its list of entries. The first MAX_CELLS entries are its cells, in order, and every
+ * entry is validated, so a fault or an unknown name past the ceiling still answers. An empty list is
+ * rejected: a row of no cells has nothing to render. `index` is 0-based and internal; every message
+ * places the row by its 1-based position, which is the number a user counts to.
  */
-function cellsFromNames(names: readonly unknown[], index: number, notices: Notices, bind: BindInstrument): Cell[] {
-  if (names.length === 0) {
-    throw new RejectedConfiguration(`row ${index} has an empty cells list`);
+function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindInstrument): Row {
+  const place = `row ${index + 1}:`;
+  if (!Array.isArray(raw)) {
+    throw new RejectedConfiguration(`${place} is not a list; a row is a list of entries, as ${ROWS_FORM}`);
   }
+  if (raw.length === 0) {
+    throw new RejectedConfiguration(`${place} is empty; a row lists the entries it renders`);
+  }
+
   const cells: Cell[] = [];
-  for (const entry of names) {
+  for (const [position, entry] of raw.entries()) {
+    const at = `row ${index + 1}, instrument ${position + 1}:`;
     // The entry is an object: not an array, not null, not a primitive.
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-      throw new RejectedConfiguration(`row ${index} has a cells entry that is not an object; declare {"instrument": "model"}`);
+      throw new RejectedConfiguration(`${at} is not an object; declare {"instrument": "model"}`);
     }
     const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align");
     if (unknownKey !== undefined) {
-      throw new RejectedConfiguration(`row ${index} has a cell with an unrecognised key ${JSON.stringify(unknownKey)}; a cell carries only instrument and align`);
+      throw new RejectedConfiguration(`${at} has an unrecognised key ${JSON.stringify(unknownKey)}; an entry carries instrument and align`);
     }
     const fields = Object.entries(entry);
     const instrumentValue = fields.find(([key]) => key === "instrument")?.[1];
     const alignValue = fields.find(([key]) => key === "align")?.[1];
     if (instrumentValue === undefined) {
-      throw new RejectedConfiguration(`row ${index} has a cell with no instrument`);
+      throw new RejectedConfiguration(`${at} no "instrument" named`);
     }
     if (typeof instrumentValue !== "string" || instrumentValue === "") {
-      throw new RejectedConfiguration(`row ${index} has an instrument that is not a non-empty string`);
+      throw new RejectedConfiguration(`${at} "instrument" is not a non-empty string`);
     }
     if (alignValue !== undefined && !isAlign(alignValue)) {
-      throw new RejectedConfiguration(`row ${index} has an align that is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
+      throw new RejectedConfiguration(`${at} align is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
     const instrument = instrumentNamed(instrumentValue);
     // One typo does not take down the statusline: the cell renders blank and the warning names it.
     // Collect unknown names before truncating, so a typo past the ceiling still warns though its
     // cell is not rendered.
-    if (instrument === undefined) notices.unknownInstruments.add(instrumentValue);
-    // The ceiling truncates last: the first MAX_CELLS entries render, the rest are not rendered.
-    // The push is guarded rather than breaking, so every entry past the ceiling is still
-    // validated and checked for unknowns before the ceiling decides.
+    if (instrument === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
+      notices.unknownInRow.push({ row: index + 1, name: instrumentValue });
+    }
+    // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
+    // break keeps every entry past it validated and checked for unknowns.
     if (cells.length < MAX_CELLS) {
       cells.push({ instrument: bind(instrument ?? blank), align });
     }
   }
-  return cells;
-}
-
-/** Normalize one row object: id synthesized from its index, cells named or defaulted. */
-function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindInstrument): Row {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new RejectedConfiguration(`row ${index} is not an object`);
-  }
-  const row = raw as Record<string, unknown>;
-
-  // Read before its siblings: a row malformed in more than one place reports the distribution.
-  let distribution: Distribution = DISTRIBUTIONS[0];
-  if ("distribution" in row) {
-    if (!isDistribution(row.distribution)) {
-      throw new RejectedConfiguration(`row ${index} has a distribution that is not ${orList(DISTRIBUTIONS)}: ${JSON.stringify(row.distribution)}`);
-    }
-    distribution = row.distribution;
-  }
-
-  // The key is not read, so it cannot corrupt the render; the warning is the honest signal.
-  if ("containers" in row) notices.containers = true;
-
-  let cells: Cell[];
-  if ("cells" in row) {
-    if (!Array.isArray(row.cells)) {
-      throw new RejectedConfiguration(`row ${index} has a cells value that is not a list`);
-    }
-    cells = cellsFromNames(row.cells, index, notices, bind);
-  } else {
-    cells = blankCells(DEFAULT_CELLS, bind);
-  }
-
-  let id = `row-${index}`;
-  if ("id" in row) {
-    if (typeof row.id !== "string" || row.id === "") {
-      throw new RejectedConfiguration(`row ${index} has an id that is not a non-empty string`);
-    }
-    id = row.id;
-  }
-
-  return { id, distribution, cells };
+  return { distribution: DISTRIBUTIONS[0], cells };
 }
 
 /** A document's rows, the empty lines its footer renders between them, and its notice's time. */
@@ -274,33 +248,35 @@ interface NormalizedDocument {
   noticeSeconds: number | undefined;
 }
 
-/** Normalize the document: one top-level row, or a list under `rows`; never both. */
+/** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
 function normalizeDocument(document: unknown, notices: Notices, theme: Theme): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
   const doc = document as Record<string, unknown>;
 
+  // A retired key answers before `rows`, `rowGap` and `instruments`, and one message serves every
+  // one of them: it is the only migration help a user gets, so it must fix all of them in one edit.
+  if (RETIRED_KEYS.some((key) => key in doc)) {
+    throw new RejectedConfiguration(
+      `a row at the top level is retired; declare rows as ${ROWS_FORM} and drop any top-level id or distribution`,
+    );
+  }
+
   let rawRows: unknown[];
   if ("rows" in doc) {
-    if ("cells" in doc || "id" in doc || "distribution" in doc) {
-      throw new RejectedConfiguration(
-        "the configuration carries both a top-level row and a rows list",
-      );
-    }
     if (!Array.isArray(doc.rows)) {
       throw new RejectedConfiguration("the rows value is not a list");
     }
-    // A top-level `containers` beside a `rows` list used to be rejected outright; the key is
-    // unread either way, so it now takes the same once-per-document warning as a row's own.
-    if ("containers" in doc) notices.containers = true;
     rawRows = doc.rows;
   } else {
-    rawRows = [doc];
+    // No `rows` means no declared row, so the default row renders; the shortcut that read the
+    // document itself as one row is the retired shape the guard above refuses.
+    rawRows = [];
   }
 
-  // Read beside either envelope, before any row: a value the reader cannot use refuses the whole
-  // document, as a bad `distribution` does. pi-tui would floor `1.5` and clamp `-1` in silence.
+  // Read before any row: a value the reader cannot use refuses the whole document. pi-tui would
+  // floor `1.5` and clamp `-1` in silence.
   // shortcut: no unknown row or document key is warned on, so a misspelt `rowGap` renders the
   // default space without a word; upgrade by adding an unknown-key rule when a second misspelling
   // hurts, as its own change.
@@ -322,27 +298,21 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
   // The default row goes through it too, so the gate and the value cannot disagree about it.
   const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
   const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
-  const seen = new Set<string>();
-  for (const row of rows) {
-    if (seen.has(row.id)) {
-      throw new RejectedConfiguration(`two rows share the id ${JSON.stringify(row.id)}`);
-    }
-    seen.add(row.id);
-  }
   return { rows, rowGap, noticeSeconds };
 }
 
 /** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
 function acceptedWarning(path: string, notices: Notices): string | undefined {
   const parts: string[] = [];
-  if (notices.containers) {
-    parts.push("carries the containers key, which is no longer read; declare cells instead");
+  // The rows' parts first, then the block's one part: a row's part changes what renders.
+  for (const unknown of notices.unknownInRow) {
+    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.name)} is not a known instrument`);
   }
-  if (notices.unknownInstruments.size > 0) {
+  if (notices.unknownInBlock.length > 0) {
     parts.push(
-      `names instruments the extension does not implement: ${[...notices.unknownInstruments].join(
-        ", ",
-      )}; those cells render blank`,
+      `the instruments block names instruments the extension does not implement: ${notices.unknownInBlock
+        .map((name) => JSON.stringify(name))
+        .join(", ")}`,
     );
   }
   return parts.length === 0 ? undefined : `pi-jefferson: ${path} ${parts.join("; ")}`;
@@ -381,7 +351,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   }
 
   try {
-    const notices: Notices = { containers: false, unknownInstruments: new Set() };
+    const notices: Notices = { unknownInRow: [], unknownInBlock: [] };
     const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source.theme);
     return {
       rows,
