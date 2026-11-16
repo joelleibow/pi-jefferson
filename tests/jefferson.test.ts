@@ -1,20 +1,19 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import {
-  CONFIG_DIR_NAME, type ContextUsage, type ReadonlyFooterDataProvider, type SessionEntry, type Theme,
-} from "@earendil-works/pi-coding-agent";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import type { TUI } from "@earendil-works/pi-tui";
 
 import { DEFAULT_CELL_TEXT } from "../extensions/jefferson/components/instruments/instrument.ts";
-import { DEFAULT_CELLS } from "../extensions/jefferson/configuration.ts";
-import jefferson, { VERSION } from "../extensions/jefferson.ts";
+import { VERSION } from "../extensions/jefferson.ts";
 import { fakeTheme } from "./fake-theme.ts";
+import {
+  blankRows, harness, useTempAgentDir, writeAgentDocument, writeProjectDocument,
+} from "./session-harness.ts";
 
 /**
  * Tests live in `tests/`, never beside the extension.
@@ -23,165 +22,6 @@ import { fakeTheme } from "./fake-theme.ts";
  * sitting next to one is executed on every pi start. A subdirectory or a sibling tree
  * is not traversed that way.
  */
-
-interface CommandDef {
-  description: string;
-  handler: (args: string, ctx: { ui: { notify(message: string): void } }) => Promise<void>;
-}
-
-type Handler = (event: unknown, ctx: unknown) => unknown;
-
-/** One `pi.on` registration: the event it was taken for, and how often its release ran. */
-interface Subscription {
-  event: string;
-  calls: number;
-}
-
-/** The component the host keeps, so `render` and `dispose` are reachable from a test. */
-interface FakeFooter {
-  render(width: number): string[];
-  invalidate(): void;
-  dispose?(): void;
-}
-
-/** One session's host-facing side: what it was told, what it installed, what it subscribed to. */
-interface FakeSession {
-  notified: Array<{ message: string; type: string | undefined }>;
-  footers: FakeFooter[];
-  repaints: () => number;
-  subscriptions: Subscription[];
-  host: {
-    contextUsage: ContextUsage | undefined; sessionId: string; leafId: string | null; entries: SessionEntry[];
-    sessionName: string | undefined; branch: string | null; statuses: Map<string, string>;
-  };
-  reads: { usage: number; sessionId: number; leafId: number; entries: number };
-  lines(width: number): string[];
-}
-
-interface SessionOptions {
-  reason?: string;
-  mode?: string;
-  cwd?: string;
-  trusted?: boolean;
-  /** Absent for a session the host restored with no model. */
-  model?: { provider: string; id: string };
-  /** Absent for a session the host has not named. */
-  sessionName?: string;
-  /** What the host reports as the branch; absent outside a repository. */
-  branch?: string | null;
-  statuses?: Array<[string, string]>;
-  thinkingLevel?: string;
-  contextUsage?: ContextUsage;
-  entries?: SessionEntry[];
-}
-
-interface Harness {
-  commands: Map<string, CommandDef>;
-  /** The host-facing order as it happened: `setFooter#n`, `unsubscribe:<event>`. */
-  log: string[];
-  start(options?: SessionOptions): Promise<FakeSession>;
-  dispatch(event: { type: string } & Record<string, unknown>): void;
-}
-
-/** A fake `pi`, the extension bound to it once, and the sessions it was started with. */
-function harness(): Harness {
-  const commands = new Map<string, CommandDef>();
-  const handlers = new Map<string, Handler>();
-  const subscriptions: Subscription[] = [];
-  const log: string[] = [];
-  let installs = 0;
-  let current: { ctx: unknown } | undefined;
-
-  const fakePi = {
-    registerCommand: (name: string, def: CommandDef) => void commands.set(name, def),
-    on: (event: string, handler: Handler): (() => void) => {
-      handlers.set(event, handler);
-      const subscription: Subscription = { event, calls: 0 };
-      subscriptions.push(subscription);
-      return () => {
-        subscription.calls += 1;
-        log.push(`unsubscribe:${event}`);
-      };
-    },
-  };
-  (jefferson as unknown as (pi: unknown) => void)(fakePi);
-
-  return {
-    commands,
-    log,
-    async start(options: SessionOptions = {}): Promise<FakeSession> {
-      const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), "jefferson-cwd-"));
-      const notified: Array<{ message: string; type: string | undefined }> = [];
-      const footers: FakeFooter[] = [];
-      let repaints = 0;
-      const session: FakeSession = {
-        notified,
-        footers,
-        repaints: () => repaints,
-        subscriptions: [],
-        host: {
-          contextUsage: options.contextUsage, sessionId: cwd, leafId: options.entries?.length ? "seeded" : null,
-          sessionName: options.sessionName, branch: options.branch ?? null, statuses: new Map(options.statuses ?? []),
-          entries: options.entries ?? [],
-        },
-        reads: { usage: 0, sessionId: 0, leafId: 0, entries: 0 },
-        lines(width: number) {
-          return footers.at(-1)?.render(width) ?? [];
-        },
-      };
-      const ctx = {
-        mode: options.mode ?? "tui",
-        cwd,
-        model: options.model,
-        thinkingLevel: options.thinkingLevel,
-        getContextUsage: () => { session.reads.usage++; return session.host.contextUsage; },
-        modelRegistry: { find: () => undefined },
-        sessionManager: {
-          getSessionId: () => { session.reads.sessionId++; return session.host.sessionId; },
-          getLeafId: () => { session.reads.leafId++; return session.host.leafId; },
-          getSessionName: () => session.host.sessionName,
-          getEntries: () => { session.reads.entries++; return session.host.entries; },
-          getBranch: () => session.host.entries,
-        },
-        isProjectTrusted: () => options.trusted ?? false,
-        ui: {
-          theme: fakeTheme(),
-          notify: (message: string, type?: string) => void notified.push({ message, type }),
-          // `Pick<TUI, "requestRender">` rather than a local shape: a rename or removal of
-          // `requestRender` in the host then fails `pnpm typecheck` instead of the fake quietly
-          // drifting from the host it stands in for.
-          setFooter: (
-            factory: (tui: Pick<TUI, "requestRender">, theme: Theme, footerData: ReadonlyFooterDataProvider) => FakeFooter,
-          ) => {
-            log.push(`setFooter#${++installs}`);
-            const tui = { requestRender: () => void (repaints += 1) };
-            // The host's footer-only data, faked at its boundary: the branch and the statuses.
-            const footerData: ReadonlyFooterDataProvider = {
-              getGitBranch: () => session.host.branch,
-              getExtensionStatuses: () => session.host.statuses,
-              getAvailableProviderCount: () => 0,
-              onBranchChange: () => () => {},
-            };
-            footers.push(factory(tui, fakeTheme(), footerData));
-          },
-        },
-      };
-      current = { ctx };
-
-      const handler = handlers.get("session_start");
-      assert.ok(handler, "no session_start handler registered");
-      const from = subscriptions.length;
-      await handler({ type: "session_start", reason: options.reason ?? "startup" }, ctx);
-      session.subscriptions = subscriptions.slice(from);
-      return session;
-    },
-    dispatch(event) {
-      const handler = handlers.get(event.type);
-      assert.ok(handler, `no handler registered for ${event.type}`);
-      handler(event, current?.ctx);
-    },
-  };
-}
 
 /** The framing the host wraps around each child it composes: a style reset and a hyperlink reset. */
 const FRAME = "\x1b[0m\x1b]8;;\x07";
@@ -194,33 +34,6 @@ function visible(line: string): string {
 test("registers exactly one command", () => {
   assert.deepEqual([...harness().commands.keys()], ["jefferson"]);
 });
-
-/** Set PI_CODING_AGENT_DIR to a temp dir for one test and restore it after. */
-function useTempAgentDir(t: { after: (fn: () => void) => void }): string {
-  const agentDir = mkdtempSync(join(tmpdir(), "jefferson-agent-"));
-  const previous = process.env.PI_CODING_AGENT_DIR;
-  process.env.PI_CODING_AGENT_DIR = agentDir;
-  t.after(() => {
-    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
-    else process.env.PI_CODING_AGENT_DIR = previous;
-  });
-  return agentDir;
-}
-
-/** `count` placeholder rows: a row lists the entries it renders, and one `blank` entry fills it. */
-function blankRows(count: number): { instrument: string }[][] {
-  return Array.from({ length: count }, () => Array.from({ length: DEFAULT_CELLS }, () => ({ instrument: "blank" })));
-}
-
-function writeAgentDocument(agentDir: string, document: unknown): void {
-  writeFileSync(join(agentDir, "pi-jefferson.json"), JSON.stringify(document));
-}
-
-function writeProjectDocument(cwd: string, document: unknown): void {
-  const dir = join(cwd, CONFIG_DIR_NAME);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "pi-jefferson.json"), JSON.stringify(document));
-}
 
 test("the jefferson command reports the installed footer and how many rows it renders", async (t) => {
   const agentDir = useTempAgentDir(t);
@@ -431,6 +244,8 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/data/field-value.ts", []],
     ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
     ["../extensions/jefferson/instrument-contract.ts", []],
+    ["../extensions/jefferson/registration.ts", ["createRegistry", "isNamePart", "isProvidedName", "normalizeName"]],
+    ["../extensions/jefferson/registration-listener.ts", ["createRegistrationListener"]],
     ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
     ["../extensions/jefferson/startup.ts", ["startUp"]],
     ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
@@ -446,7 +261,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/instruments/session.ts", ["session"]],
     ["../extensions/jefferson/components/instruments/status.ts", ["status"]],
     ["../extensions/jefferson/components/instruments/notice.ts", ["NOTICE_SECONDS", "notice"]],
-    ["../extensions/jefferson/shipped.ts", ["instrumentNamed"]],
+    ["../extensions/jefferson/shipped.ts", ["FALLBACK", "NOTICE_GATE", "SHIPPED"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
     ["../extensions/jefferson/components/visuals/timed.ts", ["timed"]],
   ];
@@ -484,14 +299,6 @@ test("the exported surface offers no way to supply or replace cell content", asy
     .map((name) => `../extensions/${name}`)
     .sort();
   assert.deepEqual(shippedFiles.filter((path) => !covered.includes(path)), [], "a shipped file the pin does not cover");
-
-  // `instrumentNamed` is a lookup, not a registration path: an unimplemented name stays
-  // unimplemented, and asking for it changes neither file's exported surface.
-  const shipped = pinnedModules.get("../extensions/jefferson/shipped.ts") as { instrumentNamed(name: string): unknown };
-  const surface = [Object.keys(shipped).sort(), Object.keys(store).sort()];
-  assert.equal(shipped.instrumentNamed("nope"), undefined);
-  assert.equal(shipped.instrumentNamed("nope"), undefined);
-  assert.deepEqual([Object.keys(shipped).sort(), Object.keys(store).sort()], surface);
 });
 
 test("the contract and field-value strip to nothing", () => {

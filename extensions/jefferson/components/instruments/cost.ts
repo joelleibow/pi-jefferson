@@ -2,7 +2,7 @@
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const cost: InstrumentDeclaration = {
-  name: "cost",
+  name: "jefferson.default.cost",
   variables: { cost: ({ totals }) => totals === undefined ? undefined : `$${totals.cost.toFixed(3)}` },
   defaultFormat: "$cost",
   defaultLabel: "Cost:",

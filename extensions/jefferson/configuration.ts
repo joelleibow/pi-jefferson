@@ -3,8 +3,9 @@
  *
  * It resolves where the two documents live, then reads and parses the one that applies, reads the
  * `rows` list as rows of entries, applies the default row and the cells ceiling, and resolves each
- * cell's instrument at parse time. A document it refuses renders the default row and warns; that is
- * the whole of its error handling.
+ * cell's instrument at parse time through the source's registry. Every name a document writes is
+ * normalized once here (design 5, 8; M12). A document it refuses renders the default row and warns;
+ * that is the whole of its error handling.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -17,9 +18,8 @@ import {
   type ThemeStyle,
 } from "@earendil-works/pi-coding-agent";
 
-import { blank } from "./components/instruments/blank.ts";
-import { NOTICE_SECONDS, notice } from "./components/instruments/notice.ts";
-import { instrumentNamed } from "./shipped.ts";
+import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
+import { normalizeName } from "./registration.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
@@ -39,12 +39,18 @@ function orList(values: readonly string[]): string {
   return quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
 }
 
-/** The two resolved document paths and the caller's trust decision. */
+/** Where a document lives, what it may read, and the registry it resolves names against. */
 export interface ConfigurationSource {
   agentPath: string;
   projectPath: string;
   projectTrusted: boolean;
   theme: Theme;
+  /** The declaration registered under a full name, or `undefined`. */
+  resolve(name: string): InstrumentDeclaration | undefined;
+  /** The declaration an entry renders when no registered name answers it: `blank`. */
+  fallback: InstrumentDeclaration;
+  /** The notice declaration's registered name, and the visible time it takes when unconfigured. */
+  noticeGate: { name: string; seconds: number };
 }
 
 export interface Configuration {
@@ -96,18 +102,29 @@ interface InstrumentConfiguration {
   declaredSeconds: ReadonlyMap<string, number>;
 }
 
-function readInstruments(raw: unknown, theme: Theme, notices: Notices): InstrumentConfiguration {
+function readInstruments(raw: unknown, source: ConfigurationSource, notices: Notices): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
   const declaredSeconds = new Map<string, number>();
   if (raw === undefined) return { configured, declaredSeconds };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration("the instruments value is not an object");
   }
+  // Two spellings of one instrument are one instrument, so configuring both is a mistake the block
+  // cannot settle: the document is refused and the message quotes both keys as written (2.6).
+  const written = new Map<string, string>();
   for (const [name, value] of Object.entries(raw)) {
+    const normalized = normalizeName(name);
+    const earlier = written.get(normalized);
+    if (earlier !== undefined) {
+      throw new RejectedConfiguration(
+        `the instruments block configures ${JSON.stringify(earlier)} and ${JSON.stringify(name)}, which are one instrument`,
+      );
+    }
+    written.set(normalized, name);
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
     }
-    const declaration = instrumentNamed(name);
+    const declaration = source.resolve(normalized);
     if (declaration === undefined) {
       notices.unknownInBlock.push(name);
       continue;
@@ -126,7 +143,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
     try {
       segments = parseFormat(declaration, format ?? declaration.defaultFormat);
     } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(error.message);
+      if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
       throw error;
     }
     const label = entry.label;
@@ -155,16 +172,16 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
         try {
           formats[kind] = parseFormat(declaration, format, true);
         } catch (error) {
-          if (error instanceof Error) throw new RejectedConfiguration(error.message);
+          if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
           throw error;
         }
       }
     }
     let style: ThemeStyle;
     try {
-      style = validateStyle(entry.style, theme);
+      style = validateStyle(entry.style, source.theme);
     } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(declaration.name)} ${error.message}`);
+      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} ${error.message}`);
       throw error;
     }
     configured.set(declaration.name, {
@@ -178,12 +195,12 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
   return { configured, declaredSeconds };
 }
 
-function defaultRow(bind: BindInstrument): Row {
-  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
+function defaultRow(bind: BindInstrument, fallback: InstrumentDeclaration): Row {
+  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind, fallback) };
 }
 
-function blankCells(count: number, bind: BindInstrument): Cell[] {
-  return Array.from({ length: count }, () => ({ instrument: bind(blank), align: ALIGNMENTS[0] }));
+function blankCells(count: number, bind: BindInstrument, fallback: InstrumentDeclaration): Cell[] {
+  return Array.from({ length: count }, () => ({ name: fallback.name, holder: { current: bind(fallback) }, align: ALIGNMENTS[0] }));
 }
 
 /**
@@ -192,7 +209,9 @@ function blankCells(count: number, bind: BindInstrument): Cell[] {
  * rejected: a row of no cells has nothing to render. `index` is 0-based and internal; every message
  * places the row by its 1-based position, which is the number a user counts to.
  */
-function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindInstrument): Row {
+function normalizeRow(
+  raw: unknown, index: number, notices: Notices, bind: BindInstrument, source: ConfigurationSource,
+): Row {
   const place = `row ${index + 1}:`;
   if (!Array.isArray(raw)) {
     throw new RejectedConfiguration(`${place} is not a list; a row is a list of entries, as ${ROWS_FORM}`);
@@ -225,17 +244,18 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
       throw new RejectedConfiguration(`${at} align is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
-    const instrument = instrumentNamed(instrumentValue);
-    // One typo does not take down the statusline: the cell renders blank and the warning names it.
-    // Collect unknown names before truncating, so a typo past the ceiling still warns though its
-    // cell is not rendered.
-    if (instrument === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
+    const declaration = source.resolve(normalizeName(instrumentValue));
+    // One typo does not take down the statusline: the cell renders the fallback and the warning
+    // names the spelling the document wrote. Collect unknown names before truncating, so a typo past
+    // the ceiling still warns though its cell is not rendered.
+    if (declaration === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
       notices.unknownInRow.push({ row: index + 1, name: instrumentValue });
     }
     // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
     // break keeps every entry past it validated and checked for unknowns.
     if (cells.length < MAX_CELLS) {
-      cells.push({ instrument: bind(instrument ?? blank), align });
+      const resolved = declaration ?? source.fallback;
+      cells.push({ name: resolved.name, holder: { current: bind(resolved) }, align });
     }
   }
   return { distribution: DISTRIBUTIONS[0], cells };
@@ -249,7 +269,7 @@ interface NormalizedDocument {
 }
 
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
-function normalizeDocument(document: unknown, notices: Notices, theme: Theme): NormalizedDocument {
+function normalizeDocument(document: unknown, notices: Notices, source: ConfigurationSource): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration document is not an object");
   }
@@ -289,15 +309,17 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     rowGap = value;
   }
 
-  const { configured, declaredSeconds } = readInstruments(doc.instruments, theme, notices);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, notices);
   const bind = instrumentBindings(configured);
   const rows = rawRows.length === 0
-    ? [defaultRow(bind)]
-    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
+    ? [defaultRow(bind, source.fallback)]
+    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind, source));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
   // The default row goes through it too, so the gate and the value cannot disagree about it.
-  const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
-  const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
+  const placesNotice = rows.some(row => row.cells.some(cell => cell.name === source.noticeGate.name));
+  const noticeSeconds = placesNotice
+    ? declaredSeconds.get(source.noticeGate.name) ?? source.noticeGate.seconds
+    : undefined;
   return { rows, rowGap, noticeSeconds };
 }
 
@@ -336,14 +358,16 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   const bind = instrumentBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
-  if (!existsSync(path)) return { rows: [defaultRow(bind)], rowGap: DEFAULT_ROW_GAP, noticeSeconds: undefined, warning: undefined };
+  if (!existsSync(path)) {
+    return { rows: [defaultRow(bind, source.fallback)], rowGap: DEFAULT_ROW_GAP, noticeSeconds: undefined, warning: undefined };
+  }
 
   let document: unknown;
   try {
     document = JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return {
-      rows: [defaultRow(bind)],
+      rows: [defaultRow(bind, source.fallback)],
       rowGap: DEFAULT_ROW_GAP,
       noticeSeconds: undefined,
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
@@ -352,7 +376,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
 
   try {
     const notices: Notices = { unknownInRow: [], unknownInBlock: [] };
-    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source.theme);
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source);
     return {
       rows,
       rowGap,
@@ -362,7 +386,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {
-        rows: [defaultRow(bind)],
+        rows: [defaultRow(bind, source.fallback)],
         rowGap: DEFAULT_ROW_GAP,
         noticeSeconds: undefined,
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,

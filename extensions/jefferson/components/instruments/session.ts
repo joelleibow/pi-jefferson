@@ -2,7 +2,7 @@
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const session: InstrumentDeclaration = {
-  name: "session",
+  name: "jefferson.default.session",
   variables: { name: readings => readings.sessionName },
   defaultFormat: "$name",
   defaultLabel: "Session:",

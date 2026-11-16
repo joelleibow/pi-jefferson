@@ -9,6 +9,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { configurationPaths, readConfiguration } from "./configuration.ts";
 import { feedSessionData } from "./data/session-data-feed.ts";
 import { installFooter } from "./footer-setup.ts";
+import { createRegistry } from "./registration.ts";
+import { createRegistrationListener } from "./registration-listener.ts";
+import { FALLBACK, NOTICE_GATE, SHIPPED } from "./shipped.ts";
 
 /** One timer, and the cancel that clears it: the scheduler the composition root supplies. */
 function schedule(callback: () => void, delayMs: number): () => void {
@@ -17,6 +20,15 @@ function schedule(callback: () => void, delayMs: number): () => void {
 }
 
 export function startUp(pi: ExtensionAPI): void {
+  // Registrations outlive a session: the registry is built here, and Jefferson registers its own
+  // instruments by the same message a provider posts, before any `session_start` runs (design 6).
+  const registry = createRegistry();
+  createRegistrationListener({
+    events: pi.events,
+    registry,
+    own: { extension: "jefferson", instruments: SHIPPED },
+  });
+
   // Retained across `session_start` calls: the previous install's release, so a store this
   // install still holds is disposed — and its subscriptions dropped — before its replacement
   // exists.
@@ -59,6 +71,9 @@ export function startUp(pi: ExtensionAPI): void {
       ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
+      resolve: name => registry.instrument(name),
+      fallback: FALLBACK,
+      noticeGate: NOTICE_GATE,
     });
 
     // The repaint request reaches the host's `tui` only when the host invokes the factory. The

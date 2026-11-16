@@ -2,7 +2,7 @@
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const model: InstrumentDeclaration = {
-  name: "model",
+  name: "jefferson.default.model",
   variables: { provider: r => r.provider, model: r => r.model },
   defaultFormat: "$provider/$model",
   defaultLabel: "Model:",

@@ -38,8 +38,12 @@ export function collapse(text: string): string {
   return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, " ");
 }
 
-function formatError(declaration: InstrumentDeclaration, detail: string): Error {
-  return new Error(`${JSON.stringify(declaration.name)}'s format ${detail}`);
+/**
+ * A parse fault, without the instrument's name: the reader names the instrument as the document
+ * wrote the key, as it already does for a style the theme refuses (design 5; RD-01).
+ */
+function formatError(detail: string): Error {
+  return new Error(`format ${detail}`);
 }
 
 /**
@@ -69,17 +73,17 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
     } else if (character === "$") {
       const name = format.slice(index + 1).match(/^[A-Za-z0-9_]+/)?.[0];
       if (name === undefined) {
-        throw formatError(declaration, "has a bare $; escape a literal dollar as \\$");
+        throw formatError("has a bare $; escape a literal dollar as \\$");
       }
       const declared = plain
         ? declaration.composed !== undefined && Object.hasOwn(declaration.composed.variables, name)
         : name === "bar" ? declaration.bar !== undefined : Object.hasOwn(declaration.variables, name);
       if (!declared) {
-        throw formatError(declaration, `names a variable it does not declare: ${JSON.stringify("$" + name)}`);
+        throw formatError(`names a variable it does not declare: ${JSON.stringify("$" + name)}`);
       }
       flush();
       if (name === "bar") {
-        if (hasBar) throw formatError(declaration, 'names a second width-taking variable: "$bar"');
+        if (hasBar) throw formatError('names a second width-taking variable: "$bar"');
         hasBar = true;
         segments.push({ kind: "bar" });
       } else {
@@ -94,7 +98,7 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
         literal += character;
         afterName = false;
       } else {
-        if (plain) throw formatError(declaration, `puts a modifier in a plain format: ${JSON.stringify("|" + name)}`);
+        if (plain) throw formatError(`puts a modifier in a plain format: ${JSON.stringify("|" + name)}`);
         const forms = subject?.kind === "variable" ? declaration.variableForms?.[subject.name] : undefined;
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
@@ -104,18 +108,18 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
         } else {
           const modifier = MODIFIERS.get(name);
           if (modifier === undefined) {
-            throw formatError(declaration, `names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
+            throw formatError(`names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
           }
           if (afterName && subject !== undefined) {
             if (subject.kind === "bar") {
-              throw formatError(declaration, `puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
+              throw formatError(`puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
             }
             segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
           } else {
             const text = collapse(literal);
             const run = text.match(/\S+$/)?.[0];
             if (run === undefined) {
-              throw formatError(declaration, `has a modifier with nothing before it: ${JSON.stringify("|" + name)}`);
+              throw formatError(`has a modifier with nothing before it: ${JSON.stringify("|" + name)}`);
             }
             const prefix = text.slice(0, text.length - run.length);
             if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });

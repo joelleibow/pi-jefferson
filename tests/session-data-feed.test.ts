@@ -291,17 +291,17 @@ test("two status cells in one render ask the host once and read the same text", 
 
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { createFooter } = await import("../extensions/jefferson/components/row/row-renderer.ts");
-  const { instrumentNamed } = await import("../extensions/jefferson/shipped.ts");
+  const { shippedInstrument } = await import("./shipped-instrument.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const { fakeTheme } = await import("./fake-theme.ts");
 
-  const declaration = instrumentNamed("status");
+  const declaration = shippedInstrument("status");
   assert.ok(declaration);
   const cell = instrumentBindings()(declaration);
   const created = createFooter(
     [{
       distribution: "equal",
-      cells: [{ instrument: cell, align: "left" }, { instrument: cell, align: "left" }],
+      cells: [{ name: "test", holder: { current: cell }, align: "left" }, { name: "test", holder: { current: cell }, align: "left" }],
     }],
     () => store.sample(),
     fakeTheme(),

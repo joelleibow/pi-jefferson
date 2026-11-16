@@ -3,7 +3,7 @@ import { compactCount } from "./compact-count.ts";
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const context: InstrumentDeclaration = {
-  name: "context",
+  name: "jefferson.default.context",
   variables: {
     tokens: ({ contextUsage: usage }) => usage === undefined ? undefined : usage.tokens === null ? "?" : compactCount(usage.tokens),
     window: ({ contextUsage: usage }) => usage === undefined ? undefined : compactCount(usage.contextWindow),

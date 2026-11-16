@@ -9,9 +9,14 @@ export type CellAlign = (typeof ALIGNMENTS)[number];
 export const DISTRIBUTIONS = ["content", "equal"] as const;
 export type Distribution = (typeof DISTRIBUTIONS)[number];
 
-/** A single cell of a row: the instrument whose text it displays, padded against its align. */
+/**
+ * A single cell of a row: the resolved full name the notice gate compares, the holder a registration
+ * can fill after the tree is built, and the alignment its text is padded against. It carries no
+ * `instrument` key, because the holder is the one copy of what the cell renders (design 9).
+ */
 export interface Cell {
-  instrument: Instrument;
+  name: string;
+  holder: { current: Instrument };
   align: CellAlign;
 }
 

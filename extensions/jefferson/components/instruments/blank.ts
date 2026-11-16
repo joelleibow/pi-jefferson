@@ -2,7 +2,7 @@
 import { DEFAULT_CELL_TEXT, FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const blank: InstrumentDeclaration = {
-  name: "blank",
+  name: "jefferson.default.blank",
   variables: {},
   defaultFormat: DEFAULT_CELL_TEXT,
   fills: true,
