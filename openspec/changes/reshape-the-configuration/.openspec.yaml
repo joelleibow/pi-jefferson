@@ -1,0 +1,26 @@
+schema: marbleization
+created: 2026-11-15
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: ca446749-6dc2-48e2-a1ad-605502e163b0
+    eleanor: 58687ee0-ae68-4a63-8129-0f228067fa05
+    michael: ef215cc3-6a78-40f7-a3f4-094aa33c0a80
+    derek_spike: 1bd00692-25cd-4cac-bf1e-31f60d7fb74b
+    bambadjan: 2e583cfa-6b4b-4955-b08d-01a795ca7994
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+  progress:
+    - "2026-11-15: change opened from card 1 of the extension-provided-instruments Explore session; owner-rulings.md written from Joel's quoted words. Research workflow e23cb839 (Chidi + Eleanor) launched."
+    - "2026-11-15: research complete (Chidi ca446749, Eleanor edd6b2ab); Michael orientation 1a939ef3. Joel ruled the orientation questions: one-row shortcut retired (a), warnings count from 1."
+    - "2026-11-15: proposal + specs (Bambadjan 0d5eecd1) validate strict. Council 789eb006: 7 lenses, zoom-out and catalyst clean, 5 with major findings converging on the retired-key set. Michael council rulings 475b8025 (resume of 1a939ef3) launched."
+    - "2026-11-15: Michael council rulings a2ba0886 (resume chain from 1a939ef3): 15 disputes, all settled, none to Joel."
+    - "2026-11-15: council.md (Bambadjan 00fde452): Owner Decisions Required = None; PL2 approved with nothing to rule. Joel added the README/docs restructure ruling to owner-rulings.md. Design draft next."
+    - "2026-11-15: design.md drafted (Bambadjan 38a7115f), README/docs layout planned from research-eleanor-docs.md (Eleanor addendum 58687ee0). Design review Stages 1-4 workflow 39729671 launched."
+    - "2026-11-15: design review 39729671 done: Stage 1 clean; Stage 2 8 findings fixed; Stage 3 rounds 1-3 needs_fixes, rounds 4-5 clean; Stage 4 clean; 26 settled, no escalations. design-review.md synthesis + Derek red/green spike launched (fff6c33f)."
+    - "2026-11-15: design-review.md written (fe25e6fc); design gate approved (Stages 1-4 clean, no escalations). Derek red/green spike 1bd00692: all checks red then green, 433 tests + typecheck green; 4 design gaps routed into tasks.md. Spike broke main node_modules via pnpm relinking through the symlinked node_modules (brief error); restored with pnpm install --frozen-lockfile --force, 425/425. tasks.md draft 8033ba3f launched."
+    - "2026-11-15: tasks.md written (Bambadjan 8ac43b4b), validates strict. Stage 5 readiness loop cb73f4cf launched."
+    - "2026-11-15: Stage 5 cb73f4cf failed: s5-r3-codebase (45b58c19) timed out at 1800000ms. Rounds 1-2 needs_fixes, both applied (16 settled). Retried through the same Pi workflow path as db7a3484, resuming at round 3 with the completed r3 readiness/structural reports and a fresh codebase lens."
+    - "2026-11-15: Stage 5 db7a3484 done: r3 needs_fixes (S5R3-1 applied), r4 and r5 clean, no escalations. tasks gate approved. Branch reshape-the-configuration opened from 24ee86b."
