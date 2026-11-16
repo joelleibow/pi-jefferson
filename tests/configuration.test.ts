@@ -16,7 +16,10 @@ import {
   MAX_CELLS,
   readConfiguration,
 } from "../extensions/jefferson/configuration.ts";
-import { DEFAULT_CELL_TEXT, FOUNDATIONAL_OPTIONS } from "../extensions/jefferson/components/instruments/instrument.ts";
+import {
+  DEFAULT_CELL_TEXT, FOUNDATIONAL_OPTIONS, type InstrumentDeclaration,
+} from "../extensions/jefferson/components/instruments/instrument.ts";
+import { SHIPPED } from "../extensions/jefferson/shipped.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { configurationSource } from "./configuration-source.ts";
 import { fakeTheme } from "./fake-theme.ts";
@@ -1018,6 +1021,26 @@ function rejected(document: unknown, message: string): void {
   assert.equal(result.rows[0]?.cells.length, 10);
   assert.deepEqual(result.rows[0]?.cells.map(cellText), Array<string>(10).fill(DEFAULT_CELL_TEXT));
 }
+
+test("A6 Jefferson's own instrument renders unwrapped", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
+  const agentPath = join(dir, "pi-jefferson.json");
+  writeFileSync(agentPath, JSON.stringify({ rows: [[{ instrument: "boom" }]] }));
+  const { source, registry, reported } = configurationSource({
+    agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme: fakeTheme(),
+  });
+  const boom: InstrumentDeclaration = {
+    name: "jefferson.default.boom",
+    variables: { boom: () => { throw new Error("Jefferson's own defect"); } },
+    defaultFormat: "$boom",
+    options: FOUNDATIONAL_OPTIONS,
+  };
+  registry.accept("jefferson", [...SHIPPED, boom]);
+  const result = readConfiguration(source);
+  // Jefferson's own instruments get no boundary, so their defects still fail the suite.
+  assert.throws(() => cellText(result.rows[0]!.cells[0]!), /Jefferson's own defect/);
+  assert.deepEqual(reported, [], "nothing contained it, so nothing was recorded");
+});
 
 test("A3 Jefferson's own instrument still rejects the document", () => {
   // J1(b) is the provided instruments' rule; Jefferson's own keep the whole-document rejection.

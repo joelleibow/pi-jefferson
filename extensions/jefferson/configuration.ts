@@ -24,6 +24,7 @@ import { isProvidedName, normalizeName } from "./registration.ts";
 import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
+  containProvided,
   instrumentBindings,
   type BindInstrument,
   type ConfiguredInstrument,
@@ -439,7 +440,12 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
   }
 
   const { configured, declaredSeconds } = readInstruments(doc.instruments, source, reading);
-  const bind = instrumentBindings(configured);
+  const binding = instrumentBindings(configured);
+  // Every provided instrument is bound through the outer boundary, at the reader's bind and the
+  // watch's alike, so neither moment can miss it; Jefferson's own stay unwrapped (design 10).
+  const bind: BindInstrument = declaration => isProvidedName(declaration.name)
+    ? containProvided(binding(declaration), declaration.name, fault => source.report(fault))
+    : binding(declaration);
   const rows = rawRows.length === 0
     ? [defaultRow(bind, source.fallback)]
     : rawRows.map((raw, index) => normalizeRow(raw, index, reading, bind, source));

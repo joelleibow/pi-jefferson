@@ -6,6 +6,7 @@ import { timed } from "../visuals/timed.ts";
 import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 import type { FieldValue, ReadingsView } from "../../data/field-value.ts";
+import type { Fault } from "../../faults.ts";
 import type { ProvidedDeclaration } from "../../instrument-contract.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
@@ -53,12 +54,38 @@ export function adaptProvidedDeclaration(
   name: string,
   declaration: ProvidedDeclaration,
   view: () => ReadingsView,
+  record?: (fault: Fault) => void,
 ): InstrumentDeclaration | ProvidedRefusal {
   // The payload crossed a bus as `unknown`, so its members are read as the values they may be.
   const members = declaration as unknown as Record<string, unknown>;
+  const quoted = JSON.stringify(name);
   const variables: Record<string, (readings: Readings) => string | undefined> = {};
   for (const [variable, resolver] of Object.entries(members.variables as object)) {
-    variables[variable] = () => (resolver as (readings: ReadingsView) => FieldValue | undefined)(view()) as string | undefined;
+    variables[variable] = () => {
+      let value: unknown;
+      try {
+        // The guard covers the provider's call and nothing else: classifying what it returned runs
+        // outside it, so a `then` getter that throws is the outer boundary's to catch (design 10).
+        value = (resolver as (readings: ReadingsView) => unknown)(view());
+      } catch {
+        record?.({ scope: name, kind: "resolver-threw", part: `${quoted} failed to render: its resolver threw` });
+        return undefined;
+      }
+      if ((typeof value === "object" && value !== null || typeof value === "function")
+        && typeof (value as { then?: unknown }).then === "function") {
+        // The rejection is observed, so a provider's promise cannot take pi down with it.
+        (value as { then(onFulfilled: undefined, onRejected: () => void): void }).then(undefined, () => {});
+        record?.({ scope: name, kind: "resolver-promise", part: `${quoted} failed to render: its resolver returned a promise` });
+        return undefined;
+      }
+      // `undefined` is the declaration's own unknown value, not a fault (M8).
+      if (value === undefined || typeof value === "string") return value;
+      record?.({
+        scope: name, kind: "resolver-returned",
+        part: `${quoted} failed to render: its resolver returned ${describeValue(value)}, where text is declared`,
+      });
+      return undefined;
+    };
   }
   const adapted: InstrumentDeclaration = {
     name,
@@ -77,6 +104,27 @@ export function adaptProvidedDeclaration(
     if (typeof resolver !== "function") return { refused: "resolver-not-function", variable };
   }
   return adapted;
+}
+
+/**
+ * The outer boundary around a provided instrument's bound render, for anything the adapter's own
+ * guard cannot see. Jefferson's own instruments are never wrapped, so their defects fail the suite
+ * (design 10; spec "Provider code costs one entry and no more").
+ */
+export function containProvided(instrument: Instrument, name: string, record: (fault: Fault) => void): Instrument {
+  return {
+    get fills() {
+      return instrument.fills;
+    },
+    render(readings, width, theme) {
+      try {
+        return instrument.render(readings, width, theme);
+      } catch {
+        record({ scope: name, kind: "resolver-threw", part: `${JSON.stringify(name)} failed to render: its resolver threw` });
+        return "";
+      }
+    },
+  };
 }
 
 export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {

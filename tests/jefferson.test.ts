@@ -242,7 +242,7 @@ test("the exported surface offers no way to supply or replace cell content", asy
     ["../extensions/jefferson/components/row/width-plan.ts", ["planRow"]],
     [
       "../extensions/jefferson/components/instruments/instrument-binding.ts",
-      ["adaptProvidedDeclaration", "describeValue", "instrumentBindings"],
+      ["adaptProvidedDeclaration", "containProvided", "describeValue", "instrumentBindings"],
     ],
     ["../extensions/jefferson/data/field-value.ts", []],
     ["../extensions/jefferson/data/provider-fields.ts", ["createProviderFields"]],

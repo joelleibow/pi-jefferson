@@ -960,6 +960,162 @@ test("A3 a rejected document's names are never checked when they register", asyn
     "a rejected read registered no watch");
 });
 
+/** A registration whose one instrument's one resolver is the function given. */
+function faultyRegistration(resolver: (readings: ReadingsView) => unknown): Registration {
+  return {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: resolver as (readings: ReadingsView) => string | undefined },
+      defaultFormat: "Savings: $saved",
+    }],
+  };
+}
+
+/**
+ * A session whose row places the model beside one provided entry, with the registration made in the
+ * order given. The provider's resolver is the function given, and the fault arrives at a render.
+ */
+async function providedRow(
+  t: { after(fn: () => void): void },
+  resolver: (readings: ReadingsView) => unknown,
+  order: "provider-first" | "Jefferson-first" = "provider-first",
+): Promise<FakeSession> {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "taiknr.savings" }]] });
+  const h = harness();
+  const send = (): void => {
+    h.events.emit("jefferson:registration", faultyRegistration(resolver));
+    h.events.emit("jefferson:update", saved("$4.10"));
+  };
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  if (order === "provider-first") {
+    send();
+    return h.start(options);
+  }
+  return h.start({ ...options, afterSessionStart: send });
+}
+
+/** Let the ledger's microtask deliver what a render recorded. */
+async function settle(): Promise<void> {
+  await new Promise(resolve => setImmediate(resolve));
+}
+
+test("A6 a resolver that throws costs only its own entry", async (t) => {
+  const session = await providedRow(t, () => { throw new Error("provider threw"); });
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), "the rest of the row renders");
+  assert.equal(drawn.includes("Savings"), false, "the entry renders nothing, label included");
+  await settle();
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+  ]);
+});
+
+test("A6 a resolver that returns a number loses only its own text", async (t) => {
+  const session = await providedRow(t, () => 42);
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"));
+  assert.equal(drawn.includes("42"), false, "only that entry loses its text");
+  await settle();
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver returned a number, where text is declared',
+    type: "warning",
+  }]);
+});
+
+test("A6 a resolver that returns a rejected promise costs only its own entry", async (t) => {
+  const session = await providedRow(t, () => Promise.reject(new Error("provider rejected")));
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"));
+  await settle();
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver returned a promise',
+    type: "warning",
+  }], "the rejection is observed, so the process keeps running");
+});
+
+test("A6 a resolver that returns undefined reports no fault", async (t) => {
+  const session = await providedRow(t, () => undefined);
+  assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"));
+  await settle();
+  assert.deepEqual(session.notified, [], "`undefined` is the declaration's own unknown value");
+});
+
+test("A6 a variable that resolves to nothing renders nothing, with no fault", async (t) => {
+  // Nothing was reported for the field, so the resolver sees unknown and the entry renders nothing.
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "model" }, { instrument: "taiknr.savings" }]] });
+  const h = harness();
+  h.events.emit("jefferson:registration", registration);
+  const unreported = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  const drawn = line(unreported);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"));
+  assert.equal(drawn.includes("Savings"), false, "the entry renders nothing, label included");
+  await settle();
+  assert.deepEqual(unreported.notified, [], "and no fault is reported");
+});
+
+test("A6 a resolver that throws on every render warns once", async (t) => {
+  const session = await providedRow(t, () => { throw new Error("provider threw"); });
+  line(session);
+  await settle();
+  assert.equal(session.notified.length, 1, "one part after the first render's flush");
+  for (let frame = 0; frame < 5; frame++) line(session);
+  await settle();
+  assert.equal(session.notified.length, 1, "and still one after sixty frames' worth of renders");
+});
+
+test("A6 a thenable whose then getter throws is contained, provider-first", async (t) => {
+  const session = await providedRow(t, () => ({ get then(): never { throw new Error("provider getter"); } }));
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), "the rest of the row renders");
+  assert.equal(drawn.includes("Savings"), false);
+  await settle();
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+  ], "the outer boundary records the threw row, once");
+});
+
+test("A6 a thenable whose then getter throws is contained, Jefferson-first", async (t) => {
+  const session = await providedRow(
+    t, () => ({ get then(): never { throw new Error("provider getter"); } }), "Jefferson-first",
+  );
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), "the rest of the row renders");
+  assert.equal(drawn.includes("Savings"), false);
+  await settle();
+  assert.deepEqual(session.notified, [
+    { message: 'pi-jefferson: "taiknr.savings" failed to render: its resolver threw', type: "warning" },
+  ]);
+});
+
+test("A6 every resolver fault part is exact", async (t) => {
+  const cases: Array<[label: string, resolver: (readings: ReadingsView) => unknown, part: string | undefined]> = [
+    ["a throw", () => { throw new Error("provider threw"); }, "its resolver threw"],
+    ["a number", () => 42, "its resolver returned a number, where text is declared"],
+    ["a boolean", () => true, "its resolver returned a boolean, where text is declared"],
+    ["a bigint", () => 42n, "its resolver returned a bigint, where text is declared"],
+    ["a symbol", () => Symbol("saved"), "its resolver returned a symbol, where text is declared"],
+    ["a function", () => () => "text", "its resolver returned a function, where text is declared"],
+    ["an object", () => ({ saved: "$4.10" }), "its resolver returned an object, where text is declared"],
+    ["an array", () => ["$4.10"], "its resolver returned an object, where text is declared"],
+    ["null", () => null, "its resolver returned null, where text is declared"],
+    ["a promise", () => Promise.resolve("$4.10"), "its resolver returned a promise"],
+    ["undefined", () => undefined, undefined],
+  ];
+  for (const [label, resolver, part] of cases) {
+    const session = await providedRow(t, resolver);
+    line(session);
+    await settle();
+    assert.deepEqual(session.notified, part === undefined ? [] : [{
+      message: `pi-jefferson: "taiknr.savings" failed to render: ${part}`,
+      type: "warning",
+    }], label);
+  }
+});
+
 test("A8 isProvidedName treats jeffersonfan.stats as provided", () => {
   assert.equal(isProvidedName("jeffersonfan.stats"), true, "the comparison is on the whole first part");
   assert.equal(isProvidedName("taiknr.savings"), true);

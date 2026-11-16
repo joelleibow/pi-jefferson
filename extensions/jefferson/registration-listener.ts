@@ -48,6 +48,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function vetRegistration(
   payload: unknown,
   registry: Registry,
+  faults: FaultLedger,
   fields: ProviderFields,
 ): AcceptedRegistration | { refusal: Fault } {
   if (!isPlainObject(payload)) {
@@ -119,7 +120,12 @@ function vetRegistration(
     if (typeof raw.defaultFormat !== "string") {
       return { refusal: { scope: name, kind: "no-default-format", part: `${full} carries no default format` } };
     }
-    const adapted = adaptProvidedDeclaration(name, raw as unknown as ProvidedDeclaration, () => fields.view(extension));
+    const adapted = adaptProvidedDeclaration(
+      name,
+      raw as unknown as ProvidedDeclaration,
+      () => fields.view(extension),
+      fault => faults.record(fault),
+    );
     if ("refused" in adapted) {
       switch (adapted.refused) {
         case "unparseable-default-format":
@@ -220,7 +226,7 @@ export function createRegistrationListener({ events, registry, faults, fields, o
       registry.accept(own.extension, own.instruments);
       return;
     }
-    const accepted = vetRegistration(payload, registry, fields);
+    const accepted = vetRegistration(payload, registry, faults, fields);
     // A refusal changes nothing a row renders, and its one part is reported once per session.
     if ("refusal" in accepted) {
       faults.record(accepted.refusal);
