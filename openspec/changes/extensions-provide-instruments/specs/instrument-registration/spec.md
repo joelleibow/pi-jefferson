@@ -40,11 +40,11 @@ instruments by that same message, and MUST send no third message.
 
 ### Requirement: A registration carries one declaration per instrument
 
-A registration MUST carry the providing extension, the fields that extension declares with their
-types, and for each instrument it provides: the instrument's name, the resolvers of the variables its
-format may name, its default format and, optionally, its default label. It MUST carry nothing else.
-Jefferson MUST copy the plain data when it registers and hold the resolvers by reference, so a later
-change by the provider cannot alter what Jefferson checked.
+A registration MUST carry the providing extension, the fields it declares with their types, and for
+each instrument: its name, the resolvers of its variables and its default format. A declaration MAY
+also carry a default label, `variableForms`, `bar`, `fills`, `variableFg`, `composed` and `options`,
+as Jefferson's own do, and nothing else. Jefferson MUST check each member's shape when it registers,
+copy the plain data, and hold the functions by reference.
 
 #### Scenario: A format naming a registered variable
 
@@ -56,6 +56,21 @@ change by the provider cannot alter what Jefferson checked.
 
 - **WHEN** a provider mutates its declaration after the registration is accepted
 - **THEN** what Jefferson renders, and what it checks, stay as registered
+
+#### Scenario: A provided bar, form, colour and composed format
+
+- **WHEN** a provider declares `bar`, `variableForms`, `variableFg` and `composed`
+- **THEN** each renders as it does for one of Jefferson's own instruments
+
+#### Scenario: A member Jefferson cannot use
+
+- **WHEN** a declaration carries a non-function `bar` or a non-boolean `fills`
+- **THEN** the registration is refused, and the warning names the instrument and the member
+
+#### Scenario: An option Jefferson does not implement
+
+- **WHEN** a declaration carries `seconds`, or `formats` with no `composed`
+- **THEN** the registration is refused, and the warning names the instrument and the option
 
 ### Requirement: A registration declares the fields Jefferson keeps
 
@@ -165,16 +180,17 @@ resolver sees MUST be additive.
 
 #### Scenario: A field nobody has reported
 
-- **WHEN** a variable of a provided instrument resolves to nothing because no value was reported
+- **WHEN** a variable a provided instrument's format names resolves to nothing because no value was
+  reported
 - **THEN** the entry renders nothing, label included, and no fault is reported
 
 ### Requirement: Provider code costs one entry and no more
 
-A resolver that throws, or returns a value outside its declared result type, a promise included, MUST
-cost only that entry its text: the entry renders nothing, label included, keeps its geometry, and the
-row, its other entries and every other row MUST render. Pi MUST keep running. Jefferson MUST wrap one
-boundary around the whole render of a provided instrument and MUST render its own instruments
-unwrapped, so their defects still fail the suite. The next render MUST try again.
+A function a provider supplies that throws, or returns a value outside its declared result type, a
+promise included, MUST cost only that entry: a resolver, a form, a select or a `bar` blanks it, label
+included, and a colour falls back to the entry's style. Its geometry, the row and every other row MUST
+render, and pi MUST keep running. Jefferson MUST wrap a provided instrument's render and MUST leave its
+own unwrapped. The next render MUST try again.
 
 #### Scenario: A resolver that throws
 
@@ -196,6 +212,21 @@ unwrapped, so their defects still fail the suite. The next render MUST try again
 
 - **WHEN** a provider's resolver returns `undefined`, as a declaration's own type allows
 - **THEN** that variable reads as unknown, and no fault is reported
+
+#### Scenario: A bar that returns text
+
+- **WHEN** a provided `bar` returns `"50"` or a non-finite number
+- **THEN** the entry renders nothing, and the fault is reported once
+
+#### Scenario: A colour the theme does not have
+
+- **WHEN** a provided colour resolver names a token the theme does not have
+- **THEN** the variable renders in the entry's style, and the fault is reported once
+
+#### Scenario: A bar below zero
+
+- **WHEN** a provided `bar` returns a negative fraction
+- **THEN** the track draws unfilled, and no fault is reported
 
 ### Requirement: A provider's fault is reported once per session
 

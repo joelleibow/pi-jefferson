@@ -1,8 +1,6 @@
 # Formats
 
-An instrument's `format` is plain text, with the instrument's variables placed in it. It is not
-Markdown. Jefferson substitutes each variable with its already-formatted value, then renders the
-text.
+An instrument's `format` is plain text with the instrument's variables placed in it. It is not Markdown. Jefferson replaces each variable with its value, already formatted, and renders the text.
 
 ```json
 {
@@ -13,22 +11,25 @@ text.
 }
 ```
 
-The variables each instrument declares are in [Instruments](instruments.md). Omit `format` and the
-instrument renders its default.
+[Instruments](instruments.md) lists each instrument's variables. Without a `format`, the instrument renders its default.
+
+Jefferson refuses a format it cannot use. For one of Jefferson's instruments that rejects the whole configuration file. For an instrument from another extension it refuses that instrument alone. [What Jefferson refuses](#what-jefferson-refuses) lists the faults.
+
+## Variables
+
+A variable is `$` and a name, such as `$model`. A name is a run of letters, digits and underscores. A format may name only the variables its instrument has.
+
+When a variable the format names has no value yet, the instrument renders nothing, label included. A variable the format does not name has no effect.
 
 ## Special characters
 
-`$` and `|` are the format's two special characters, and `\` makes the character after it that
-character. `\$`, `\|` and `\m` render `$`, `|` and `m`, and a backslash with nothing after it stays
-itself. So `a\b` renders `ab`, and `$idle\m` renders the minutes with an `m` straight after them.
+`$` and `|` are the format's two special characters. A backslash makes the character after it plain text: `\$`, `\|` and `\m` render `$`, `|` and `m`. A backslash with nothing after it stays a backslash. So `a\b` renders `ab`, and `$idle\m` renders the minutes with an `m` straight after them.
 
-Jefferson turns each control character in a format into a space. It then removes the whitespace at
-the front and the back of the format. Whitespace inside the format is text.
+Jefferson turns each control character in a format into a space, then removes the whitespace at the start and the end. Whitespace inside the format is text.
 
 ## Forms
 
-Some variables accept named forms, and a form gives you a different piece of the same value. A form
-comes directly after its variable, before any modifier:
+Some variables have named forms. A form gives you a different piece of the same value, and it comes directly after its variable, before any modifier:
 
 | Path form | Renders |
 | --- | --- |
@@ -36,18 +37,13 @@ comes directly after its variable, before any modifier:
 | `$path\|absolute` | The whole directory: `/Users/joelleibow/Projects/pi-jefferson` |
 | `$path\|relative` | The directory under your home directory: `~` for home itself and `~/Projects/pi-jefferson` below it, and the whole directory anywhere outside home |
 
-A form is not a modifier: it picks which text arrives. A form applies before the modifiers after it,
-so `$path|relative|capitalize` capitalizes the relative text, and `$path|bold` renders the
-directory's own name bold.
+A form is not a modifier: it picks which text arrives. Jefferson applies the form first and the modifiers after it, so `$path|relative|capitalize` capitalizes the relative text, and `$path|bold` renders the directory's own name in bold.
 
-A form may follow only the variable that declares it, once, and before anything else. `$model|base`
-rejects the document, because `model` declares no form. So does a form written anywhere else.
+A form may follow only a variable that has it, once, and before anything else. `$model|base` is refused, because `model` has no forms. So is a form written anywhere else.
 
 ## Modifiers
 
-A `|name` after a variable, or after the text in front of it, modifies that text. Modifiers chain,
-and each applies in the order the format writes them. On plain text a modifier covers the run of
-non-whitespace characters directly before it, so a multi-word phrase takes a modifier on each word:
+A `|name` after a variable, or after plain text, modifies that text. Modifiers chain, and they apply in the order the format writes them. After plain text, a modifier covers the run of non-whitespace characters directly before it, so each word of a phrase takes its own modifier:
 
 ```
 🧠 $model via|dim $provider|capitalize
@@ -61,74 +57,53 @@ Here `via` renders dim, and the provider's value is capitalized.
 | `upper` | Upper-cases the whole value: `high` becomes `HIGH` |
 | `lower` | Lower-cases the whole value: `HIGH` becomes `high` |
 
-Six more modifiers set pi's text attributes: `bold`, `dim`, `italic`, `underline`, `inverse` and
-`strikethrough`. A modifier only adds: `$model|bold` renders bold even where the instrument's `style`
-sets `bold: false`, and nothing in a format switches an attribute off.
+Six more modifiers set pi's text attributes: `bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`. A modifier only adds. `$model|bold` renders bold even where the instrument's `style` sets `bold: false`, and nothing in a format switches an attribute off.
 
 ## When a pipe is a modifier
 
-A `|` begins a modifier only when a name follows it directly. A name is a run of letters, digits and
-underscores, so `10|20` and `$model|_x` start a modifier, and an unknown modifier rejects the
-document.
+A `|` begins a modifier only when a name follows it directly. So `10|20` and `$model|_x` both begin a modifier, and an unknown modifier is refused.
 
-Followed by anything else the pipe is the character itself: a space, the end of the format, `$`, `|`
-or other punctuation. So `$model | $provider` renders `claude-opus-4 | anthropic`.
+Followed by anything else, the pipe is just a pipe: a space, the end of the format, `$`, another `|`, or other punctuation. So `$model | $provider` renders `claude-opus-4 | anthropic`.
 
-Where a literal pipe has to sit beside a name, write `\|`.
+To put a pipe directly before a name, write `\|`.
 
-The escape changed meaning in an earlier release: a format written `\|` used to render `\|`, because
-a backslash before anything except `$` was a literal backslash, and it renders `|` now.
+The escape changed meaning in an earlier release. A format written `\|` used to render `\|`, because a backslash before anything except `$` was a literal backslash. It renders `|` now.
 
 ## The bar
 
-`context` declares `$bar`. It takes the width the rest of the format leaves, and it shrinks to
-nothing when none is left.
+`$bar` draws a bar. `context` has it, and so can an instrument from another extension. The bar takes the width the rest of the format leaves, and it shrinks to nothing when none is left. A format that holds `$bar` makes its instrument fill the row; [Configuration](configuration.md#how-a-row-fills-the-width) says how instruments that fill share the spare columns.
 
-An entry whose format holds `$bar` fills the row's spare columns, sharing them with any `blank`
-entry. Drop the `$bar` from the format and the entry takes only its text's width.
-
-Use at most one `$bar` in a format, and no modifier after it. The filled portion changes to the
-theme's `warning` colour above 70% and its `error` colour above 90%. Without an estimate from the
-host, the bar draws an unfilled, dim track.
+A format holds at most one `$bar`, and no modifier follows it. The filled part takes the theme's `warning` colour above 70% and its `error` colour above 90%. When the instrument has data but no percentage, such as `context` without an estimate from the host, the bar draws an unfilled, dim track. When the instrument has no data at all, `$bar` has no value, and the instrument renders nothing.
 
 ## Styles
 
-`style` uses pi's `ThemeStyle`. `fg` accepts foreground theme colour tokens, `bg` background tokens,
-and either slot can use a colour pi's parser accepts. The six boolean attributes are `bold`, `dim`,
-`italic`, `underline`, `inverse` and `strikethrough`, and each is also a modifier inside a format.
+`style` uses pi's `ThemeStyle`. `fg` takes a foreground theme colour token, `bg` takes a background one, and either can take a colour that pi's parser accepts. The six boolean attributes are `bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`, and each is also a modifier.
 
-`fg` and `bg` are not modifiers: colours belong to `style`. A modifier only adds to what `style`
-sets.
+`fg` and `bg` are not modifiers. Colours belong to `style`, and a modifier only adds to what `style` sets.
 
-`thinking`'s `$level` is the one value `style` does not fully control. It takes the foreground pi
-gives the thinking rules on the input box for the current level: the theme's `thinkingOff` through
-`thinkingMax` token, read from the theme at render time. That replaces a configured `fg` on `$level`
-only. A configured `bg` and the boolean attributes stay, and the label and any other text keep the
-instrument's `fg`.
+An instrument can choose the foreground of one of its variables itself, and that colour replaces a configured `fg` on that variable's text only. A configured `bg` and the boolean attributes stay, and the label and the rest of the text keep the instrument's `fg`. `thinking` does this for `$level`: it takes the foreground pi gives the thinking rules on the input box for the current level, the theme's `thinkingOff` through `thinkingMax` token, read when the footer renders. An instrument from another extension can do the same for its own variables.
 
 ## Composed formats
 
-One instrument composes its text from a set of formats and hands the result to the entry through one
-variable: `notice` does this with `$notice`. A composed format is plain. It names the values that
-belong to it, and it takes no modifier and no form. Styling belongs to the entry, so `style` still
-sets colours and attributes over the whole notice.
+An instrument can compose its text from a set of formats, one for each kind of thing it shows. It picks the kind from its own data and hands the composed text to its format through one variable. `notice` does this with `$notice`, and an instrument from another extension can do it too. When there is nothing to compose, the instrument renders nothing, label included.
 
-The two variable sets are not interchangeable. A composed format names its own values, such as
-`$tokens`, and the entry's format names `$notice`. `$tokens` is no variable of an entry, and a
-`|name` inside a composed format rejects the document.
+A kind's format is plain. It names the values that belong to the set, and it takes no modifier and no form. Styling belongs to the instrument: `style` styles the composed variable as it styles any other.
 
-[Notices](notices.md) lists the kinds and their texts.
+The two sets of variables do not mix. A kind's format names the set's values, such as `$tokens`. The instrument's format names the composed variable, such as `$notice`. Each is refused in the other's place.
 
-## What rejects a format
+The `formats` option rewrites the text of one kind at a time. [Notices](notices.md) lists the kinds of `notice`. An instrument from another extension offers `formats` only when its extension says so.
 
-Jefferson rejects the whole document, renders the default row, and warns with a message naming the
-offender when it cannot use a format. The faults are:
+## What Jefferson refuses
+
+Jefferson refuses a format with:
 
 - a bare `$` (write `\$` for a literal dollar);
 - a modifier it does not implement;
-- a form on an instrument that declares none, or in a position that has none;
+- a form on a variable that has none, or in a place where a form cannot go;
 - a modifier on `$bar`;
 - a second `$bar`;
 - a modifier with nothing before it;
-- a `$name` the instrument does not declare;
-- a modifier inside a composed format.
+- a `$name` the instrument does not have;
+- a modifier inside a kind's format.
+
+For one of Jefferson's instruments, the footer then renders the default row, and one warning names the fault ([Configuration](configuration.md#what-a-rejected-configuration-file-renders)). For an instrument from another extension, only that instrument is refused ([Configuration](configuration.md#an-extensions-instrument)).

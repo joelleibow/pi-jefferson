@@ -57,8 +57,8 @@ ruling is the contract's shape (`owner-rulings.md`, 2026-11-15, "The contract is
 
 - The spinner, any animation clock, and any timed visual for a provider (D8; M14).
 - `jefferson.custom.*`, user-composed instruments (D6).
-- Provider-declared options, `fills`, `bar`, `variableForms`, `variableFg`, `composed` or
-  `shownUntil` in the contract (M14).
+- `shownUntil` for providers, which a later change builds on change 3's timer (`owner-rulings.md`,
+  2026-11-16).
 - Per-field generic typing for a provider's resolvers (decision 4).
 - The taiknr repository (D1), and any change to how Jefferson's own host data arrives
   (`michael-orientation.md` §2).
@@ -71,13 +71,13 @@ Ten new files, and the homes beside them.
 
 | File | Single responsibility | Depends on |
 |---|---|---|
-| `extensions/jefferson/instrument-contract.ts` (new) | The published contract: the two messages' payload shapes, the declaration both a provider and Jefferson's own instruments write, and the channel names as string-literal types; re-exports `FieldType`, `FieldValue` and `ReadingsView` from `data/field-value.ts`. Type declarations only. | `data/field-value.ts` (types) |
+| `extensions/jefferson/instrument-contract.ts` (new) | The published contract: the two messages' payload shapes, the declaration with its optional `variableForms`, `bar`, `fills`, `variableFg`, `composed` and `options`, `ComposedFormat<R>`, and the channel names as string-literal types; re-exports `FieldType`, `FieldValue` and `ReadingsView` from `data/field-value.ts`. Type declarations only. | `data/field-value.ts` (types) |
 | `extensions/jefferson/registration.ts` (new) | What a name means and what has registered: the reserved prefix `jefferson.`, the full-name rule, and the registry that holds registrations, answers a lookup, and keeps the watch table — `watch(name, apply)`, accepting a name runs that name's watches once and drops them, and `releaseWatches()`. Pure; no bus, no pi. | `instrument-contract.ts` (types), `components/instruments/instrument.ts` (types) |
-| `extensions/jefferson/registration-listener.ts` (new) | The bus boundary: subscribes `jefferson:registration` and `jefferson:update`, emits Jefferson's own payload on the registration channel, validates each payload, asks the field holding's check, adapts each declaration and parses its default format, hands it to the registry, requests the one repaint an accepted registration takes, and records every refusal. The only file that calls `on` or `emit` on the bus, and the only one that writes the two channel strings at runtime. | `registration.ts`, `faults.ts`, `data/provider-fields.ts`, `instrument-contract.ts`, `components/instruments/instrument.ts` (types), `components/instruments/instrument-binding.ts` (for the adapter, `describeValue` and the parse) |
+| `extensions/jefferson/registration-listener.ts` (new) | The bus boundary: subscribes `jefferson:registration` and `jefferson:update`, emits Jefferson's own payload on the registration channel, validates each payload, asks the field holding's check, adapts each declaration and parses its default format, checks each optional member and the composed kind formats, refuses a member or option Jefferson cannot offer, hands it to the registry, requests the one repaint an accepted registration takes, and records every refusal. The only file that calls `on` or `emit` on the bus, and the only one that writes the two channel strings at runtime. | `registration.ts`, `faults.ts`, `data/provider-fields.ts`, `instrument-contract.ts`, `components/instruments/instrument.ts` (types), `components/instruments/instrument-binding.ts` (for the adapter, `describeValue` and the parse) |
 | `extensions/jefferson/faults.ts` (new) | The faults this session has reported: dedupes by scope and kind, queues what arrives before delivery opens, and delivers once. | nothing |
 | `data/field-value.ts` (new) | The value a provider's field holds (`FieldValue`: `string`, finite `number` or `boolean`), the three types it takes (`FieldType`), and the view a provided resolver reads (`ReadingsView`). Type declarations only, so the holding reads them without importing the contract (T14) and the store, the holding and the published contract read one declaration (M23). | nothing |
 | `data/provider-fields.ts` (new) | The fields providers declared and the latest value each reported, with every rule about them: one runtime record of the three types, one check that changes nothing for a type outside the three or a conflict with an earlier accepted registration's type, the report value check, then declare, report, view per extension and clear — `declare` commits and decides nothing. Store data, so it sits with the store and imports nothing outside `data/`. | `data/field-value.ts` |
-| `tests/fixtures/sample-provider/provider.mts` (new) | The provider the CI fixture check compiles: it imports the two channel literal types and builds a `Registration<"sample-provider">` with a boolean and a number field, one resolver and no `defaultLabel`, plus a `Report` of `false`. The `.mts` extension keeps it out of `tsconfig`'s `tests/**/*.ts` and out of `node --test`'s patterns, and fixes ESM without a package.json. | `pi-jefferson/instruments` (types) |
+| `tests/fixtures/sample-provider/provider.mts` (new) | The provider the CI fixture check compiles: it imports the two channel literal types and builds a `Registration<"sample-provider">` with a boolean and a number field, one resolver and no `defaultLabel`, plus a `Report` of `false`, and a second instrument using every optional member. The `.mts` extension keeps it out of `tsconfig`'s `tests/**/*.ts` and out of `node --test`'s patterns, and fixes ESM without a package.json. | `pi-jefferson/instruments` (types) |
 | `tests/fixtures/sample-provider/tsconfig.json` (new) | The provider's own flags: target and lib ES2021, module and moduleResolution `nodenext`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noEmit`, and `types: []`. | nothing |
 | `tests/fixtures/sample-provider/reserved.mts` (new) | A registration under `jefferson.` the packaging check requires to fail its type check with TS2344: `Registration<"jefferson.custom">`. A passing compile is a CI failure. | `pi-jefferson/instruments` (types) |
 | `tests/fixtures/sample-provider/tsconfig.reserved.json` (new) | Extends the fixture's tsconfig and includes `reserved.mts`. | nothing |
@@ -88,11 +88,12 @@ Modified files:
 
 | File | Change |
 |---|---|
-| `extensions/jefferson/format.ts` | `formatError` drops the declaration's name: a parse error is `format <detail>`, and the reader names the instrument, as it already does for `validateStyle` (design 5; RD-01). |
+| `extensions/jefferson/format.ts` | `formatError` drops the declaration's name: a parse error is `format <detail>`, and the reader names the instrument, as it already does for `validateStyle`. It resolves only what the format names, and it passes the render's theme to `variableFg` (design 5, 20; K13). |
+| `extensions/jefferson/components/visuals/bar.ts` | Clamps a negative fill, so a provider's bar below zero draws its track unfilled rather than past its start (decision 10; K14). |
 | `extensions/jefferson/shipped.ts` | Exports the list Jefferson registers (`SHIPPED`) and the two roles the reader needs, read from the declaration files it already imports: `FALLBACK`, the `blank` declaration, and `NOTICE_GATE`, the notice declaration's registered name with its default seconds. `instrumentNamed` goes, and with it the static lookup (T13; decisions 8, 14). |
-| `extensions/jefferson/components/instruments/*.ts` (eleven) | Each declaration's `name` becomes its registered name, `jefferson.default.<name>` (decision 5). In `notice.ts`, `NOTICE_SECONDS` stays where it is, so that file's exports stay `["NOTICE_SECONDS", "notice"]`, and its `name` is the one home of `jefferson.default.notice` (decision 8). |
-| `extensions/jefferson/components/instruments/instrument.ts` | `InstrumentDeclaration` becomes the contract's declaration over `Readings` plus the members only Jefferson's own instruments take, so one declaration shape reaches the contract's checks and change 3 adds its visual mix-in once (M14). |
-| `extensions/jefferson/components/instruments/instrument-binding.ts` | Exports three functions: `adaptProvidedDeclaration`, which the listener calls at acceptance to adapt a contract declaration to an `InstrumentDeclaration` over `Readings` and check each resolver's result; `describeValue`, the one home of the `<what>` vocabulary both fault rows use; and `containProvided`, which wraps a bound `Instrument`'s render and reads `fills` through to it. The read's own `bind` applies the wrapper, so neither bind moment can miss it (decisions 6, 9, 10, 14). |
+| `extensions/jefferson/components/instruments/*.ts` (eleven) | Each declaration's `name` becomes its registered name, `jefferson.default.<name>` (decision 5). In `notice.ts`, `NOTICE_SECONDS` stays where it is, so that file's exports stay `["NOTICE_SECONDS", "notice"]`, and its `name` is the one home of `jefferson.default.notice` (decision 8). `context.ts`'s `bar` returns `undefined` with no usage (decision 20). |
+| `extensions/jefferson/components/instruments/instrument.ts` | `InstrumentDeclaration` is `Omit<ContractDeclaration<Readings>, "variableFg" | "options">` plus `variableFg` with the render's theme, `shownUntil`, and a required `options`; `ComposedFormat` comes from the contract, so one declaration shape reaches the contract's checks and change 3 adds its visual mix-in once (design 3; `owner-rulings.md`, 2026-11-16). `bar` may return `undefined` (decision 20). |
+| `extensions/jefferson/components/instruments/instrument-binding.ts` | Exports three functions: `adaptProvidedDeclaration`, which the listener calls at acceptance to adapt a contract declaration to an `InstrumentDeclaration` over `Readings` and check each resolver's result; `describeValue`, the one home of the `<what>` vocabulary both fault rows use; and `containProvided`, which wraps a bound `Instrument`'s render and reads `fills` through to it. The read's own `bind` applies the wrapper, so neither bind moment can miss it (decisions 6, 9, 10, 14). The composed path renders nothing when there is nothing to compose (decision 20). |
 | `extensions/jefferson/configuration.ts` | Resolves every document name through the registry after normalization, keys the configured map by the resolved name, gates the notice path on the name and default seconds the source carries, passes `registry.watch` as the source's `watch`, returns its unknown names as data in `unknownNames` (each `{ written, normalized, row? }`) and the document path it chose in `path`, and exports `acceptedWarning(path, unknownNames)`, the composer delivery calls, whose two D17 forms are unchanged. It applies `containProvided` inside its own `bind`, and imports neither `blank.ts` nor `notice.ts` (decisions 8, 9, 10, 12, 13). |
 | `extensions/jefferson/startup.ts` | The composition root: creates the registry, the ledger and the field holding in the factory; builds Jefferson's payload from `SHIPPED` and hands it to the listener's constructor, which subscribes both channels and emits it; moves the repaint slot out of the `session_start` body into the factory, where `installFooter`'s `receiveRepaint` sets it and the shutdown body clears it; takes the fallback and the notice gate from `shipped.ts` when it builds the reader's source; adds the `resources_discover` handler that opens delivery; threads the report sink; and drops provider state at `session_shutdown`. It passes `pi.events` to the listener's constructor and calls nothing on it (decisions 6, 8, 9, 11, 12, 19). |
 | `extensions/jefferson/components/row/row.ts` | A cell holds `{ name, holder: { current: Instrument }, align }`: the resolved full name the notice gate compares, the holder a registration can fill, and its alignment. It carries no `instrument` key (decision 9). |
@@ -177,11 +178,22 @@ type UpdateChannel = "jefferson:update";
 
 type FieldDeclaration = Readonly<Record<string, FieldType>>;
 
+type ComposedFormat<R> = {
+  segments: Readonly<Record<string, (readings: R) => string | undefined>>;
+  defaultKind: string;
+};
+
 type ContractDeclaration<R> = {
   name: string;
   variables: Readonly<Record<string, (readings: R) => string | undefined>>;
   defaultFormat: string;
   defaultLabel?: string;
+  variableForms?: Readonly<Record<string, readonly string[]>>;
+  bar?: (readings: R, width: number) => number | null | undefined;
+  fills?: boolean;
+  variableFg?: (readings: R, theme: unknown) => string | undefined;
+  composed?: ComposedFormat<R>;
+  options?: readonly "formats"[];
 };
 
 type ProvidedDeclaration = ContractDeclaration<ReadingsView>;
@@ -205,15 +217,21 @@ type Report = {                          // posted on jefferson:update
 };
 ```
 
-`instrument.ts` then writes `type InstrumentDeclaration = ContractDeclaration<Readings> & { … }`,
-adding only the members its own instruments take: `variableForms`, `bar`, `fills`, `options`,
-`variableFg`, `composed`, `shownUntil`.
+`instrument.ts` then writes `InstrumentDeclaration` as
+`Omit<ContractDeclaration<Readings>, "variableFg" | "options">` plus `variableFg` with the render's
+theme, `shownUntil` and a required `options`.
 
 *Why.* D5's two messages in Joel's words; M14 fixes the declaration's content, excludes everything
 else from the contract, and requires Jefferson's own declaration to be the contract's declaration over
 its own readings plus its extra members, so change 3's visual mix-in lands once; M15 makes fields
 belong to the extension rather than one instrument; M16 fixes the three types and the latest-value
 rule. The member names are this design's; nothing in the rulings names them.
+
+Joel's 2026-11-16 ruling, "Providers get what Jefferson's instruments get", puts the six optional
+members into the contract, overruling M14 for them. `variableFg` returns `string` rather than pi's
+`ThemeColor`, because importing that type puts pi's type graph into every provider's compile: measured
+failing under the fixture's flags, TS2307 without pi and TS1543 inside pi's `.d.ts` with it. `options`
+is `readonly "formats"[]`, the one option a provided instrument may take.
 
 R2 (owner-rulings.md, 2026-11-16) makes the extension a type parameter, because TypeScript cannot
 exclude a literal from `string` without one. The parameter is required, so a bare `Registration` is
@@ -302,9 +320,13 @@ accepted: it declares its fields under the merge rule, registers no name, and co
 registration for that extension, so it takes the one repaint an accepted registration takes.
 
 **Acceptance checks what binding consumes.** When the listener checks a declaration at acceptance, it
-refuses one whose `variables` map holds a value that is not a function, refuses one whose `defaultLabel` is
-present and not a string, and builds the adapted declaration once and parses its `defaultFormat` with
-`format.ts`'s `parseFormat`, refusing the registration when that parse throws. The adapted
+checks each optional member's shape first — a non-function `bar`, a non-boolean `fills`, a
+`variableFg` that is not a function, a `variableForms` entry that is not a list, a `composed` without
+both halves, and an `options` naming anything but `formats` — then refuses one whose `variables` map
+holds a value that is not a function, refuses one whose `defaultLabel` is present and not a string,
+and builds the adapted declaration once and parses its `defaultFormat` with `format.ts`'s
+`parseFormat`, refusing the registration when that parse throws. The composed kind formats parse last,
+so a fault in a kind is reported after the format the declaration defaults to. The adapted
 declaration is a Jefferson `InstrumentDeclaration` over `Readings`; each of its variables reads the
 provider's view and has its result checked (decision 10). A refusal follows the acceptance unit's
 rules: the whole registration, first fault reported. The registry holds the adapted declaration, so
@@ -438,11 +460,17 @@ provider's view and its result is checked. A throw records the "threw" row. A th
 function with a callable `then` — is checked first, gets a no-op rejection handler
 (`value.then(undefined, () => {})`), and records the promise row, so a rejecting promise is observed
 and pi keeps running. A string or `undefined` passes through. Anything else records the "returned
-<what>" row with decision 15's vocabulary. Every fault makes the adapter return `undefined`, so the
-entry renders as an unknown datum renders: nothing, label included, with its holder and `fills` kept,
-and the next render calls the resolver again. The second is the outer boundary around the bound
+<what>" row with decision 15's vocabulary. Every fault makes the adapter return `undefined` for a variable the format names, so the entry renders
+as an unknown datum renders: nothing, label included, with its holder and `fills` kept, and the next
+render calls the resolver again. A function whose variable the format does not name is never called
+(decision 20). The second is the outer boundary around the bound
 render, for anything else a provided render might throw, which records the "threw" row. Jefferson's
 own instruments get neither, so their defects still fail the suite.
+
+Every provided function is guarded by one `call`, and each fault yields its member's absent value:
+text and `bar` read unknown, a `select` composes nothing, and a colour falls back to the cell's style.
+A colour is checked with the render's theme, and `drawBar` clamps a negative fill, so a bar below zero
+draws its track unfilled without a fault.
 
 `instrument-binding.ts` exports two functions. `adaptProvidedDeclaration` is the one the listener
 calls at acceptance: the adapter's guard covers the provider's call, and classifying the returned
@@ -540,9 +568,11 @@ decision 9's `apply` for a name the document already read. Both moments run one 
 everything under the key — the value's shape, format, label, option, variable, modifier and style —
 and a fault refuses that instrument alone: its entries
 render `blank` and one warning names it and the fault. Jefferson's own instruments keep the
-whole-document rejection. A provided instrument's option list is `FOUNDATIONAL_OPTIONS` in
-`components/instruments/instrument.ts`, the one place that set lives, so the check and the binding
-refuse and accept the same three keys.
+whole-document rejection. A provided instrument's options are the foundational three — format, style
+and label — plus `formats` when it declares `formats` in `options` with a `composed` format set.
+`seconds` is not offered, because it is the notice gate's and `shownUntil`'s. The check covers
+`formats` as one more option, so a kind the registration does not carry refuses that instrument alone
+(decision 15).
 
 An `instruments`-block entry whose instrument never registers draws no warning and is never checked,
 whatever it holds, for a provided name and a name in Jefferson's namespace alike (owner-rulings.md,
@@ -599,6 +629,12 @@ pin the block's silence: a block entry for an instrument that never registers dr
 the same document with a row naming the name still warns once by the row. The CI pack step's reserved
 fixture check is the test that a registration under `jefferson.` fails a provider's type check.
 
+Decision 20's tests come with it: a variable the format leaves out is never resolved and does not blank
+the instrument; a named variable that is unknown blanks it; a format that names no variable keeps its
+label; `context` configured with `$bar` alone renders nothing with no usage; and the composed path
+renders nothing when there is nothing to compose. The per-instrument tests that stated the old
+every-variable rule are rewritten to name the variables their formats name.
+
 *Why.* T15 (use the real bus, never a substituted registry), T13 (no second lookup), R1 and S8 (the
 scanned rule is retired, so the pin changes with the delta), M23 (a provider's compiler flags differ
 from this repository's), M27 (the harness and the test files are plan obligations).
@@ -612,6 +648,15 @@ Every new string, word for word. Reused unchanged: the rejection wrapper
 `pi-jefferson: <path> was rejected (<part>); rendering the default row`, and the accepted-warning
 wrapper `pi-jefferson: <path> <part>[; <part>…]` with `row N: "<name>" is not a known instrument`
 (D17's row form; its block form is retired by Joel's 2026-11-16 ruling).
+
+Changed in this change by Joel's 2026-11-16 rulings (no printed string says "entry" or "document"):
+
+| Situation | Part |
+|---|---|
+| A row that is not a list | `row N: is not a list; a row is a list of instruments, as {"rows": [[{"instrument": "model"}]]}` |
+| A row with no instruments | `row N: is empty; a row lists the instruments it renders` |
+| An instrument in a row with an unrecognised key | `row N, instrument M: has an unrecognised key "<key>"; an instrument in a row takes only "instrument" and "align"` |
+| A document that is not an object | `the configuration file is not an object` |
 
 Fault parts join under their own wrapper, `pi-jefferson: <part>[; <part>…]`, because a fault is not a
 fault in the user's document. A part is exactly the table's text, with names quoted as written. The
@@ -644,26 +689,38 @@ did not declare; "taiknr.savings" failed to render: its resolver threw`.
 | A report with no registration | `taiknr reports "saved" without a registration` |
 | A report of the wrong type | `taiknr reports "saved" as <what>, and it declared <type>`, where `<what>` is `a string`, `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included), `null`, or `nothing` when the value is missing |
 | A report of NaN or an infinity | `taiknr reports "saved" as a number that is not finite` |
-| A provided key that is not an object | `the instruments block gives "taiknr.savings" a value that is not an object; its entries render blank` |
-| A format, or a label, that is not a string | `"taiknr.savings" is configured with a format that is not a string; its entries render blank`, and the same sentence with `label` in place of `format` |
-| A format naming an undeclared variable | `"taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; its entries render blank` |
-| An option a provided instrument does not take | `"taiknr.savings" is configured with "width", which the instrument does not declare; its entries render blank` |
-| A modifier the format does not allow | `"taiknr.savings" is configured with a format Jefferson cannot parse; its entries render blank` |
-| A style the theme refuses | `"taiknr.savings" is configured with a style Jefferson cannot use; its entries render blank` |
-| A resolver that threw | `"taiknr.savings" failed to render: its resolver threw` |
-| A resolver that returned a non-string | `"<name>" failed to render: its resolver returned <what>, where text is declared`, where `<what>` is `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included) or `null`; a thenable is checked first and takes the promise row |
-| A resolver that returned a promise | `"taiknr.savings" failed to render: its resolver returned a promise` |
+| A provided key that is not an object | `"taiknr.savings" is configured with a value that is not an object; it renders blank` |
+| A format, or a label, that is not a string | `"taiknr.savings" is configured with a format that is not a string; it renders blank`, and the same sentence with `label` in place of `format` |
+| A format naming an undeclared variable | `"taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; it renders blank` |
+| An option a provided instrument does not take | `"taiknr.savings" is configured with "width", which the instrument does not declare; it renders blank` |
+| A modifier the format does not allow | `"taiknr.savings" is configured with a format Jefferson cannot parse; it renders blank` |
+| A style the theme refuses | `"taiknr.savings" is configured with a style Jefferson cannot use; it renders blank` |
+| A provided function that threw | `"<name>" failed to render: its <member> threw` |
+| A provided function that returned a non-string | `"<name>" failed to render: its <member> returned <what>, where <declared> is declared`, where `<what>` is `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included) or `null`; a thenable is checked first and takes the promise row |
+| A provided function that returned a promise | `"<name>" failed to render: its <member> returned a promise` |
 | A provider types an extension under `jefferson.` | `a name under jefferson. belongs to Jefferson`, shown by `tsc` in TS2344 before the provider runs |
+| A member that is not a function | `"<name>" carries a <member> that is not a function`, where `<member>` is `bar` or `variableFg` (K15) |
+| `fills` that is not a boolean | `"<name>" carries "fills" that is not a boolean` (K15) |
+| A `variableForms`, `composed` or `options` Jefferson cannot use | `"<name>" carries a <member> Jefferson cannot use` (K15) |
+| An option Jefferson does not offer a provided instrument | `"<name>" carries an option "<option>", which Jefferson does not offer a provided instrument` (K15) |
+| `formats` that is not an object | `"<name>" is configured with "formats" that is not an object; it renders blank` (K16) |
+| A `formats` kind that is not a string | `"<name>" is configured with a "formats" kind "<kind>" that is not a string; it renders blank` (K16) |
+| A `formats` kind the instrument does not carry | `"<name>" is configured with a "formats" kind "<kind>", which the instrument does not carry; it renders blank` (K16) |
+| A kind's format Jefferson cannot parse | `"<name>" is configured with a "formats" kind "<kind>" that Jefferson cannot parse; it renders blank` (K16) |
 | Both spellings of one instrument | `the instruments block configures "path" and "jefferson.default.path", which are one instrument` — a document rejection, so it travels in the rejection wrapper |
 | The two channel names | `jefferson:registration` and `jefferson:update`, each named for what is posted on it (decision 18) |
 
 The `<what>` vocabulary has one home, `describeValue` in
 `components/instruments/instrument-binding.ts`, and both rows use it: it answers one word for each
-`typeof` result, `nothing` for `undefined`.
+`typeof` result, `nothing` for `undefined`. `<member>` is `resolver`, `select`, `bar` or `colour`, and
+`<declared>` is `text`, `a finite number or null` or `a theme colour`. For a colour the theme lacks,
+`<what>` is the quoted token. The three resolver strings above stay byte-identical: a resolver's
+`<member>` fills as `resolver`.
 
 *Why.* M3 and M4: the design states every string, the tests assert them, and Joel approves the wording
 at his live check. The vocabulary follows the existing parts (`does not declare`, `is configured with`,
-`was rejected`), and no string contains "cell" (ADR 0015).
+`was rejected`), and no string contains "cell", "entry" or "document" (ADR 0015; `owner-rulings.md`,
+2026-11-16).
 
 *Alternatives weighed.* One wrapper for document notices and faults (refused: a fault part would carry
 a path that has nothing to do with it). Putting the consequence on only the first settings message
@@ -776,6 +833,26 @@ complete, or a session-two registration re-rendering a released footer.
 report that arrived before it, T2). Recreating the ledger per session inside `startup.ts` (refused:
 `registration-listener.ts` holds a reference from the factory, and a fresh ledger would need the
 listener re-subscribed).
+
+### 20. Only a variable the format names can blank an instrument
+
+`resolveFormat` resolves only the active format's segments: a bare variable through `variables`, a
+form through `variableForms`, and `$bar` through `bar`. A named one that is `undefined` renders the
+instrument as nothing, label included. A declared variable the format leaves out is never resolved, so
+a provider's function for it is never called and cannot fault. A format that names no variable is
+never blanked. `bar` returns `undefined` for an unknown datum and `null` for a known usage with no
+estimate, so a `$bar`-only `context` cell still renders nothing with no usage, while a null estimate
+still draws the dim track. The composed path renders nothing when there is nothing to compose, so the
+2026-11-11 silencing no longer depends on the cell's format naming `$notice`.
+
+*Why.* Joel's 2026-11-16 ruling: an instrument is blanked by a variable its format names, not by every
+variable it declares. That overrules council ruling M18, which recorded the opposite rule, and it
+matches the measured survey of the shipped instruments: each one's format names the variables whose
+absence should silence it.
+
+*Alternatives weighed.* Keeping the every-variable rule (refused by Joel: a provider's unrelated field
+could blank an instrument that shows something else). Blanking `$bar` on `null` (refused by the living
+context requirement: a null estimate draws the dim track and keeps `?/<window>`).
 
 ## Risks / Trade-offs
 

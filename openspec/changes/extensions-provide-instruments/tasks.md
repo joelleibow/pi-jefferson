@@ -55,7 +55,6 @@ the base — so the task that writes it names the mutation that turns it red.
 | `tests/session-harness.ts` | Moves `harness()` and its types out of `tests/jefferson.test.ts` unchanged, and exports `harness`, its types, `useTempAgentDir`, `blankRows`, `writeAgentDocument` and `writeProjectDocument` (`tests/jefferson.test.ts:198`, `:210`, `:214`, `:218`), so no test file imports another's helpers and no test runs twice. The fake `pi` gains `events: createEventBus()`; `harness(options?: { beforeFactory?(events: EventBus): void }): Harness`; `SessionOptions.afterSessionStart?(session: FakeSession, events: EventBus): void \| Promise<void>` receives the session `start()` is building — the same object it resolves to — after the `session_start` handler returns and before `resources_discover` fires; `start()` fires `{ type: "resources_discover", cwd, reason: "startup" }` when a handler exists; `Harness.events` is that bus. 2.1 only adds the hooks; they stay unused until the tasks that need them (M27; design 14; RR3-12). |
 | `tests/configuration-source.ts` | `configurationSource({ agentPath, projectPath, projectTrusted, theme })`, returning `{ source, registry, reported }`: `registry` is `createRegistry()` with `registry.accept("jefferson", SHIPPED)`, `source` is the four paths and theme plus each member as its task lands it, and `reported` collects what the reader reports. Real objects only; no stub resolver (CB-7, RR2-02). |
 | `tests/registration.test.ts` | Derek's 17 tests, rebuilt and extended (design 14; decision 15). |
-| `tests/fixtures/sample-provider/provider.mts` | The provider the packaging check compiles (`A10`). |
 | `tests/fixtures/sample-provider/tsconfig.json` | Target and lib ES2021, `nodenext`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noEmit`, `types: []` (`A10`). |
 | `tests/fixtures/sample-provider/reserved.mts` | A registration under `jefferson.` the packaging check requires to fail its type check with TS2344 (J2; 12.2). |
 | `tests/fixtures/sample-provider/tsconfig.reserved.json` | Extends the fixture's tsconfig and includes `reserved.mts` (12.2). |
@@ -66,7 +65,9 @@ the base — so the task that writes it names the mutation that turns it red.
 | Path | What changes and why |
 |---|---|
 | `extensions/jefferson/shipped.ts` | `SHIPPED` becomes an array in today's order beside `instrumentNamed` (2.4), then gains `FALLBACK` and `NOTICE_GATE` and loses `instrumentNamed` (2.5); the pin row moves from `["SHIPPED","instrumentNamed"]` to `["FALLBACK","NOTICE_GATE","SHIPPED"]`. |
-| `extensions/jefferson/format.ts` | `formatError` drops the declaration's name: a parse error is `format <detail>`, and the reader names the instrument, as it already does for `validateStyle` (2.5; design 5; RD-01). |
+| `extensions/jefferson/format.ts` | `formatError` drops the declaration's name: a parse error is `format <detail>`, and the reader names the instrument, as it already does for `validateStyle` (2.5; design 5; RD-01). It passes the render's theme to `variableFg` (14.1). |
+| `extensions/jefferson/components/visuals/bar.ts` | Clamps a negative fill, so a provided bar below zero draws its track unfilled (14.2). |
+| `tests/fixtures/sample-provider/provider.mts` | Gains a second instrument using every optional member, so the packaging check compiles the whole contract (14.5). |
 | `extensions/jefferson/components/instruments/blank.ts`, `model.ts`, `thinking.ts`, `path.ts`, `context.ts`, `tokens.ts`, `cost.ts`, `branch.ts`, `session.ts`, `status.ts`, `notice.ts` | Each `name` becomes `jefferson.default.<name>` (2.5); `notice.ts` keeps `NOTICE_SECONDS` and its exports stay `["NOTICE_SECONDS", "notice"]`. |
 | `extensions/jefferson/components/instruments/instrument.ts` | `InstrumentDeclaration` becomes `ContractDeclaration<Readings>` plus its own members (3.2). |
 | `extensions/jefferson/components/instruments/instrument-binding.ts` | Gains `adaptProvidedDeclaration` (3.4), `describeValue` (4.4) and `containProvided` (8.3); `instrumentBindings` keeps its signature and takes no view. |
@@ -116,7 +117,7 @@ any importer its own module instance. No name below matches the live
 | `registration-listener.ts` | `createRegistrationListener` | `createRegistrationListener({ events, registry, faults, fields, repaint, own }): void` — subscribes both channels, then emits `own` on `jefferson:registration`. `events` is an `EventBus`. `OwnRegistration` is an **unexported** type in this file: `{ extension: "jefferson"; instruments: readonly InstrumentDeclaration[] }` | `["createRegistrationListener"]` |
 | `faults.ts` | `createFaultLedger` | `createFaultLedger(): FaultLedger` with `record(fault: Fault)`, `open(notify: (message: string) => void)`, `close()`. `Fault` is `{ scope: string; kind: string; part: string }`: `kind` is one fixed string per decision-15 row, so a templated row dedupes as one kind; `scope` follows decision 7, with a fixed string as the anonymous scope; a delivered message is `pi-jefferson: <part>[; <part>…]`. `open(notify)` delivers every queued fault at once, as one notice, and sends nothing when the queue is empty; after that a fault is delivered once per microtask flush. The `resources_discover` handler sends the unknown-name notice first, then calls `open` (RR3-15). | `["createFaultLedger"]` |
 | `data/provider-fields.ts` | `createProviderFields` | `createProviderFields(repaint?: () => void): ProviderFields` with `checkFields(extension, fields: unknown)` returning `undefined`, `{ type: "outside", field, given }` or `{ type: "conflict", field, declared, given }`; `declare(extension, fields)`; `checkReport(extension, field, value: unknown)` returning `undefined`, `{ type: "undeclared" }`, `{ type: "wrong-type", declared, given }` or `{ type: "not-finite" }`, where `wrong-type`'s `given` is the reported value as received, so `describeValue` and not `data/` supplies the wording; `report(extension, field, value: FieldValue)`; `view(extension): ReadingsView`; `clear()`. The listener maps each tagged answer to its decision-15 text, so no user-facing string lives in `data/` | `["createProviderFields"]` |
-| `components/instruments/instrument-binding.ts` | `adaptProvidedDeclaration`, `containProvided`, `describeValue` | `adaptProvidedDeclaration(name, declaration: ProvidedDeclaration, view: () => ReadingsView, record?: (fault: Fault) => void)` returning an `InstrumentDeclaration` or one of `{ refused: "unparseable-default-format" }`, `{ refused: "label-not-string" }`, `{ refused: "resolver-not-function", variable }`, checked in that order, which is decision 15's row order; `containProvided(instrument: Instrument, name, record): Instrument`; `describeValue(value: unknown): string`, the one home of the `<what>` vocabulary: `undefined` → `nothing`, `null` → `null`, a string → `a string`, a number → `a number`, a boolean → `a boolean`, a bigint → `a bigint`, a symbol → `a symbol`, a function → `a function`, any other object including arrays → `an object` | `["adaptProvidedDeclaration","containProvided","describeValue","instrumentBindings"]` |
+| `components/instruments/instrument-binding.ts` | `adaptProvidedDeclaration`, `containProvided`, `describeValue` — its `ProvidedRefusal` widens to the optional members' refusals, and its pinned keys are unchanged (14.2, 14.3) | `adaptProvidedDeclaration(name, declaration: ProvidedDeclaration, view: () => ReadingsView, record?: (fault: Fault) => void)` returning an `InstrumentDeclaration` or one of `{ refused: "unparseable-default-format" }`, `{ refused: "label-not-string" }`, `{ refused: "resolver-not-function", variable }`, checked in that order, which is decision 15's row order; `containProvided(instrument: Instrument, name, record): Instrument`; `describeValue(value: unknown): string`, the one home of the `<what>` vocabulary: `undefined` → `nothing`, `null` → `null`, a string → `a string`, a number → `a number`, a boolean → `a boolean`, a bigint → `a bigint`, a symbol → `a symbol`, a function → `a function`, any other object including arrays → `an object` | `["adaptProvidedDeclaration","containProvided","describeValue","instrumentBindings"]` |
 | `configuration.ts` | `readConfiguration`, `acceptedWarning`, `configurationPaths`, `DEFAULT_CELLS`, `MAX_CELLS` | `ConfigurationSource` gains `resolve(name): InstrumentDeclaration \| undefined`, `fallback: InstrumentDeclaration`, `noticeGate: { name: string; seconds: number }`, `report(fault: Fault): void`, and `watch` with the registry's signature. `Configuration` gains `path: string` and `unknownNames: readonly UnknownName[]`, where `UnknownName` is `{ written: string; normalized: string; row?: number }`. `acceptedWarning(path, unknownNames): string \| undefined` | `["DEFAULT_CELLS","MAX_CELLS","acceptedWarning","configurationPaths","readConfiguration"]` |
 | `shipped.ts` | `SHIPPED`, `FALLBACK`, `NOTICE_GATE` | `SHIPPED: readonly InstrumentDeclaration[]`, in today's order; `FALLBACK: InstrumentDeclaration`, the `blank` declaration; `NOTICE_GATE: { name: string; seconds: number }` | `["FALLBACK","NOTICE_GATE","SHIPPED"]` |
 | `tests/shipped-instrument.ts` | `shippedInstrument` | `shippedInstrument(bare: string): InstrumentDeclaration \| undefined`, the same signature as `instrumentNamed` | not pinned |
@@ -184,6 +185,12 @@ line. "base" means the base already proves it and the test stays unchanged.
 | Registering again after a shutdown | 3.5 | `A2 a registration after a shutdown is accepted, not refused` |
 | A key this Jefferson does not know | 3.5, 3.6 | `A1 a registration with an unknown key still registers`; `A1 a report with an unknown key is read as the known ones` |
 | A message missing what it must carry | 4.3 | `A2 every registration refusal part is exact` |
+| A provided bar, form, colour and composed format | 14.1, 14.2 | `A22 a provided bar, form, colour and composed format render as Jefferson's own do` |
+| A member Jefferson cannot use | 14.3 | `A22 every member refusal part is exact` |
+| An option Jefferson does not implement | 14.3 | `A22 every member refusal part is exact` |
+| A bar that returns text | 14.2 | `A22 a bar that returns text blanks the entry` |
+| A colour the theme does not have | 14.2 | `A22 a colour the theme does not have falls back to the style` |
+| A bar below zero | 14.2 | `A22 a bar below zero draws its track unfilled` |
 
 **`statusline`**
 
@@ -213,6 +220,13 @@ line. "base" means the base already proves it and the test stays unchanged.
 | A variable the registration does not declare | 7.1 | `A3 a format naming an undeclared variable refuses it alone` |
 | A value that is not an object | 7.1, 7.3 | `A3 a value that is not an object refuses it alone`; `A3 a non-object value for a provided name stays blank, then refuses it alone when it registers`; `A3 a non-object value for a provided name that never registers leaves the document accepted, with no warning` |
 | A provider that registered before the document was read | 7.2, 7.3 | `A3 a format naming an undeclared variable refuses it alone`; `A3 the same document in Jefferson-first order refuses the same instrument` |
+| A format that names one datum | 13.3 | `A21 model with a format naming one datum renders it` |
+| A bar alone with no usage | 13.2 | `A21 a bar alone with no usage renders nothing` |
+| A variable the format leaves out | 13.1 | `A21 a variable the format leaves out is never resolved and does not blank the instrument` |
+| A named variable that is unknown | 13.1 | `A21 a named variable that is unknown blanks the instrument` |
+| A format that names no variable | 13.1 | `A21 a format that names no variable keeps its label` |
+| A provided instrument's formats | 14.4 | `A22 a provided instrument's formats render the selected text` |
+| A formats kind the instrument does not carry | 14.4 | `A3 a formats kind the instrument does not carry` |
 | A name only the block configures | 12.3 | `A3 a block-only provided name is checked provider-first`; `A3 a block-only provided name is checked Jefferson-first` |
 
 **`session-data-store`**
@@ -330,7 +344,7 @@ row, each asserting the exact part.
 - [x] 5.5 Group-end: `pnpm test` must be green.
 - [x] 5.6 Mark for Joel, and the coder does not tick it: in a live pi session, a document naming an unregistered provided instrument stays silent at startup, warns once startup completes, and the same entry renders as soon as the provider registers.
   - Joel, 2026-11-16, live pi session with the `livecheck` stand-in loaded via `pi -e`. At startup row 4 was blank and showed one warning: `pi-jefferson: /Users/joelleibow/.pi/agent/pi-jefferson.json row 4: "livecheck.probe" is not a known instrument`. After `/livecheck register` the row showed "Probe: 0", and after `/livecheck report` it showed "Probe: 1".
-- [ ] 5.7 Mark for Joel, and the coder does not tick it: in a live pi session, a refused registration, a refused report and a resolver fault each warn once, and he approves their wording (design 15).
+- [ ] 5.7 Mark for Joel, and the coder does not tick it: in a live pi session, a refused registration, a refused report and a resolver fault each warn once, and he approves their wording. The strings Joel approves are decision 15's as amended for 2026-11-16 (K5, K6, K18).
 
 ## 6. Late binding and the holder (`A4`)
 
@@ -431,3 +445,77 @@ tests/registration.test.ts`.
 - [ ] 12.4 Group end. Verify: `pnpm typecheck` is clean; `pnpm test` is green with 0 `Event handler
 error` lines in its output; and `openspec validate extensions-provide-instruments --strict` reports the
 change valid.
+
+## 13. Joel's 2026-11-16 review rulings
+
+Joel ruled that only a variable the format names can blank an instrument, and his ruling corrects the
+user vocabulary and the settings strings. 13.1–13.4 revise the ticked boxes they supersede.
+
+- [ ] 13.1 Only a variable the format names can blank an instrument. Write the red test first: an
+instrument whose format names one variable renders while a declared variable the format leaves out is
+unreported, and that unreported variable's function is never called. Then make `resolveFormat` resolve
+only the active format's segments — bare variables through `variables`, forms through `variableForms`,
+`$bar` through `bar` — so a declared variable the format leaves out never resolves, and a format that
+names no variable is never blanked. Boundary cases: `model` with the format `$model` and no provider;
+`thinking` with the label `🤔` and the format `""`; `context` with `$bar` alone and no usage. Test:
+`A21 a variable the format leaves out is never resolved and does not blank the instrument`,
+`A21 a named variable that is unknown blanks the instrument`, `A21 a format that names no variable
+keeps its label`, `A21 a bar alone with no usage renders nothing` — in `tests/registration.test.ts` and
+`tests/row-renderer.test.ts`. Verify: `pnpm typecheck`, and `pnpm test --test-name-pattern "^A21 "`.
+Mutation: resolve every declared variable again, and the first title goes red.
+- [ ] 13.2 `$bar` and the composed path keep their old behaviour. A `$bar`-only `context` cell renders
+nothing with no usage, and a null estimate still draws the dim track; the composed path renders nothing
+when there is nothing to compose, so the notice's silencing no longer depends on the format naming
+`$notice`. Boundary cases: a computed notice with no text; `context` with `$bar` and a null estimate.
+Test: `A21 context with a bar and a null estimate draws the dim track`, `A21 the composed path renders
+nothing when there is nothing to compose`. Verify: `pnpm test --test-name-pattern "^A21 (context with|the composed)"`.
+Mutation: make `context`'s `bar` return `null` with no usage, and the bar-alone title goes red.
+- [ ] 13.3 Rewrite the per-instrument tests that stated the every-variable rule: `model`, `thinking`,
+`context`, `branch`, `session` and `status` now name the variables their formats name. Boundary cases:
+`model` with the format `$model` renders with no provider; `branch` with no repository still renders
+nothing. Test: the six rewritten titles. Verify: `pnpm test --test-name-pattern "^(A8|A9|A21) "` is
+green, and `rg -n "when either datum is unknown|MUST be nothing when" tests` prints nothing.
+- [ ] 13.4 The printed strings Joel approves lose "entry" and "document": the six settings rows end
+`; it renders blank`, the shape row reads `"taiknr.savings" is configured with a value that is not an
+object; it renders blank`, and the four document rejections carry design 15's new parts. Boundary
+cases: each of the four rejection parts. Test: `A21 every document rejection part is exact`, one case
+per row. Verify: `pnpm test --test-name-pattern "^A21 every document"`; no warning in `extensions/`
+names an entry or a document.
+- [ ] 13.5 Group end. Verify: `pnpm typecheck` is clean; `pnpm test` is green with 0 `Event handler
+error` lines; and `openspec validate extensions-provide-instruments --strict` reports the change valid.
+
+## 14. Providers get what Jefferson's instruments get
+
+Joel's 2026-11-16 ruling gives a provider's declaration the members Jefferson's own instruments have,
+with containment for each and `formats` as the one provided option.
+
+- [ ] 14.1 The contract and the declaration. `instrument-contract.ts` gains the optional
+`variableForms`, `bar`, `fills`, `variableFg`, `composed` and `options`, and `ComposedFormat<R>`;
+`instrument.ts` becomes `Omit<ContractDeclaration<Readings>, "variableFg" | "options">` plus
+`variableFg` with the render's theme, `shownUntil` and a required `options`; `format.ts` passes the
+render's theme to `variableFg`. Boundary cases: a declaration with no optional member; one with all of
+them. Test: `A22 the fixture's second instrument uses every optional member` in `tests/registration.test.ts`.
+Verify: `pnpm typecheck`.
+- [ ] 14.2 Containment for every member. One `call` guards every provided function, and each fault
+yields its member's absent value: text and `bar` read unknown, a `select` composes nothing, a colour
+falls back to the cell's style. Write one test per wrapper first. Boundary cases: a non-function colour
+resolver; a select that returns a number; a colour naming a token the theme lacks. Test: `A22 a bar
+that returns text blanks the entry`, `A22 a colour the theme does not have falls back to the style`,
+`A22 a select that returns a number composes nothing`, with their mutations (remove one wrapper at a
+time). Verify: `pnpm test --test-name-pattern "^A22 (a bar|a colour|a select)"`.
+- [ ] 14.3 The registration rows. A member Jefferson cannot use refuses the registration with its row:
+a non-function `bar` or `variableFg`, a non-boolean `fills`, a `variableForms` or `composed` Jefferson
+cannot use, and an option Jefferson does not offer a provided instrument. Boundary cases: one case per
+row; `seconds`; `formats` with no `composed`. Test: `A22 every member refusal part is exact`, shown red
+once by mapping one row to a wrong part. Verify: `pnpm test --test-name-pattern "^A22 every member"`.
+- [ ] 14.4 `formats` as a provided instrument's one option. `checkProvidedSettings` covers `formats`
+in both orders, so a kind the registration does not carry refuses that instrument alone. Boundary cases:
+a `formats` value that is not an object; a kind that is not a string; a kind's format Jefferson cannot
+parse. Test: `A3 a formats kind the instrument does not carry`, `A22 every formats refusal part is
+exact`. Verify: `pnpm test --test-name-pattern "^(A3 a formats|A22 every formats)"`.
+- [ ] 14.5 The fixture. `provider.mts` gains a second instrument using every optional member, and the CI
+step's compile must pass with it. Boundary cases: `shownUntil`, which the contract does not offer;
+`seconds`, which is not a provided option. Test: the CI pack step's fixture check, run in a working-tree
+copy per Conventions. Verify: the step fails once when `options` offers `seconds`, and passes on revert.
+- [ ] 14.6 Group end. Verify: `pnpm typecheck` is clean; `pnpm test` is green with 0 `Event handler
+error` lines; and `openspec validate extensions-provide-instruments --strict` reports the change valid.
