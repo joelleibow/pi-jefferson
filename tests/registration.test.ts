@@ -595,9 +595,35 @@ test("A2 a change made after registering does not reach the render or the check"
   posted.name = "renamed";
   posted.defaultFormat = "Hijacked $saved";
   posted.defaultLabel = "Hijacked:";
-  posted.variables = { saved: () => "hijacked" };
+  posted.variables = { saved: () => "hijacked", added: () => "later" };
 
   assert.equal(line(await h.start()), "Savings: $4.10", "what Jefferson renders is what it accepted");
+
+  // A later J1(b) check reads the accepted copy too: the variable the provider added after
+  // acceptance is not one the instrument declares, so a format naming it refuses the instrument.
+  const later = useTempAgentDir(t);
+  writeAgentDocument(later, {
+    instruments: { "taiknr.savings": { format: "$added" } },
+    rows: [[{ instrument: "taiknr.savings" }]],
+  });
+  const checked = harness();
+  const reposted: Registration = {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      defaultFormat: "Savings: $saved",
+    }],
+  };
+  checked.events.emit("jefferson:registration", reposted);
+  reposted.instruments[0]!.variables = { saved: () => "hijacked", added: () => "later" };
+  const refused = await checked.start();
+  assert.deepEqual(refused.notified, [{
+    message: 'pi-jefferson: "taiknr.savings" is configured with a format naming "$added", which the instrument does not declare; its entries render blank',
+    type: "warning",
+  }]);
+  assert.equal(line(refused), placeholder(), "and the entry renders the fallback");
 });
 
 test("A8 jeffersonfan.stats registers through the bus and renders", async (t) => {
