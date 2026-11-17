@@ -16,6 +16,7 @@ x-marbleization:
     design: approved
     tasks: approved
     implement: approved
+    validate: approved
   progress:
     - "2026-11-15: change opened from card 2 of the extension-provided-instruments Explore session, right after 0.13.0 (37a1698). Branch extensions-provide-instruments. owner-rulings.md written from Joel's quoted words. Research workflow (Chidi + Eleanor) launched."
     - "2026-11-15: research complete (Chidi 43dc6795, Eleanor 5c5a59fa). Michael orientation f86d97e1 launched; asked to decide whether resolver code in the contract is his call or Joel's."
@@ -40,3 +41,4 @@ x-marbleization:
     - "2026-11-16: Validate fixes committed (e50263b code, b15e67e docs), 521/521. Joel ruled during Validate: names free except everything under jefferson. (refused at runtime, rejected at compile time by the contract types); unregistered block settings are silent. Workflow d37a05c5: Michael turns rulings into fixes, Derek then Bambadjan apply."
     - "2026-11-16: Joel's live checks: 5.6 passed and ticked; 5.7 showed one warning per fault, wording pending. Joel's guide review produced rulings: no entry, no document, no prescribing code, unused-variable blanking is a bug, bare names are Jefferson's, and an Opus 5.5 high editorial pass over the user-facing docs. Workflow: Michael K-fixes, then Derek, then Bambadjan artifacts, then editorial on Opus."
     - "2026-11-16: Re-check fixes committed 4f08ab4; Michael final check pending. Joel approved the 5.7 wording: \"Perfect. This all looks great.\" All tasks ticked. Archive next."
+    - "2026-11-16: Michael final check 55a47b83: approve. Archived by Bambadjan dcb4b809; 4 living specs strict-valid (instrument-registration created)."
