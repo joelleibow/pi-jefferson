@@ -236,7 +236,7 @@ The token replaces the `fg` of the user's `style` on that variable's text only. 
 - `select`, a function that receives your fields and returns the key of the kind to show, or `undefined` for none.
 - `formats`, the default text for each key.
 
-A kind's text is plain: it takes no modifier and no form ([Formats](formats.md#composed-formats)). A value it names that returns `undefined` renders as nothing in its place. When `select` returns `undefined`, or the chosen text comes out empty, the instrument renders nothing, label included.
+A kind's text is plain: it takes no modifier and no form ([Formats](formats.md#composed-formats)). A value it names that returns `undefined` renders as nothing in its place. When `select` returns `undefined`, or the chosen text comes out empty, Jefferson calls the function in `variables` for `$state` instead, so the `() => undefined` above leaves `$state` with no value. Then `$state` works like any variable with no value: a format that names it renders nothing, label included, and a format that leaves it out is not affected.
 
 Above, while `working` is `true` the instrument reads `taiknr: Saving $4.12` and a bar. While it is `false` it reads `taiknr: Idle` and a bar. Before `working` has a value it shows nothing.
 
@@ -277,6 +277,7 @@ Jefferson contains a fault in your functions to the instrument that has it:
 - A function that throws costs the instrument its text.
 - A function that returns a promise costs the instrument its text. Jefferson observes the promise's rejection, so pi keeps running.
 - A function that returns a value of the wrong kind costs the instrument its text.
+- A composed value that faults renders as nothing in its place, as its `undefined` does.
 - A `variableFg` function that faults costs only its colour, and the instrument still renders.
 
 The rest of the row renders, and so does every other row. The next render calls your function again.

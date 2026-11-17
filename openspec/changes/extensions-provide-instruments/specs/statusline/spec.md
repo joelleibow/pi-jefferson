@@ -595,3 +595,8 @@ blanked. Jefferson's own instruments and provided ones MUST follow the same rule
 
 - **WHEN** `thinking` is configured with the label `🤔` and the format `""`, and the level is unknown
 - **THEN** the cell renders `🤔`
+
+#### Scenario: A composed variable the format leaves out
+
+- **WHEN** taiknr declares `$saved` and a composed `$state`, the format is `$saved`, `saved` is reported, and the composed set's `select` has no answer
+- **THEN** the instrument renders the saved value, because a composed variable with nothing to compose blanks only a format that names it

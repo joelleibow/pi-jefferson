@@ -85,7 +85,7 @@ An instrument can choose the foreground of one of its variables itself, and that
 
 ## Composed formats
 
-An instrument can compose its text from a set of formats, one for each kind of thing it shows. It picks the kind from its own data and hands the composed text to its format through one variable. `notice` does this with `$notice`, and an instrument from another extension can do it too. When there is nothing to compose, the instrument renders nothing, label included.
+An instrument can compose its text from a set of formats, one for each kind of thing it shows. It picks the kind from its own data and hands the composed text to its format through one variable. `notice` does this with `$notice`, and an instrument from another extension can do it too. When there is nothing to compose, `$notice` has no value, so a format that names it renders nothing, label included, and a format that leaves it out renders as usual. An instrument from another extension works the same way, unless its extension gives the variable a value of its own.
 
 A kind's format is plain. It names the values that belong to the set, and it takes no modifier and no form. Styling belongs to the instrument: `style` styles the composed variable as it styles any other.
 

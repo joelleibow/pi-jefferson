@@ -186,11 +186,7 @@ resolver sees MUST be additive.
 
 ### Requirement: Provider code costs one entry and no more
 
-A function a provider supplies that throws, or returns a value outside its declared result type, a
-promise included, MUST cost only that entry: a resolver, a form, a select or a `bar` blanks it, label
-included, and a colour falls back to the entry's style. Its geometry, the row and every other row MUST
-render, and pi MUST keep running. Jefferson MUST wrap a provided instrument's render and MUST leave its
-own unwrapped. The next render MUST try again.
+A function a provider supplies that throws, or returns a value outside its declared result type, a promise included, MUST cost only that entry: a resolver, a form or a `bar` blanks it, label included, a select composes nothing, a composed value renders nothing in its place, and a colour falls back to the entry's style. Its geometry, the row and every other row MUST render, and pi MUST keep running. Jefferson MUST wrap a provided instrument's render, not its own. The next render MUST try again.
 
 #### Scenario: A resolver that throws
 
