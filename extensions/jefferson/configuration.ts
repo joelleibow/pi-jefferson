@@ -136,8 +136,8 @@ interface InstrumentConfiguration {
  * Everything under a provided name's key — its shape, format, label, option, variable, modifier and
  * style — checked against what its registration declared, or the one part that refuses it. It runs
  * when the document and the registration are both in hand, whichever came second (design 13; J1(b)).
- * A provided instrument takes `FOUNDATIONAL_OPTIONS` and nothing else, so the check and the binding
- * accept the same keys.
+ * A provided instrument takes the options its adapted declaration lists: the foundational three, and
+ * `formats` when it declares one, so the check and the binding accept the same keys.
  */
 function checkProvidedSettings(
   name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme,

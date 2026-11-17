@@ -1159,6 +1159,95 @@ function rawLine(session: FakeSession, width = 80): string {
   return session.lines(width)[0] ?? "";
 }
 
+test("A6 a provider's key that names an Object member reads as its own key", async (t) => {
+  // A provider's key is its own: a name that happens to be an `Object.prototype` member is not a
+  // lookup into the prototype, and an unknown key is no fault at all.
+  const inheritedSelect = await registeredRow(t, {
+    extension: "taiknr",
+    fields: { working: "boolean" },
+    instruments: [{
+      name: "usage",
+      variables: { state: () => undefined },
+      composed: {
+        variable: "state",
+        variables: {},
+        select: () => "constructor",
+        formats: { busy: "Busy" },
+      },
+      defaultFormat: "$state",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
+  assert.equal(line(inheritedSelect), "Model: anthropic/claude-opus-4");
+  await settle();
+  assert.deepEqual(inheritedSelect.notified, []);
+
+  const inheritedVariable = await registeredRow(t, {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "usage",
+      variables: { constructor: () => "c", saved: () => "s" },
+      variableFg: { saved: () => "accent" },
+      defaultFormat: "$constructor $saved",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
+  assert.equal(line(inheritedVariable), "Model: anthropic/claude-opus-4 c s");
+  await settle();
+  assert.deepEqual(inheritedVariable.notified, []);
+});
+
+test("A2 a composed select swapped after registering does not reach the render", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: [[{ instrument: "taiknr.usage" }]] });
+  const payload: Registration<"taiknr"> = {
+    extension: "taiknr",
+    fields: { working: "boolean" },
+    instruments: [{
+      name: "usage",
+      variables: { state: () => undefined },
+      composed: {
+        variable: "state",
+        variables: {},
+        select: () => "busy",
+        formats: { busy: "Busy", idle: "Idle" },
+      },
+      defaultFormat: "$state",
+    }],
+  };
+  const h = harness();
+  h.events.emit("jefferson:registration", payload);
+  // The provider changes its own object after posting: what Jefferson renders is what it accepted.
+  payload.instruments[0]!.composed!.select = () => "idle";
+  const session = await h.start();
+  assert.equal(line(session), "Busy");
+});
+
+test("A6 a composed instrument whose format does not name its composed variable renders while select has no answer", async (t) => {
+  // A composed set's silence is its own reading's business: a format that does not name the composed
+  // variable cannot be blanked by it (owner-rulings.md, 2026-11-16, "Variables are never coupled").
+  const session = await registeredRow(t, {
+    extension: "taiknr",
+    fields: { saved: "string", working: "boolean" },
+    instruments: [{
+      name: "usage",
+      variables: {
+        state: () => undefined,
+        saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined,
+      },
+      composed: {
+        variable: "state",
+        variables: { saved: () => "s" },
+        select: (readings: ReadingsView) => readings.working === true ? "busy" : undefined,
+        formats: { busy: "Working on $saved" },
+      },
+      defaultFormat: "$saved",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }], [{ extension: "taiknr", field: "saved", value: "4.12" }]);
+  assert.ok(line(session).endsWith("4.12"), line(session));
+  await settle();
+  assert.deepEqual(session.notified, []);
+});
+
 test("A6 a provided bar draws $bar from its own fields", async (t) => {
   const session = await registeredRow(t, {
     extension: "taiknr",
@@ -1308,6 +1397,53 @@ test("A6 every provided member fault part is exact", async (t) => {
     );
     assert.equal(line(session), "Model: anthropic/claude-opus-4",
       `${label}: the entry renders nothing while the model beside it renders`);
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: `pi-jefferson: "taiknr.usage" failed to render: ${part}`,
+      type: "warning",
+    }], label);
+  }
+});
+
+test("A6 a provided composed value or colour that faults is contained, and its promise observed", async (t) => {
+  const composedValue = (value: () => unknown): readonly unknown[] => [{
+    name: "usage",
+    variables: { state: () => undefined },
+    composed: {
+      variable: "state",
+      variables: { saved: value },
+      select: () => "busy",
+      formats: { busy: "Working on $saved" },
+    },
+    defaultFormat: "$state",
+  }];
+  const colour = (fg: () => unknown): readonly unknown[] => [{
+    name: "usage",
+    variables: { saved: () => "busy" },
+    variableFg: { saved: fg },
+    defaultFormat: "$saved",
+  }];
+  const cases: Array<[string, readonly unknown[], string, string]> = [
+    ["a composed value that throws", composedValue(() => { throw new Error("provider"); }),
+      "Model: anthropic/claude-opus-4 Working on", "its variable threw"],
+    ["a composed value that returns a number", composedValue(() => 42),
+      "Model: anthropic/claude-opus-4 Working on", "its variable returned a number, where text is declared"],
+    ["a composed value that returns a rejected promise", composedValue(() => Promise.reject(new Error("provider"))),
+      "Model: anthropic/claude-opus-4 Working on", "its variable returned a promise"],
+    ["a colour that throws", colour(() => { throw new Error("provider"); }),
+      "Model: anthropic/claude-opus-4 busy", "its colour threw"],
+    ["a colour that returns a number", colour(() => 5),
+      "Model: anthropic/claude-opus-4 busy", "its colour returned a number, where a theme colour is declared"],
+    ["a colour that returns a rejected promise", colour(() => Promise.reject(new Error("provider"))),
+      "Model: anthropic/claude-opus-4 busy", "its colour returned a promise"],
+  ];
+  for (const [label, instruments, drawn, part] of cases) {
+    const session = await registeredRow(
+      t,
+      { extension: "taiknr", fields: { saved: "string" }, instruments } as unknown as Registration<"taiknr">,
+      [{ instrument: "model" }, { instrument: "taiknr.usage" }],
+    );
+    assert.equal(line(session), drawn, label);
     await settle();
     assert.deepEqual(session.notified, [{
       message: `pi-jefferson: "taiknr.usage" failed to render: ${part}`,

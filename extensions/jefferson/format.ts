@@ -264,7 +264,10 @@ export function resolveFormat(
     if (segment.kind === "bar") return bar;
     const merged = mergedStyle(style, segment.modifiers);
     // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
-    const token = segment.kind === "variable" ? declaration.variableFg?.[segment.name]?.(arrived[index]!, theme) : undefined;
+    const colours = declaration.variableFg;
+    const token = segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
+      ? colours[segment.name]!(arrived[index]!, theme)
+      : undefined;
     return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
   }).join("");
 }

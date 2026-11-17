@@ -21,7 +21,8 @@ export interface ConfiguredInstrument {
 
 /**
  * The one home of decision 15's `<what>`: one word for each thing a value may be. Both a report that
- * carries the wrong type and a resolver that returns one answer it, so the two rows cannot drift.
+ * carries the wrong type and a provided function that returns one answer it, so the two rows cannot
+ * drift.
  */
 export function describeValue(value: unknown): string {
   if (value === undefined) return "nothing";
@@ -63,14 +64,15 @@ function isFunctionMap(value: unknown): boolean {
 
 /**
  * Adapt one provided declaration to a Jefferson declaration over `Readings`, or refuse it. The
- * refusals are checked in decision 15's row order — the default format first, then the label, then
- * the resolvers — so the part the listener reports is the first fault the table names.
+ * checks run in the order the guide lists them: the member shapes and option names first, then the
+ * default format, the label, the variables, and the composed kinds last.
  *
  * Every function a provider writes runs behind one guard: the call is guarded, a thenable's
  * rejection is observed, and a result outside the member's declared type is a fault recorded once.
- * A fault yields its member's own absent value — for a text resolver, a form, a composed value and
- * `bar`, unknown, which blanks the instrument; for `select`, nothing to compose; for a colour,
- * `undefined`, which is "no colour", so the cell's own style stands (owner-rulings.md, 2026-11-16).
+ * A fault yields its member's own absent value: for a variable, a form and `bar`, unknown, which
+ * blanks the instrument; for a composed value, nothing in its place; for `select`, nothing to
+ * compose; for a colour, `undefined`, which is "no colour", so the cell's own style stands
+ * (owner-rulings.md, 2026-11-16).
  */
 export function adaptProvidedDeclaration(
   name: string,
@@ -206,13 +208,15 @@ export function adaptProvidedDeclaration(
   );
 
   const composedMember = members.composed as Record<string, unknown> | undefined;
+  // Held by reference at acceptance, as every other provided function is (M16).
+  const select = composedMember?.select as (readings: ReadingsView) => unknown;
   const composed = composedMember === undefined ? undefined : {
     variable: composedMember.variable as string,
     variables: Object.fromEntries(Object.entries(composedMember.variables as object).map(([key, resolver]) => [
       key,
       () => text("variable", () => (resolver as (readings: ReadingsView) => unknown)(view())),
     ])),
-    select: () => text("select", () => (composedMember.select as (readings: ReadingsView) => unknown)(view())),
+    select: () => text("select", () => select(view())),
     // A copy, so a provider's later change to its own object cannot reach the binding (M16).
     formats: { ...(composedMember.formats as Readonly<Record<string, string>>) },
   };
@@ -297,13 +301,17 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
           let preResolved: Record<string, string> | undefined;
           if (composed !== undefined) {
             const key = composed.select(readings);
-            const chosen = key === undefined ? undefined : entry?.formats?.[key] ?? plain[key];
+            // A key the provider chose is looked up as its own, never through `Object.prototype`: an
+            // unknown key composes nothing, and inherited names are not entries at all.
+            const chosen = key === undefined ? undefined
+              : entry?.formats !== undefined && Object.hasOwn(entry.formats, key) ? entry.formats[key]
+                : Object.hasOwn(plain, key) ? plain[key] : undefined;
             const composedText = chosen === undefined ? "" : resolvePlain(declaration, chosen, readings);
-            // An empty kind text silences the kind (D5, Joel's 2026-11-11 ruling): nothing to compose
-            // renders nothing, label included, whatever the format names, because only the variables
-            // a format names can blank it otherwise (owner-rulings.md, 2026-11-16).
-            if (composedText === "") return "";
-            preResolved = { [composed.variable]: composedText };
+            // A composed set with nothing to compose leaves its place empty, and only a format that
+            // names the composed variable is blanked by it: variables are never coupled, so a
+            // neighbour's silence cannot take another variable's text with it (owner-rulings.md,
+            // 2026-11-16, "Variables are never coupled").
+            if (composedText !== "") preResolved = { [composed.variable]: composedText };
           }
           const text = resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
           // A timed declaration's whole text shows or hides: nothing to show renders as nothing,

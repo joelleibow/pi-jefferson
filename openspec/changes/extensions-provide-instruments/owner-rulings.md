@@ -93,6 +93,10 @@ Joel, during taiknr's Explore: *"there was a decision to not allow $bar within a
 - **This change:** the contract offers `bar`, `fills`, `variableForms`, `variableFg`, `options` and `composed` to providers, with the same fault containment as variables. It also checks provided options at registration, as J1(b) does for format, label and style. M14 is overruled for these six.
 - **Follow-up:** `shownUntil` for providers, built on change 3's timer. It is not in this change.
 
+## 2026-11-16: Variables are never coupled
+
+Michael's re-validation asked whether a composed variable with nothing to compose (an empty `select`, or a kind whose text is empty) should blank the whole instrument when the user's format does not name it. That is K3's carve-out, which was kept for the 2026-11-11 notice ruling. Joel said: *"No. We shouldn't be coupling variables together like that in any way. If your neigbor doesn't have a car that's doesn't mean you can't drive."* **No variable's emptiness affects any other variable. A composed variable blanks its instrument only when the format names it, exactly like any other variable. K3's unconditional blank is removed. A notice format that leaves out `$notice` (for example `"!"`) renders even while a silenced kind is live. The 2026-11-11 notice ruling holds for any format that names `$notice`.**
+
 ## Earlier rulings this change inherits
 
 - **2026-11-03, vocabulary:** a row holds cells, and a cell holds an instrument. *"`module` and `widget` are rejected words."* Since 2026-11-15, "cell" no longer appears in anything a user reads (ADR 0015).
