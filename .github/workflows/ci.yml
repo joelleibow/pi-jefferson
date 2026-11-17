@@ -76,3 +76,44 @@ jobs:
               process.exit(1);
             }
           ' "$tmp/shipping.json" "$tmp/packed-package.json"
+
+          # The published contract resolves for a consumer of an installed package. The manifest
+          # is the packed one, because a target missing from the tarball cannot be withdrawn once
+          # it ships.
+          node -e '
+            const fs = require("node:fs");
+            const shipped = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).files.map((f) => f.path);
+            const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+            const target = manifest.exports?.["./instruments"];
+            if (typeof target !== "string") {
+              console.error("FAIL: the packed manifest declares no ./instruments export");
+              process.exit(1);
+            }
+            const path = target.replace(/^\.\//, "");
+            if (!shipped.includes(path)) {
+              console.error(`FAIL: the export\u0027s target ${target} is not in the packed file list`);
+              process.exit(1);
+            }
+            console.log(`OK: ${target} is in the packed file list`);
+          ' "$tmp/shipping.json" "$tmp/packed-package.json"
+
+          # A provider consumes the contract under flags this repository does not use, so a sample
+          # provider is compiled against the extracted tarball: nodenext resolution, its own lib,
+          # and no ambient types.
+          mkdir -p "$tmp/provider/node_modules/pi-jefferson"
+          cp -R tests/fixtures/sample-provider/. "$tmp/provider/"
+          tar -xzf "$tmp"/*.tgz -C "$tmp/provider/node_modules/pi-jefferson" --strip-components=1
+          pnpm exec tsc -p "$tmp/provider/tsconfig.json"
+
+          # A registration under jefferson. fails a provider's type check (owner-rulings.md,
+          # 2026-11-16), so the reserved fixture must fail, with TS2344 and the contract's words.
+          if pnpm exec tsc -p "$tmp/provider/tsconfig.reserved.json" > "$tmp/reserved.log" 2>&1; then
+            echo "FAIL: a registration under jefferson. type-checks"
+            exit 1
+          fi
+          if ! grep -q 'error TS2344: .*a name under jefferson\. belongs to Jefferson' "$tmp/reserved.log"; then
+            cat "$tmp/reserved.log"
+            echo "FAIL: the reserved fixture failed its type check for another reason"
+            exit 1
+          fi
+          echo "OK: a registration under jefferson. fails the type check"

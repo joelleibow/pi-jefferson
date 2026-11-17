@@ -19,6 +19,9 @@
     "README.md",
     "LICENSE"
   ],
+  "exports": {
+    "./instruments": "./extensions/jefferson/instrument-contract.ts"
+  },
   "pi": {
     "image": "https://raw.githubusercontent.com/joelleibow/pi-jefferson/main/docs/images/jefferson-cosmic-star-dragon.png",
     "extensions": [

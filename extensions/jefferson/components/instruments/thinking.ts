@@ -10,7 +10,7 @@ const THINKING_FG: Readonly<Record<string, ThemeColor>> = {
 };
 
 export const thinking: InstrumentDeclaration = {
-  name: "thinking",
+  name: "jefferson.default.thinking",
   variables: { level: r => r.thinkingLevel },
   variableFg: { level: level => Object.hasOwn(THINKING_FG, level) ? THINKING_FG[level] : undefined },
   defaultFormat: "$level|capitalize",

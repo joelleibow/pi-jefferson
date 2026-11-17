@@ -6,9 +6,14 @@ import { homedir } from "node:os";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { configurationPaths, readConfiguration } from "./configuration.ts";
+import { acceptedWarning, configurationPaths, readConfiguration, type Configuration } from "./configuration.ts";
+import { createProviderFields } from "./data/provider-fields.ts";
 import { feedSessionData } from "./data/session-data-feed.ts";
+import { createFaultLedger } from "./faults.ts";
 import { installFooter } from "./footer-setup.ts";
+import { createRegistry } from "./registration.ts";
+import { createRegistrationListener } from "./registration-listener.ts";
+import { FALLBACK, NOTICE_GATE, SHIPPED } from "./shipped.ts";
 
 /** One timer, and the cancel that clears it: the scheduler the composition root supplies. */
 function schedule(callback: () => void, delayMs: number): () => void {
@@ -17,6 +22,52 @@ function schedule(callback: () => void, delayMs: number): () => void {
 }
 
 export function startUp(pi: ExtensionAPI): void {
+  // The one repaint slot: the host's `tui` is reachable only inside the footer's factory, so its
+  // `receiveRepaint` sets this, and every push — a report, an accepted registration — reads it. The
+  // shutdown clears it, so nothing asks a context the host has invalidated to render again. It is
+  // declared before the listener, which reads it while it emits Jefferson's own payload.
+  let requestRepaint: (() => void) | undefined;
+
+  // Registrations outlive a session: the registry is built here, and Jefferson registers its own
+  // instruments by the same message a provider posts, before any `session_start` runs (design 6).
+  const registry = createRegistry();
+  // Created here, not in `session_start`: a report that arrives before Jefferson's own handler
+  // must still be held (design 11; T2).
+  const repaint = (): void => requestRepaint?.();
+  const fields = createProviderFields(repaint);
+  const faults = createFaultLedger();
+  createRegistrationListener({
+    events: pi.events,
+    registry,
+    faults,
+    fields,
+    repaint,
+    own: { extension: "jefferson", instruments: SHIPPED },
+  });
+
+  // The pin: pi's `bindExtensions` emits `resources_discover` after every extension's `session_start`
+  // handler, on every path that starts a session, and only when someone handles it, so handling it
+  // is what makes it fire. No pi document promises that order (research-chidi.md §1; T4, corrected by
+  // M20), and it is the only marker startup has completed (design 12). Re-check it on every pi bump.
+  pi.on("resources_discover", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    if (latest !== undefined) {
+      // A name the registry answers by now is not unknown: a provider's own `session_start` handler
+      // may have registered it after the document was read.
+      const unknown = latest.unknownNames.filter(name => registry.instrument(name.normalized) === undefined);
+      const warning = acceptedWarning(latest.path, unknown);
+      if (warning !== undefined) ctx.ui.notify(warning, "warning");
+    }
+    // Delivery opens here, and only here: a fault found at any earlier moment waits for this, so a
+    // provider that registers from its own `session_start` handler is not warned about first. The
+    // unknown-name notice goes first, then the faults in arrival order.
+    faults.open(message => ctx.ui.notify(message, "warning"));
+  });
+
+  // The latest read, for the handler that runs once startup is complete: the unknown names the
+  // document carried are judged against the registry as it stands then (design 12).
+  let latest: Configuration | undefined;
+
   // Retained across `session_start` calls: the previous install's release, so a store this
   // install still holds is disposed — and its subscriptions dropped — before its replacement
   // exists.
@@ -30,6 +81,15 @@ export function startUp(pi: ExtensionAPI): void {
   // a pending expiry must not repaint a context the host has invalidated.
   pi.on("session_shutdown", () => {
     releasePrevious?.();
+    // Provider state belongs to the session that accepted it; Jefferson's own keeps for the
+    // factory's life. This runs after the release and never inside it, so a report that arrived
+    // before the next `session_start` survives it (design 19 item 1; M22).
+    registry.clearProvided();
+    fields.clear();
+    // Third, and never inside the release closure: a fault that arrived before the next
+    // `session_start` must queue rather than be dropped with the session before it.
+    faults.close();
+    requestRepaint = undefined;
   });
 
   pi.registerCommand("jefferson", {
@@ -55,20 +115,28 @@ export function startUp(pi: ExtensionAPI): void {
 
     // Read first: the store is built with the visible time the document's notice declaration
     // names, so configuration cannot wait until after the feed exists.
-    const { rows, rowGap, warning, noticeSeconds } = readConfiguration({
+    const configuration = readConfiguration({
       ...configurationPaths(ctx.cwd),
       projectTrusted: ctx.isProjectTrusted(),
       theme: ctx.ui.theme,
+      resolve: name => registry.instrument(name),
+      fallback: FALLBACK,
+      noticeGate: NOTICE_GATE,
+      watch: registry.watch,
+      report: fault => faults.record(fault),
     });
-
-    // The repaint request reaches the host's `tui` only when the host invokes the factory. The
-    // factory's call sets it, so every push after the install reaches the host.
-    let requestRepaint: (() => void) | undefined;
+    latest = configuration;
+    const { rows, rowGap, warning, noticeSeconds } = configuration;
 
     const { store, release, attachFooterData } = feedSessionData(
-      pi, ctx, () => requestRepaint?.(), homedir, () => performance.now(), schedule, noticeSeconds,
+      pi, ctx, repaint, homedir, () => performance.now(), schedule, noticeSeconds,
     );
-    releasePrevious = release;
+    // The release drops the store's subscriptions and this read's watches together: a later
+    // session's registration never fills a released footer (design 19 item 3).
+    releasePrevious = () => {
+      release();
+      registry.releaseWatches();
+    };
 
     if (warning !== undefined) ctx.ui.notify(warning, "warning");
 

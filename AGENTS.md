@@ -1,18 +1,12 @@
 # AGENTS.md
 
-Notes for an agent working in this repository. `ARCHITECTURE.md` describes the parts; this file is the
-handful of things that are easy to get wrong.
+Notes for an agent working in this repository. `ARCHITECTURE.md` describes the parts; this file is the handful of things that are easy to get wrong.
 
 ## Words
 
-A row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). That is the code's
-vocabulary. Users read "row", "entry" and "instrument": a row is a list of entries, and an entry names
-the instrument it renders (Joel's ruling, 2026-11-15;
-[ADR 0015](docs/adr/0015-cell-is-no-longer-a-word-users-see.md)). So a configuration key, a warning,
-the README and a `docs/` page never say "cell", and prose here may say it about the model.
+In the code, a row holds cells, and a cell holds an instrument (Joel's ruling, 2026-11-03). Users and extension authors read only "row" and "instrument": a row holds instruments (Joel's ruling, 2026-11-16; [ADR 0015](docs/adr/0015-cell-is-no-longer-a-word-users-see.md)). "Cell" and "entry" are code vocabulary only. A configuration key, a printed warning, the README and a `docs/` page say neither word: they say "instrument", or describe a row's position. Prose in this file may use both about the model.
 
-Never call the statusline concept a "module" or a "widget". Where the extension-source-layout spec
-uses "module" as a term of art, it means a source file, and new prose says "source file".
+Never call the statusline concept a "module" or a "widget". Where the extension-source-layout spec uses "module" as a term of art, it means a source file, and new prose says "source file".
 
 ## Running things
 
@@ -22,82 +16,39 @@ pnpm test        # node --test, source executed directly
 openspec validate --strict
 ```
 
-There is no build step. Node strips types at load, so only erasable TypeScript is allowed: no `enum`,
-no parameter properties, no runtime `namespace`, no decorators. Relative imports carry the `.ts`
-extension.
+There is no build step. Node strips types at load, so only erasable TypeScript is allowed: no `enum`, no parameter properties, no runtime `namespace`, no decorators. Relative imports carry the `.ts` extension.
+
+The package publishes one subpath, `exports["./instruments"]`, and it points at `extensions/jefferson/instrument-contract.ts`, a file of type declarations. A CI step pins that target in the packed file list, so a change that moves the contract keeps the export, the tarball and the check in step.
 
 ## Adding an instrument
 
-1. Add one file under `extensions/jefferson/components/instruments/` that imports
-   `FOUNDATIONAL_OPTIONS` from `instrument.ts` and declares the instrument — name, variables, defaults
-   and options, plus a `defaultLabel` or a `variableFg` if it needs them — then add one entry to
-   `extensions/jefferson/shipped.ts` so `instrumentNamed` resolves it. A `defaultLabel` carries no trailing
-   space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required
-   on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as
-   `blank` does. A `$bar` in a format makes the cell fill without saying so. A variable with more
-   than one rendering declares `variableForms` in the same file: the named resolvers for that
-   variable; a bare `$name` renders `variables.name`. `parseFormat` rejects a `|name` the declaration
-   does not carry, and `resolveFormat` renders the form a format names, so the forms are declared
-   once, on the instrument.
-2. Variable resolvers read the store and return already-formatted strings. The bound render seam is
-   `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
-3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`,
-   along with whatever seeds or pushes it. Do not reach for host state inside the instrument.
-4. A row sizes a cell from its text rendered at width 0, so an instrument's text must not depend on
-   the width unless it fills. The test in `tests/instrument.test.ts` that compares width 0 with width
-   200 across the shipped instruments fails when one breaks this.
+1. Add one file under `extensions/jefferson/components/instruments/` that imports `FOUNDATIONAL_OPTIONS` from `instrument.ts` and declares the instrument — name, variables, defaults and options, plus a `defaultLabel` or a `variableFg` if it needs them — then add it to `SHIPPED` in `extensions/jefferson/shipped.ts`. Its `name` is its registered name, `jefferson.default.<name>`, and startup registers the list through the same message an extension posts. A `defaultLabel` carries no trailing space: binding adds the one gap, and a declared space would only be trimmed. `fills` is required on `Instrument`: set it on the declaration when the instrument takes the row's spare columns, as `blank` does. A `$bar` in a format makes the cell fill without saying so. A variable with more than one rendering declares `variableForms` in the same file: the named resolvers for that variable; a bare `$name` renders `variables.name`. `parseFormat` rejects a `|name` the declaration does not carry, and `resolveFormat` renders the form a format names, so the forms are declared once, on the instrument.
+2. Variable resolvers read the store and return already-formatted strings. The bound render seam is `(readings, width, theme) => string`; never subscribe, poll, or cache host data.
+3. If the store does not hold the data the instrument displays, add it in `extensions/jefferson/data/`, along with whatever seeds or pushes it. Do not reach for host state inside the instrument. An instrument another extension provides brings its own data: its fields arrive through `data/provider-fields.ts`, and its resolvers read those fields and no other datum.
+4. A row sizes a cell from its text rendered at width 0, so an instrument's text must not depend on the width unless it fills. The test in `tests/instrument.test.ts` that compares width 0 with width 200 across the shipped instruments fails when one breaks this.
 5. Add a test that proves the cell renders it, and one that proves alignment still applies.
-6. A visual lives in `extensions/jefferson/components/visuals/` and imports no file of this package;
-   `format.ts` or a declaration mixes it in. An instrument whose datum shows for a time declares
-   `shownUntil` on its declaration rather than keeping time or subscribing: binding hands the resolved
-   text to the timed visual with the render's `sampledAt`, and past that instant the cell renders
-   nothing, label included.
+6. A visual lives in `extensions/jefferson/components/visuals/` and imports no file of this package; `format.ts` or a declaration mixes it in. An instrument whose datum shows for a time declares `shownUntil` on its declaration rather than keeping time or subscribing: binding hands the resolved text to the timed visual with the render's `sampledAt`, and past that instant the cell renders nothing, label included.
 
 ## Adding a notice kind
 
-One notice kind is one line pi's transcript draws. To add one, add a member of `NoticeKind` in
-`extensions/jefferson/data/notice.ts`, one entry in `FORMATS` in
-`extensions/jefferson/components/instruments/notice.ts`, and a subscription in
-`extensions/jefferson/data/session-data-feed.ts` only if a host event carries the kind. Every
-subscription joins the feed's one release, and the whole notice path stays dormant while no row places
-a `notice` cell.
+One notice kind is one line pi's transcript draws. To add one, add a member of `NoticeKind` in `extensions/jefferson/data/notice.ts`, one entry in `FORMATS` in `extensions/jefferson/components/instruments/notice.ts`, and a subscription in `extensions/jefferson/data/session-data-feed.ts` only if a host event carries the kind. Every subscription joins the feed's one release, and the whole notice path stays dormant while no row places a `notice` cell.
 
-Two things a new kind must not break. **A kind's format is plain:** it names the values (`$tokens`,
-`$cost`, `$idle`, `$blocks`) and takes no modifier and no form, because styling belongs to the cell and
-an inner reset would drop the notice's `warning` foreground. **The declaration's two variable sets are
-not interchangeable:** `variables` holds `$notice`, the cell's format, and `composed.variables` holds
-the values a kind's format names. A `formats` entry that names `$notice`, or a cell's format that names
-`$tokens`, rejects the document. [ADR 0012](docs/adr/0012-a-composed-format-is-chosen-by-a-reading.md)
-says why the sets are split.
+Two things a new kind must not break. **A kind's format is plain:** it names the values (`$tokens`, `$cost`, `$idle`, `$blocks`) and takes no modifier and no form, because styling belongs to the cell and an inner reset would drop the notice's `warning` foreground. **The declaration's two variable sets are not interchangeable:** `variables` holds `$notice`, the cell's format, and `composed.variables` holds the values a kind's format names. A `formats` entry that names `$notice`, or a cell's format that names `$tokens`, rejects the document. [ADR 0012](docs/adr/0012-a-composed-format-is-chosen-by-a-reading.md) says why the sets are split.
 
-A kind's text carries the noun or the unit; a value carries the number. `$blocks` is `2` and `$idle`
-is `6`, because an English word inside a value is what a user writing their own words would have to
-work around, and the notice has two thinking kinds only because pi writes `thinking block` for one.
+A kind's text carries the noun or the unit; a value carries the number. `$blocks` is `2` and `$idle` is `6`, because an English word inside a value is what a user writing their own words would have to work around, and the notice has two thinking kinds only because pi writes `thinking block` for one.
 
-`data/notice.ts` copies pi's rule. Its header carries the pin, `shortcut: copies pi 1.4.0's rule;
-drift in the user's global pi between pin bumps is invisible, re-check on every pin bump`, so check
-every constant and every rule against pi's own files when the pin moves, and move the pin in that
-comment.
+`data/notice.ts` copies pi's rule. Its header carries the pin, `shortcut: copies pi 1.4.0's rule; drift in the user's global pi between pin bumps is invisible, re-check on every pin bump`, so check every constant and every rule against pi's own files when the pin moves, and move the pin in that comment.
 
 ## Testing the footer's height
 
-The footer's first line is row one; only the lines between rows are empty. A test of a row's
-horizontal geometry passes `rowGap` 0 to `createFooter` so every line is a row; a test of the gap reads
-the exact list of lines. The gap line is a bare `""`, so the helper that frames a row's line does not apply
-to it. [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md) says why the first row sits flush on the editor.
+The footer's first line is row one; only the lines between rows are empty. A test of a row's horizontal geometry passes `rowGap` 0 to `createFooter` so every line is a row; a test of the gap reads the exact list of lines. The gap line is a bare `""`, so the helper that frames a row's line does not apply to it. [ADR 0008](docs/adr/0008-the-space-between-rows-is-the-stacks-gap.md) says why the first row sits flush on the editor.
 
 ## Two traps this repository has already paid for
 
-**A pad needs a reset.** A cell's text may end with an open SGR. Spaces appended after it inherit the
-styling. Emit a reset before such a pad. The host resets between children, so only the intra-cell case
-is ours.
+**A pad needs a reset.** A cell's text may end with an open SGR. Spaces appended after it inherit the styling. Emit a reset before such a pad. The host resets between children, so only the intra-cell case is ours.
 
-**Measure columns, never characters.** `visibleWidth` for measuring, `truncateToWidth` for clipping.
-A wide glyph dropped at a clip boundary leaves the text narrower than the arithmetic predicted, so
-compute the pad from the clipped result.
+**Measure columns, never characters.** `visibleWidth` for measuring, `truncateToWidth` for clipping. A wide glyph dropped at a clip boundary leaves the text narrower than the arithmetic predicted, so compute the pad from the clipped result.
 
 ## Where decisions live
 
-An `openspec/changes/<name>/design.md` records a change's decisions, and archives with it. Reasons that
-outlive a change belong in `docs/adr/`. The model belongs in `ARCHITECTURE.md`. If a rule is being
-retired, say so in an ADR rather than deleting it from a spec and leaving the next reader to guess why.
+An `openspec/changes/<name>/design.md` records a change's decisions, and archives with it. Reasons that outlive a change belong in `docs/adr/`. The model belongs in `ARCHITECTURE.md`. If a rule is being retired, say so in an ADR rather than deleting it from a spec and leaving the next reader to guess why.

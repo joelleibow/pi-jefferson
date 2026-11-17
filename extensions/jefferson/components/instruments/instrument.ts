@@ -1,6 +1,11 @@
-/** Each instrument owns its name, variables, default format and accepted options. */
+/**
+ * Each instrument owns its name, variables, default format and accepted options. The declaration is
+ * the published contract's declaration over Jefferson's own readings, plus the members only a
+ * shipped instrument takes, so change 3's visual mix-in lands once (design 3; M14).
+ */
 import type { Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 
+import type { ComposedFormat as ContractComposedFormat, ContractDeclaration } from "../../instrument-contract.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 
 export const DEFAULT_CELL_TEXT =
@@ -16,39 +21,21 @@ export interface Instrument {
 export type VariableForm = (readings: Readings) => string | undefined;
 
 /** A format set chosen by a reading: the notice's kind, its values and its default text. */
-export interface ComposedFormat {
-  /** The variable the chosen text arrives at the cell's format through. */
-  readonly variable: string;
-  /** The values a kind's format may name, already formatted. */
-  readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
-  /** The reading that selects the format's key; nothing to compose when it yields `undefined`. */
-  readonly select: (readings: Readings) => string | undefined;
-  /** One default format per key. */
-  readonly formats: Readonly<Record<string, string>>;
-}
+export type ComposedFormat = ContractComposedFormat<Readings>;
 
-export interface InstrumentDeclaration {
-  readonly name: string;
-  readonly variables: Readonly<Record<string, (readings: Readings) => string | undefined>>;
+export type InstrumentDeclaration = Omit<ContractDeclaration<Readings>, "variableFg" | "options"> & {
   /**
-   * The named forms a variable accepts, by variable and then by name; `|name` after that variable
-   * selects one. A bare `$name` renders `variables`, which a form may also be named for.
+   * A foreground token per variable; the render's theme is passed so a provided token is checked.
+   * The contract gives a provider `string | undefined`, because pi's own type graph must not enter a
+   * provider's compile (owner-rulings.md, 2026-11-16).
    */
-  readonly variableForms?: Readonly<Record<string, Readonly<Record<string, VariableForm>>>>;
-  readonly bar?: (readings: Readings) => number | null;
-  /** A declaration that fills in every format. A `$bar` in the format fills without saying so. */
-  readonly fills?: boolean;
-  readonly defaultFormat: string;
-  readonly defaultLabel?: string;
-  readonly variableFg?: Readonly<Record<string, (value: string) => ThemeColor | undefined>>;
-  /** A format set chosen by a reading, composed into the variable it names. */
-  readonly composed?: ComposedFormat;
+  readonly variableFg?: Readonly<Record<string, (value: string, theme: Theme) => ThemeColor | undefined>>;
   /**
    * A timed datum's instant: the reading the timed visual compares against the render's instant.
    * A declaration carrying it is timed, and the whole cell shows or hides with the datum.
    */
   readonly shownUntil?: (readings: Readings) => number | undefined;
   readonly options: readonly string[];
-}
+};
 
 export const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style", "label"] as const);

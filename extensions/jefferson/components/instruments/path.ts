@@ -23,7 +23,7 @@ const relativeToHome: VariableForm = (readings) => {
 const base: VariableForm = readings => readings.cwd === undefined ? undefined : basename(readings.cwd);
 
 export const path: InstrumentDeclaration = {
-  name: "path",
+  name: "jefferson.default.path",
   variables: { path: base },
   variableForms: {
     path: { base, absolute: readings => readings.cwd, relative: relativeToHome },

@@ -3,8 +3,9 @@
  *
  * It resolves where the two documents live, then reads and parses the one that applies, reads the
  * `rows` list as rows of entries, applies the default row and the cells ceiling, and resolves each
- * cell's instrument at parse time. A document it refuses renders the default row and warns; that is
- * the whole of its error handling.
+ * cell's instrument at parse time through the source's registry. Every name a document writes is
+ * normalized once here (design 5, 8; M12). A document it refuses renders the default row and warns;
+ * that is the whole of its error handling.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -17,16 +18,17 @@ import {
   type ThemeStyle,
 } from "@earendil-works/pi-coding-agent";
 
-import { blank } from "./components/instruments/blank.ts";
-import { NOTICE_SECONDS, notice } from "./components/instruments/notice.ts";
-import { instrumentNamed } from "./shipped.ts";
-import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
-import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import {
+  containProvided,
   instrumentBindings,
   type BindInstrument,
   type ConfiguredInstrument,
 } from "./components/instruments/instrument-binding.ts";
+import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
+import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
+import type { Fault } from "./faults.ts";
+import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { isProvidedName, normalizeName } from "./registration.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
@@ -39,12 +41,32 @@ function orList(values: readonly string[]): string {
   return quoted.slice(0, -1).join(", ") + ` or ${quoted[quoted.length - 1]}`;
 }
 
-/** The two resolved document paths and the caller's trust decision. */
+/** Where a document lives, what it may read, and the registry it resolves names against. */
 export interface ConfigurationSource {
   agentPath: string;
   projectPath: string;
   projectTrusted: boolean;
   theme: Theme;
+  /** The declaration registered under a full name, or `undefined`. */
+  resolve(name: string): InstrumentDeclaration | undefined;
+  /** The declaration an entry renders when no registered name answers it: `blank`. */
+  fallback: InstrumentDeclaration;
+  /** The notice declaration's registered name, and the visible time it takes when unconfigured. */
+  noticeGate: { name: string; seconds: number };
+  /** Hold `apply` until the name registers, or until the install whose read asked is released. */
+  watch(name: string, apply: (declaration: InstrumentDeclaration) => void): void;
+  /** Record a fault this read found, which the composition root delivers after startup completes. */
+  report(fault: Fault): void;
+}
+
+/** One name the document wrote that no instrument answered, and the row that placed it. */
+export interface UnknownName {
+  /** The spelling the document used, which is the one every message quotes. */
+  written: string;
+  /** The name it means: a bare name is the `jefferson.default.*` one. */
+  normalized: string;
+  /** The 1-based row that placed it: only a row's entry is reported, because only it renders blank. */
+  row: number;
 }
 
 export interface Configuration {
@@ -56,10 +78,14 @@ export interface Configuration {
    * composition root passes it to the feed, which takes no notice and holds no timer without it.
    */
   noticeSeconds: number | undefined;
+  /** The document path this read chose, which is the one its warnings print. */
+  path: string;
   /**
-   * Set when a present document was rejected, and also when an accepted document has
-   * something to report: instruments the extension does not implement.
+   * Every name the document names that no instrument answered, as data: startup drops the ones the
+   * registry answers by the time startup completes and composes the rest (design 12).
    */
+  unknownNames: readonly UnknownName[];
+  /** Set only when a present document could not be read or was rejected. */
   warning: string | undefined;
 }
 
@@ -80,37 +106,182 @@ const ROWS_FORM = '{"rows": [[{"instrument": "model"}]]}';
 /** A document the extension refused: the default row renders, none of it. */
 class RejectedConfiguration extends Error {}
 
-/** What an accepted document still has to say for itself, gathered across all its rows. */
-interface Notices {
-  /** Each distinct (row, name) pair a row's entry names, in row order and first-entry order. */
-  unknownInRow: { row: number; name: string }[];
-  /** Every name the `instruments` block configures that no shipped instrument answers to, in key order. */
-  unknownInBlock: string[];
+/** What one read gathers as it walks the document: the names nothing answered, and the holders a
+ * late registration fills. */
+interface Reading {
+  unknownNames: UnknownName[];
+  /** Each unresolved provided name, and every cell of this read that names it. */
+  holders: Map<string, Array<Cell["holder"]>>;
+  /** Each provided block value whose instrument has not registered, for the watch to check then. */
+  held: Map<string, unknown>;
+  /** Each provided name whose settings were refused: its entries render the fallback instrument. */
+  refused: Set<string>;
+  /**
+   * The settings faults found while the document normalized. They wait here, because a document a
+   * later row or key rejects never installs, and a fault about it would be a warning about something
+   * the user never had (the published rule is that only an accepted document's faults are reported).
+   */
+  faults: Fault[];
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
 interface InstrumentConfiguration {
-  /** Each declaration's parsed format, style, label and kind formats. */
-  configured: ReadonlyMap<string, ConfiguredInstrument>;
+  /** Each declaration's parsed format, style, label and kind formats; a watch adds to it. */
+  configured: Map<string, ConfiguredInstrument>;
   /** Each declaration's declared visible time, by name: the reader's share, never the binding's. */
   declaredSeconds: ReadonlyMap<string, number>;
 }
 
-function readInstruments(raw: unknown, theme: Theme, notices: Notices): InstrumentConfiguration {
+/**
+ * Everything under a provided name's key — its shape, format, label, option, variable, modifier and
+ * style — checked against what its registration declared, or the one part that refuses it. It runs
+ * when the document and the registration are both in hand, whichever came second (design 13; J1(b)).
+ * A provided instrument takes the options its adapted declaration lists: the foundational three, and
+ * `formats` when it declares one, so the check and the binding accept the same keys.
+ */
+function checkProvidedSettings(
+  name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme,
+): ConfiguredInstrument | { kind: string; part: string } {
+  const consequence = "; it renders blank";
+  if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
+    return {
+      kind: "settings-shape",
+      part: `${JSON.stringify(name)} is configured with a value that is not an object${consequence}`,
+    };
+  }
+  const entry = (raw ?? {}) as Record<string, unknown>;
+  const format = entry.format;
+  if (format !== undefined && typeof format !== "string") {
+    return {
+      kind: "settings-format",
+      part: `${JSON.stringify(name)} is configured with a format that is not a string${consequence}`,
+    };
+  }
+  const label = entry.label;
+  if (label !== undefined && typeof label !== "string") {
+    return {
+      kind: "settings-label",
+      part: `${JSON.stringify(name)} is configured with a label that is not a string${consequence}`,
+    };
+  }
+  for (const key of Object.keys(entry)) {
+    if (!declaration.options.includes(key)) {
+      return {
+        kind: "settings-option",
+        part: `${JSON.stringify(name)} is configured with ${JSON.stringify(key)}, which the instrument does not declare${consequence}`,
+      };
+    }
+  }
+  let segments: FormatSegment[];
+  try {
+    segments = parseFormat(declaration, format ?? declaration.defaultFormat);
+  } catch (error) {
+    // The table separates a format naming a variable the instrument lacks from one the language
+    // refuses; the parse error is the only place that difference is visible.
+    const variable = error instanceof Error
+      ? /names a variable it does not declare: (".*")$/.exec(error.message)?.[1]
+      : undefined;
+    return variable === undefined
+      ? { kind: "settings-parse", part: `${JSON.stringify(name)} is configured with a format Jefferson cannot parse${consequence}` }
+      : {
+        kind: "settings-variable",
+        part: `${JSON.stringify(name)} is configured with a format naming ${variable}, which the instrument does not declare${consequence}`,
+      };
+  }
+  let style: ThemeStyle;
+  try {
+    style = validateStyle(entry.style, theme);
+  } catch {
+    return {
+      kind: "settings-style",
+      part: `${JSON.stringify(name)} is configured with a style Jefferson cannot use${consequence}`,
+    };
+  }
+  // The composed set's kinds, checked as the whole-document rule checks Jefferson's own: shape, the
+  // kind it names, the text's type, then the parse — each refusing only this instrument (J1(b)).
+  let formats: Record<string, FormatSegment[]> | undefined;
+  const declaredFormats = entry.formats;
+  if (declaredFormats !== undefined) {
+    if (typeof declaredFormats !== "object" || declaredFormats === null || Array.isArray(declaredFormats)) {
+      return {
+        kind: "settings-formats",
+        part: `${JSON.stringify(name)} is configured with formats that is not an object${consequence}`,
+      };
+    }
+    formats = {};
+    const carried = declaration.composed?.formats;
+    for (const [kind, text] of Object.entries(declaredFormats)) {
+      if (carried === undefined || !Object.hasOwn(carried, kind)) {
+        return {
+          kind: "settings-formats-kind",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)}, which the instrument does not carry${consequence}`,
+        };
+      }
+      if (typeof text !== "string") {
+        return {
+          kind: "settings-formats-string",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format is not a string${consequence}`,
+        };
+      }
+      try {
+        formats[kind] = parseFormat(declaration, text, true);
+      } catch {
+        return {
+          kind: "settings-formats-parse",
+          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format Jefferson cannot parse${consequence}`,
+        };
+      }
+    }
+  }
+  return { segments, style, ...(label === undefined ? {} : { label }), ...(formats === undefined ? {} : { formats }) };
+}
+
+function readInstruments(raw: unknown, source: ConfigurationSource, reading: Reading): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
   const declaredSeconds = new Map<string, number>();
   if (raw === undefined) return { configured, declaredSeconds };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new RejectedConfiguration("the instruments value is not an object");
   }
+  // Each key as written, by the name it means: two registered spellings of one instrument are
+  // refused, and two spellings of an unregistered one are two inert entries.
+  const written = new Map<string, string>();
   for (const [name, value] of Object.entries(raw)) {
+    const normalized = normalizeName(name);
+    const earlier = written.get(normalized);
+    written.set(normalized, name);
+    const declaration = source.resolve(normalized);
+    // An entry whose instrument has not registered draws no warning, whatever it holds: its settings
+    // are checked only when that instrument registers (owner-rulings.md, 2026-11-16).
+    if (declaration === undefined) {
+      // Only a provided name can still register, so only its raw value waits for the watch (design 9).
+      if (isProvidedName(normalized)) reading.held.set(normalized, value);
+      continue;
+    }
+    // Two spellings of one registered instrument are a mistake the block cannot settle: the document
+    // is refused and the message quotes both keys as written (2.6).
+    if (earlier !== undefined) {
+      throw new RejectedConfiguration(
+        `the instruments block configures ${JSON.stringify(earlier)} and ${JSON.stringify(name)}, which are one instrument`,
+      );
+    }
+
+    // A provided name answers to its own instrument alone, so a fault under it refuses that
+    // instrument and never the document: one extension's mistake cannot take down a user's footer.
+    if (isProvidedName(normalized)) {
+      const settings = checkProvidedSettings(normalized, value, declaration, source.theme);
+      if ("part" in settings) {
+        reading.refused.add(normalized);
+        reading.faults.push({ scope: normalized, kind: settings.kind, part: settings.part });
+        continue;
+      }
+      configured.set(normalized, settings);
+      continue;
+    }
+
+    // Jefferson's own instruments keep the whole-document rule.
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
-    }
-    const declaration = instrumentNamed(name);
-    if (declaration === undefined) {
-      notices.unknownInBlock.push(name);
-      continue;
     }
     const entry = value as Record<string, unknown>;
     for (const key of Object.keys(entry)) {
@@ -126,7 +297,7 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
     try {
       segments = parseFormat(declaration, format ?? declaration.defaultFormat);
     } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(error.message);
+      if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
       throw error;
     }
     const label = entry.label;
@@ -155,16 +326,16 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
         try {
           formats[kind] = parseFormat(declaration, format, true);
         } catch (error) {
-          if (error instanceof Error) throw new RejectedConfiguration(error.message);
+          if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
           throw error;
         }
       }
     }
     let style: ThemeStyle;
     try {
-      style = validateStyle(entry.style, theme);
+      style = validateStyle(entry.style, source.theme);
     } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(declaration.name)} ${error.message}`);
+      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} ${error.message}`);
       throw error;
     }
     configured.set(declaration.name, {
@@ -178,12 +349,12 @@ function readInstruments(raw: unknown, theme: Theme, notices: Notices): Instrume
   return { configured, declaredSeconds };
 }
 
-function defaultRow(bind: BindInstrument): Row {
-  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind) };
+function defaultRow(bind: BindInstrument, fallback: InstrumentDeclaration): Row {
+  return { distribution: DISTRIBUTIONS[0], cells: blankCells(DEFAULT_CELLS, bind, fallback) };
 }
 
-function blankCells(count: number, bind: BindInstrument): Cell[] {
-  return Array.from({ length: count }, () => ({ instrument: bind(blank), align: ALIGNMENTS[0] }));
+function blankCells(count: number, bind: BindInstrument, fallback: InstrumentDeclaration): Cell[] {
+  return Array.from({ length: count }, () => ({ name: fallback.name, holder: { current: bind(fallback) }, align: ALIGNMENTS[0] }));
 }
 
 /**
@@ -192,13 +363,15 @@ function blankCells(count: number, bind: BindInstrument): Cell[] {
  * rejected: a row of no cells has nothing to render. `index` is 0-based and internal; every message
  * places the row by its 1-based position, which is the number a user counts to.
  */
-function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindInstrument): Row {
+function normalizeRow(
+  raw: unknown, index: number, reading: Reading, bind: BindInstrument, source: ConfigurationSource,
+): Row {
   const place = `row ${index + 1}:`;
   if (!Array.isArray(raw)) {
-    throw new RejectedConfiguration(`${place} is not a list; a row is a list of entries, as ${ROWS_FORM}`);
+    throw new RejectedConfiguration(`${place} is not a list; a row is a list of instruments, as ${ROWS_FORM}`);
   }
   if (raw.length === 0) {
-    throw new RejectedConfiguration(`${place} is empty; a row lists the entries it renders`);
+    throw new RejectedConfiguration(`${place} is empty; a row lists the instruments it renders`);
   }
 
   const cells: Cell[] = [];
@@ -210,7 +383,9 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
     }
     const unknownKey = Object.keys(entry).find((key) => key !== "instrument" && key !== "align");
     if (unknownKey !== undefined) {
-      throw new RejectedConfiguration(`${at} has an unrecognised key ${JSON.stringify(unknownKey)}; an entry carries instrument and align`);
+      throw new RejectedConfiguration(
+        `${at} has an unrecognised key ${JSON.stringify(unknownKey)}; an instrument in a row takes only "instrument" and "align"`,
+      );
     }
     const fields = Object.entries(entry);
     const instrumentValue = fields.find(([key]) => key === "instrument")?.[1];
@@ -225,17 +400,32 @@ function normalizeRow(raw: unknown, index: number, notices: Notices, bind: BindI
       throw new RejectedConfiguration(`${at} align is not ${orList(ALIGNMENTS)}: ${JSON.stringify(alignValue)}`);
     }
     const align: CellAlign = alignValue === undefined ? "left" : alignValue;
-    const instrument = instrumentNamed(instrumentValue);
-    // One typo does not take down the statusline: the cell renders blank and the warning names it.
-    // Collect unknown names before truncating, so a typo past the ceiling still warns though its
-    // cell is not rendered.
-    if (instrument === undefined && !notices.unknownInRow.some((unknown) => unknown.row === index + 1 && unknown.name === instrumentValue)) {
-      notices.unknownInRow.push({ row: index + 1, name: instrumentValue });
+    const normalized = normalizeName(instrumentValue);
+    // A provided instrument whose settings were refused renders the fallback: the instrument
+    // exists, its settings do not, and the one warning already named it (design 13).
+    const refused = reading.refused.has(normalized);
+    const declaration = refused ? undefined : source.resolve(normalized);
+    // One typo does not take down the statusline: the cell renders the fallback and the warning
+    // names the spelling the document wrote. Collect unknown names before truncating, so a typo past
+    // the ceiling still warns though its cell is not rendered. A name joins once per row it is
+    // written in, and the first spelling of it is the one every message prints.
+    if (declaration === undefined && !refused
+      && !reading.unknownNames.some((unknown) => unknown.row === index + 1 && unknown.normalized === normalized)) {
+      reading.unknownNames.push({ written: instrumentValue, normalized, row: index + 1 });
     }
     // The ceiling truncates last: the first MAX_CELLS entries render, and the guard rather than a
     // break keeps every entry past it validated and checked for unknowns.
     if (cells.length < MAX_CELLS) {
-      cells.push({ instrument: bind(instrument ?? blank), align });
+      const resolved = declaration ?? source.fallback;
+      const holder = { current: bind(resolved) };
+      cells.push({ name: resolved.name, holder, align });
+      // An entry naming a provided instrument that has not registered joins that name's watch: when
+      // it registers, this read's bind fills the holder (design 9).
+      if (declaration === undefined && !refused && isProvidedName(normalized)) {
+        const recorded = reading.holders.get(normalized);
+        if (recorded === undefined) reading.holders.set(normalized, [holder]);
+        else recorded.push(holder);
+      }
     }
   }
   return { distribution: DISTRIBUTIONS[0], cells };
@@ -249,9 +439,9 @@ interface NormalizedDocument {
 }
 
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
-function normalizeDocument(document: unknown, notices: Notices, theme: Theme): NormalizedDocument {
+function normalizeDocument(document: unknown, reading: Reading, source: ConfigurationSource): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    throw new RejectedConfiguration("the configuration document is not an object");
+    throw new RejectedConfiguration("the configuration file is not an object");
   }
   const doc = document as Record<string, unknown>;
 
@@ -289,32 +479,56 @@ function normalizeDocument(document: unknown, notices: Notices, theme: Theme): N
     rowGap = value;
   }
 
-  const { configured, declaredSeconds } = readInstruments(doc.instruments, theme, notices);
-  const bind = instrumentBindings(configured);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, reading);
+  const binding = instrumentBindings(configured);
+  // Every provided instrument is bound through the outer boundary, at the reader's bind and the
+  // watch's alike, so neither moment can miss it; Jefferson's own stay unwrapped (design 10).
+  const bind: BindInstrument = declaration => isProvidedName(declaration.name)
+    ? containProvided(binding(declaration), declaration.name, fault => source.report(fault))
+    : binding(declaration);
   const rows = rawRows.length === 0
-    ? [defaultRow(bind)]
-    : rawRows.map((raw, index) => normalizeRow(raw, index, notices, bind));
+    ? [defaultRow(bind, source.fallback)]
+    : rawRows.map((raw, index) => normalizeRow(raw, index, reading, bind, source));
   // Placement is read from the rows the root installs, inside the ceiling the cells already obey.
   // The default row goes through it too, so the gate and the value cannot disagree about it.
-  const placesNotice = rows.some(row => row.cells.some(cell => cell.instrument === bind(notice)));
-  const noticeSeconds = placesNotice ? declaredSeconds.get(notice.name) ?? NOTICE_SECONDS : undefined;
+  const placesNotice = rows.some(row => row.cells.some(cell => cell.name === source.noticeGate.name));
+  const noticeSeconds = placesNotice
+    ? declaredSeconds.get(source.noticeGate.name) ?? source.noticeGate.seconds
+    : undefined;
+  // Only now, with the whole document normalized: a rejected read registers no watch and reports no
+  // fault, so a settings fault found above is delivered only for a document that installs.
+  for (const fault of reading.faults) source.report(fault);
+
+  // A name only the `instruments` block configures takes a watch with no holder, so its settings are
+  // checked when it registers: the check runs for every name the document names, not only the ones a
+  // row places (the statusline delta's MUST; M6).
+  for (const name of new Set([...reading.holders.keys(), ...reading.held.keys()])) {
+    const holders = reading.holders.get(name) ?? [];
+    const raw = reading.held.get(name);
+    source.watch(name, (declaration) => {
+      // (a) The same check the reader runs for a name already registered, on the value the document
+      // held for it — so the outcome depends on the name and never on the load order.
+      const settings = checkProvidedSettings(name, raw, declaration, source.theme);
+      if ("part" in settings) {
+        // (c) The fault refuses that instrument alone: every holder stays on the fallback.
+        source.report({ scope: name, kind: settings.kind, part: settings.part });
+        return;
+      }
+      // (b) The entry goes into the read's Map before the bind reads it, then every holder follows.
+      configured.set(name, settings);
+      const bound = bind(declaration);
+      for (const holder of holders) holder.current = bound;
+    });
+  }
   return { rows, rowGap, noticeSeconds };
 }
 
-/** What an accepted document has to say for itself, or `undefined` when it has nothing to say. */
-function acceptedWarning(path: string, notices: Notices): string | undefined {
-  const parts: string[] = [];
-  // The rows' parts first, then the block's one part: a row's part changes what renders.
-  for (const unknown of notices.unknownInRow) {
-    parts.push(`row ${unknown.row}: ${JSON.stringify(unknown.name)} is not a known instrument`);
-  }
-  if (notices.unknownInBlock.length > 0) {
-    parts.push(
-      `the instruments block names instruments the extension does not implement: ${notices.unknownInBlock
-        .map((name) => JSON.stringify(name))
-        .join(", ")}`,
-    );
-  }
+/**
+ * What an accepted document has to say for itself, or `undefined` when it has nothing to say. The
+ * delivery point hands it the names the registry still does not answer (design 12).
+ */
+export function acceptedWarning(path: string, unknownNames: readonly UnknownName[]): string | undefined {
+  const parts = unknownNames.map((unknown) => `row ${unknown.row}: ${JSON.stringify(unknown.written)} is not a known instrument`);
   return parts.length === 0 ? undefined : `pi-jefferson: ${path} ${parts.join("; ")}`;
 }
 
@@ -336,35 +550,45 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
   const bind = instrumentBindings();
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
-  if (!existsSync(path)) return { rows: [defaultRow(bind)], rowGap: DEFAULT_ROW_GAP, noticeSeconds: undefined, warning: undefined };
+  if (!existsSync(path)) {
+    return {
+      rows: [defaultRow(bind, source.fallback)],
+      rowGap: DEFAULT_ROW_GAP,
+      noticeSeconds: undefined,
+      path,
+      unknownNames: [],
+      warning: undefined,
+    };
+  }
 
   let document: unknown;
   try {
     document = JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return {
-      rows: [defaultRow(bind)],
+      rows: [defaultRow(bind, source.fallback)],
       rowGap: DEFAULT_ROW_GAP,
       noticeSeconds: undefined,
+      path,
+      unknownNames: [],
       warning: `pi-jefferson: ${path} could not be read or parsed; rendering the default row`,
     };
   }
 
   try {
-    const notices: Notices = { unknownInRow: [], unknownInBlock: [] };
-    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, notices, source.theme);
-    return {
-      rows,
-      rowGap,
-      noticeSeconds,
-      warning: acceptedWarning(path, notices),
+    const reading: Reading = {
+      unknownNames: [], holders: new Map(), held: new Map(), refused: new Set(), faults: [],
     };
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source);
+    return { rows, rowGap, noticeSeconds, path, unknownNames: reading.unknownNames, warning: undefined };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {
       return {
-        rows: [defaultRow(bind)],
+        rows: [defaultRow(bind, source.fallback)],
         rowGap: DEFAULT_ROW_GAP,
         noticeSeconds: undefined,
+        path,
+        unknownNames: [],
         warning: `pi-jefferson: ${path} was rejected (${error.message}); rendering the default row`,
       };
     }

@@ -46,13 +46,17 @@ export function createFooter(
       }
       const cached = texts.get(width);
       if (cached !== undefined) return cached;
-      const text = cell.instrument.render(current, width, theme);
+      const text = cell.holder.current.render(current, width, theme);
       texts.set(width, text);
       return text;
     };
     return {
-      fills: cell.instrument.fills,
-      contentWidth: () => cell.instrument.fills ? 0 : visibleWidth(textAt(0)),
+      // Read on every plan, never copied when the tree is built: a registration can swap the holder,
+      // and a filled cell that took the row's slack must give it back (design 9).
+      get fills() {
+        return cell.holder.current.fills;
+      },
+      contentWidth: () => cell.holder.current.fills ? 0 : visibleWidth(textAt(0)),
       render(cellWidth) {
         const lead = joint() ? " " : "";
         const clipped = truncateToWidth(lead + textAt(cellWidth), cellWidth);

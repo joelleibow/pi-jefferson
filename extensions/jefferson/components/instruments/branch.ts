@@ -2,7 +2,7 @@
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const branch: InstrumentDeclaration = {
-  name: "branch",
+  name: "jefferson.default.branch",
   variables: { branch: readings => readings.branch },
   defaultFormat: "$branch",
   defaultLabel: "Branch:",

@@ -3,7 +3,8 @@ import { test } from "node:test";
 
 import { DEFAULT_CELL_TEXT, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { blank } from "../extensions/jefferson/components/instruments/blank.ts";
-import { instrumentNamed } from "../extensions/jefferson/shipped.ts";
+import { SHIPPED } from "../extensions/jefferson/shipped.ts";
+import { shippedInstrument } from "./shipped-instrument.ts";
 import type { Notice } from "../extensions/jefferson/data/notice.ts";
 import type { Readings, Timed } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
@@ -56,9 +57,9 @@ const labels = {
 } as const;
 
 function named(name: string): InstrumentDeclaration {
-  const declaration = instrumentNamed(name);
+  const declaration = shippedInstrument(name);
   assert.ok(declaration, `${name} is shipped`);
-  assert.equal(declaration.name, name);
+  assert.equal(declaration.name, `jefferson.default.${name}`);
   return declaration;
 }
 
@@ -84,14 +85,13 @@ test("the eleven shipped declarations own their names, variables, defaults and f
   assert.equal(declarations.length, 11);
   assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
   for (const declaration of declarations) assert.deepEqual(declaration.options.slice(0, 3), blank.options);
-  assert.equal(instrumentNamed("blank"), blank);
+  assert.equal(shippedInstrument("blank"), blank);
 });
 
-test("unimplemented and inherited names stay unresolved however often asked", () => {
-  for (const name of ["git", "nope", "toString", "constructor", "hasOwnProperty", "__proto__"]) {
-    assert.equal(instrumentNamed(name), undefined, name);
-    assert.equal(instrumentNamed(name), undefined, name);
-  }
+test("A8 the shipped names are the set the extension shipped", () => {
+  const before = ["blank", "model", "thinking", "path", "context", "tokens", "cost", "branch", "session", "status", "notice"];
+  assert.deepEqual(SHIPPED.map(declaration => declaration.name), before.map(bare => `jefferson.default.${bare}`));
+  for (const bare of before) assert.ok(shippedInstrument(bare), bare);
 });
 
 test("every shipped default parses and renders its declared text", async () => {
@@ -140,8 +140,9 @@ test("each declaration reads only the datums its variables display", async () =>
   assert.equal(await render("cost", unreadable({ totals: seed.totals })), "$0.000");
 });
 
-test("unknown suppresses the whole model declaration even under a model-only format", async () => {
-  assert.equal(await render("model", { ...seed, provider: undefined }, "$model"), "");
+test("an unknown model datum blanks the declaration only when its format names it", async () => {
+  assert.equal(await render("model", { ...seed, provider: undefined }, "$model"), "claude-opus-4");
+  assert.equal(await render("model", { ...seed, provider: undefined }, "$provider"), "");
   assert.equal(await render("model", { ...seed, model: undefined }), "");
   assert.equal(await render("model", unknown), "");
   assert.equal(await render("model", { ...seed, provider: "" }, "$provider: $model"), ": claude-opus-4");
@@ -171,6 +172,19 @@ test("percent and cost variables arrive already formatted without a subscription
   assert.equal(await render("context", { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } }, "$percent"), "?");
   assert.equal(await render("cost", { ...seed, totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0.123 } }), "$0.123");
   assert.equal(await render("cost", seed), "$0.000");
+});
+
+test("a $bar-only context renders nothing with no usage, and an unfilled track for a null estimate", async () => {
+  // No usage at all is unknown, so a format that names only $bar renders nothing.
+  assert.equal(await render("context", unknown, "$bar"), "");
+  // A null estimate is a known usage with nothing to fill, so the dim track draws unfilled.
+  const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
+  assert.equal(
+    stripTerminalSequences(await render("context", {
+      ...seed, contextUsage: { tokens: null, contextWindow: 200000, percent: null },
+    }, "$bar")),
+    "░".repeat(80),
+  );
 });
 
 test("context distinguishes known estimates, null estimates, absent usage and real zero", async () => {
@@ -303,6 +317,7 @@ test("a footer's bound cost and tokens read one identical totals object from one
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   const { readConfiguration } = await import("../extensions/jefferson/configuration.ts");
+  const { configurationSource } = await import("./configuration-source.ts");
   const { createFooter } = await import("../extensions/jefferson/components/row/row-renderer.ts");
   const { createSessionDataStore } = await import("../extensions/jefferson/data/session-data-store.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
@@ -310,7 +325,9 @@ test("a footer's bound cost and tokens read one identical totals object from one
   const dir = mkdtempSync(join(tmpdir(), "jefferson-agreement-"));
   const agentPath = join(dir, "pi-jefferson.json");
   writeFileSync(agentPath, JSON.stringify({ rows: [[{ instrument: "cost" }, { instrument: "tokens" }]] }));
-  const { rows, warning } = readConfiguration({ agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme: fakeTheme() });
+  const { rows, warning } = readConfiguration(configurationSource({
+    agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme: fakeTheme(),
+  }).source);
   assert.equal(warning, undefined);
   let scans = 0;
   const store = createSessionDataStore({
@@ -327,8 +344,8 @@ test("a footer's bound cost and tokens read one identical totals object from one
   });
   const seen: Array<Readings["totals"]> = [];
   for (const cell of rows[0]?.cells ?? []) {
-    const bound = cell.instrument;
-    cell.instrument = { fills: bound.fills, render(readings, width, theme) {
+    const bound = cell.holder.current;
+    cell.holder.current = { fills: bound.fills, render(readings, width, theme) {
       seen.push(readings.totals);
       return bound.render(readings, width, theme);
     } };
@@ -370,7 +387,7 @@ test("an instrument that does not fill renders the same text at width 0 and at w
 
   // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
   const configured = instrumentBindings(new Map([
-    ["context", { segments: parseFormat(named("context"), "$percent $bar"), style: {} }],
+    [named("context").name, { segments: parseFormat(named("context"), "$percent $bar"), style: {} }],
   ]));
   const bar = configured(named("context"));
   assert.equal(bar.fills, true, "a format holding $bar fills");
@@ -444,8 +461,8 @@ test("an empty kind text silences that kind", async () => {
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const theme = fakeTheme();
-  const boundWith = (formats: Record<string, string>) => instrumentBindings(new Map([
-    ["notice", { segments: parseFormat(named("notice"), "$notice"), style: {},
+  const boundWith = (formats: Record<string, string>, cell = "$notice") => instrumentBindings(new Map([
+    [named("notice").name, { segments: parseFormat(named("notice"), cell), style: {},
       formats: Object.fromEntries(Object.entries(formats)
         .map(([kind, format]) => [kind, parseFormat(named("notice"), format, true)])) }],
   ]))(named("notice"));
@@ -454,6 +471,8 @@ test("an empty kind text silences that kind", async () => {
   assert.equal(boundWith({ miss: "   " }).render(held, 80, theme), "", "whitespace alone trims to the same");
   assert.equal(boundWith({ miss: "$idle" }).render(held, 80, theme), "",
     "and a text that resolves empty because its only value is one this kind does not carry");
+  assert.equal(stripTerminalSequences(boundWith({ miss: "" }, "!").render(held, 80, theme)), "Notice: !",
+    "the format does not name $notice, so an empty kind text leaves the label and its literal alone");
   assert.equal(stripTerminalSequences(boundWith({ miss: "Spent $tokens" }).render(held, 80, theme)),
     "Notice: Spent 125k", "a kind with text still renders");
 });
@@ -462,7 +481,7 @@ test("a configured kind's format renders the user's words around the declared va
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const bound = instrumentBindings(new Map([
-    ["notice", { segments: parseFormat(named("notice"), "$notice"), style: {},
+    [named("notice").name, { segments: parseFormat(named("notice"), "$notice"), style: {},
       formats: { miss: parseFormat(named("notice"), "Spent $tokens, paid$cost", true) } }],
   ]))(named("notice"));
   const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" }, shownUntil: 1 } };

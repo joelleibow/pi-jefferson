@@ -3,7 +3,7 @@ import { compactCount } from "./compact-count.ts";
 import { FOUNDATIONAL_OPTIONS, type InstrumentDeclaration } from "./instrument.ts";
 
 export const tokens: InstrumentDeclaration = {
-  name: "tokens",
+  name: "jefferson.default.tokens",
   variables: {
     input: ({ totals }) => totals === undefined ? undefined : compactCount(totals.input),
     output: ({ totals }) => totals === undefined ? undefined : compactCount(totals.output),

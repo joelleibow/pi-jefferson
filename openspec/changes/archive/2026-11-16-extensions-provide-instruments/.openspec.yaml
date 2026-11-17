@@ -1,0 +1,44 @@
+schema: marbleization
+created: 2026-11-15
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: 43dc6795-2ae2-47b1-9c81-5122ee6f777a
+    eleanor: 5c5a59fa-1c8b-427f-97de-03e4dab4064f
+    michael: 9697d5e7-b22f-42a6-8c8a-530dcb27b1e1
+    derek_spike: d7389373-1d82-4436-bd42-d19203168b43
+    judge_gen_verify: 0b7fb0a2-09c4-42d5-a9e6-bd85944ca784
+    judge_gen_review: 6d307f74-9efc-4146-a210-3d14c8a74a44
+    derek: bbbac359-8006-452d-a33c-a3a6bedd9b82
+    bambadjan: 7f8e70a6-413f-43c0-a827-d5ab5e57a1f1
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+  progress:
+    - "2026-11-15: change opened from card 2 of the extension-provided-instruments Explore session, right after 0.13.0 (37a1698). Branch extensions-provide-instruments. owner-rulings.md written from Joel's quoted words. Research workflow (Chidi + Eleanor) launched."
+    - "2026-11-15: research complete (Chidi 43dc6795, Eleanor 5c5a59fa). Michael orientation f86d97e1 launched; asked to decide whether resolver code in the contract is his call or Joel's."
+    - "2026-11-15: Michael orientation 9a603cfa: resolver code settled by him (contract carries functions). Joel ruled J1 (b) and the CONTRIBUTING.md docs split. Proposal + specs launched."
+    - "2026-11-15: proposal + 4 delta specs (new capability instrument-registration) by Bambadjan db543601, strict-valid. Council launched."
+    - "2026-11-15: council 0a212be1: catalyst clean; 6 lenses with findings (CC1, CC2 blocking); 3 owner questions raised. Michael council rulings 9c7bd38d launched."
+    - "2026-11-15: Michael council rulings 98ee22f7: 29 settled. Conductor surfaced the types-only ruling against Joel's earlier helper pick; Joel confirmed types-only. council.md launched."
+    - "2026-11-15: council.md (Bambadjan ed53ef37) written; deltas updated to 29 rulings; strict-valid. PL2 approved (types-only ruled by Joel). Design draft launched."
+    - "2026-11-15: design.md drafted (Bambadjan ae4d8336), 17 decisions, strict-valid. Joel ruled the channel names: jefferson:registration and jefferson:update. Design review Stages 0 (fold ruling) + 1-4 launched."
+    - "2026-11-15: design review 08e961e8 failed at s3-r5-structural (b163230d) timeout 1800000ms. Stages 0-2 done; S3 r1 needs_fixes, r2 clean, r3 needs_fixes, r4 clean. Resumed 44ff4261 at r5 with the completed critic report."
+    - "2026-11-15: design review done (44ff4261): S3 r4+r5 clean, S4 clean, 125 settled, no escalations. design gate approved. design-review.md + Derek red/green spike (own install in mktemp worktree) launched."
+    - "2026-11-15: design-review.md (Bambadjan 90cdb5a9). Derek spike d7389373: 440/440, typecheck clean, own install, main checkout intact (423/423). 9 design gaps to Michael, then fixes and tasks.md."
+    - "2026-11-15: Michael spike-gap resolution da548b4c: 10 fixes (G1-G6, G8-G11), no escalations; applied by Bambadjan 58ce91f9. tasks.md written (ffec9a93), strict-valid. Stage 5 launched with 60-minute lens timeout."
+    - "2026-11-16: Stage 5 feffa730 failed: s5-r3-codebase (72eac24a) timed out at 3600000ms while active (46 turns, 106 tool calls, 1 compaction; not hung). r1, r2 needs_fixes, both applied. Resumed 9262c046 at r3 reusing r3 readiness/structural; codebase rerun with 2h timeout."
+    - "2026-11-16: Stage 5 9262c046 hit the 5-round cap (r3-r5 needs_fixes; r5: 1 blocking + 6 major, all propose_fix by Michael 383d2eaa and applied by Bambadjan d160f8c1, unreviewed). Joel: \"If michael resolved these things lets implement if things surface then Derek should raise them.\" tasks gate approved by Joel's ruling."
+    - "2026-11-16: Derek implemented (5e06ed3f): 14 commits, HEAD 1d51698, 60/62 boxes (5.6, 5.7 are Joel's), 516/516, typecheck clean. One consult (describeValue, Michael c93c3055) amended by Bambadjan e9e3e846. Implementation gate launched."
+    - "2026-11-16: implementation gate 263cadda: changes_requested. Blocking: TDZ, Jefferson's own registration reads requestRepaint before init (171 Event handler errors in the suite). Major: 8.1 ticked without its no-notify-in-render assertion. 2 minor. Fix + re-review workflow 819a3f4e."
+    - "2026-11-16: Derek fixed the gate findings (2ec8f864, b8786d3); Michael re-review a735f4f0: approve. 518/518, 0 bus errors. Docs pass launched."
+    - "2026-11-16: docs pass (Bambadjan 1d771ec5) committed 999fbc6; conductor removed docs/releasing.md for him. 11/11 doc JSON examples accepted. PR #24 opened (release:minor). Judge Gen validate launched."
+    - "2026-11-16: Judge Gen verify 0b7fb0a2 (0 critical, W1-W3, S1-S3) + review 6d307f74 (0 must-fix, 7 should-fix, 2 nice). Michael Validate adjudication 18ded68a launched."
+    - "2026-11-16: Michael Validate 9697d5e7: changes_requested, 11 findings upheld (2 major code: W2 block-only provided name unwatched Jefferson-first, W3 a.b.c treated as provided; 9 minor, 1 Derek fixture + 8 Bambadjan docs). Withdrew his CR-R2-2. Fixes workflow 2cd68419."
+    - "2026-11-16: Validate fixes committed (e50263b code, b15e67e docs), 521/521. Joel ruled during Validate: names free except everything under jefferson. (refused at runtime, rejected at compile time by the contract types); unregistered block settings are silent. Workflow d37a05c5: Michael turns rulings into fixes, Derek then Bambadjan apply."
+    - "2026-11-16: Joel's live checks: 5.6 passed and ticked; 5.7 showed one warning per fault, wording pending. Joel's guide review produced rulings: no entry, no document, no prescribing code, unused-variable blanking is a bug, bare names are Jefferson's, and an Opus 5.5 high editorial pass over the user-facing docs. Workflow: Michael K-fixes, then Derek, then Bambadjan artifacts, then editorial on Opus."
+    - "2026-11-16: Re-check fixes committed 4f08ab4; Michael final check pending. Joel approved the 5.7 wording: \"Perfect. This all looks great.\" All tasks ticked. Archive next."
+    - "2026-11-16: Michael final check 55a47b83: approve. Archived by Bambadjan dcb4b809; 4 living specs strict-valid (instrument-registration created)."

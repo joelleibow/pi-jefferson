@@ -20,7 +20,7 @@ const FORMATS: Readonly<Record<NoticeKind, string>> = {
 };
 
 export const notice: InstrumentDeclaration = {
-  name: "notice",
+  name: "jefferson.default.notice",
   // The cell's format names the composed text, whose absence blanks the cell and its label.
   variables: { notice: () => undefined },
   composed: {

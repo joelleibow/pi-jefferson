@@ -1,7 +1,6 @@
 # Instruments
 
-An entry names one instrument. The instrument renders the text for that entry, from the pi session's
-own data.
+An instrument draws one piece of the footer from the pi session's data. A row lists the instruments it shows, and [Configuration](configuration.md) says how to write a row.
 
 Jefferson ships these instruments:
 
@@ -19,32 +18,29 @@ Jefferson ships these instruments:
 | `status` | `$status` | `Status:` | `$status` |
 | `notice` | `$notice` | `Notice:` | `$notice` |
 
-`blank` is the placeholder instrument. Its text is the fixed lorem ipsum above, and the default row
-holds ten of them.
+`blank` is the placeholder. Its text is the fixed lorem ipsum above, and the default row holds ten of them.
 
-The variables and the format language are in [Formats](formats.md). The `notice` instrument has its
-own page: [Notices](notices.md).
+Each of these is registered as `jefferson.default.<name>`, and a bare name such as `"model"` means that instrument. [Configuration](configuration.md#names) has the naming rule.
+
+[Formats](formats.md) explains the variables and the format language. `notice` has its own page, [Notices](notices.md).
 
 ## Options
 
-`instruments` configures an instrument once, by name, for every entry that names it. Every
-instrument takes three options:
+Every instrument takes three options, set in the `instruments` block ([Configuration](configuration.md#the-instruments-block)):
 
 | Option | Value |
 | --- | --- |
 | `format` | The text the instrument renders. See [Formats](formats.md). |
-| `label` | Text placed in front of the format. See below. |
-| `style` | Colours and attributes for the whole text. See [Formats](formats.md). |
+| `label` | Text in front of the format. See [The label](#the-label). |
+| `style` | Colours and attributes for the whole text. See [Formats](formats.md#styles). |
 
 `notice` also takes `seconds` and `formats`.
 
-An option the instrument does not declare rejects the document, and the warning names it.
+Jefferson refuses a setting it cannot use, such as an option the instrument does not take. For one of Jefferson's instruments, a refused setting rejects the whole configuration file ([Configuration](configuration.md#what-a-rejected-configuration-file-renders)). For an instrument from another extension, it refuses that instrument alone ([Configuration](configuration.md#an-extensions-instrument)).
 
 ## The label
 
-`label` is literal text placed in front of the format, whether the document configures the format or
-uses the default. Every instrument except `blank` has a default label, so `model` reads
-`Model: anthropic/claude-opus-4`.
+`label` is literal text in front of the format, whether you configure the format or keep the default. Every instrument except `blank` has a default label, so `model` reads `Model: anthropic/claude-opus-4`.
 
 ```json
 {
@@ -55,37 +51,18 @@ uses the default. Every instrument except `blank` has a default label, so `model
 
 That renders `🤔 High`.
 
-A label is literal: `$` means nothing in it, and `$label` is not a variable. A format that names
-`$label` rejects the document. Jefferson turns each control character in a label into one space,
-then removes the whitespace at its front and back. A label that is not a string rejects the document.
+`$` means nothing in a label, and `$label` is not a variable, so a format that names `$label` is refused. Jefferson turns each control character in a label into a space, then trims the whitespace from both ends. A label that is not a string is refused.
 
-A label followed by a format always gets one space between them, so you never write it. The space
-takes the label's style, counts toward the width of the text, and comes out of what `$bar` has left.
+Jefferson puts one space between a label and its format, so you never write it. The space takes the label's style, counts toward the instrument's width, and comes out of what `$bar` has left.
 
-A label that is empty after the trim, `label: ""` included, shows no label and no space. A format
-that is empty or only whitespace leaves the label alone, with no space after it.
+A label that is empty after the trim, `label: ""` included, shows no label and no space. A format that is empty or only whitespace leaves the label alone, with no space after it.
 
-A configured label replaces the default. `label: ""` removes it.
+A configured label replaces the default, so `label: ""` removes it.
 
-When an instrument's data is unknown, the entry renders nothing, the label included. With known
-data and `"format": ""`, the entry is the label alone.
+[Formats](formats.md#variables) says when an instrument renders nothing, label included. With `"format": ""` the instrument shows its label alone.
 
-## A name no instrument answers to
+## Instruments from other extensions
 
-A name the extension does not implement does not reject the document. Jefferson accepts it, warns,
-and renders that entry as `blank`, so one typo does not take the statusline down.
+Another extension can add instruments to the footer. Place one by its full name, such as `taiknr.savings`. Configure it in the `instruments` block as you configure Jefferson's own: `format`, `label` and `style`, plus `formats` when its extension offers that option. Its variables, default format and default label come from that extension's documentation.
 
-The warning places the entry by its row:
-
-```
-row 3: "taiknr.savings" is not a known instrument
-```
-
-The warning holds one part for each row and name, in row order.
-
-When the `instruments` block configures a name that no instrument answers to, the warning names it
-with no row, because no entry names it:
-
-```
-the instruments block names instruments the extension does not implement: "taiknr.savings"
-```
+[Provide instruments from your extension](extension-authors.md) describes what the extension writes.

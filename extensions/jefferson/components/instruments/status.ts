@@ -26,7 +26,7 @@ const statusText: VariableForm = (readings) => {
 };
 
 export const status: InstrumentDeclaration = {
-  name: "status",
+  name: "jefferson.default.status",
   variables: { status: statusText },
   defaultFormat: "$status",
   defaultLabel: "Status:",
