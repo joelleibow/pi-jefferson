@@ -99,7 +99,11 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
         afterName = false;
       } else {
         if (plain) throw formatError(`puts a modifier in a plain format: ${JSON.stringify("|" + name)}`);
-        const forms = subject?.kind === "variable" ? declaration.variableForms?.[subject.name] : undefined;
+        // A key the provider chose is its own: a variable named for an `Object.prototype` member has
+        // no forms, and a form nobody declared is no form.
+        const allForms = declaration.variableForms;
+        const forms = subject?.kind === "variable" && allForms !== undefined && Object.hasOwn(allForms, subject.name)
+          ? allForms[subject.name] : undefined;
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
         if (afterName && subject?.kind === "variable" && subject.form === undefined

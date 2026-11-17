@@ -291,7 +291,10 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
         : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
       // A composed declaration's kind formats parse once, at the bind: the defaults here and
       // the document's overrides already parsed by the configuration reader.
-      const composed = declaration.composed;
+      // Composed only when the format names the composed variable: a variable the format leaves out
+      // is never resolved, so its set's functions never run and cannot fault (decision 20).
+      const composed = segments.some(segment => segment.kind === "variable" && segment.form === undefined
+        && segment.name === declaration.composed?.variable) ? declaration.composed : undefined;
       const plain: Readonly<Record<string, FormatSegment[]>> = composed === undefined ? {}
         : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, true)]));
       instrument = {

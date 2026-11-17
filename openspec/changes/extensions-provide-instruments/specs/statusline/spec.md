@@ -484,6 +484,39 @@ unknown.
 - **WHEN** the only status's text is whitespace and newlines
 - **THEN** the cell renders nothing, as with no statuses
 
+### Requirement: A notice's text is a format with declared variables
+
+Each notice kind's text MUST be a format the user can configure, and the values in it MUST be
+variables the declaration carries: the token count, the cost, the idle minutes, the number of dropped
+thinking blocks and the like. A value MUST carry the quantity and no English word — `$idle` is the
+minutes and `$blocks` the count — and a unit or a noun belongs in the kind's text. A variable's
+numeral rendering MUST keep pi's formatting, and Jefferson MUST ship no translations.
+
+#### Scenario: A configured format
+
+- **WHEN** the document writes a notice kind's text in its own words around the declared variables
+- **THEN** the cell renders those words, with the notice's values in place of the variables
+
+#### Scenario: A value keeps pi's formatting
+
+- **WHEN** a configured format shows a count for a notice of 20,000 tokens
+- **THEN** the value reads `20k`, because pi's formatting belongs to the value and not to the words
+
+#### Scenario: A value with no word in it
+
+- **WHEN** a user writes `Anthropic a supprimé $blocks` for a notice of two dropped blocks
+- **THEN** the value is `2`, and the user's own words supply the noun pi would have written
+
+#### Scenario: An empty kind text silences it
+
+- **WHEN** the document sets `formats.miss: ""`, the cell's format names `$notice`, and the store holds a miss
+- **THEN** the cell renders nothing, with no `Notice:` label and no gap, because `$notice` has no text while that kind would show
+
+#### Scenario: An empty kind text under a format that leaves out `$notice`
+
+- **WHEN** the document sets `formats.miss: ""`, the cell's format is `!`, and the store holds a miss
+- **THEN** the cell renders `Notice: !`, because a variable the format does not name has no effect
+
 ## ADDED Requirements
 
 ### Requirement: A bare name means the default instrument of that name

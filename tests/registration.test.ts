@@ -1194,6 +1194,24 @@ test("A6 a provider's key that names an Object member reads as its own key", asy
   assert.equal(line(inheritedVariable), "Model: anthropic/claude-opus-4 c s");
   await settle();
   assert.deepEqual(inheritedVariable.notified, []);
+
+  // A form named through an inherited key is no form, so the format is refused at registration.
+  const inheritedForm = await registeredRow(t, {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "usage",
+      variables: { constructor: () => "c", saved: () => "s" },
+      variableForms: { saved: { short: () => "s" } },
+      defaultFormat: "$constructor|name $saved",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
+  await settle();
+  assert.equal(
+    inheritedForm.notified.some(notified => notified.message.includes('"taiknr.usage" carries a default format Jefferson cannot parse')),
+    true,
+    `an inherited key is no form: ${JSON.stringify(inheritedForm.notified)}`,
+  );
 });
 
 test("A2 a composed select swapped after registering does not reach the render", async (t) => {
@@ -1220,6 +1238,32 @@ test("A2 a composed select swapped after registering does not reach the render",
   payload.instruments[0]!.composed!.select = () => "idle";
   const session = await h.start();
   assert.equal(line(session), "Busy");
+});
+
+test("A6 a composed set the format does not name is never composed, so its functions never run", async (t) => {
+  let calls = 0;
+  const session = await registeredRow(t, {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "usage",
+      variables: {
+        state: () => undefined,
+        saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined,
+      },
+      composed: {
+        variable: "state",
+        variables: { saved: () => { calls++; throw new Error("provider"); } },
+        select: () => { calls++; throw new Error("provider"); },
+        formats: { busy: "Working on $saved" },
+      },
+      defaultFormat: "$saved",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }], [{ extension: "taiknr", field: "saved", value: "4.12" }]);
+  assert.equal(line(session), "Model: anthropic/claude-opus-4 4.12");
+  await settle();
+  assert.equal(calls, 0, "a variable the format leaves out is never resolved, so its set's functions never run");
+  assert.deepEqual(session.notified, []);
 });
 
 test("A6 a composed instrument whose format does not name its composed variable renders while select has no answer", async (t) => {
