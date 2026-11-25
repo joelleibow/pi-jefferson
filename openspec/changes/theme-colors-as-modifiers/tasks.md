@@ -412,7 +412,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   stays unchanged and remains the proof that every shipped name registers with no theme ever handed
   (ruling 2(d)). Verify: C1 green in both orders, `pnpm typecheck` clean and `pnpm test` green.
 
-- [ ] 3.3 Write the failing tests first: a payload that throws while vetting is contained (C6) — a
+- [x] 3.3 Write the failing tests first: a payload that throws while vetting is contained (C6) — a
   registration whose `fields` is `{ saved: 1n }`, then a well-formed registration a row places, in both
   load orders: the footer installs, the second instrument renders, no warning is drawn, and exactly one
   `console.error` line `Event handler error (jefferson:registration):` is written, with the error object.

@@ -325,13 +325,13 @@ export function createRegistrationListener({ events, registry, faults, fields, r
   // the first `receiveTheme` hands over the one theme: the whole hold the spec promises, widened to
   // the colour check without a second vet (design, "A provider's registration waits for the first
   // theme and is vetted once, whole").
-  const held: Array<(check: ForegroundCheck) => void> = [];
+  const held: Array<{ channel: RegistrationChannel | UpdateChannel; run: (check: ForegroundCheck) => void }> = [];
   let check: ForegroundCheck | undefined;
 
-  /** Vetted now when the listener is live, and queued otherwise. */
-  const accept = (run: (check: ForegroundCheck) => void): void => {
+  /** Vetted now when the listener is live, and queued otherwise, with the channel it came on. */
+  const accept = (channel: RegistrationChannel | UpdateChannel, run: (check: ForegroundCheck) => void): void => {
     if (check === undefined) {
-      held.push(run);
+      held.push({ channel, run });
       return;
     }
     run(check);
@@ -374,11 +374,11 @@ export function createRegistrationListener({ events, registry, faults, fields, r
     // made before the message takes its place in the queue, so a message posted by a getter during
     // this copy is queued — or vetted — ahead of it, which is the order acceptance has always taken.
     const copy = isPlainObject(payload) ? copyThrough(REGISTRATION_COPY, payload) : payload;
-    accept(checked => applyRegistration(copy, checked));
+    accept(REGISTRATION, checked => applyRegistration(copy, checked));
   });
   events.on(UPDATE, (payload: unknown) => {
     const copy = isPlainObject(payload) ? copyThrough(REPORT_COPY, payload) : payload;
-    accept(() => applyReport(copy));
+    accept(UPDATE, () => applyReport(copy));
   });
   events.emit(REGISTRATION, own);
 
@@ -392,7 +392,16 @@ export function createRegistrationListener({ events, registry, faults, fields, r
       const first = check === undefined;
       check = next;
       if (!first) return;
-      for (const run of held.splice(0)) run(next);
+      for (const { channel, run } of held.splice(0)) {
+        // Each drained message is contained on its own: a throw ends that message and is logged as
+        // pi's bus logs a live one, nothing is accepted or warned for it, and the drain goes on. Left
+        // uncontained, one provider's payload would take down this session's `session_start`.
+        try {
+          run(next);
+        } catch (error) {
+          console.error(`Event handler error (${channel}):`, error);
+        }
+      }
     },
   };
 }

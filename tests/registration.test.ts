@@ -1510,6 +1510,34 @@ test("C1 a getter that emits during another message's copy is vetted ahead of it
   }
 });
 
+test("C6 a payload that throws while vetting is contained, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "acme.x"]]);
+    const errors = t.mock.method(console, "error");
+    const h = harness();
+    const send = (): void => {
+      // The field type is a BigInt, which the refuse-its-type text cannot stringify.
+      h.events.emit("jefferson:registration", { extension: "taiknr", fields: { saved: 1n }, instruments: [] });
+      h.events.emit("jefferson:registration", {
+        extension: "acme",
+        fields: { x: "string" },
+        instruments: [{ name: "x", variables: { x: () => "ok" }, defaultFormat: "Acme $x" }],
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    assert.equal(line(session), "Model: anthropic/claude-opus-4 Acme ok", `${order}: the footer installed`);
+    await settle();
+    assert.deepEqual(session.notified, [], `${order}: nothing is accepted, recorded or warned for it`);
+    const logged = errors.mock.calls.map(call => call.arguments);
+    assert.equal(logged.length, 1, `${order}: one line`);
+    assert.equal(logged[0]?.[0], "Event handler error (jefferson:registration):", order);
+    assert.ok(logged[0]?.[1] instanceof Error, `${order}: the error object is passed, not stringified`);
+  }
+});
+
 test("C1 a message posted during the drain is vetted at once, in both orders", async (t) => {
   for (const order of ["provider-first", "Jefferson-first"] as const) {
     documentShowing(t, [["model"]]);
