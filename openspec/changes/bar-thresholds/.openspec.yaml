@@ -5,9 +5,11 @@ x-marbleization:
   runs:
     chidi: 241bb4a9-0086-48ab-92d0-f541fe68a4c1
     eleanor: 8ac0625e-da2a-459d-9edd-db85d859ddfe
-    michael: 433c0392-89f2-456b-bc69-3401caa75b61
-  gates: {}
+    michael: 8c7d2556-714e-4d09-94b5-f87762be5cb9
+  gates:
+    council_owner: approved
   progress:
     - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
     - "2026-11-25: Research done (Chidi, Eleanor). Michael orientation 433c0392: one question for Joel (Q1: does a threshold style replace or layer on the top-level style; Michael recommends layer). Also notes strict > copied pi 1.4.0 footer; Joel's >= ruling outranks it, ADR to record."
     - "2026-11-25: Joel answered Q1: \"replaces only the keys it names\" (layer key by key), added to owner-rulings.md. Launched plan-1.js: proposal+specs, 7-lens council, Michael rulings, council.md."
+    - "2026-11-25: proposal/specs (Bambadjan 039d8ccc), council 7 lenses, Michael rulings 8c7d2556 (29 rows, all settled), council.md + revisions (0d6d2e0e). Owner decisions: none. Launched plan-2.js: design, design review 1-4, design-review.md, Derek red/green, gaps, tasks, Stage 5."
