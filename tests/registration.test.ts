@@ -677,10 +677,12 @@ test("A8 jeffersonfan.stats registers through the bus and renders", async (t) =>
 test("A8 jefferson.custom.mine stays free", () => {
   const events = createEventBus();
   const registry = createRegistry();
-  createRegistrationListener({
+  const listener = createRegistrationListener({
     events, registry, faults: createFaultLedger(), fields: createProviderFields(() => {}), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
+  // A held message is not accepted until the handle is handed a theme.
+  listener.receiveTheme(fakeTheme());
   events.emit("jefferson:registration", registration);
   assert.notEqual(registry.instrument("taiknr.savings"), undefined, "a provider's two-part name registers");
   assert.equal(registry.instrument("jefferson.custom.mine"), undefined, "three parts belong to Jefferson");
@@ -1464,6 +1466,79 @@ test("C7 a held report is judged as it was posted, in both load orders", async (
       message: 'pi-jefferson: taiknr reports "saved" as a number, and it declared string',
       type: "warning",
     }], order);
+  }
+});
+
+test("C1 a provided default format naming a colour registers and renders it, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    const payload: Registration<"taiknr"> = {
+      ...registration,
+      instruments: [{ ...registration.instruments[0]!, defaultFormat: "Savings: $saved|accent" }],
+    };
+    // No `instruments` entry: the row places it, so the bind re-parses the default format with the
+    // same check the registration vet ran.
+    const session = await registeredRow(t, payload, [{ instrument: "taiknr.savings" }], [saved("$4.10")], order);
+    assert.equal(line(session), "Savings: $4.10", order);
+    assert.ok(rawLine(session).includes(fakeTheme().style("$4.10", { fg: "accent" })), order);
+    await settle();
+    assert.deepEqual(session.notified, [], order);
+  }
+});
+
+test("C1 a getter that emits during another message's copy is vetted ahead of it, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model"]]);
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", {
+        get extension() {
+          h.events.emit("jefferson:registration", { extension: "acme" });
+          return "taiknr";
+        },
+        instruments: 5,
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: registration from "acme" carries no instruments; registration from "taiknr" carries no instruments',
+      type: "warning",
+    }], order);
+  }
+});
+
+test("C1 a message posted during the drain is vetted at once, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model"]]);
+    const errors = t.mock.method(console, "error");
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", {
+        extension: "taiknr",
+        fields: {
+          saved: {
+            toJSON() {
+              h.events.emit("jefferson:registration", { extension: "acme" });
+              return "array";
+            },
+          },
+        },
+        instruments: [],
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: registration from "acme" carries no instruments; registration from "taiknr" declares "saved" as "array", which is not string, number or boolean',
+      type: "warning",
+    }], order);
+    assert.deepEqual(errors.mock.calls.map(call => call.arguments), [], order);
   }
 });
 

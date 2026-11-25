@@ -36,7 +36,9 @@ export function startUp(pi: ExtensionAPI): void {
   const repaint = (): void => requestRepaint?.();
   const fields = createProviderFields(repaint);
   const faults = createFaultLedger();
-  createRegistrationListener({
+  // The handle the listener answers on: the theme reaches it from `session_start`, which is the
+  // only moment a theme exists (design, "A provider's registration waits for the first theme").
+  const listener = createRegistrationListener({
     events: pi.events,
     registry,
     faults,
@@ -45,6 +47,11 @@ export function startUp(pi: ExtensionAPI): void {
     own: { extension: "jefferson", instruments: SHIPPED },
   });
 
+  // The pin, for the same reason: every theme pi loads carries the same 49 foreground names, because
+  // each built-in theme carries all of them and pi's validator refuses a user theme that leaves a
+  // required token out or adds an unknown one. That is why no format's colour needs a guard at
+  // render. Re-check it on every pi pin bump (design, "The theme's name set is invariant at the pin").
+  //
   // The pin: pi's `bindExtensions` emits `resources_discover` after every extension's `session_start`
   // handler, on every path that starts a session, and only when someone handles it, so handling it
   // is what makes it fire. No pi document promises that order (research-chidi.md §1; T4, corrected by
@@ -109,6 +116,11 @@ export function startUp(pi: ExtensionAPI): void {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    // First thing, before the mode check and before the document is read: a provider's message that
+    // arrived before this session is holding a theme, and this is the only moment there is one. The
+    // object `ctx.ui.theme` returns, never `ctx`: a stale runner's `ctx.ui` throws.
+    listener.receiveTheme(ctx.ui.theme);
+
     if (ctx.mode !== "tui") return;
 
     releasePrevious?.();

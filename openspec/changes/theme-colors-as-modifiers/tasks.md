@@ -316,7 +316,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   Verify: P1, C5 and C7 green, `:598` and `:1217` green in the provider-first order, `pnpm typecheck`
   clean and `pnpm test` green.
 
-- [ ] 3.2 Write the failing test first: **C1**, a provided instrument a row places, with no `instruments`
+- [x] 3.2 Write the failing test first: **C1**, a provided instrument a row places, with no `instruments`
   entry, whose default format names a colour, registers and renders in that colour with no warning, in
   both load orders. Its fixture: call
   `registeredRow(t, payload, [{ instrument: "taiknr.savings" }], [saved("$4.10")], order)` for each

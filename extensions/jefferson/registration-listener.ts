@@ -4,9 +4,10 @@
  * only file that calls `on` or `emit` on the bus, and the only one that writes the two channel
  * strings at runtime (design 6, 7; G3).
  */
-import type { EventBus, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { EventBus, Theme } from "@earendil-works/pi-coding-agent";
 
 import { adaptProvidedDeclaration, describeValue } from "./components/instruments/instrument-binding.ts";
+import { foregroundCheck, type ForegroundCheck } from "./format.ts";
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
 import type { FieldType, FieldValue } from "./data/field-value.ts";
 import type { ProviderFields } from "./data/provider-fields.ts";
@@ -41,10 +42,6 @@ interface AcceptedRegistration {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
-// Until the listener is handed a theme, its vet has no colour to measure a name against. It is
-// deleted when the theme arrives with the hold (design, "A provider's registration waits").
-const acceptNoColour = (_name: string): _name is ThemeColor => false;
 
 /** How one member of a message is copied when the message arrives. */
 type MemberCopy = (value: unknown) => unknown;
@@ -134,6 +131,7 @@ function vetRegistration(
   registry: Registry,
   faults: FaultLedger,
   fields: ProviderFields,
+  check: ForegroundCheck,
 ): AcceptedRegistration | { refusal: Fault } {
   if (!isPlainObject(payload)) {
     return { refusal: { scope: ANONYMOUS, kind: "registration-not-object", part: "a registration is not an object" } };
@@ -200,7 +198,7 @@ function vetRegistration(
       raw as unknown as ProvidedDeclaration,
       () => fields.view(extension),
       fault => faults.record(fault),
-      acceptNoColour,
+      check,
     );
     if ("refused" in adapted) {
       switch (adapted.refused) {
@@ -308,6 +306,12 @@ function vetReport(payload: unknown, registry: Registry, fields: ProviderFields)
   }
 }
 
+/** The handle a session holds: how the one theme that can measure a colour reaches the listener. */
+export interface RegistrationListener {
+  /** Hand the listener the theme the host gave this session; the first call is what goes live. */
+  receiveTheme(theme: Theme): void;
+}
+
 export function createRegistrationListener({ events, registry, faults, fields, repaint, own }: {
   events: EventBus;
   registry: Registry;
@@ -315,19 +319,26 @@ export function createRegistrationListener({ events, registry, faults, fields, r
   fields: ProviderFields;
   repaint: () => void;
   own: OwnRegistration;
-}): void {
-  // The bus carries no sender and replays nothing, so the payload object's identity is what proves
-  // a `jefferson` claim is Jefferson's own (design 6; M10).
-  events.on(REGISTRATION, (payload: unknown) => {
-    if (payload === own) {
-      registry.accept(own.extension, own.instruments);
-      repaint();
+}): RegistrationListener {
+  // A provider's message can arrive before any session exists, and a colour's name can only be
+  // measured against a theme. So a message is copied at arrival and waits, in arrival order, until
+  // the first `receiveTheme` hands over the one theme: the whole hold the spec promises, widened to
+  // the colour check without a second vet (design, "A provider's registration waits for the first
+  // theme and is vetted once, whole").
+  const held: Array<(check: ForegroundCheck) => void> = [];
+  let check: ForegroundCheck | undefined;
+
+  /** Vetted now when the listener is live, and queued otherwise. */
+  const accept = (run: (check: ForegroundCheck) => void): void => {
+    if (check === undefined) {
+      held.push(run);
       return;
     }
-    // Copied at arrival, so what the vet reads is what the provider posted, whatever it does to its
-    // own object afterwards (the spec's "A held message is judged as it was posted").
-    const copy = isPlainObject(payload) ? copyThrough(REGISTRATION_COPY, payload) : payload;
-    const accepted = vetRegistration(copy, registry, faults, fields);
+    run(check);
+  };
+
+  const applyRegistration = (payload: unknown, check: ForegroundCheck): void => {
+    const accepted = vetRegistration(payload, registry, faults, fields, check);
     // A refusal changes nothing a row renders, and its one part is reported once per session.
     if ("refusal" in accepted) {
       faults.record(accepted.refusal);
@@ -338,15 +349,50 @@ export function createRegistrationListener({ events, registry, faults, fields, r
     // One repaint, after the registry has run that registration's watches, so the entry a watch
     // filled is the one that render shows (design 9). A refused registration takes none.
     repaint();
-  });
-  events.on(UPDATE, (payload: unknown) => {
-    const copy = isPlainObject(payload) ? copyThrough(REPORT_COPY, payload) : payload;
-    const accepted = vetReport(copy, registry, fields);
+  };
+
+  const applyReport = (payload: unknown): void => {
+    const accepted = vetReport(payload, registry, fields);
     if ("refusal" in accepted) {
       faults.record(accepted.refusal);
       return;
     }
     fields.report(accepted.extension, accepted.field, accepted.value);
+  };
+
+  // The bus carries no sender and replays nothing, so the payload object's identity is what proves
+  // a `jefferson` claim is Jefferson's own (design 6; M10). Its own payload is accepted by identity
+  // and never held: the names a document may write must answer before the read.
+  events.on(REGISTRATION, (payload: unknown) => {
+    if (payload === own) {
+      registry.accept(own.extension, own.instruments);
+      repaint();
+      return;
+    }
+    // Copied at arrival, so what the vet reads is what the provider posted, whatever it does to its
+    // own object afterwards (the spec's "A held message is judged as it was posted"). The copy is
+    // made before the message takes its place in the queue, so a message posted by a getter during
+    // this copy is queued — or vetted — ahead of it, which is the order acceptance has always taken.
+    const copy = isPlainObject(payload) ? copyThrough(REGISTRATION_COPY, payload) : payload;
+    accept(checked => applyRegistration(copy, checked));
+  });
+  events.on(UPDATE, (payload: unknown) => {
+    const copy = isPlainObject(payload) ? copyThrough(REPORT_COPY, payload) : payload;
+    accept(() => applyReport(copy));
   });
   events.emit(REGISTRATION, own);
+
+  return {
+    receiveTheme(theme) {
+      // The first call goes live and then drains what arrived while the listener was holding, in
+      // arrival order, through the one vet-and-apply path. Going live first is what makes a message
+      // posted during the drain — a `toJSON` that emits — vetted at once, as it is when it arrives.
+      // A later call replaces the theme the check asks and drains nothing.
+      const next = foregroundCheck(theme);
+      const first = check === undefined;
+      check = next;
+      if (!first) return;
+      for (const run of held.splice(0)) run(next);
+    },
+  };
 }
