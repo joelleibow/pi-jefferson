@@ -11,7 +11,9 @@ import type { InstrumentDeclaration } from "./components/instruments/instrument.
 import type { FieldType, FieldValue } from "./data/field-value.ts";
 import type { ProviderFields } from "./data/provider-fields.ts";
 import type { Fault, FaultLedger } from "./faults.ts";
-import type { ProvidedDeclaration, RegistrationChannel, UpdateChannel } from "./instrument-contract.ts";
+import type {
+  ComposedFormat, ProvidedDeclaration, Registration, RegistrationChannel, Report, UpdateChannel,
+} from "./instrument-contract.ts";
 import { isProvidedName, type Registry } from "./registration.ts";
 
 // The contract is types-only, so the spelling lives here, against the contract's literal type:
@@ -43,6 +45,84 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 // Until the listener is handed a theme, its vet has no colour to measure a name against. It is
 // deleted when the theme arrives with the hold (design, "A provider's registration waits").
 const acceptNoColour = (_name: string): _name is ThemeColor => false;
+
+/** How one member of a message is copied when the message arrives. */
+type MemberCopy = (value: unknown) => unknown;
+
+/** A value kept as posted: a string, a function, anything the contract does not shape. */
+const kept: MemberCopy = value => value;
+
+/**
+ * A map copied by defining its own enumerable entries. Never by assigning them: assignment sends an
+ * own `__proto__` key to the prototype setter, which drops or reparents it, while the vet reads it
+ * as an entry (`instrument-binding.ts:169`, `:221`; the design's "The copy, at arrival").
+ */
+const mapCopied: MemberCopy = value => isPlainObject(value) ? Object.fromEntries(Object.entries(value)) : value;
+
+/** A map of maps, copied two levels by that same definition. */
+const mapOfMapsCopied: MemberCopy = value => isPlainObject(value)
+  ? Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, mapCopied(inner)]))
+  : value;
+
+/** A list copied by its elements. */
+const listCopied = (element: MemberCopy): MemberCopy => value => Array.isArray(value) ? value.map(element) : value;
+
+/** Every element of a list that is a message of its own, copied through that message's table. */
+const elementsCopied = (table: Readonly<Record<string, MemberCopy>>): MemberCopy =>
+  value => isPlainObject(value) ? copyThrough(table, value) : value;
+
+/**
+ * One message copied through its table. Each member the table names is read exactly once, here at
+ * arrival, whether or not the vet would reach it; a member the contract does not name is not read,
+ * so a provider's own key changes nothing and no function the payload carries is called.
+ */
+function copyThrough(
+  table: Readonly<Record<string, MemberCopy>>, message: Record<string, unknown>,
+): Record<string, unknown> {
+  const copy: Record<string, unknown> = {};
+  for (const [member, copyMember] of Object.entries(table)) {
+    if (Object.hasOwn(message, member)) copy[member] = copyMember(message[member]);
+  }
+  return copy;
+}
+
+/**
+ * The member tables, one per contract shape. Each is pinned to its shape's keys, so a member the
+ * contract gains and a table lacks fails `pnpm typecheck` rather than going uncopied in silence.
+ * `Registration<never>` satisfies the provider-extension constraint, and a registration's members do
+ * not depend on the extension it names.
+ */
+const COMPOSED_COPY = {
+  variable: kept,
+  variables: mapCopied,
+  select: kept,
+  formats: mapCopied,
+} as const satisfies Record<keyof ComposedFormat<unknown>, MemberCopy>;
+
+const DECLARATION_COPY = {
+  name: kept,
+  variables: mapCopied,
+  defaultFormat: kept,
+  defaultLabel: kept,
+  variableForms: mapOfMapsCopied,
+  bar: kept,
+  fills: kept,
+  variableFg: mapCopied,
+  composed: elementsCopied(COMPOSED_COPY),
+  options: listCopied(kept),
+} as const satisfies Record<keyof ProvidedDeclaration, MemberCopy>;
+
+const REGISTRATION_COPY = {
+  extension: kept,
+  fields: mapCopied,
+  instruments: listCopied(elementsCopied(DECLARATION_COPY)),
+} as const satisfies Record<keyof Registration<never>, MemberCopy>;
+
+const REPORT_COPY = {
+  extension: kept,
+  field: kept,
+  value: kept,
+} as const satisfies Record<keyof Report, MemberCopy>;
 
 /**
  * The registration a payload carries, or the one part that refuses it. The order is decision 15's:
@@ -244,7 +324,10 @@ export function createRegistrationListener({ events, registry, faults, fields, r
       repaint();
       return;
     }
-    const accepted = vetRegistration(payload, registry, faults, fields);
+    // Copied at arrival, so what the vet reads is what the provider posted, whatever it does to its
+    // own object afterwards (the spec's "A held message is judged as it was posted").
+    const copy = isPlainObject(payload) ? copyThrough(REGISTRATION_COPY, payload) : payload;
+    const accepted = vetRegistration(copy, registry, faults, fields);
     // A refusal changes nothing a row renders, and its one part is reported once per session.
     if ("refusal" in accepted) {
       faults.record(accepted.refusal);
@@ -257,7 +340,8 @@ export function createRegistrationListener({ events, registry, faults, fields, r
     repaint();
   });
   events.on(UPDATE, (payload: unknown) => {
-    const accepted = vetReport(payload, registry, fields);
+    const copy = isPlainObject(payload) ? copyThrough(REPORT_COPY, payload) : payload;
+    const accepted = vetReport(copy, registry, fields);
     if ("refusal" in accepted) {
       faults.record(accepted.refusal);
       return;

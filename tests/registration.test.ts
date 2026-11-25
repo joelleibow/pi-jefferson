@@ -385,6 +385,19 @@ test("A2 every registration refusal part is exact", async (t) => {
     ["a composed kind Jefferson cannot parse", events => events.emit("jefferson:registration",
       from({ instruments: [{ ...savings, composed: { variable: "state", variables: {}, select: () => "busy", formats: { busy: "Busy on $nope" } } }] })),
       '"taiknr.savings" carries a composed format "busy" Jefferson cannot parse'],
+    ["a fields that is not a map", events => events.emit("jefferson:registration", from({ fields: "x", instruments: [] })),
+      'registration from "taiknr" declares "fields" as "x", which is not string, number or boolean'],
+    ["a fields entry named __proto__", events => events.emit("jefferson:registration",
+      from({ fields: JSON.parse('{"__proto__":"array"}'), instruments: [] })),
+      'registration from "taiknr" declares "__proto__" as "array", which is not string, number or boolean'],
+    ["a variables that is not a map", events => events.emit("jefferson:registration",
+      from({ instruments: [{ name: "savings", variables: "x", defaultFormat: "x" }] })),
+      '"taiknr.savings" carries no variables'],
+    ["a variables entry named __proto__", events => events.emit("jefferson:registration",
+      from({ instruments: [{ ...savings, variables: { ...savings.variables, ...JSON.parse('{"__proto__":5}') } }] })),
+      '"taiknr.savings" carries a variable "__proto__" that is not a function'],
+    ["a posted null", events => events.emit("jefferson:registration", null),
+      "a registration is not an object"],
     ["field type outside the three", events => events.emit("jefferson:registration", from({ fields: { saved: "array" }, instruments: [] })),
       'registration from "taiknr" declares "saved" as "array", which is not string, number or boolean'],
     ["one field at two types", events => {
@@ -428,6 +441,7 @@ test("A2 every report refusal part is exact", async (t) => {
   const amount = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
   const cases: Array<[label: string, send: (events: EventBus) => void, part: string]> = [
     ["report shape", events => events.emit("jefferson:update", "nope"), "a report is not an object"],
+    ["report shape, null", events => events.emit("jefferson:update", null), "a report is not an object"],
     ["no extension name", events => events.emit("jefferson:update", { field: "saved", value: "x" }),
       "a report carries no extension name"],
     ["no field name", events => events.emit("jefferson:update", { extension: "taiknr", value: "x" }),
@@ -1403,6 +1417,54 @@ test("A6 a provided composed format renders the selected text", async (t) => {
   assert.ok(line(session).endsWith("Working on 3"), line(session));
   await settle();
   assert.deepEqual(session.notified, []);
+});
+
+test("C5 a held registration is judged as it was posted, provider-first", async (t) => {
+  documentShowing(t, [["model", "taiknr.savings"]]);
+  const payload: Registration<"taiknr"> = {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      variableFg: { saved: () => "accent" },
+      defaultFormat: "Savings: $saved",
+    }],
+  };
+  const h = harness();
+  h.events.emit("jefferson:registration", payload);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  // The provider changes what it posted before the session starts: the copy, not the object, is
+  // what Jefferson checks and renders (the spec's "A held message is judged as it was posted").
+  (payload.instruments[0] as { variableFg: Record<string, unknown> }).variableFg.saved = 5;
+  const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.equal(line(session), "Model: anthropic/claude-opus-4 Savings: $4.10");
+  await settle();
+  assert.deepEqual(session.notified, [], "the value it was posted with still answers");
+});
+
+test("C7 a held report is judged as it was posted, in both load orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "taiknr.savings"]]);
+    const h = harness();
+    const first = { extension: "taiknr", field: "saved", value: 42 as string | number };
+    const send = (): void => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", first);
+      first.value = "$4.10";
+      h.events.emit("jefferson:update", first);
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    assert.equal(line(session), "Model: anthropic/claude-opus-4 Savings: $4.10", order);
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: taiknr reports "saved" as a number, and it declared string',
+      type: "warning",
+    }], order);
+  }
 });
 
 test("A6 every provided member fault part is exact", async (t) => {

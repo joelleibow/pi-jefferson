@@ -259,7 +259,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
 
 ## 3. The listener holds, and the session hands it a theme
 
-- [ ] 3.1 Write the failing tests first, the copy at arrival, built while the listener still vets at
+- [x] 3.1 Write the failing tests first, the copy at arrival, built while the listener still vets at
   arrival with task 1.2's interim check: the refusal-part tables' new rows — `fields: "x"`, `variables:
   "x"`, a `null` registration, a `null` report, an own `__proto__` field name and **a `variables` row
   (new)** — keep today's texts (P1, a pin). The `variables` row is
