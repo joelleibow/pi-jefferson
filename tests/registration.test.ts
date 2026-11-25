@@ -1522,6 +1522,36 @@ test("A6 a provided composed format renders the selected text", async (t) => {
   assert.deepEqual(session.notified, []);
 });
 
+test("A2 a registration whose members are a class's getters and methods registers, in both orders", async (t) => {
+  /** One instrument whose `bar` is a method, so it lives on the prototype and not on the object. */
+  class Savings {
+    name = "savings";
+    defaultFormat = "Savings: $saved $bar";
+    variables = { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined };
+    bar(): number { return 50; }
+  }
+  /** A registration whose `instruments` is a getter: the vet reads a member by property access. */
+  class Posted {
+    extension = "taiknr";
+    fields = { saved: "string" };
+    get instruments(): Savings[] { return [new Savings()]; }
+  }
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["taiknr.savings"]]);
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", new Posted());
+      h.events.emit("jefferson:update", saved("$4.10"));
+    };
+    const session = order === "provider-first"
+      ? await (send(), h.start())
+      : await h.start({ afterSessionStart: send });
+    assert.ok(line(session).startsWith("Savings: $4.10 █"), `${order}: ${line(session)}`);
+    await settle();
+    assert.deepEqual(session.notified, [], order);
+  }
+});
+
 test("C5 a held registration is judged as it was posted, provider-first", async (t) => {
   documentShowing(t, [["model", "taiknr.savings"]]);
   const payload: Registration<"taiknr"> = {

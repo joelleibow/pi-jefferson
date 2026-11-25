@@ -70,15 +70,19 @@ const nestedCopied = (table: Readonly<Record<string, MemberCopy>>): MemberCopy =
 
 /**
  * One message copied through its table. Each member the table names is read exactly once, here at
- * arrival, whether or not the vet would reach it; a member the contract does not name is not read,
- * so a provider's own key changes nothing and no function the payload carries is called.
+ * arrival, whether or not the vet would reach it, and by property access as the vet reads it — own or
+ * inherited alike, so a registration written as a class's getters and methods registers as it does
+ * today. A member the contract does not name is not read, so a provider's own key changes nothing and
+ * no function the payload carries is called. A member reading `undefined` is left out of the copy,
+ * which the vet cannot tell from absent, so nothing it checks moves.
  */
 function copyThrough(
   table: Readonly<Record<string, MemberCopy>>, message: Record<string, unknown>,
 ): Record<string, unknown> {
   const copy: Record<string, unknown> = {};
   for (const [member, copyMember] of Object.entries(table)) {
-    if (Object.hasOwn(message, member)) copy[member] = copyMember(message[member]);
+    const value = message[member];
+    if (value !== undefined) copy[member] = copyMember(value);
   }
   return copy;
 }

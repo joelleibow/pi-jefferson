@@ -117,7 +117,7 @@ export function startUp(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event, ctx) => {
     // First thing, before the mode check and before the document is read: a provider's message that
-    // arrived before this session is holding a theme, and this is the only moment there is one. The
+    // arrived before this session is waiting for a theme, and this is the only moment there is one. The
     // object `ctx.ui.theme` returns, never `ctx`: a stale runner's `ctx.ui` throws.
     listener.receiveTheme(ctx.ui.theme);
 
