@@ -9,7 +9,7 @@ A format could style text and could not colour one piece of it. The vocabulary a
 
 The names could not be copied. pi publishes no runtime list of the names its themes carry: a theme answers for one name at a time through its foreground accessor, the two slots are told apart only by which accessor accepts a name, and a background name, a case variant and an inherited object property are all refused alike. A list of the host's names written down here would be a copy to drift at every pi release.
 
-Joel ruled the shape on 2026-11-24: every foreground colour a theme defines becomes a name after `|`, no background colour does, a reserved word keeps its meaning, and a colour written in the format is the strongest colour there is. The rulings are quoted in `openspec/changes/theme-colors-as-modifiers/owner-rulings.md`, and the decision they took is `openspec/changes/theme-colors-as-modifiers/design.md`.
+Joel ruled the shape on 2026-11-24: every foreground colour a theme defines becomes a name after `|`, no background colour does, a reserved word keeps its meaning, and a colour written in the format is the strongest colour there is. The rulings are quoted in `openspec/changes/archive/2026-11-25-theme-colors-as-modifiers/owner-rulings.md`, and the decision they took is `openspec/changes/archive/2026-11-25-theme-colors-as-modifiers/design.md`.
 
 ## Decision
 

@@ -531,7 +531,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   `noUnusedLocals` (measured). Then walk both delta specs against the coverage table below; a scenario no
   task proves is a gap to report to the conductor, not a test to invent here.
 
-- [ ] 5.3 **(Joel's — the writer never ticks this; the conductor ticks it with his observation in his
+- [x] 5.3 **(Joel's — the writer never ticks this; the conductor ticks it with his observation in his
   words.)** In his own session on pi's system theme, watch that `|muted` looks faint and that a name taken
   from the live 49-name table colours a piece, because the suite proves the rule against `fakeTheme` by
   behaviour and no test reads pi's files (D11; `redgreen-derek.md`, "Not verified").
