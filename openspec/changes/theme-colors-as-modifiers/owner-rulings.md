@@ -1,0 +1,12 @@
+# Owner Rulings
+
+Joel's rulings for this change, quoted and dated. They bind, and they are newer than every other artifact in this change directory.
+
+## 2026-11-24: The feature, from the Explore session
+
+He explored this with Conductor Janet. The idea came from the `pi-theme-grid` script, which prints a pi theme's VARS and COLORS as coloured cells, and from zentui, which he reports lets settings reference any COLORS colour. His request: *"Could we make any color defined in "COLORS" able to be used as a piped modifier? e.g. in settings, a format like "$model via|dim $provider|capitalize" could do "$model|toolDiffRemoved via|dim $provider|capitalize|bashMode" and that color would be applied to the variable or plain text it's attached to?"*
+
+- **Every foreground colour is a modifier; no background colour is.** *"we register all `foreground` colors defined in a theme to be available as pipe extensions to change a texts color. We don't register any for that purpose that are defined with a `slot` of `background`."* He also said: *"we never read theme files if pi provides us that access already."* **The colour names and their foreground or background slot come from what pi provides, not from reading a theme file.**
+- **A reserved word keeps its meaning.** He asked whether `dim` is a known terminal modifier, and was told it is the standard name (terminfo `dim`, chalk, Rich, ncurses). He ruled: *"we shouldn't let any foreground slot color from pi reading the theme clobber something that is a reserved word."* **Where a colour's name is already a modifier, the modifier keeps the name. `|dim` stays the faint attribute.**
+- **Nothing that works today changes, and colours stack with other modifiers.** He said: *"Nothing breaks with how dim is used today, right? As well, a user could do something like "$thinkingLevel|toolDiffAdded|dim""*. He was told both hold, and that the thinking instrument's variable is spelled `$level`. **A colour modifier combines with the other modifiers on the same piece of text.**
+- **A colour in the format beats the instrument's built-in colour.** He was asked: "Should a colour that you write in the format beat the instrument's built-in colour?" (the thinking instrument colours `$level` itself, and the notice instrument colours `$notice`). He said: *"Yes"*. **Text colour, strongest first: the colour written in the format, then the instrument's built-in colour for that variable, then the instrument's style.**
