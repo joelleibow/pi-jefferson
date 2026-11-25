@@ -225,7 +225,7 @@ function vetRegistration(
         case "unparseable-default-format":
           return { refusal: {
             scope: name, kind: "unparseable-default-format",
-            part: `${full} carries a default format Jefferson cannot parse`,
+            part: `${full}'s default ${adapted.message}`,
           } };
         case "label-not-string":
           return { refusal: {

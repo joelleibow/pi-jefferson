@@ -434,7 +434,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   contained as C6's is. Both load orders' outcomes identical is C6's own assertion. Verify: C6 green in
   both orders and `pnpm test` green.
 
-- [ ] 3.4 Write the failing tests first, the registration arm's text landing together with the
+- [x] 3.4 Write the failing tests first, the registration arm's text landing together with the
   `ProvidedRefusal` variant change:
   - `tests/registration.test.ts:1982` and `:1986` each expect
     `{ refused: "unparseable-default-format", message: 'format names a variable it does not declare:

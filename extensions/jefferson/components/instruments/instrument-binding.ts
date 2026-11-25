@@ -49,7 +49,7 @@ export type ProvidedRefusal =
   | { refused: "member-unusable"; member: OptionalMember }
   | { refused: "option-unimplemented"; option: string }
   | { refused: "formats-without-composed" }
-  | { refused: "unparseable-default-format" }
+  | { refused: "unparseable-default-format"; message: string }
   | { refused: "label-not-string" }
   | { refused: "resolver-not-function"; variable: string }
   | { refused: "unparseable-composed-format"; kind: string };
@@ -237,8 +237,11 @@ export function adaptProvidedDeclaration(
   };
   try {
     parseFormat(adapted, adapted.defaultFormat, check);
-  } catch {
-    return { refused: "unparseable-default-format" };
+  } catch (error) {
+    // The parser's own sentence, carried out so every path a bad name reaches words it alike; by the
+    // repository's convention for a caught parse error (configuration.ts:298-301).
+    if (!(error instanceof Error)) throw error;
+    return { refused: "unparseable-default-format", message: error.message };
   }
   if (members.defaultLabel !== undefined && typeof members.defaultLabel !== "string") return { refused: "label-not-string" };
   for (const [variable, resolver] of Object.entries(members.variables as object)) {

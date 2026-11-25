@@ -353,7 +353,10 @@ test("A2 every registration refusal part is exact", async (t) => {
       '"taiknr.savings" carries no default format'],
     ["unparseable default format", events => events.emit("jefferson:registration",
       from({ instruments: [{ ...savings, defaultFormat: "Spent $spent" }] })),
-      '"taiknr.savings" carries a default format Jefferson cannot parse'],
+      '"taiknr.savings"\'s default format names a variable it does not declare: "$spent"'],
+    ["a modifier on the bar", events => events.emit("jefferson:registration",
+      from({ instruments: [{ ...savings, bar: () => 50, defaultFormat: "Savings: $saved $bar|bold" }] })),
+      '"taiknr.savings"\'s default format puts a modifier on "$bar": "|bold"'],
     ["label not a string", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, defaultLabel: 4 }] })),
       '"taiknr.savings" carries a default label that is not a string'],
     ["resolver not a function", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, variables: { saved: 4 } }] })),
@@ -429,11 +432,108 @@ test("A2 a registration whose default format names an undeclared variable is ref
     const session = await run(harness());
     const messages = session.notified.map(notified => notified.message);
     assert.equal(line(session), placeholder(), `${order}: the entry renders on blank`);
-    const fault = messages.findIndex(message => message.includes('"taiknr.savings" carries a default format Jefferson cannot parse'));
+    const fault = messages.findIndex(message => message.includes('"taiknr.savings"\'s default format names a variable it does not declare: "$spent"'));
     const unknown = messages.findIndex(message => message.includes('row 1: "taiknr.savings" is not a known instrument'));
     assert.equal(fault, messages.length - 1, `${order}: one part, delivered after startup completes`);
     assert.ok(unknown >= 0 && unknown < fault, `${order}: the unknown-name part comes first`);
   }
+});
+
+/** A registration whose one instrument's default format carries the text given. */
+function defaultingTo(format: string, extra: Record<string, unknown> = {}): Registration<"taiknr"> {
+  return {
+    ...registration,
+    instruments: [{ ...registration.instruments[0]!, ...extra, defaultFormat: format }],
+  };
+}
+
+const NOT_A_COLOUR = '"taiknr.savings"\'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|notacolour"';
+
+test("C2 a default format naming a name the theme lacks is refused whole, alike in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "taiknr.savings"]]);
+    const h = harness();
+    const payload = defaultingTo("Savings: $saved|notacolour");
+    const send = (): void => void h.events.emit("jefferson:registration", payload);
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    const drawn = line(session);
+    assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), `${order}: the row's other instruments render`);
+    assert.equal(drawn.includes("Savings"), false, `${order}: the refused instrument's position renders blank`);
+    await settle();
+    const messages = session.notified.map(notified => notified.message);
+    assert.equal(messages.length, 2, `${order}: ${JSON.stringify(messages)}`);
+    assert.ok(messages[0]?.endsWith('row 1: "taiknr.savings" is not a known instrument'), `${order}: the notice first`);
+    assert.ok(messages[1]?.endsWith(NOT_A_COLOUR), `${order}: then the refusal`);
+    assert.equal(messages.filter(message => message.includes("|notacolour")).length, 1,
+      `${order}: exactly one message quotes the name`);
+  }
+});
+
+test("C2b the refusal takes its siblings, its fields and its later reports, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    const payload: Registration<"taiknr"> = {
+      extension: "taiknr",
+      fields: { saved: "string" },
+      instruments: [
+        { ...registration.instruments[0]!, defaultFormat: "Savings: $saved|notacolour" },
+        { name: "stubs", variables: { stubs: () => "3" }, defaultFormat: "Stubs: $stubs" },
+      ],
+    };
+    const session = await registeredRow(
+      t, payload, [{ instrument: "model" }, { instrument: "taiknr.stubs" }], [saved("$4.10")], order,
+    );
+    const drawn = line(session);
+    assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), order);
+    assert.equal(drawn.includes("Stubs:"), false, `${order}: the sibling is refused with it`);
+    await settle();
+    const messages = session.notified.map(notified => notified.message);
+    assert.equal(messages.length, 2, `${order}: ${JSON.stringify(messages)}`);
+    assert.ok(messages[0]?.endsWith('row 1: "taiknr.stubs" is not a known instrument'), `${order}: the notice first`);
+    assert.equal(messages[1],
+      `pi-jefferson: ${NOT_A_COLOUR}; taiknr reports "saved" without a registration`, `${order}: its field and its report go too`);
+  }
+});
+
+test("C2 a default format naming a name the theme lacks, with no document", async (t) => {
+  // No configuration file at all: the default row renders its placeholders and the refusal alone.
+  useTempAgentDir(t);
+  const h = harness();
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start();
+  assert.equal(session.lines(80).length, 1, "the default row renders");
+  assert.equal(line(session), placeholder(8).repeat(10), "its ten placeholders, and nothing else");
+  await settle();
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" }]);
+});
+
+test("C2 a default format naming a name the theme lacks, with the document rejected", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: 5 });
+  const path = join(agentDir, "pi-jefferson.json");
+  const h = harness();
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start(options);
+  await settle();
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} was rejected (the rows value is not a list); rendering the default row`, type: "warning" },
+    { message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" },
+  ], "then the refusal");
+});
+
+test("C2 a default format naming a name the theme lacks, with no row naming it", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start(options);
+  assert.equal(line(session), "Model: anthropic/claude-opus-4");
+  await settle();
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" }],
+    "with no row naming it, the refusal arrives alone");
 });
 
 test("A2 every report refusal part is exact", async (t) => {
@@ -1227,7 +1327,8 @@ test("A6 a provider's key that names an Object member reads as its own key", asy
   }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
   await settle();
   assert.equal(
-    inheritedForm.notified.some(notified => notified.message.includes('"taiknr.usage" carries a default format Jefferson cannot parse')),
+    inheritedForm.notified.some(notified => notified.message.includes(
+      '"taiknr.usage"\'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|name"')),
     true,
     `an inherited key is no form: ${JSON.stringify(inheritedForm.notified)}`,
   );
@@ -2193,8 +2294,9 @@ test("A1 a default label that is not a string is refused", () => {
 test("A1 a default format Jefferson cannot parse is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultFormat: "Spent $spent" } as unknown as ProvidedDeclaration;
   assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck),
-    { refused: "unparseable-default-format" });
+    { refused: "unparseable-default-format", message: 'format names a variable it does not declare: "$spent"' });
   // The table's row order decides which fault a payload with two is refused for.
   const twice = { ...declaration, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}, fgCheck), { refused: "unparseable-default-format" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}, fgCheck),
+    { refused: "unparseable-default-format", message: 'format names a variable it does not declare: "$spent"' });
 });
