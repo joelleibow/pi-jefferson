@@ -2,7 +2,11 @@ schema: marbleization
 created: 2026-11-25
 x-marbleization:
   working_dir_state: existing_project
-  runs: {}
+  runs:
+    chidi: 241bb4a9-0086-48ab-92d0-f541fe68a4c1
+    eleanor: 8ac0625e-da2a-459d-9edd-db85d859ddfe
+    michael: 433c0392-89f2-456b-bc69-3401caa75b61
   gates: {}
   progress:
     - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
+    - "2026-11-25: Research done (Chidi, Eleanor). Michael orientation 433c0392: one question for Joel (Q1: does a threshold style replace or layer on the top-level style; Michael recommends layer). Also notes strict > copied pi 1.4.0 footer; Joel's >= ruling outranks it, ADR to record."
