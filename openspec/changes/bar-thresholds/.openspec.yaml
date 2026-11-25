@@ -1,0 +1,8 @@
+schema: marbleization
+created: 2026-11-25
+x-marbleization:
+  working_dir_state: existing_project
+  runs: {}
+  gates: {}
+  progress:
+    - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
