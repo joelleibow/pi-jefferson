@@ -1,7 +1,7 @@
 # 3. A format carries modifiers, and `|` is a second special character
 
 Date: 2026-11-06
-Status: Accepted. Supersedes the `MUST NOT … apply a style` clause and the `$` is the only special character clause of `An instrument's format is plain text and variables` in the statusline spec. Its escape sentence is superseded in turn by [ADR 0014](0014-a-backslash-escapes-the-character-after-it.md): the two special characters stay, and a backslash now yields any character. No other sentence of this record changes.
+Status: Accepted. Supersedes the `MUST NOT … apply a style` clause and the `$` is the only special character clause of `An instrument's format is plain text and variables` in the statusline spec. Its escape sentence is superseded in turn by [ADR 0014](0014-a-backslash-escapes-the-character-after-it.md): the two special characters stay, and a backslash now yields any character. Its sentence that `fg` and `bg` are not modifiers, and the one direction its consequences claim for every modifier, are superseded by [ADR 0021](0021-a-foreground-colour-of-the-theme-is-a-modifier.md): a foreground colour of the theme is a modifier, and the colour a format names is the strongest colour there is. An attribute modifier still only adds. No other sentence of this record changes.
 
 ## Context
 

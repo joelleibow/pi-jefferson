@@ -57,11 +57,27 @@ Here `via` renders dim, and the provider's value is capitalized.
 | `upper` | Upper-cases the whole value: `high` becomes `HIGH` |
 | `lower` | Lower-cases the whole value: `HIGH` becomes `high` |
 
-Six more modifiers set pi's text attributes: `bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`. A modifier only adds. `$model|bold` renders bold even where the instrument's `style` sets `bold: false`, and nothing in a format switches an attribute off.
+Six more modifiers set pi's text attributes: `bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`. An attribute modifier only adds: `$model|bold` renders bold even where the instrument's `style` sets `bold: false`, and nothing in a format switches an attribute off. A colour is the other kind of modifier, and it sets the foreground of the text it attaches to ([Colours](#colours)).
+
+### Colours
+
+A `|name` may also be a foreground colour of the theme you are running. `$model via|muted $provider|toolDiffRemoved` renders the model in `toolDiffRemoved` and the word `via` in `muted`.
+
+The names belong to pi, not to Jefferson. A colour is a name of the theme's foreground slot, spelled as pi spells it, so `|Accent` is not `|accent`. Jefferson keeps no list of the names: it asks the theme you are running, so a name is whatever that theme carries, and pi's own documentation is where it names them. A colour renders as its theme draws it, and Jefferson adds nothing. So a colour a theme draws faint looks faint here too: `|muted` does on pi's system theme.
+
+Only a foreground colour is a modifier. A background colour, such as `selectedBg`, is refused, and so is a name the theme does not have.
+
+A name after the pipe is read in one order. Directly after a variable, the first name may be one of that variable's forms ([Forms](#forms)). After that come the modifiers Jefferson implements, and then the theme's foreground colours. So `|dim` is the faint attribute, never the theme's `dim` colour, which is reached through the instrument's `style`. And `$path|relative|accent` renders the relative path in `accent`, because the form comes first.
+
+A colour stacks with the rest of its chain: `$provider|accent|bold` and `$provider|bold|accent` both render the value in `accent` and bold. When one text carries two colours, the later one wins.
+
+A colour is the strongest colour there is. It beats both the instrument's `style` foreground and the colour an instrument chooses for that variable itself ([Styles](#styles)). A label has no format, so only `style` colours it. `$bar` takes no modifier, so it takes no colour, and a kind's text in `formats` is plain, so a colour in one is refused.
+
+A colour needs Jefferson 0.15.0 or later. An earlier release refuses the format that names one, as it refuses any name it does not implement.
 
 ## When a pipe is a modifier
 
-A `|` begins a modifier only when a name follows it directly. So `10|20` and `$model|_x` both begin a modifier, and an unknown modifier is refused.
+A `|` begins a modifier only when a name follows it directly. So `10|20` and `$model|_x` both begin a modifier, and a name that is neither a modifier Jefferson implements nor a foreground colour of the theme is refused.
 
 Followed by anything else, the pipe is just a pipe: a space, the end of the format, `$`, another `|`, or other punctuation. So `$model | $provider` renders `claude-opus-4 | anthropic`.
 
@@ -79,15 +95,15 @@ A format holds at most one `$bar`, and no modifier follows it. The filled part t
 
 `style` uses pi's `ThemeStyle`. `fg` takes a foreground theme colour token, `bg` takes a background one, and either can take a colour that pi's parser accepts. The six boolean attributes are `bold`, `dim`, `italic`, `underline`, `inverse` and `strikethrough`, and each is also a modifier.
 
-`fg` and `bg` are not modifiers. Colours belong to `style`, and a modifier only adds to what `style` sets.
+`bg` is not a modifier: a background colour belongs to `style`. A foreground colour may be one ([Colours](#colours)), and it replaces the `fg` of the text it attaches to while everything else `style` sets stays. An attribute modifier only adds to what `style` sets.
 
-An instrument can choose the foreground of one of its variables itself, and that colour replaces a configured `fg` on that variable's text only. A configured `bg` and the boolean attributes stay, and the label and the rest of the text keep the instrument's `fg`. `thinking` does this for `$level`: it takes the foreground pi gives the thinking rules on the input box for the current level, the theme's `thinkingOff` through `thinkingMax` token, read when the footer renders. An instrument from another extension can do the same for its own variables.
+An instrument can choose the foreground of one of its variables itself, and that colour replaces a configured `fg` on that variable's text only. A configured `bg` and the boolean attributes stay, and the label and the rest of the text keep the instrument's `fg`. A colour the format names for that variable beats the instrument's own choice, and then the instrument is not asked for one ([Colours](#colours)). `thinking` does this for `$level`: it takes the foreground pi gives the thinking rules on the input box for the current level, the theme's `thinkingOff` through `thinkingMax` token, read when the footer renders. An instrument from another extension can do the same for its own variables.
 
 ## Composed formats
 
 An instrument can compose its text from a set of formats, one for each kind of thing it shows. It picks the kind from its own data and hands the composed text to its format through one variable. `notice` does this with `$notice`, and an instrument from another extension can do it too. When there is nothing to compose, `$notice` has no value, so a format that names it renders nothing, label included, and a format that leaves it out renders as usual. An instrument from another extension works the same way, unless its extension gives the variable a value of its own.
 
-A kind's format is plain. It names the values that belong to the set, and it takes no modifier and no form. Styling belongs to the instrument: `style` styles the composed variable as it styles any other.
+A kind's format is plain. It names the values that belong to the set, and it takes no modifier and no form — a colour included. Styling belongs to the instrument: `style` styles the composed variable as it styles any other, and the instrument's own format colours it like any other text.
 
 The two sets of variables do not mix. A kind's format names the set's values, such as `$tokens`. The instrument's format names the composed variable, such as `$notice`. Each is refused in the other's place.
 
@@ -98,7 +114,7 @@ The `formats` option rewrites the text of one kind at a time. [Notices](notices.
 Jefferson refuses a format with:
 
 - a bare `$` (write `\$` for a literal dollar);
-- a modifier it does not implement;
+- a name after the pipe that is neither a modifier Jefferson implements nor a foreground colour of the theme;
 - a form on a variable that has none, or in a place where a form cannot go;
 - a modifier on `$bar`;
 - a second `$bar`;
