@@ -1086,6 +1086,17 @@ test("the document surfaces the second-width-taker guard's full message", () => 
   rejected({ instruments: { context: { format: "$bar $bar" } } }, '"context"\'s format names a second width-taking variable: "$bar"');
 });
 
+test("an own instrument's format naming a colour is accepted and draws it", () => {
+  const theme = fakeTheme({ toolDiffRemoved: "\x1b[38;5;1m" });
+  const { rows, warning } = readDocument({
+    rows: [[{ instrument: "model" }]],
+    instruments: { model: { format: "$model|toolDiffRemoved" } },
+  }, theme);
+  assert.equal(warning, undefined, "a colour is a modifier, not a fault");
+  assert.equal(rows[0]!.cells[0]!.holder.current.render(seed, 80, theme),
+    "Model: " + theme.style("claude-opus-4", { fg: "toolDiffRemoved" }));
+});
+
 test("the document surfaces the unknown-name guard's full message", () => {
   rejected({ instruments: { model: { format: "$model|bd" } } },
     '"model"\'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|bd"');
@@ -1369,6 +1380,7 @@ test("a configured format's undeclared variable, modifier and form each reject t
   for (const [formats, detail] of [
     [{ miss: "Spent $nope" }, 'names a variable it does not declare: "$nope"'],
     [{ miss: "$tokens|bold" }, 'puts a modifier in a plain format: "|bold"'],
+    [{ miss: "$tokens|accent" }, 'puts a modifier in a plain format: "|accent"'],
     [{ miss: "$notice" }, 'names a variable it does not declare: "$notice"'],
   ] as const) {
     const { rows, warning } = readDocument({ rows: [[{ instrument: "notice" }]], instruments: { notice: { formats } } });

@@ -136,7 +136,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   returns `format.ts:115` and exactly the six expectations above (measured);
   `pnpm typecheck` clean and `pnpm test` green.
 
-- [ ] 1.4 Write the failing tests first, the colour's read and draw landing together:
+- [x] 1.4 Write the failing tests first, the colour's read and draw landing together:
   - **The language's cases.** A colour on a variable, `$model|toolDiffRemoved` (A1); a colour on literal
     text, `$model via|muted $provider` (A2); a colour after a form, `$path|relative|accent` (A7); a colour
     and an attribute in either order (A13); a colour beating the `style`'s `fg` while literal text keeps

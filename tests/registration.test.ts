@@ -1499,6 +1499,25 @@ test("A6 a provided composed value or colour that faults is contained, and its p
   }
 });
 
+test("A colour function the format covers is never asked, so its throw warns nothing", async (t) => {
+  const { session } = settingsDocument(t, { format: "$saved|accent" }, {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      variableFg: { saved: () => { throw new Error("provider"); } },
+      defaultFormat: "Savings: $saved",
+    }],
+  });
+  const started = await session;
+  // The document's format replaces the default one, and the fixture has no default label.
+  assert.equal(line(started), "Model: anthropic/claude-opus-4 $4.10");
+  assert.ok(rawLine(started).includes(fakeTheme().style("$4.10", { fg: "accent" })), rawLine(started));
+  await settle();
+  assert.deepEqual(started.notified, [], "a colour the user's format replaced is never asked, so it cannot fault");
+});
+
 test("A6 a provided colour the theme does not have falls back to the cell's style", async (t) => {
   const session = await registeredRow(t, {
     extension: "taiknr",

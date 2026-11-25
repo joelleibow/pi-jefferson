@@ -10,8 +10,8 @@ import type { InstrumentDeclaration } from "./components/instruments/instrument.
 import type { Readings } from "./data/session-data-store.ts";
 
 export type FormatSegment =
-  | { kind: "literal"; text: string; modifiers: readonly Modifier[] }
-  | { kind: "variable"; name: string; form?: string; modifiers: readonly Modifier[] }
+  | { kind: "literal"; text: string; modifiers: readonly Modifier[]; colour?: ThemeColor }
+  | { kind: "variable"; name: string; form?: string; modifiers: readonly Modifier[]; colour?: ThemeColor }
   | { kind: "bar" };
 
 type StyleAttribute = Exclude<keyof ThemeStyle, "fg" | "bg">;
@@ -109,11 +109,16 @@ export function parseFormat(
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
         if (afterName && subject?.kind === "variable" && subject.form === undefined
+          && subject.colour === undefined
           && subject.modifiers.length === 0 && forms !== undefined && Object.hasOwn(forms, name)) {
           segments[segments.length - 1] = { ...subject, form: name };
         } else {
+          // Jefferson's own names come before the theme, so `|dim` keeps its meaning where the theme
+          // also carries a `dim` colour, and a later pipe name joins the reserved set by joining the
+          // table (owner-rulings.md, 2026-11-24).
           const modifier = MODIFIERS.get(name);
-          if (modifier === undefined) {
+          const colour = modifier === undefined && check(name) ? name : undefined;
+          if (modifier === undefined && colour === undefined) {
             throw formatError(
               `names neither a modifier Jefferson implements nor a foreground colour of the theme: ${JSON.stringify("|" + name)}`,
             );
@@ -122,7 +127,8 @@ export function parseFormat(
             if (subject.kind === "bar") {
               throw formatError(`puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
             }
-            segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+            if (modifier !== undefined) segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+            else if (colour !== undefined) segments[segments.length - 1] = { ...subject, colour };
           } else {
             const text = collapse(literal);
             const run = text.match(/\S+$/)?.[0];
@@ -131,7 +137,10 @@ export function parseFormat(
             }
             const prefix = text.slice(0, text.length - run.length);
             if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
-            segments.push({ kind: "literal", text: run, modifiers: [modifier] });
+            segments.push({
+              kind: "literal", text: run, modifiers: modifier === undefined ? [] : [modifier],
+              ...(colour === undefined ? {} : { colour }),
+            });
             literal = "";
           }
         }
@@ -293,11 +302,15 @@ export function resolveFormat(
   return segments.map((segment, index) => {
     if (segment.kind === "bar") return bar;
     const merged = mergedStyle(style, segment.modifiers);
-    // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
+    // The format's own colour is the strongest, so the declared token is asked only for a piece the
+    // format does not colour: a provider's colour function the user's format covers never runs, and
+    // a colour it would have thrown about is never reported (owner-rulings.md, 2026-11-24).
     const colours = declaration.variableFg;
-    const token = segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
-      ? colours[segment.name]!(arrived[index]!, theme)
-      : undefined;
-    return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
+    const token = segment.colour !== undefined ? undefined
+      : segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
+        ? colours[segment.name]!(arrived[index]!, theme)
+        : undefined;
+    const foreground = segment.colour ?? token;
+    return styledPiece(pieces[index]!, foreground === undefined ? merged : { ...merged, fg: foreground }, theme);
   }).join("");
 }

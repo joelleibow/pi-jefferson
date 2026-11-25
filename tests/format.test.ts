@@ -276,7 +276,7 @@ test("every shipped modifier name parses", () => {
 });
 
 test("a name neither a modifier nor a colour rejects, naming the theme and the name", () => {
-  for (const name of ["bd", "accent", "fg"]) {
+  for (const name of ["bd", "fg"]) {
     assert.throws(() => parseFormat(named("model"), `$model|${name}`, fgCheck),
       { message: `format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|${name}"` });
   }
@@ -298,6 +298,123 @@ test("a case-different name is another name, because a colour's name is pi's spe
   assert.throws(() => parseFormat(named("model"), "$model|Accent", fgCheck), {
     message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|Accent"',
   });
+});
+
+/** A theme that carries the delta's example names, so a test can write them in a format. */
+const mutedTheme = fakeTheme({ muted: "\x1b[38;5;8m" });
+
+test("a colour on a variable draws that value in the theme's colour and nothing else changes", () => {
+  const theme = fakeTheme({ toolDiffRemoved: "\x1b[38;5;1m" });
+  assert.equal(rendered("model", "$model|toolDiffRemoved", { theme }),
+    theme.style("claude-opus-4", { fg: "toolDiffRemoved" }));
+});
+
+test("a colour on literal text takes the non-whitespace run before it", () => {
+  const theme = mutedTheme;
+  assert.equal(rendered("model", "$model via|muted $provider", { theme }),
+    "claude-opus-4 " + theme.style("via", { fg: "muted" }) + " anthropic");
+});
+
+test("a colour after a form draws the form in the theme's colour", () => {
+  const segments = parseFormat(named("path"), "$path|relative|accent", fgCheck);
+  assert.deepEqual(segments, [{ kind: "variable", name: "path", form: "relative", modifiers: [], colour: "accent" }]);
+  const theme = fakeTheme();
+  assert.equal(rendered("path", "$path|relative|accent", { theme }), theme.style("~/Projects/pi-jefferson", { fg: "accent" }));
+});
+
+const priceFixture: InstrumentDeclaration = {
+  name: "fixture", defaultFormat: "$price", options: [],
+  variables: { price: () => "4.10" },
+  variableForms: { price: { accent: () => "the form" } },
+};
+
+test("a form named like a colour wins directly after its variable", () => {
+  const segments = parseFormat(priceFixture, "$price|accent", fgCheck);
+  assert.deepEqual(segments, [{ kind: "variable", name: "price", form: "accent", modifiers: [] }]);
+  assert.equal(resolveFormat(priceFixture, segments, {}, seed, 80, fakeTheme()), "the form");
+});
+
+test("that name after another modifier is the colour, not the form", () => {
+  const segments = parseFormat(priceFixture, "$price|bold|accent", fgCheck);
+  assert.deepEqual(segments, [{ kind: "variable", name: "price", modifiers: [{ style: "bold" }], colour: "accent" }]);
+  const theme = fakeTheme();
+  assert.equal(resolveFormat(priceFixture, segments, {}, seed, 80, theme), theme.style("4.10", { bold: true, fg: "accent" }));
+});
+
+test("a colour and an attribute on one piece render alike in either order", () => {
+  const theme = fakeTheme();
+  for (const format of ["$provider|accent|bold", "$provider|bold|accent"]) {
+    assert.equal(rendered("model", format, { theme }), theme.style("anthropic", { fg: "accent", bold: true }), format);
+  }
+});
+
+test("a colour beats the style's foreground while literal text keeps it", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|warning via", { style: { fg: "accent" }, theme }),
+    theme.style("claude-opus-4", { fg: "warning" }) + theme.style(" via", { fg: "accent" }));
+});
+
+test("a colour sets no attribute and clears none", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$model|accent", { theme }), theme.style("claude-opus-4", { fg: "accent" }));
+  assert.equal(rendered("model", "$model|accent", { style: { bold: false }, theme }),
+    theme.style("claude-opus-4", { bold: false, fg: "accent" }));
+});
+
+test("a faint colour is pass-through, exactly as the same colour through the style", () => {
+  const theme = mutedTheme;
+  assert.equal(rendered("model", "$model|muted", { theme }), rendered("model", "$model", { theme, style: { fg: "muted" } }));
+  assert.equal(rendered("model", "$model|muted", { theme }), theme.style("claude-opus-4", { fg: "muted" }));
+});
+
+test("two colours on one piece apply in the order written, so the later wins", () => {
+  const theme = fakeTheme();
+  assert.equal(rendered("model", "$provider|accent|warning", { theme }), theme.style("anthropic", { fg: "warning" }));
+});
+
+test("dim keeps its meaning where the theme carries a dim colour too", () => {
+  const theme = fakeTheme({ dim: "\x1b[38;5;3m" });
+  assert.deepEqual(parseFormat(named("model"), "$model|dim", foregroundCheck(theme)),
+    [{ kind: "variable", name: "model", modifiers: [{ style: "dim" }] }]);
+  assert.equal(rendered("model", "$model|dim", { theme }), theme.style("claude-opus-4", { dim: true }));
+});
+
+test("a form after a colour is refused, naming the form", () => {
+  assert.throws(() => parseFormat(named("path"), "$path|accent|relative", fgCheck), {
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|relative"',
+  });
+});
+
+test("the bar takes no colour, as it takes no attribute", () => {
+  assert.throws(() => parseFormat(named("context"), "$bar|accent", fgCheck),
+    { message: 'format puts a modifier on "$bar": "|accent"' });
+});
+
+test("a plain format refuses a colour before any lookup", () => {
+  assert.throws(() => parseFormat(noticeInstrument, "$tokens|accent", fgCheck, true),
+    { message: 'format puts a modifier in a plain format: "|accent"' });
+});
+
+test("the names are the theme's, not a copy: one the theme carries is a colour and one it lacks is not", () => {
+  const invented = fakeTheme({ invented: "\x1b[35m" });
+  assert.doesNotThrow(() => parseFormat(named("model"), "$model|invented", foregroundCheck(invented)));
+  assert.throws(() => parseFormat(named("model"), "$model|bashMode", fgCheck), {
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|bashMode"',
+  });
+});
+
+test("the theme at render time decides the escape, whatever theme the format was parsed against", () => {
+  const first = fakeTheme({ muted: "\x1b[38;5;8m" });
+  const second = fakeTheme({ muted: "\x1b[38;5;2m" });
+  assert.notEqual(first.getFgAnsi("muted"), second.getFgAnsi("muted"), "two themes that disagree about one name");
+  const segments = parseFormat(named("model"), "$model|muted", foregroundCheck(first));
+  assert.equal(resolveFormat(named("model"), segments, {}, seed, 80, second), second.style("claude-opus-4", { fg: "muted" }));
+});
+
+test("a foreground colour of the theme is a modifier", () => {
+  const theme = fakeTheme();
+  assert.doesNotThrow(() => parseFormat(named("model"), "$model|accent", fgCheck));
+  assert.equal(rendered("model", "$model|accent", { theme }), theme.style("claude-opus-4", { fg: "accent" }));
 });
 
 test("a modifier after an undeclared variable reports the variable, not the modifier", () => {

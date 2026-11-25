@@ -425,6 +425,47 @@ test("the notice's default text is its kind's, in the warning colour, and nothin
   assert.equal(bound.fills, false);
 });
 
+test("a notice's format colour beats warning while its text and columns are unchanged", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const { stripTerminalSequences, visibleWidth } = await import("@earendil-works/pi-tui");
+  const theme = fakeTheme();
+  const declaration = named("notice");
+  const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 1 } };
+  const draw = (format: string): string => instrumentBindings(fgCheck, new Map([
+    [declaration.name, { segments: parseFormat(declaration, format, fgCheck), style: {} }],
+  ]))(declaration).render(shown, 80, theme);
+  const plain = draw("$notice");
+  assert.equal(plain, "Notice: " + theme.style("Cache miss: 20k tokens re-billed (~$0.10)", { fg: "warning" }));
+  assert.equal(draw("$notice|accent"), "Notice: " + theme.style("Cache miss: 20k tokens re-billed (~$0.10)", { fg: "accent" }));
+  assert.equal(stripTerminalSequences(draw("$notice|accent")), stripTerminalSequences(plain), "the text is the same");
+  assert.equal(visibleWidth(draw("$notice|accent")), visibleWidth(plain), "so are the columns");
+});
+
+test("the thinking level's own colour holds until the format names one", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("thinking");
+  const draw = (format: string): string => instrumentBindings(fgCheck, new Map([
+    [declaration.name, { segments: parseFormat(declaration, format, fgCheck), style: {} }],
+  ]))(declaration).render(seed, 80, theme);
+  assert.equal(draw("$level"), "Thinking: " + theme.style("high", { fg: "thinkingHigh" }), "the level keeps the input box's colour");
+  assert.equal(draw("$level|accent"), "Thinking: " + theme.style("high", { fg: "accent" }), "the format's colour is the strongest");
+});
+
+test("a label keeps the style while the value takes the format's colour", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("model");
+  const bound = instrumentBindings(fgCheck, new Map([[declaration.name, {
+    segments: parseFormat(declaration, "$model|warning", fgCheck), style: { fg: "accent" }, label: "Model:",
+  }]]))(declaration);
+  assert.equal(bound.render(seed, 80, theme),
+    theme.style("Model: ", { fg: "accent" }) + theme.style("claude-opus-4", { fg: "warning" }));
+});
+
 test("a timed declaration shows its text until its instant and nothing after it, label included", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const theme = fakeTheme();
