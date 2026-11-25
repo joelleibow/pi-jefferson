@@ -1,5 +1,5 @@
 /** The format language: literal text, $variables and |modifiers; declarations supply already-formatted values. */
-import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
 import toLower from "lodash-es/toLower.js";
 import toUpper from "lodash-es/toUpper.js";
@@ -147,11 +147,32 @@ const STYLE_KEYS = {
   fg: true, bg: true, bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
 } satisfies Record<keyof ThemeStyle, true>;
 
+/** Whether a name is a foreground colour of the theme it was built from. */
+export type ForegroundCheck = (name: string) => name is ThemeColor;
+
+/**
+ * The one foreground probe: a name is a colour of this theme when its accessor answers, and not when
+ * it throws. pi publishes no list of its names, so the theme itself is asked, at the pin through
+ * `getFgAnsi` alone (`theme.js:212-216`, `:234`); every theme pi loads carries the same 49 names,
+ * which needs no guard at render (design, "The theme's name set is invariant at the pin").
+ */
+export function foregroundCheck(theme: Theme): ForegroundCheck {
+  return (name: string): name is ThemeColor => {
+    try {
+      theme.getFgAnsi(name as Parameters<Theme["getFgAnsi"]>[0]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+}
+
 export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
   if (raw === undefined) return {};
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new Error("has a style that is not an object");
   }
+  const isForeground = foregroundCheck(theme);
   const validated: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!Object.hasOwn(STYLE_KEYS, key)) {
@@ -160,8 +181,9 @@ export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
     if (key === "fg" || key === "bg") {
       if (typeof value === "string") {
         try {
-          if (key === "fg") theme.getFgAnsi(value as Parameters<Theme["getFgAnsi"]>[0]);
-          else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
+          if (key === "fg") {
+            if (!isForeground(value)) throw new Error("not a foreground colour");
+          } else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
           validated[key] = value;
           continue;
         } catch {

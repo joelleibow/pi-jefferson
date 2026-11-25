@@ -251,7 +251,7 @@ test("every shipped file's exported keys are pinned, and registration is the onl
     ["../extensions/jefferson/data/session-data-feed.ts", ["feedSessionData"]],
     ["../extensions/jefferson/data/session-data-store.ts", ["createSessionDataStore"]],
     ["../extensions/jefferson/format.ts",
-      ["collapse", "parseFormat", "resolveFormat", "resolvePlain", "validateStyle"]],
+      ["collapse", "foregroundCheck", "parseFormat", "resolveFormat", "resolvePlain", "validateStyle"]],
     ["../extensions/jefferson/faults.ts", ["createFaultLedger"]],
     ["../extensions/jefferson/instrument-contract.ts", []],
     ["../extensions/jefferson/registration.ts", ["createRegistry", "isProvidedName", "normalizeName"]],

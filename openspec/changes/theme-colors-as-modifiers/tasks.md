@@ -60,7 +60,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
 
 ## 1. The format language owns the foreground check and the colour
 
-- [ ] 1.1 Write the failing tests first: the export pin at `tests/jefferson.test.ts:232-305` lists
+- [x] 1.1 Write the failing tests first: the export pin at `tests/jefferson.test.ts:232-305` lists
   `foregroundCheck` and stays red until `format.ts` exports it (R1; red at `cf90995` as
   `AssertionError: ../extensions/jefferson/format.ts + 'foregroundCheck'`); and **the check's pair
   (new)**, asserted directly on `foregroundCheck` in `tests/format.test.ts`, whose import from

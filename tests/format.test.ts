@@ -4,7 +4,9 @@ import { test } from "node:test";
 import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
-import { parseFormat, resolveFormat, resolvePlain, validateStyle } from "../extensions/jefferson/format.ts";
+import {
+  foregroundCheck, parseFormat, resolveFormat, resolvePlain, validateStyle,
+} from "../extensions/jefferson/format.ts";
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { shippedInstrument } from "./shipped-instrument.ts";
 import { notice as noticeInstrument } from "../extensions/jefferson/components/instruments/notice.ts";
@@ -245,6 +247,20 @@ for (const [key, message] of [
     assert.throws(() => validateStyle({ [key]: ["#bf5700"] }, fakeTheme()), { message });
   });
 }
+
+test("the foreground check asks the theme, so a name the theme carries is a colour and one it lacks is not", () => {
+  // The provenance test: a copied list of pi's names, or a theme file read from disk, would fail
+  // the second half, because `bashMode` is a name pi has that this theme does not (ruling 13).
+  const invented = foregroundCheck(fakeTheme({ invented: "\x1b[35m" }));
+  assert.equal(invented("invented"), true);
+  assert.equal(invented("accent"), true);
+  const check = foregroundCheck(fakeTheme());
+  // A pi name this theme lacks, a background name, a case variant, and three names inherited from
+  // `Object.prototype`: pi's lookup and the fake's are both Maps.
+  for (const name of ["bashMode", "selectedBg", "Accent", "constructor", "toString", "__proto__"]) {
+    assert.equal(check(name), false, name);
+  }
+});
 
 const ATTRIBUTES = {
   bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
