@@ -275,11 +275,29 @@ test("every shipped modifier name parses", () => {
   }
 });
 
-test("an unknown modifier rejects naming the instrument and the modifier", () => {
+test("a name neither a modifier nor a colour rejects, naming the theme and the name", () => {
   for (const name of ["bd", "accent", "fg"]) {
     assert.throws(() => parseFormat(named("model"), `$model|${name}`, fgCheck),
-      { message: `format names a modifier it does not implement: "|${name}"` });
+      { message: `format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|${name}"` });
   }
+});
+
+test("a background colour's name is refused, naming it, because only a foreground colour is a modifier", () => {
+  assert.throws(() => parseFormat(named("model"), "$model|selectedBg", fgCheck), {
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|selectedBg"',
+  });
+});
+
+test("a misspelt colour is refused, naming the misspelling", () => {
+  assert.throws(() => parseFormat(named("model"), "$model|acccent", fgCheck), {
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|acccent"',
+  });
+});
+
+test("a case-different name is another name, because a colour's name is pi's spelling", () => {
+  assert.throws(() => parseFormat(named("model"), "$model|Accent", fgCheck), {
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|Accent"',
+  });
 });
 
 test("a modifier after an undeclared variable reports the variable, not the modifier", () => {
@@ -401,25 +419,25 @@ test("a form is recorded on the variable's segment, apart from the modifier chai
 
 test("a form after literal text rejects naming the instrument and the name", () => {
   assert.throws(() => parseFormat(named("path"), "hello|base", fgCheck), {
-    message: 'format names a modifier it does not implement: "|base"',
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|base"',
   });
 });
 
 test("a form on a variable that does not declare it rejects naming that variable", () => {
   assert.throws(() => parseFormat(named("model"), "$model|base", fgCheck), {
-    message: 'format names a modifier it does not implement: "|base"',
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|base"',
   });
 });
 
 test("a form after another modifier rejects naming the instrument and the form", () => {
   assert.throws(() => parseFormat(named("path"), "$path|bold|absolute", fgCheck), {
-    message: 'format names a modifier it does not implement: "|absolute"',
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|absolute"',
   });
 });
 
 test("two forms on one variable reject on the second", () => {
   assert.throws(() => parseFormat(named("path"), "$path|base|absolute", fgCheck), {
-    message: 'format names a modifier it does not implement: "|absolute"',
+    message: 'format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|absolute"',
   });
 });
 

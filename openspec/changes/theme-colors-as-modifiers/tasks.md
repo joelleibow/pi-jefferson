@@ -118,7 +118,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   check. Verify: `pnpm typecheck` clean and `pnpm test` green at the 538 tests that shipped at `cf90995`
   (S0).
 
-- [ ] 1.3 Write the failing tests first: `$model|selectedBg` refused naming `|selectedBg` (A3),
+- [x] 1.3 Write the failing tests first: `$model|selectedBg` refused naming `|selectedBg` (A3),
   `$model|acccent` refused naming `|acccent` (A4), `$model|Accent` refused naming `|Accent` (A6); in
   `tests/format.test.ts`, `:259-264` and the four form-refusal tests at `:383-405` following the new
   sentence, with `bd`, `accent` and `fg` all still refused; in `tests/configuration.test.ts`, `:1090`

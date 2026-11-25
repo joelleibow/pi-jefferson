@@ -1086,8 +1086,14 @@ test("the document surfaces the second-width-taker guard's full message", () => 
   rejected({ instruments: { context: { format: "$bar $bar" } } }, '"context"\'s format names a second width-taking variable: "$bar"');
 });
 
-test("the document surfaces the unknown-modifier guard's full message", () => {
-  rejected({ instruments: { model: { format: "$model|bd" } } }, '"model"\'s format names a modifier it does not implement: "|bd"');
+test("the document surfaces the unknown-name guard's full message", () => {
+  rejected({ instruments: { model: { format: "$model|bd" } } },
+    '"model"\'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|bd"');
+});
+
+test("a background colour's name is refused in a document, naming the instrument and the name", () => {
+  rejected({ instruments: { model: { format: "$model|selectedBg" } } },
+    '"model"\'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|selectedBg"');
 });
 
 test("the style shape guard rejects a non-object with the full composed message", () => {

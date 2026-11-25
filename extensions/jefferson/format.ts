@@ -114,7 +114,9 @@ export function parseFormat(
         } else {
           const modifier = MODIFIERS.get(name);
           if (modifier === undefined) {
-            throw formatError(`names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
+            throw formatError(
+              `names neither a modifier Jefferson implements nor a foreground colour of the theme: ${JSON.stringify("|" + name)}`,
+            );
           }
           if (afterName && subject !== undefined) {
             if (subject.kind === "bar") {
