@@ -224,7 +224,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
 
 ## 2. The binding's own probe gives way to the language's check
 
-- [ ] 2.1 A refactor with no behaviour change: replace the `variableFg` guard's own foreground probe with
+- [x] 2.1 A refactor with no behaviour change: replace the `variableFg` guard's own foreground probe with
   `foregroundCheck(theme)` built from the theme the render is handed, at that render and not before, so
   `format.ts` stays the one home of the rule and the guard answers the same names a format does. **The
   guard pair (new)**, written first, in `tests/registration.test.ts` beside "A1 a provider variable reads

@@ -3,7 +3,9 @@ import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-ag
 
 import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
 import { timed } from "../visuals/timed.ts";
-import { collapse, parseFormat, resolveFormat, resolvePlain, type ForegroundCheck, type FormatSegment } from "../../format.ts";
+import {
+  collapse, foregroundCheck, parseFormat, resolveFormat, resolvePlain, type ForegroundCheck, type FormatSegment,
+} from "../../format.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 import type { FieldValue, ReadingsView } from "../../data/field-value.ts";
 import type { Fault } from "../../faults.ts";
@@ -196,14 +198,13 @@ export function adaptProvidedDeclaration(
         if (typeof token !== "string") {
           return fault("colour", "resolver-returned", `returned ${describeValue(token)}, where a theme colour is declared`);
         }
-        try {
-          // Without this check pi's `Theme.style` throws `Unknown theme color`, and the outer
-          // boundary would blank the entry under the wrong part.
-          theme.getFgAnsi(token as Parameters<Theme["getFgAnsi"]>[0]);
-        } catch {
+        // The language's own check, built from the theme this render is handed: the guard answers the
+        // names a format does, so pi's `Theme.style` never meets one it would throw on, and the outer
+        // boundary never blanks the entry under the wrong part.
+        if (!foregroundCheck(theme)(token)) {
           return fault("colour", "resolver-returned", `returned ${JSON.stringify(token)}, where a theme colour is declared`);
         }
-        return token as ThemeColor;
+        return token;
       },
     ]),
   );

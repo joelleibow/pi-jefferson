@@ -13,7 +13,7 @@ import { adaptProvidedDeclaration } from "../extensions/jefferson/components/ins
 import { foregroundCheck } from "../extensions/jefferson/format.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { createProviderFields } from "../extensions/jefferson/data/provider-fields.ts";
-import { createFaultLedger } from "../extensions/jefferson/faults.ts";
+import { createFaultLedger, type Fault } from "../extensions/jefferson/faults.ts";
 import { configurationSource } from "./configuration-source.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import { createRegistrationListener } from "../extensions/jefferson/registration-listener.ts";
@@ -1986,6 +1986,32 @@ test("A1 a provider variable reads its view", () => {
   const readings = {} as Readings;
   assert.equal(adapted.variables.saved?.(readings), "$1");
   assert.equal(adapted.variables.saved?.(readings), "$2", "each call asks the provider's view again");
+});
+
+test("A1 a provided colour answers the names the theme carries and refuses the names it lacks", () => {
+  // The guard pair: the binding's probe and the format's are one rule, so the names a colour may be
+  // are the theme's own, asked of the theme the render is handed.
+  const faults: Fault[] = [];
+  const adapt = (token: string): InstrumentDeclaration | { refused: string } => adaptProvidedDeclaration("taiknr.savings", {
+    name: "savings",
+    variables: { saved: () => "$4.10" },
+    variableFg: { saved: () => token },
+    defaultFormat: "$saved",
+  }, () => ({}), fault => faults.push(fault), fgCheck);
+
+  const carried = adapt("invented");
+  assert.ok(!("refused" in carried), "a colour function's answer is checked at render, not at registration");
+  assert.equal(carried.variableFg?.saved?.("$4.10", fakeTheme({ invented: "\x1b[35m" })), "invented");
+  assert.deepEqual(faults, [], "a name the theme carries draws no fault");
+
+  const lacking = adapt("bashMode");
+  assert.ok(!("refused" in lacking));
+  assert.equal(lacking.variableFg?.saved?.("$4.10", fakeTheme()), undefined, "no colour is not an unknown datum");
+  assert.deepEqual(faults, [{
+    scope: "taiknr.savings",
+    kind: "resolver-returned",
+    part: '"taiknr.savings" failed to render: its colour returned "bashMode", where a theme colour is declared',
+  }]);
 });
 
 test("A1 a resolver that is not a function is refused", () => {
