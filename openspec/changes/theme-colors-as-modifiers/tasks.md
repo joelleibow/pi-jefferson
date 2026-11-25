@@ -518,11 +518,11 @@ file. The docs pass does, after the implementation gate, from the list in the de
 
 ## 5. The finished tree, proved whole
 
-- [ ] 5.1 Run `pnpm typecheck` and `pnpm test` on the finished tree, and confirm the 538 tests that
+- [x] 5.1 Run `pnpm typecheck` and `pnpm test` on the finished tree, and confirm the 538 tests that
   shipped at `cf90995` all pass (S0), alongside the 26 checks and 7 pins `redgreen-derek.md` lists.
   Boundary cases: none. Verify: both commands clean, and the counts stated in the PR.
 
-- [ ] 5.2 Re-run each check a later task could have changed, now against the finished code: the export pin
+- [x] 5.2 Re-run each check a later task could have changed, now against the finished code: the export pin
   (task 1.1); the rewritten expectations (tasks 1.3, 3.4 and 4.1); the harness proofs — task 1.4's C4,
   provider-first through `settingsDocument`, and in both orders task 3.2's C1, its getter-order pin and
   its live-first pin, task 3.3's C6, and task 3.4's C2 with its three setups; and a check that the interim

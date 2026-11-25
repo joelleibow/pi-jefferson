@@ -64,8 +64,8 @@ const mapOfMapsCopied: MemberCopy = value => isPlainObject(value)
 /** A list copied by its elements. */
 const listCopied = (element: MemberCopy): MemberCopy => value => Array.isArray(value) ? value.map(element) : value;
 
-/** Every element of a list that is a message of its own, copied through that message's table. */
-const elementsCopied = (table: Readonly<Record<string, MemberCopy>>): MemberCopy =>
+/** A member shaped as another contract shape, copied through that shape's table. */
+const nestedCopied = (table: Readonly<Record<string, MemberCopy>>): MemberCopy =>
   value => isPlainObject(value) ? copyThrough(table, value) : value;
 
 /**
@@ -105,14 +105,14 @@ const DECLARATION_COPY = {
   bar: kept,
   fills: kept,
   variableFg: mapCopied,
-  composed: elementsCopied(COMPOSED_COPY),
+  composed: nestedCopied(COMPOSED_COPY),
   options: listCopied(kept),
 } as const satisfies Record<keyof ProvidedDeclaration, MemberCopy>;
 
 const REGISTRATION_COPY = {
   extension: kept,
   fields: mapCopied,
-  instruments: listCopied(elementsCopied(DECLARATION_COPY)),
+  instruments: listCopied(nestedCopied(DECLARATION_COPY)),
 } as const satisfies Record<keyof Registration<never>, MemberCopy>;
 
 const REPORT_COPY = {

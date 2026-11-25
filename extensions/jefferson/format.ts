@@ -186,22 +186,26 @@ export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
     throw new Error("has a style that is not an object");
   }
   const isForeground = foregroundCheck(theme);
+  /** The background half of the same question: only a style's `bg` asks it, never a `|name`. */
+  const isBackground = (name: string): boolean => {
+    try {
+      theme.getBgAnsi(name as Parameters<Theme["getBgAnsi"]>[0]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const validated: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!Object.hasOwn(STYLE_KEYS, key)) {
       throw new Error(`has a style key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
     }
     if (key === "fg" || key === "bg") {
-      if (typeof value === "string") {
-        try {
-          if (key === "fg") {
-            if (!isForeground(value)) throw new Error("not a foreground colour");
-          } else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
-          validated[key] = value;
-          continue;
-        } catch {
-          // A non-token may still be a concrete color; only the parser can accept that.
-        }
+      // A name of this key's own slot is kept as the name; anything else may still be a concrete
+      // colour, which only pi's parser can accept.
+      if (typeof value === "string" && (key === "fg" ? isForeground(value) : isBackground(value))) {
+        validated[key] = value;
+        continue;
       }
       const message = `has ${key === "fg" ? "an" : "a"} ${key} that is neither a ${key === "fg" ? "foreground" : "background"}-slot theme token nor a color pi's parser accepts: ${JSON.stringify(value)}`;
       if (typeof value !== "string" && typeof value !== "number") throw new Error(message);
@@ -306,10 +310,10 @@ export function resolveFormat(
     // format does not colour: a provider's colour function the user's format covers never runs, and
     // a colour it would have thrown about is never reported (owner-rulings.md, 2026-11-24).
     const colours = declaration.variableFg;
-    const token = segment.colour !== undefined ? undefined
-      : segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
-        ? colours[segment.name]!(arrived[index]!, theme)
-        : undefined;
+    const declared = segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
+      ? colours[segment.name]!
+      : undefined;
+    const token = segment.colour === undefined && declared !== undefined ? declared(arrived[index]!, theme) : undefined;
     const foreground = segment.colour ?? token;
     return styledPiece(pieces[index]!, foreground === undefined ? merged : { ...merged, fg: foreground }, theme);
   }).join("");

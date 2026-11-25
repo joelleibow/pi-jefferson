@@ -47,10 +47,10 @@ export function startUp(pi: ExtensionAPI): void {
     own: { extension: "jefferson", instruments: SHIPPED },
   });
 
-  // The pin, for the same reason: every theme pi loads carries the same 49 foreground names, because
-  // each built-in theme carries all of them and pi's validator refuses a user theme that leaves a
-  // required token out or adds an unknown one. That is why no format's colour needs a guard at
-  // render. Re-check it on every pi pin bump (design, "The theme's name set is invariant at the pin").
+  // A second pin fact, re-checked with the one below on every pi bump: every theme pi loads carries
+  // the same 49 foreground names, because each built-in theme carries all of them and pi's validator
+  // refuses a user theme that leaves a required token out or adds an unknown one. That is why a
+  // format's colour needs no guard at render (design, "The theme's name set is invariant at the pin").
   //
   // The pin: pi's `bindExtensions` emits `resources_discover` after every extension's `session_start`
   // handler, on every path that starts a session, and only when someone handles it, so handling it
