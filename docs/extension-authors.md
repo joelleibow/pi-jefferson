@@ -117,7 +117,7 @@ Each instrument in `instruments` has four parts:
 
 - `name`, the instrument's own name, without your extension's.
 - `variables`, an object of functions, one for each variable. The key is the variable's name, so `saved` is `$saved` in a format. Each function receives your fields and returns text.
-- `defaultFormat`, the format the instrument renders until the user configures one. It is written in Jefferson's [format language](formats.md), and it may name only your variables.
+- `defaultFormat`, the format the instrument renders until the user configures one. It is written in Jefferson's [format language](formats.md), and it may name only your variables. A colour in it needs Jefferson 0.15.0 or later: an older Jefferson refuses the whole registration, so an author who must run on older releases keeps colours out of a default format and leaves them to the user's own format.
 - `defaultLabel`, optional: the text in front of the format until the user configures a label. [The label](instruments.md#the-label) says how Jefferson trims it and spaces it.
 
 A variable returns text, or `undefined` when it has no value yet. Returning anything else is a fault.
@@ -207,6 +207,8 @@ A form is another rendering of a variable's value. `variableForms` maps a variab
 
 Above, `saved` has the form `cents`. A user who writes `$saved|cents` sees `412¢`, and a bare `$saved` still renders `$4.12`. A form comes directly after its variable, before any modifier ([Formats](formats.md#forms)). When the form returns `undefined`, the instrument renders nothing.
 
+A form is read before the theme's colours, so a form called `accent` still renders its own text on the variable that declares it. Written anywhere else, that name is the theme's colour.
+
 ### `bar`
 
 `bar` lets a format name `$bar`. It is a function that receives your fields and returns a percentage. `$bar` always means the bar, whatever your variables are called.
@@ -225,7 +227,7 @@ The user places `$bar` anywhere in the format, and it takes the width the rest o
 
 `variableFg` maps a variable's name to a function that chooses the variable's foreground colour. The function receives the variable's text, before any modifier changed it, and returns the name of a theme colour token, or `undefined` for no colour of its own.
 
-The token replaces the `fg` of the user's `style` on that variable's text only. The user's `bg` and attributes still apply, and the rest of the text keeps the user's `fg`. Above, `$state` turns `accent` while taiknr is saving. A token the theme does not have is a fault, and the variable keeps the user's style.
+The token replaces the `fg` of the user's `style` on that variable's text only, unless the user's format names a colour for that variable: the format's colour is the stronger one, and your function is not called for that piece. The user's `bg` and attributes still apply, and the rest of the text keeps the user's `fg`. Above, `$state` turns `accent` while taiknr is saving. A token the theme does not have is a fault, and the variable keeps the user's style.
 
 ### `composed`
 
@@ -307,7 +309,7 @@ Warnings about your registration and your updates carry no file path, because th
 | An optional member of the wrong shape | `pi-jefferson: "taiknr.savings" carries fills Jefferson cannot use`, with `bar`, `variableForms`, `variableFg`, `composed` or `options` in place of `fills` |
 | An option Jefferson does not offer | `pi-jefferson: "taiknr.savings" declares the option "seconds", which Jefferson does not implement` |
 | `formats` without `composed` | `pi-jefferson: "taiknr.savings" declares "formats" without a composed format set` |
-| A default format Jefferson cannot parse | `pi-jefferson: "taiknr.savings" carries a default format Jefferson cannot parse` |
+| A default format Jefferson cannot use | `pi-jefferson: "taiknr.savings"'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "\|notacolour"`, or `pi-jefferson: "taiknr.savings"'s default format names a variable it does not declare: "$spent"` |
 | A `defaultLabel` that is not a string | `pi-jefferson: "taiknr.savings" carries a default label that is not a string` |
 | A variable that is not a function | `pi-jefferson: "taiknr.savings" carries a variable "saved" that is not a function` |
 | A composed text Jefferson cannot parse | `pi-jefferson: "taiknr.savings" carries a composed format "busy" Jefferson cannot parse` |

@@ -1,0 +1,37 @@
+schema: marbleization
+created: 2026-11-24
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: a0d4fbb2-731b-415e-9f96-3fcde0bba8a3
+    eleanor: 25a71bad-ef17-4dc8-839a-05b9e59849f4
+    michael: fdbe6d5a-6ae7-418f-b3ab-71aed315fe79
+    bambadjan: 76979f46-1213-46ac-a8ee-7ea30a14fcce
+    bambadjan_council: 96616fb7-6082-405c-9b3b-bdeacda06d04
+    bambadjan_design: 93bf8a4a-3676-4fd0-a935-7dcfcd0c9b10
+    derek_redgreen: e6b8b8f4-f967-4530-a84c-27004a734ef2
+    derek: 2a4ba6c0-fa13-4f90-9ed4-809bc1ee3325
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+    owner_live_check: approved
+  progress:
+    - "2026-11-24: change opened from a 2026-11-24 Explore session on main at cf90995 (0.14.0). Branch theme-colors-as-modifiers. owner-rulings.md (4 rulings, quoted) and plan-context.md (no larger plan) written. Research workflow 8a55d233 (Chidi + Eleanor) launched."
+    - "2026-11-24: Research done (Chidi a0d4fbb2, Eleanor 25a71bad). Michael orientation aaafddce: no questions only Joel can answer; one conditional (a provider default format refusal at registration, S10/T2) comes to Joel only if the design cannot keep it. Plan started: Bambadjan drafting proposal and specs."
+    - "2026-11-24: proposal.md and specs (statusline, instrument-registration) written by Bambadjan 76979f46; openspec validate --strict passes. Council (7 lenses) launched."
+    - "2026-11-24: council a72c8400 complete (7 reports, council-*.md). Catalyst and zoom-out clean; critic, structural, readiness, codebase, comprehension converge on provider default format naming a colour (registration is theme-free). Michael council-rulings resume launched."
+    - "2026-11-24: Michael council rulings 25179119: 16 rows, all settled, none for Joel (provider default naming a colour registers; any other bad name keeps whole-registration refusal, order-independent). Bambadjan writing council.md and revising proposal/specs."
+    - "2026-11-24: council.md written, rulings applied to proposal and specs (validate --strict green). Owner decisions required: none; council_owner approved. Ruling 16.1 landed as retire-and-replace of the requirement. Bambadjan drafting design.md."
+    - "2026-11-24: design.md written (Bambadjan 93bf8a4a), validate --strict green. Design Review stages 1-4 launched as one workflow (design-review.js)."
+    - "2026-11-24: Design Review 1c6fe4f0 done: S1 1 minor; S2 5 fixed; S3 r1 11, r2 9, r3/r4 clean (streak 2); S4 1 minor, pass. 50 settled findings. Michael latest d9446fc6. design gate approved. Launched design-review.md synthesis + Derek red/green + Michael gaps + patch (redgreen.js)."
+    - "2026-11-24: design-review.md written; Derek red/green e6b8b8f4: 26 red->green, 7 pins, base 538 pass, after 569 pass. Michael gaps 81ae0635: 7 gaps, clean, 1 wording fix applied. Launched tasks.md + Stage 5 readiness loop (readiness.js)."
+    - "2026-11-24: tasks.md written (Bambadjan fc925cae). Stage 5 readiness 26ba8a7c: r1 23, r2 14, r3 10, r4 7 (clean), r5 4 (clean), streak 2; 75 settled; docs pass moved out of tasks.md to the docs stage. Michael latest 0c40fb5c. Planning complete; awaiting Joel go for Implement."
+    - "2026-11-24: Joel: \"There's no need to stop and ask for that. You can get things rolling.\" Planning committed. Implement launched: Derek tasks 1.1-5.2, Michael verdict loop up to 3 rounds (implement.js)."
+    - "2026-11-24: Implement: Derek 7b26142e built 1.1-5.2 (8 commits, 577 pass). Michael r1 a4d92c7f changes_requested (copy refused class-shaped registrations; startup comment). Derek 2a4ba6c0 fixed in 7e1a515 (578 pass). Michael r2 fdbe6d5a approve. implement gate approved. Docs pass launched."
+    - "2026-11-25: docs pass (Bambadjan fcf296a2) committed 1a9e201: ADR 0021, ADR 0003 status, docs/formats Colours, configuration, extension-authors, notices, ARCHITECTURE, AGENTS. 578 pass. Pushed; PR #25 (release:minor). Validate launched: Judge Gen verify + PR review, then Michael adjudication (validate.js)."
+    - "2026-11-25: Validate: Judge Gen verify 883a2c13 (no issues) and PR review b895a6c3 (no must-fix; 1 should-fix: ADR 0021 cites the pre-archive path). Michael ba9e0315 approve; ADR 0021:12 path fix goes in the archive commit. Waiting on Joel live check (task 5.3)."
+    - "2026-11-25: Joel live check, part 1: |selectedBg on the path instrument rejected the document with the parser sentence quoting the name (screenshot). Joel: \"error works as expected.\" Colour rendering not yet confirmed."
+    - "2026-11-25: Joel live check, part 2 (screenshot): model in toolDiffRemoved, via faint, Anthropic capitalized in bashMode, thinking level green. Joel: \"The other's are a beautiful thing!!! Well done.\" Task 5.3 ticked. Archiving."

@@ -10,9 +10,10 @@ import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil
 
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { adaptProvidedDeclaration } from "../extensions/jefferson/components/instruments/instrument-binding.ts";
+import { foregroundCheck } from "../extensions/jefferson/format.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { createProviderFields } from "../extensions/jefferson/data/provider-fields.ts";
-import { createFaultLedger } from "../extensions/jefferson/faults.ts";
+import { createFaultLedger, type Fault } from "../extensions/jefferson/faults.ts";
 import { configurationSource } from "./configuration-source.ts";
 import { fakeTheme } from "./fake-theme.ts";
 import { createRegistrationListener } from "../extensions/jefferson/registration-listener.ts";
@@ -26,6 +27,8 @@ import { SHIPPED } from "../extensions/jefferson/shipped.ts";
 import {
   harness, useTempAgentDir, writeAgentDocument, type FakeSession, type Harness,
 } from "./session-harness.ts";
+
+const fgCheck = foregroundCheck(fakeTheme());
 
 /**
  * The registration taiknr posts: one instrument whose one resolver reads the string field `saved`.
@@ -350,7 +353,10 @@ test("A2 every registration refusal part is exact", async (t) => {
       '"taiknr.savings" carries no default format'],
     ["unparseable default format", events => events.emit("jefferson:registration",
       from({ instruments: [{ ...savings, defaultFormat: "Spent $spent" }] })),
-      '"taiknr.savings" carries a default format Jefferson cannot parse'],
+      '"taiknr.savings"\'s default format names a variable it does not declare: "$spent"'],
+    ["a modifier on the bar", events => events.emit("jefferson:registration",
+      from({ instruments: [{ ...savings, bar: () => 50, defaultFormat: "Savings: $saved $bar|bold" }] })),
+      '"taiknr.savings"\'s default format puts a modifier on "$bar": "|bold"'],
     ["label not a string", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, defaultLabel: 4 }] })),
       '"taiknr.savings" carries a default label that is not a string'],
     ["resolver not a function", events => events.emit("jefferson:registration", from({ instruments: [{ ...savings, variables: { saved: 4 } }] })),
@@ -382,6 +388,19 @@ test("A2 every registration refusal part is exact", async (t) => {
     ["a composed kind Jefferson cannot parse", events => events.emit("jefferson:registration",
       from({ instruments: [{ ...savings, composed: { variable: "state", variables: {}, select: () => "busy", formats: { busy: "Busy on $nope" } } }] })),
       '"taiknr.savings" carries a composed format "busy" Jefferson cannot parse'],
+    ["a fields that is not a map", events => events.emit("jefferson:registration", from({ fields: "x", instruments: [] })),
+      'registration from "taiknr" declares "fields" as "x", which is not string, number or boolean'],
+    ["a fields entry named __proto__", events => events.emit("jefferson:registration",
+      from({ fields: JSON.parse('{"__proto__":"array"}'), instruments: [] })),
+      'registration from "taiknr" declares "__proto__" as "array", which is not string, number or boolean'],
+    ["a variables that is not a map", events => events.emit("jefferson:registration",
+      from({ instruments: [{ name: "savings", variables: "x", defaultFormat: "x" }] })),
+      '"taiknr.savings" carries no variables'],
+    ["a variables entry named __proto__", events => events.emit("jefferson:registration",
+      from({ instruments: [{ ...savings, variables: { ...savings.variables, ...JSON.parse('{"__proto__":5}') } }] })),
+      '"taiknr.savings" carries a variable "__proto__" that is not a function'],
+    ["a posted null", events => events.emit("jefferson:registration", null),
+      "a registration is not an object"],
     ["field type outside the three", events => events.emit("jefferson:registration", from({ fields: { saved: "array" }, instruments: [] })),
       'registration from "taiknr" declares "saved" as "array", which is not string, number or boolean'],
     ["one field at two types", events => {
@@ -413,11 +432,108 @@ test("A2 a registration whose default format names an undeclared variable is ref
     const session = await run(harness());
     const messages = session.notified.map(notified => notified.message);
     assert.equal(line(session), placeholder(), `${order}: the entry renders on blank`);
-    const fault = messages.findIndex(message => message.includes('"taiknr.savings" carries a default format Jefferson cannot parse'));
+    const fault = messages.findIndex(message => message.includes('"taiknr.savings"\'s default format names a variable it does not declare: "$spent"'));
     const unknown = messages.findIndex(message => message.includes('row 1: "taiknr.savings" is not a known instrument'));
     assert.equal(fault, messages.length - 1, `${order}: one part, delivered after startup completes`);
     assert.ok(unknown >= 0 && unknown < fault, `${order}: the unknown-name part comes first`);
   }
+});
+
+/** A registration whose one instrument's default format carries the text given. */
+function defaultingTo(format: string, extra: Record<string, unknown> = {}): Registration<"taiknr"> {
+  return {
+    ...registration,
+    instruments: [{ ...registration.instruments[0]!, ...extra, defaultFormat: format }],
+  };
+}
+
+const NOT_A_COLOUR = '"taiknr.savings"\'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|notacolour"';
+
+test("C2 a default format naming a name the theme lacks is refused whole, alike in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "taiknr.savings"]]);
+    const h = harness();
+    const payload = defaultingTo("Savings: $saved|notacolour");
+    const send = (): void => void h.events.emit("jefferson:registration", payload);
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    const drawn = line(session);
+    assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), `${order}: the row's other instruments render`);
+    assert.equal(drawn.includes("Savings"), false, `${order}: the refused instrument's position renders blank`);
+    await settle();
+    const messages = session.notified.map(notified => notified.message);
+    assert.equal(messages.length, 2, `${order}: ${JSON.stringify(messages)}`);
+    assert.ok(messages[0]?.endsWith('row 1: "taiknr.savings" is not a known instrument'), `${order}: the notice first`);
+    assert.ok(messages[1]?.endsWith(NOT_A_COLOUR), `${order}: then the refusal`);
+    assert.equal(messages.filter(message => message.includes("|notacolour")).length, 1,
+      `${order}: exactly one message quotes the name`);
+  }
+});
+
+test("C2b the refusal takes its siblings, its fields and its later reports, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    const payload: Registration<"taiknr"> = {
+      extension: "taiknr",
+      fields: { saved: "string" },
+      instruments: [
+        { ...registration.instruments[0]!, defaultFormat: "Savings: $saved|notacolour" },
+        { name: "stubs", variables: { stubs: () => "3" }, defaultFormat: "Stubs: $stubs" },
+      ],
+    };
+    const session = await registeredRow(
+      t, payload, [{ instrument: "model" }, { instrument: "taiknr.stubs" }], [saved("$4.10")], order,
+    );
+    const drawn = line(session);
+    assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), order);
+    assert.equal(drawn.includes("Stubs:"), false, `${order}: the sibling is refused with it`);
+    await settle();
+    const messages = session.notified.map(notified => notified.message);
+    assert.equal(messages.length, 2, `${order}: ${JSON.stringify(messages)}`);
+    assert.ok(messages[0]?.endsWith('row 1: "taiknr.stubs" is not a known instrument'), `${order}: the notice first`);
+    assert.equal(messages[1],
+      `pi-jefferson: ${NOT_A_COLOUR}; taiknr reports "saved" without a registration`, `${order}: its field and its report go too`);
+  }
+});
+
+test("C2 a default format naming a name the theme lacks, with no document", async (t) => {
+  // No configuration file at all: the default row renders its placeholders and the refusal alone.
+  useTempAgentDir(t);
+  const h = harness();
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start();
+  assert.equal(session.lines(80).length, 1, "the default row renders");
+  assert.equal(line(session), placeholder(8).repeat(10), "its ten placeholders, and nothing else");
+  await settle();
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" }]);
+});
+
+test("C2 a default format naming a name the theme lacks, with the document rejected", async (t) => {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { rows: 5 });
+  const path = join(agentDir, "pi-jefferson.json");
+  const h = harness();
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start(options);
+  await settle();
+  assert.deepEqual(session.notified, [
+    { message: `pi-jefferson: ${path} was rejected (the rows value is not a list); rendering the default row`, type: "warning" },
+    { message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" },
+  ], "then the refusal");
+});
+
+test("C2 a default format naming a name the theme lacks, with no row naming it", async (t) => {
+  documentShowing(t, [["model"]]);
+  const h = harness();
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  h.events.emit("jefferson:registration", defaultingTo("Savings: $saved|notacolour"));
+  const session = await h.start(options);
+  assert.equal(line(session), "Model: anthropic/claude-opus-4");
+  await settle();
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${NOT_A_COLOUR}`, type: "warning" }],
+    "with no row naming it, the refusal arrives alone");
 });
 
 test("A2 every report refusal part is exact", async (t) => {
@@ -425,6 +541,7 @@ test("A2 every report refusal part is exact", async (t) => {
   const amount = { extension: "taiknr", fields: { amount: "number" }, instruments: [] };
   const cases: Array<[label: string, send: (events: EventBus) => void, part: string]> = [
     ["report shape", events => events.emit("jefferson:update", "nope"), "a report is not an object"],
+    ["report shape, null", events => events.emit("jefferson:update", null), "a report is not an object"],
     ["no extension name", events => events.emit("jefferson:update", { field: "saved", value: "x" }),
       "a report carries no extension name"],
     ["no field name", events => events.emit("jefferson:update", { extension: "taiknr", value: "x" }),
@@ -660,10 +777,12 @@ test("A8 jeffersonfan.stats registers through the bus and renders", async (t) =>
 test("A8 jefferson.custom.mine stays free", () => {
   const events = createEventBus();
   const registry = createRegistry();
-  createRegistrationListener({
+  const listener = createRegistrationListener({
     events, registry, faults: createFaultLedger(), fields: createProviderFields(() => {}), repaint: () => {},
     own: { extension: "jefferson", instruments: SHIPPED },
   });
+  // A held message is not accepted until the handle is handed a theme.
+  listener.receiveTheme(fakeTheme());
   events.emit("jefferson:registration", registration);
   assert.notEqual(registry.instrument("taiknr.savings"), undefined, "a provider's two-part name registers");
   assert.equal(registry.instrument("jefferson.custom.mine"), undefined, "three parts belong to Jefferson");
@@ -946,8 +1065,8 @@ test("A3 every settings refusal part is exact", async (t) => {
       `"taiknr.savings" is configured with "width", which the instrument does not declare${blank}`],
     ["a format naming an undeclared variable", { format: "$spent" },
       `"taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare${blank}`],
-    ["a modifier the format does not allow", { format: "$saved|wobble" },
-      `"taiknr.savings" is configured with a format Jefferson cannot parse${blank}`],
+    ["a name neither a modifier nor a colour", { format: "$saved|wobble" },
+      `"taiknr.savings"'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|wobble"${blank}`],
     ["a style the theme refuses", { style: { fg: "nope" } },
       `"taiknr.savings" is configured with a style Jefferson cannot use${blank}`],
     ["formats that are not an object", { formats: 5 },
@@ -1208,7 +1327,8 @@ test("A6 a provider's key that names an Object member reads as its own key", asy
   }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
   await settle();
   assert.equal(
-    inheritedForm.notified.some(notified => notified.message.includes('"taiknr.usage" carries a default format Jefferson cannot parse')),
+    inheritedForm.notified.some(notified => notified.message.includes(
+      '"taiknr.usage"\'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|name"')),
     true,
     `an inherited key is no form: ${JSON.stringify(inheritedForm.notified)}`,
   );
@@ -1402,6 +1522,185 @@ test("A6 a provided composed format renders the selected text", async (t) => {
   assert.deepEqual(session.notified, []);
 });
 
+test("A2 a registration whose members are a class's getters and methods registers, in both orders", async (t) => {
+  /** One instrument whose `bar` is a method, so it lives on the prototype and not on the object. */
+  class Savings {
+    name = "savings";
+    defaultFormat = "Savings: $saved $bar";
+    variables = { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined };
+    bar(): number { return 50; }
+  }
+  /** A registration whose `instruments` is a getter: the vet reads a member by property access. */
+  class Posted {
+    extension = "taiknr";
+    fields = { saved: "string" };
+    get instruments(): Savings[] { return [new Savings()]; }
+  }
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["taiknr.savings"]]);
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", new Posted());
+      h.events.emit("jefferson:update", saved("$4.10"));
+    };
+    const session = order === "provider-first"
+      ? await (send(), h.start())
+      : await h.start({ afterSessionStart: send });
+    assert.ok(line(session).startsWith("Savings: $4.10 █"), `${order}: ${line(session)}`);
+    await settle();
+    assert.deepEqual(session.notified, [], order);
+  }
+});
+
+test("C5 a held registration is judged as it was posted, provider-first", async (t) => {
+  documentShowing(t, [["model", "taiknr.savings"]]);
+  const payload: Registration<"taiknr"> = {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      variableFg: { saved: () => "accent" },
+      defaultFormat: "Savings: $saved",
+    }],
+  };
+  const h = harness();
+  h.events.emit("jefferson:registration", payload);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  // The provider changes what it posted before the session starts: the copy, not the object, is
+  // what Jefferson checks and renders (the spec's "A held message is judged as it was posted").
+  (payload.instruments[0] as { variableFg: Record<string, unknown> }).variableFg.saved = 5;
+  const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+  assert.equal(line(session), "Model: anthropic/claude-opus-4 Savings: $4.10");
+  await settle();
+  assert.deepEqual(session.notified, [], "the value it was posted with still answers");
+});
+
+test("C7 a held report is judged as it was posted, in both load orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "taiknr.savings"]]);
+    const h = harness();
+    const first = { extension: "taiknr", field: "saved", value: 42 as string | number };
+    const send = (): void => {
+      h.events.emit("jefferson:registration", registration);
+      h.events.emit("jefferson:update", first);
+      first.value = "$4.10";
+      h.events.emit("jefferson:update", first);
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    assert.equal(line(session), "Model: anthropic/claude-opus-4 Savings: $4.10", order);
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: taiknr reports "saved" as a number, and it declared string',
+      type: "warning",
+    }], order);
+  }
+});
+
+test("C1 a provided default format naming a colour registers and renders it, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    const payload: Registration<"taiknr"> = {
+      ...registration,
+      instruments: [{ ...registration.instruments[0]!, defaultFormat: "Savings: $saved|accent" }],
+    };
+    // No `instruments` entry: the row places it, so the bind re-parses the default format with the
+    // same check the registration vet ran.
+    const session = await registeredRow(t, payload, [{ instrument: "taiknr.savings" }], [saved("$4.10")], order);
+    assert.equal(line(session), "Savings: $4.10", order);
+    assert.ok(rawLine(session).includes(fakeTheme().style("$4.10", { fg: "accent" })), order);
+    await settle();
+    assert.deepEqual(session.notified, [], order);
+  }
+});
+
+test("C1 a getter that emits during another message's copy is vetted ahead of it, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model"]]);
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", {
+        get extension() {
+          h.events.emit("jefferson:registration", { extension: "acme" });
+          return "taiknr";
+        },
+        instruments: 5,
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: registration from "acme" carries no instruments; registration from "taiknr" carries no instruments',
+      type: "warning",
+    }], order);
+  }
+});
+
+test("C6 a payload that throws while vetting is contained, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model", "acme.x"]]);
+    const errors = t.mock.method(console, "error");
+    const h = harness();
+    const send = (): void => {
+      // The field type is a BigInt, which the refuse-its-type text cannot stringify.
+      h.events.emit("jefferson:registration", { extension: "taiknr", fields: { saved: 1n }, instruments: [] });
+      h.events.emit("jefferson:registration", {
+        extension: "acme",
+        fields: { x: "string" },
+        instruments: [{ name: "x", variables: { x: () => "ok" }, defaultFormat: "Acme $x" }],
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    assert.equal(line(session), "Model: anthropic/claude-opus-4 Acme ok", `${order}: the footer installed`);
+    await settle();
+    assert.deepEqual(session.notified, [], `${order}: nothing is accepted, recorded or warned for it`);
+    const logged = errors.mock.calls.map(call => call.arguments);
+    assert.equal(logged.length, 1, `${order}: one line`);
+    assert.equal(logged[0]?.[0], "Event handler error (jefferson:registration):", order);
+    assert.ok(logged[0]?.[1] instanceof Error, `${order}: the error object is passed, not stringified`);
+  }
+});
+
+test("C1 a message posted during the drain is vetted at once, in both orders", async (t) => {
+  for (const order of ["provider-first", "Jefferson-first"] as const) {
+    documentShowing(t, [["model"]]);
+    const errors = t.mock.method(console, "error");
+    const h = harness();
+    const send = (): void => {
+      h.events.emit("jefferson:registration", {
+        extension: "taiknr",
+        fields: {
+          saved: {
+            toJSON() {
+              h.events.emit("jefferson:registration", { extension: "acme" });
+              return "array";
+            },
+          },
+        },
+        instruments: [],
+      });
+    };
+    const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+    const session = order === "provider-first"
+      ? await (send(), h.start(options))
+      : await h.start({ ...options, afterSessionStart: send });
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: registration from "acme" carries no instruments; registration from "taiknr" declares "saved" as "array", which is not string, number or boolean',
+      type: "warning",
+    }], order);
+    assert.deepEqual(errors.mock.calls.map(call => call.arguments), [], order);
+  }
+});
+
 test("A6 every provided member fault part is exact", async (t) => {
   const cases: Array<[label: string, instruments: readonly unknown[], reports: ReadonlyArray<{ extension: string; field: string; value: string | number | boolean }>, part: string]> = [
     ["a bar that throws", [{
@@ -1494,6 +1793,25 @@ test("A6 a provided composed value or colour that faults is contained, and its p
       type: "warning",
     }], label);
   }
+});
+
+test("A colour function the format covers is never asked, so its throw warns nothing", async (t) => {
+  const { session } = settingsDocument(t, { format: "$saved|accent" }, {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "savings",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      variableFg: { saved: () => { throw new Error("provider"); } },
+      defaultFormat: "Savings: $saved",
+    }],
+  });
+  const started = await session;
+  // The document's format replaces the default one, and the fixture has no default label.
+  assert.equal(line(started), "Model: anthropic/claude-opus-4 $4.10");
+  assert.ok(rawLine(started).includes(fakeTheme().style("$4.10", { fg: "accent" })), rawLine(started));
+  await settle();
+  assert.deepEqual(started.notified, [], "a colour the user's format replaced is never asked, so it cannot fault");
 });
 
 test("A6 a provided colour the theme does not have falls back to the cell's style", async (t) => {
@@ -1959,29 +2277,56 @@ test("A1 a provider variable reads its view", () => {
     const view = { saved: `$${reads.length + 1}` };
     reads.push(view);
     return view;
-  }, () => {});
+  }, () => {}, fgCheck);
   assert.ok(!("refused" in adapted));
   const readings = {} as Readings;
   assert.equal(adapted.variables.saved?.(readings), "$1");
   assert.equal(adapted.variables.saved?.(readings), "$2", "each call asks the provider's view again");
 });
 
+test("A1 a provided colour answers the names the theme carries and refuses the names it lacks", () => {
+  // The guard pair: the binding's probe and the format's are one rule, so the names a colour may be
+  // are the theme's own, asked of the theme the render is handed.
+  const faults: Fault[] = [];
+  const adapt = (token: string): InstrumentDeclaration | { refused: string } => adaptProvidedDeclaration("taiknr.savings", {
+    name: "savings",
+    variables: { saved: () => "$4.10" },
+    variableFg: { saved: () => token },
+    defaultFormat: "$saved",
+  }, () => ({}), fault => faults.push(fault), fgCheck);
+
+  const carried = adapt("invented");
+  assert.ok(!("refused" in carried), "a colour function's answer is checked at render, not at registration");
+  assert.equal(carried.variableFg?.saved?.("$4.10", fakeTheme({ invented: "\x1b[35m" })), "invented");
+  assert.deepEqual(faults, [], "a name the theme carries draws no fault");
+
+  const lacking = adapt("bashMode");
+  assert.ok(!("refused" in lacking));
+  assert.equal(lacking.variableFg?.saved?.("$4.10", fakeTheme()), undefined, "no colour is not an unknown datum");
+  assert.deepEqual(faults, [{
+    scope: "taiknr.savings",
+    kind: "resolver-returned",
+    part: '"taiknr.savings" failed to render: its colour returned "bashMode", where a theme colour is declared',
+  }]);
+});
+
 test("A1 a resolver that is not a function is refused", () => {
   const declaration = { ...registration.instruments[0]!, variables: { saved: "nope" } } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck),
     { refused: "resolver-not-function", variable: "saved" });
 });
 
 test("A1 a default label that is not a string is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}), { refused: "label-not-string" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck), { refused: "label-not-string" });
 });
 
 test("A1 a default format Jefferson cannot parse is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultFormat: "Spent $spent" } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
-    { refused: "unparseable-default-format" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck),
+    { refused: "unparseable-default-format", message: 'format names a variable it does not declare: "$spent"' });
   // The table's row order decides which fault a payload with two is refused for.
   const twice = { ...declaration, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}), { refused: "unparseable-default-format" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}, fgCheck),
+    { refused: "unparseable-default-format", message: 'format names a variable it does not declare: "$spent"' });
 });

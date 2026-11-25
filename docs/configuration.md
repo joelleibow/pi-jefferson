@@ -126,7 +126,7 @@ Jefferson reports the first fault it finds, once per session, after startup comp
 | A label that is not a string | `pi-jefferson: "taiknr.savings" is configured with a label that is not a string; it renders blank` |
 | An option the instrument does not take | `pi-jefferson: "taiknr.savings" is configured with "width", which the instrument does not declare; it renders blank` |
 | A format naming a variable the instrument does not have | `pi-jefferson: "taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; it renders blank` |
-| Any other format Jefferson cannot parse | `pi-jefferson: "taiknr.savings" is configured with a format Jefferson cannot parse; it renders blank` |
+| Any other format Jefferson cannot use | `pi-jefferson: "taiknr.savings"'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "\|acccent"; it renders blank` |
 | A style Jefferson cannot use | `pi-jefferson: "taiknr.savings" is configured with a style Jefferson cannot use; it renders blank` |
 | `formats` that is not an object | `pi-jefferson: "taiknr.savings" is configured with formats that is not an object; it renders blank` |
 | A kind the instrument does not have | `pi-jefferson: "taiknr.savings" is configured with a formats kind "sleepy", which the instrument does not carry; it renders blank` |

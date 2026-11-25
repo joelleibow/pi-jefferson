@@ -7,7 +7,10 @@ import { SHIPPED } from "../extensions/jefferson/shipped.ts";
 import { shippedInstrument } from "./shipped-instrument.ts";
 import type { Notice } from "../extensions/jefferson/data/notice.ts";
 import type { Readings, Timed } from "../extensions/jefferson/data/session-data-store.ts";
+import { foregroundCheck } from "../extensions/jefferson/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
+
+const fgCheck = foregroundCheck(fakeTheme());
 
 const seed: Readings = {
   provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high",
@@ -66,7 +69,7 @@ function named(name: string): InstrumentDeclaration {
 async function render(name: string, readings: Readings, format?: string): Promise<string> {
   const declaration = named(name);
   const { parseFormat, resolveFormat } = await import("../extensions/jefferson/format.ts");
-  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat), {}, readings, 80, fakeTheme());
+  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat, fgCheck), {}, readings, 80, fakeTheme());
 }
 
 test("the eleven shipped declarations own their names, variables, defaults and foundational options", () => {
@@ -363,7 +366,7 @@ test("an instrument that does not fill renders the same text at width 0 and at w
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const theme = fakeTheme();
-  const bound = instrumentBindings();
+  const bound = instrumentBindings(fgCheck);
 
   // The probe's assumption: a width-0 render is the instrument's text, because nothing but `$bar`
   // reads the width, and a bar declares that it fills.
@@ -386,8 +389,8 @@ test("an instrument that does not fill renders the same text at width 0 and at w
   );
 
   // The guard discriminates: the one instrument that reads the width is marked, and its text moves.
-  const configured = instrumentBindings(new Map([
-    [named("context").name, { segments: parseFormat(named("context"), "$percent $bar"), style: {} }],
+  const configured = instrumentBindings(fgCheck, new Map([
+    [named("context").name, { segments: parseFormat(named("context"), "$percent $bar", fgCheck), style: {} }],
   ]));
   const bar = configured(named("context"));
   assert.equal(bar.fills, true, "a format holding $bar fills");
@@ -398,7 +401,7 @@ test("the notice's default text is its kind's, in the warning colour, and nothin
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const theme = fakeTheme();
-  const bound = instrumentBindings()(named("notice"));
+  const bound = instrumentBindings(fgCheck)(named("notice"));
   // The instant is in the future of the seed's sample, so every case shows.
   const shownUntil = 1;
   const cases: Array<[Timed<Notice>, string]> = [
@@ -422,6 +425,47 @@ test("the notice's default text is its kind's, in the warning colour, and nothin
   assert.equal(bound.fills, false);
 });
 
+test("a notice's format colour beats warning while its text and columns are unchanged", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const { stripTerminalSequences, visibleWidth } = await import("@earendil-works/pi-tui");
+  const theme = fakeTheme();
+  const declaration = named("notice");
+  const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 1 } };
+  const draw = (format: string): string => instrumentBindings(fgCheck, new Map([
+    [declaration.name, { segments: parseFormat(declaration, format, fgCheck), style: {} }],
+  ]))(declaration).render(shown, 80, theme);
+  const plain = draw("$notice");
+  assert.equal(plain, "Notice: " + theme.style("Cache miss: 20k tokens re-billed (~$0.10)", { fg: "warning" }));
+  assert.equal(draw("$notice|accent"), "Notice: " + theme.style("Cache miss: 20k tokens re-billed (~$0.10)", { fg: "accent" }));
+  assert.equal(stripTerminalSequences(draw("$notice|accent")), stripTerminalSequences(plain), "the text is the same");
+  assert.equal(visibleWidth(draw("$notice|accent")), visibleWidth(plain), "so are the columns");
+});
+
+test("the thinking level's own colour holds until the format names one", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("thinking");
+  const draw = (format: string): string => instrumentBindings(fgCheck, new Map([
+    [declaration.name, { segments: parseFormat(declaration, format, fgCheck), style: {} }],
+  ]))(declaration).render(seed, 80, theme);
+  assert.equal(draw("$level"), "Thinking: " + theme.style("high", { fg: "thinkingHigh" }), "the level keeps the input box's colour");
+  assert.equal(draw("$level|accent"), "Thinking: " + theme.style("high", { fg: "accent" }), "the format's colour is the strongest");
+});
+
+test("a label keeps the style while the value takes the format's colour", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("model");
+  const bound = instrumentBindings(fgCheck, new Map([[declaration.name, {
+    segments: parseFormat(declaration, "$model|warning", fgCheck), style: { fg: "accent" }, label: "Model:",
+  }]]))(declaration);
+  assert.equal(bound.render(seed, 80, theme),
+    theme.style("Model: ", { fg: "accent" }) + theme.style("claude-opus-4", { fg: "warning" }));
+});
+
 test("a timed declaration shows its text until its instant and nothing after it, label included", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const theme = fakeTheme();
@@ -433,7 +477,7 @@ test("a timed declaration shows its text until its instant and nothing after it,
     shownUntil: readings => readings.notice?.shownUntil,
     options: Object.freeze(["format", "label"]),
   };
-  const bound = instrumentBindings()(declaration);
+  const bound = instrumentBindings(fgCheck)(declaration);
   const held: Readings = { ...seed, notice: { kind: "miss", values: {}, shownUntil: 1 } };
   assert.equal(bound.render(held, 80, theme), "Timed: claude-opus-4", "before the instant");
   assert.equal(bound.render({ ...held, sampledAt: 1 }, 80, theme), "", "at the instant: no text, no label, no gap");
@@ -448,7 +492,7 @@ test("the notice instrument shows its text until its instant and nothing after i
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const theme = fakeTheme();
-  const bound = instrumentBindings()(named("notice"));
+  const bound = instrumentBindings(fgCheck)(named("notice"));
   const held: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: "" }, shownUntil: 1 } };
   assert.equal(stripTerminalSequences(bound.render(held, 80, theme)), "Notice: Cache miss: 125k tokens re-billed",
     "before the instant");
@@ -461,10 +505,10 @@ test("an empty kind text silences that kind", async () => {
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
   const { stripTerminalSequences } = await import("@earendil-works/pi-tui");
   const theme = fakeTheme();
-  const boundWith = (formats: Record<string, string>, cell = "$notice") => instrumentBindings(new Map([
-    [named("notice").name, { segments: parseFormat(named("notice"), cell), style: {},
+  const boundWith = (formats: Record<string, string>, cell = "$notice") => instrumentBindings(fgCheck, new Map([
+    [named("notice").name, { segments: parseFormat(named("notice"), cell, fgCheck), style: {},
       formats: Object.fromEntries(Object.entries(formats)
-        .map(([kind, format]) => [kind, parseFormat(named("notice"), format, true)])) }],
+        .map(([kind, format]) => [kind, parseFormat(named("notice"), format, fgCheck, true)])) }],
   ]))(named("notice"));
   const held: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" }, shownUntil: 1 } };
   assert.equal(boundWith({ miss: "" }).render(held, 80, theme), "", "an empty kind text renders nothing, label included");
@@ -480,9 +524,9 @@ test("an empty kind text silences that kind", async () => {
 test("a configured kind's format renders the user's words around the declared values", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const { parseFormat } = await import("../extensions/jefferson/format.ts");
-  const bound = instrumentBindings(new Map([
-    [named("notice").name, { segments: parseFormat(named("notice"), "$notice"), style: {},
-      formats: { miss: parseFormat(named("notice"), "Spent $tokens, paid$cost", true) } }],
+  const bound = instrumentBindings(fgCheck, new Map([
+    [named("notice").name, { segments: parseFormat(named("notice"), "$notice", fgCheck), style: {},
+      formats: { miss: parseFormat(named("notice"), "Spent $tokens, paid$cost", fgCheck, true) } }],
   ]))(named("notice"));
   const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" }, shownUntil: 1 } };
   assert.equal((await import("@earendil-works/pi-tui")).stripTerminalSequences(bound.render(shown, 80, fakeTheme())),

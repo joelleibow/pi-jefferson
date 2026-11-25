@@ -1,5 +1,5 @@
 /** The format language: literal text, $variables and |modifiers; declarations supply already-formatted values. */
-import type { Theme, ThemeStyle } from "@earendil-works/pi-coding-agent";
+import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-agent";
 import { parseColor, visibleWidth } from "@earendil-works/pi-tui";
 import toLower from "lodash-es/toLower.js";
 import toUpper from "lodash-es/toUpper.js";
@@ -10,8 +10,8 @@ import type { InstrumentDeclaration } from "./components/instruments/instrument.
 import type { Readings } from "./data/session-data-store.ts";
 
 export type FormatSegment =
-  | { kind: "literal"; text: string; modifiers: readonly Modifier[] }
-  | { kind: "variable"; name: string; form?: string; modifiers: readonly Modifier[] }
+  | { kind: "literal"; text: string; modifiers: readonly Modifier[]; colour?: ThemeColor }
+  | { kind: "variable"; name: string; form?: string; modifiers: readonly Modifier[]; colour?: ThemeColor }
   | { kind: "bar" };
 
 type StyleAttribute = Exclude<keyof ThemeStyle, "fg" | "bg">;
@@ -49,9 +49,11 @@ function formatError(detail: string): Error {
 /**
  * Parse a format against the declaration's variables, or in plain mode against a composed
  * format set's values. A plain format carries no modifier and no form: its text is one colour,
- * styled at the cell.
+ * styled at the cell. The check answers what a `|name` may be beyond Jefferson's own names.
  */
-export function parseFormat(declaration: InstrumentDeclaration, format: string, plain = false): FormatSegment[] {
+export function parseFormat(
+  declaration: InstrumentDeclaration, format: string, check: ForegroundCheck, plain = false,
+): FormatSegment[] {
   // A format's outer whitespace is not text (ADR 0006); collapse first so a trailing control character becomes a space the trim removes.
   format = collapse(format).trim();
   const segments: FormatSegment[] = [];
@@ -107,18 +109,26 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
         // A form comes first after its variable, once; anywhere else the name is no form, and
         // the modifier table decides whether the document is rejected.
         if (afterName && subject?.kind === "variable" && subject.form === undefined
+          && subject.colour === undefined
           && subject.modifiers.length === 0 && forms !== undefined && Object.hasOwn(forms, name)) {
           segments[segments.length - 1] = { ...subject, form: name };
         } else {
+          // Jefferson's own names come before the theme, so `|dim` keeps its meaning where the theme
+          // also carries a `dim` colour, and a later pipe name joins the reserved set by joining the
+          // table (owner-rulings.md, 2026-11-24).
           const modifier = MODIFIERS.get(name);
-          if (modifier === undefined) {
-            throw formatError(`names a modifier it does not implement: ${JSON.stringify("|" + name)}`);
+          const colour = modifier === undefined && check(name) ? name : undefined;
+          if (modifier === undefined && colour === undefined) {
+            throw formatError(
+              `names neither a modifier Jefferson implements nor a foreground colour of the theme: ${JSON.stringify("|" + name)}`,
+            );
           }
           if (afterName && subject !== undefined) {
             if (subject.kind === "bar") {
               throw formatError(`puts a modifier on "$bar": ${JSON.stringify("|" + name)}`);
             }
-            segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+            if (modifier !== undefined) segments[segments.length - 1] = { ...subject, modifiers: [...subject.modifiers, modifier] };
+            else if (colour !== undefined) segments[segments.length - 1] = { ...subject, colour };
           } else {
             const text = collapse(literal);
             const run = text.match(/\S+$/)?.[0];
@@ -127,7 +137,10 @@ export function parseFormat(declaration: InstrumentDeclaration, format: string, 
             }
             const prefix = text.slice(0, text.length - run.length);
             if (prefix !== "") segments.push({ kind: "literal", text: prefix, modifiers: [] });
-            segments.push({ kind: "literal", text: run, modifiers: [modifier] });
+            segments.push({
+              kind: "literal", text: run, modifiers: modifier === undefined ? [] : [modifier],
+              ...(colour === undefined ? {} : { colour }),
+            });
             literal = "";
           }
         }
@@ -147,26 +160,52 @@ const STYLE_KEYS = {
   fg: true, bg: true, bold: true, dim: true, italic: true, underline: true, inverse: true, strikethrough: true,
 } satisfies Record<keyof ThemeStyle, true>;
 
+/** Whether a name is a foreground colour of the theme it was built from. */
+export type ForegroundCheck = (name: string) => name is ThemeColor;
+
+/**
+ * The one foreground probe: a name is a colour of this theme when its accessor answers, and not when
+ * it throws. pi publishes no list of its names, so the theme itself is asked, at the pin through
+ * `getFgAnsi` alone (`theme.js:212-216`, `:234`); every theme pi loads carries the same 49 names,
+ * which needs no guard at render (design, "The theme's name set is invariant at the pin").
+ */
+export function foregroundCheck(theme: Theme): ForegroundCheck {
+  return (name: string): name is ThemeColor => {
+    try {
+      theme.getFgAnsi(name as Parameters<Theme["getFgAnsi"]>[0]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+}
+
 export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
   if (raw === undefined) return {};
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new Error("has a style that is not an object");
   }
+  const isForeground = foregroundCheck(theme);
+  /** The background half of the same question: only a style's `bg` asks it, never a `|name`. */
+  const isBackground = (name: string): boolean => {
+    try {
+      theme.getBgAnsi(name as Parameters<Theme["getBgAnsi"]>[0]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   const validated: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!Object.hasOwn(STYLE_KEYS, key)) {
       throw new Error(`has a style key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
     }
     if (key === "fg" || key === "bg") {
-      if (typeof value === "string") {
-        try {
-          if (key === "fg") theme.getFgAnsi(value as Parameters<Theme["getFgAnsi"]>[0]);
-          else theme.getBgAnsi(value as Parameters<Theme["getBgAnsi"]>[0]);
-          validated[key] = value;
-          continue;
-        } catch {
-          // A non-token may still be a concrete color; only the parser can accept that.
-        }
+      // A name of this key's own slot is kept as the name; anything else may still be a concrete
+      // colour, which only pi's parser can accept.
+      if (typeof value === "string" && (key === "fg" ? isForeground(value) : isBackground(value))) {
+        validated[key] = value;
+        continue;
       }
       const message = `has ${key === "fg" ? "an" : "a"} ${key} that is neither a ${key === "fg" ? "foreground" : "background"}-slot theme token nor a color pi's parser accepts: ${JSON.stringify(value)}`;
       if (typeof value !== "string" && typeof value !== "number") throw new Error(message);
@@ -267,11 +306,15 @@ export function resolveFormat(
   return segments.map((segment, index) => {
     if (segment.kind === "bar") return bar;
     const merged = mergedStyle(style, segment.modifiers);
-    // A declared token styles the value it was given, before any modifier changed it, and wins on fg.
+    // The format's own colour is the strongest, so the declared token is asked only for a piece the
+    // format does not colour: a provider's colour function the user's format covers never runs, and
+    // a colour it would have thrown about is never reported (owner-rulings.md, 2026-11-24).
     const colours = declaration.variableFg;
-    const token = segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
-      ? colours[segment.name]!(arrived[index]!, theme)
+    const declared = segment.kind === "variable" && colours !== undefined && Object.hasOwn(colours, segment.name)
+      ? colours[segment.name]!
       : undefined;
-    return styledPiece(pieces[index]!, token === undefined ? merged : { ...merged, fg: token }, theme);
+    const token = segment.colour === undefined && declared !== undefined ? declared(arrived[index]!, theme) : undefined;
+    const foreground = segment.colour ?? token;
+    return styledPiece(pieces[index]!, foreground === undefined ? merged : { ...merged, fg: foreground }, theme);
   }).join("");
 }

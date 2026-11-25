@@ -57,7 +57,7 @@ The values are bare quantities, and the words around them belong to the kind:
 
 A kind that carries no value for a variable renders nothing in its place. A thinking notice has no cost, and a compaction has no block count.
 
-Each kind's text is a composed format, so it takes no modifier and no form ([Formats](formats.md#composed-formats)). The instrument's own format names `$notice`, the text composed for the kind that is showing. `$notice` takes the theme's `warning` colour, which replaces a configured `fg` on it. A configured `bg` and the boolean attributes still apply.
+Each kind's text is a composed format, so it takes no modifier and no form ([Formats](formats.md#composed-formats)). The instrument's own format names `$notice`, the text composed for the kind that is showing. `$notice` takes the theme's `warning` colour, which replaces a configured `fg` on it — unless the format names a colour for `$notice`, which is the stronger one ([Formats](formats.md#colours)). A configured `bg` and the boolean attributes still apply.
 
 ## What rejects a notice
 

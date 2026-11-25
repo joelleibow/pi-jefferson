@@ -3,7 +3,9 @@ import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-ag
 
 import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
 import { timed } from "../visuals/timed.ts";
-import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
+import {
+  collapse, foregroundCheck, parseFormat, resolveFormat, resolvePlain, type ForegroundCheck, type FormatSegment,
+} from "../../format.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 import type { FieldValue, ReadingsView } from "../../data/field-value.ts";
 import type { Fault } from "../../faults.ts";
@@ -47,7 +49,7 @@ export type ProvidedRefusal =
   | { refused: "member-unusable"; member: OptionalMember }
   | { refused: "option-unimplemented"; option: string }
   | { refused: "formats-without-composed" }
-  | { refused: "unparseable-default-format" }
+  | { refused: "unparseable-default-format"; message: string }
   | { refused: "label-not-string" }
   | { refused: "resolver-not-function"; variable: string }
   | { refused: "unparseable-composed-format"; kind: string };
@@ -79,6 +81,7 @@ export function adaptProvidedDeclaration(
   declaration: ProvidedDeclaration,
   view: () => ReadingsView,
   record: (fault: Fault) => void,
+  check: ForegroundCheck,
 ): InstrumentDeclaration | ProvidedRefusal {
   // The payload crossed a bus as `unknown`, so its members are read as the values they may be.
   const members = declaration as unknown as Record<string, unknown>;
@@ -195,14 +198,13 @@ export function adaptProvidedDeclaration(
         if (typeof token !== "string") {
           return fault("colour", "resolver-returned", `returned ${describeValue(token)}, where a theme colour is declared`);
         }
-        try {
-          // Without this check pi's `Theme.style` throws `Unknown theme color`, and the outer
-          // boundary would blank the entry under the wrong part.
-          theme.getFgAnsi(token as Parameters<Theme["getFgAnsi"]>[0]);
-        } catch {
+        // The language's own check, built from the theme this render is handed: the guard answers the
+        // names a format does, so pi's `Theme.style` never meets one it would throw on, and the outer
+        // boundary never blanks the entry under the wrong part.
+        if (!foregroundCheck(theme)(token)) {
           return fault("colour", "resolver-returned", `returned ${JSON.stringify(token)}, where a theme colour is declared`);
         }
-        return token as ThemeColor;
+        return token;
       },
     ]),
   );
@@ -234,9 +236,12 @@ export function adaptProvidedDeclaration(
     options: Object.freeze([...new Set([...FOUNDATIONAL_OPTIONS, ...((members.options ?? []) as readonly string[])])]),
   };
   try {
-    parseFormat(adapted, adapted.defaultFormat);
-  } catch {
-    return { refused: "unparseable-default-format" };
+    parseFormat(adapted, adapted.defaultFormat, check);
+  } catch (error) {
+    // The parser's own sentence, carried out so every path a bad name reaches words it alike; by the
+    // repository's convention for a caught parse error (configuration.ts:298-301).
+    if (!(error instanceof Error)) throw error;
+    return { refused: "unparseable-default-format", message: error.message };
   }
   if (members.defaultLabel !== undefined && typeof members.defaultLabel !== "string") return { refused: "label-not-string" };
   for (const [variable, resolver] of Object.entries(members.variables as object)) {
@@ -245,7 +250,7 @@ export function adaptProvidedDeclaration(
   // Last, because a kind's format is parsed against the adapted declaration the checks above accept.
   for (const [kind, format] of Object.entries(adapted.composed?.formats ?? {})) {
     try {
-      parseFormat(adapted, format, true);
+      parseFormat(adapted, format, check, true);
     } catch {
       return { refused: "unparseable-composed-format", kind };
     }
@@ -274,13 +279,15 @@ export function containProvided(instrument: Instrument, name: string, record: (f
   };
 }
 
-export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
+export function instrumentBindings(
+  check: ForegroundCheck, configured: ReadonlyMap<string, ConfiguredInstrument> = new Map(),
+): BindInstrument {
   const bound = new Map<string, Instrument>();
   return declaration => {
     let instrument = bound.get(declaration.name);
     if (instrument === undefined) {
       const entry = configured.get(declaration.name);
-      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
+      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat, check);
       const style = entry?.style ?? {};
       // The label carries no edge whitespace of its own, and one gap stands between it and its
       // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
@@ -296,7 +303,7 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
       const composed = segments.some(segment => segment.kind === "variable" && segment.form === undefined
         && segment.name === declaration.composed?.variable) ? declaration.composed : undefined;
       const plain: Readonly<Record<string, FormatSegment[]>> = composed === undefined ? {}
-        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, true)]));
+        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, check, true)]));
       instrument = {
         // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
         fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),
