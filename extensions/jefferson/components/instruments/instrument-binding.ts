@@ -3,7 +3,7 @@ import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-ag
 
 import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
 import { timed } from "../visuals/timed.ts";
-import { collapse, parseFormat, resolveFormat, resolvePlain, type FormatSegment } from "../../format.ts";
+import { collapse, parseFormat, resolveFormat, resolvePlain, type ForegroundCheck, type FormatSegment } from "../../format.ts";
 import type { Readings } from "../../data/session-data-store.ts";
 import type { FieldValue, ReadingsView } from "../../data/field-value.ts";
 import type { Fault } from "../../faults.ts";
@@ -79,6 +79,7 @@ export function adaptProvidedDeclaration(
   declaration: ProvidedDeclaration,
   view: () => ReadingsView,
   record: (fault: Fault) => void,
+  check: ForegroundCheck,
 ): InstrumentDeclaration | ProvidedRefusal {
   // The payload crossed a bus as `unknown`, so its members are read as the values they may be.
   const members = declaration as unknown as Record<string, unknown>;
@@ -234,7 +235,7 @@ export function adaptProvidedDeclaration(
     options: Object.freeze([...new Set([...FOUNDATIONAL_OPTIONS, ...((members.options ?? []) as readonly string[])])]),
   };
   try {
-    parseFormat(adapted, adapted.defaultFormat);
+    parseFormat(adapted, adapted.defaultFormat, check);
   } catch {
     return { refused: "unparseable-default-format" };
   }
@@ -245,7 +246,7 @@ export function adaptProvidedDeclaration(
   // Last, because a kind's format is parsed against the adapted declaration the checks above accept.
   for (const [kind, format] of Object.entries(adapted.composed?.formats ?? {})) {
     try {
-      parseFormat(adapted, format, true);
+      parseFormat(adapted, format, check, true);
     } catch {
       return { refused: "unparseable-composed-format", kind };
     }
@@ -274,13 +275,15 @@ export function containProvided(instrument: Instrument, name: string, record: (f
   };
 }
 
-export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredInstrument> = new Map()): BindInstrument {
+export function instrumentBindings(
+  check: ForegroundCheck, configured: ReadonlyMap<string, ConfiguredInstrument> = new Map(),
+): BindInstrument {
   const bound = new Map<string, Instrument>();
   return declaration => {
     let instrument = bound.get(declaration.name);
     if (instrument === undefined) {
       const entry = configured.get(declaration.name);
-      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat);
+      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat, check);
       const style = entry?.style ?? {};
       // The label carries no edge whitespace of its own, and one gap stands between it and its
       // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
@@ -296,7 +299,7 @@ export function instrumentBindings(configured: ReadonlyMap<string, ConfiguredIns
       const composed = segments.some(segment => segment.kind === "variable" && segment.form === undefined
         && segment.name === declaration.composed?.variable) ? declaration.composed : undefined;
       const plain: Readonly<Record<string, FormatSegment[]>> = composed === undefined ? {}
-        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, true)]));
+        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, check, true)]));
       instrument = {
         // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
         fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),

@@ -4,7 +4,7 @@
  * only file that calls `on` or `emit` on the bus, and the only one that writes the two channel
  * strings at runtime (design 6, 7; G3).
  */
-import type { EventBus } from "@earendil-works/pi-coding-agent";
+import type { EventBus, ThemeColor } from "@earendil-works/pi-coding-agent";
 
 import { adaptProvidedDeclaration, describeValue } from "./components/instruments/instrument-binding.ts";
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
@@ -39,6 +39,10 @@ interface AcceptedRegistration {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+// Until the listener is handed a theme, its vet has no colour to measure a name against. It is
+// deleted when the theme arrives with the hold (design, "A provider's registration waits").
+const acceptNoColour = (_name: string): _name is ThemeColor => false;
 
 /**
  * The registration a payload carries, or the one part that refuses it. The order is decision 15's:
@@ -116,6 +120,7 @@ function vetRegistration(
       raw as unknown as ProvidedDeclaration,
       () => fields.view(extension),
       fault => faults.record(fault),
+      acceptNoColour,
     );
     if ("refused" in adapted) {
       switch (adapted.refused) {

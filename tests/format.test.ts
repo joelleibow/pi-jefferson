@@ -23,6 +23,8 @@ const seed: Readings = {
   sampledAt: 0,
 };
 
+const fgCheck = foregroundCheck(fakeTheme());
+
 function named(name: string): InstrumentDeclaration {
   const declaration = shippedInstrument(name);
   assert.ok(declaration);
@@ -33,7 +35,8 @@ function rendered(name: string, format: string, options: {
   readings?: Readings; width?: number; style?: ThemeStyle; theme?: Theme;
 } = {}): string {
   const declaration = named(name);
-  return resolveFormat(declaration, parseFormat(declaration, format), options.style ?? {}, options.readings ?? seed, options.width ?? 80, options.theme ?? fakeTheme());
+  const theme = options.theme ?? fakeTheme();
+  return resolveFormat(declaration, parseFormat(declaration, format, foregroundCheck(theme)), options.style ?? {}, options.readings ?? seed, options.width ?? 80, theme);
 }
 
 test("an escaped dollar is literal text, not a variable", () => {
@@ -51,32 +54,32 @@ test("Markdown characters in formats and values remain literal", () => {
 });
 
 test("an unknown variable rejects naming the instrument and variable", () => {
-  assert.throws(() => parseFormat(named("model"), "$nope"), { message: 'format names a variable it does not declare: "$nope"' });
+  assert.throws(() => parseFormat(named("model"), "$nope", fgCheck), { message: 'format names a variable it does not declare: "$nope"' });
 });
 
 test("bar is rejected when the declaration has no width-taking variable", () => {
-  assert.throws(() => parseFormat(named("model"), "$bar"), { message: 'format names a variable it does not declare: "$bar"' });
-  assert.throws(() => parseFormat(named("blank"), "$anything"), { message: 'format names a variable it does not declare: "$anything"' });
+  assert.throws(() => parseFormat(named("model"), "$bar", fgCheck), { message: 'format names a variable it does not declare: "$bar"' });
+  assert.throws(() => parseFormat(named("blank"), "$anything", fgCheck), { message: 'format names a variable it does not declare: "$anything"' });
 });
 
 test("a second bar rejects naming the second width-taking variable", () => {
-  assert.throws(() => parseFormat(named("context"), "$bar $bar"), { message: 'format names a second width-taking variable: "$bar"' });
+  assert.throws(() => parseFormat(named("context"), "$bar $bar", fgCheck), { message: 'format names a second width-taking variable: "$bar"' });
 });
 
 test("a bare dollar rejects with the literal-dollar escape in the message", () => {
   for (const format of ["$", "cost: $!"]) {
-    assert.throws(() => parseFormat(named("model"), format), { message: 'format has a bare $; escape a literal dollar as \\$' });
+    assert.throws(() => parseFormat(named("model"), format, fgCheck), { message: 'format has a bare $; escape a literal dollar as \\$' });
   }
 });
 
 test("variable names consume the maximal alphanumeric and underscore run", () => {
   for (const name of ["modelName", "_x", "1model"]) {
-    assert.throws(() => parseFormat(named("model"), `$${name}`), { message: `format names a variable it does not declare: "$${name}"` });
+    assert.throws(() => parseFormat(named("model"), `$${name}`, fgCheck), { message: `format names a variable it does not declare: "$${name}"` });
   }
 });
 
 test("an empty format has no segments and renders empty text", () => {
-  assert.deepEqual(parseFormat(named("model"), ""), []);
+  assert.deepEqual(parseFormat(named("model"), "", fgCheck), []);
   assert.equal(rendered("model", ""), "");
 });
 
@@ -93,13 +96,13 @@ test("a format with whitespace at either edge renders as if it had none", () => 
 
 test("a format with nothing but whitespace has no segments", () => {
   for (const format of ["   ", "\t\n"]) {
-    assert.deepEqual(parseFormat(named("model"), format), [], JSON.stringify(format));
+    assert.deepEqual(parseFormat(named("model"), format, fgCheck), [], JSON.stringify(format));
   }
 });
 
 test("a literal the trim empties is dropped and the trim goes on to the next segment", () => {
   for (const format of ["  hello|dim", "hello|dim  "]) {
-    assert.deepEqual(parseFormat(named("model"), format), [{ kind: "literal", text: "hello", modifiers: [{ style: "dim" }] }], JSON.stringify(format));
+    assert.deepEqual(parseFormat(named("model"), format, fgCheck), [{ kind: "literal", text: "hello", modifiers: [{ style: "dim" }] }], JSON.stringify(format));
   }
 });
 
@@ -168,14 +171,14 @@ test("bar-only formats fill their cell with clamped and floored pressure", () =>
 
 test("control characters collapse per character in literals and substituted values", () => {
   const controls = "\r\n\t\u007f\u009b";
-  assert.deepEqual(parseFormat(named("model"), `L${controls}R`), [{ kind: "literal", text: "L     R", modifiers: [] }]);
+  assert.deepEqual(parseFormat(named("model"), `L${controls}R`, fgCheck), [{ kind: "literal", text: "L     R", modifiers: [] }]);
   assert.equal(rendered("model", `$model`, { readings: { ...seed, model: `L${controls}R` } }), "L     R");
   assert.equal(rendered("model", "$model", { readings: { ...seed, model: controls } }), "     ");
 });
 
 test("formats and data carrying controls keep three clipped footer rows at one line each", () => {
   const declaration = named("model");
-  const segments = parseFormat(declaration, "L\n$model");
+  const segments = parseFormat(declaration, "L\n$model", fgCheck);
   let readings = { ...seed, model: "a\r\t\x1bb" };
   const instrument = { fills: false, render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
   const footer = createFooter([0, 1, 2].map(index => ({ distribution: "equal" as const, cells: [{ name: "jefferson.default.model", holder: { current: instrument }, align: "left" }] })), () => readings, fakeTheme(), 1);
@@ -209,7 +212,7 @@ test("collapse runs before styling so data ESC becomes a space and the cell's SG
 
 test("inherited object properties are unknown format variables", () => {
   for (const name of ["toString", "constructor", "hasOwnProperty", "valueOf"]) {
-    assert.throws(() => parseFormat(named("model"), `$${name}`), { message: `format names a variable it does not declare: "$${name}"` });
+    assert.throws(() => parseFormat(named("model"), `$${name}`, fgCheck), { message: `format names a variable it does not declare: "$${name}"` });
   }
 });
 
@@ -218,8 +221,8 @@ test("a variables record with no prototype uses the same own-property rule", () 
     name: "fixture", defaultFormat: "$value", options: [],
     variables: Object.assign(Object.create(null), { value: () => "known" }),
   };
-  assert.equal(resolveFormat(declaration, parseFormat(declaration, "$value"), {}, seed, 80, fakeTheme()), "known");
-  assert.throws(() => parseFormat(declaration, "$constructor"), { message: 'format names a variable it does not declare: "$constructor"' });
+  assert.equal(resolveFormat(declaration, parseFormat(declaration, "$value", fgCheck), {}, seed, 80, fakeTheme()), "known");
+  assert.throws(() => parseFormat(declaration, "$constructor", fgCheck), { message: 'format names a variable it does not declare: "$constructor"' });
 });
 
 test("style validation keeps slot tokens as strings and parses concrete colors once", () => {
@@ -268,19 +271,19 @@ const ATTRIBUTES = {
 
 test("every shipped modifier name parses", () => {
   for (const name of [...Object.keys(ATTRIBUTES), "capitalize", "upper", "lower"]) {
-    assert.doesNotThrow(() => parseFormat(named("model"), `$model|${name}`), name);
+    assert.doesNotThrow(() => parseFormat(named("model"), `$model|${name}`, fgCheck), name);
   }
 });
 
 test("an unknown modifier rejects naming the instrument and the modifier", () => {
   for (const name of ["bd", "accent", "fg"]) {
-    assert.throws(() => parseFormat(named("model"), `$model|${name}`),
+    assert.throws(() => parseFormat(named("model"), `$model|${name}`, fgCheck),
       { message: `format names a modifier it does not implement: "|${name}"` });
   }
 });
 
 test("a modifier after an undeclared variable reports the variable, not the modifier", () => {
-  assert.throws(() => parseFormat(named("model"), "$nope|bold"),
+  assert.throws(() => parseFormat(named("model"), "$nope|bold", fgCheck),
     { message: 'format names a variable it does not declare: "$nope"' });
 });
 
@@ -309,7 +312,7 @@ test("a modifier merges into the instrument's style rather than wrapping it", ()
 
 test("a chain extends the same segment rather than starting a new one", () => {
   const theme = fakeTheme();
-  const segments = parseFormat(named("model"), "$provider|bold|underline");
+  const segments = parseFormat(named("model"), "$provider|bold|underline", fgCheck);
   assert.equal(segments.length, 1);
   assert.equal(segments.flatMap(segment => segment.kind === "bar" ? [] : segment.modifiers).length, 2);
   assert.equal(rendered("model", "$provider|bold|underline", { theme }),
@@ -388,47 +391,47 @@ test("a chain on literal text extends the same run", () => {
 });
 
 test("a form is recorded on the variable's segment, apart from the modifier chain", () => {
-  assert.deepEqual(parseFormat(named("path"), "$path|relative"), [
+  assert.deepEqual(parseFormat(named("path"), "$path|relative", fgCheck), [
     { kind: "variable", name: "path", form: "relative", modifiers: [] },
   ]);
-  assert.deepEqual(parseFormat(named("path"), "$path|base"), [
+  assert.deepEqual(parseFormat(named("path"), "$path|base", fgCheck), [
     { kind: "variable", name: "path", form: "base", modifiers: [] },
   ]);
 });
 
 test("a form after literal text rejects naming the instrument and the name", () => {
-  assert.throws(() => parseFormat(named("path"), "hello|base"), {
+  assert.throws(() => parseFormat(named("path"), "hello|base", fgCheck), {
     message: 'format names a modifier it does not implement: "|base"',
   });
 });
 
 test("a form on a variable that does not declare it rejects naming that variable", () => {
-  assert.throws(() => parseFormat(named("model"), "$model|base"), {
+  assert.throws(() => parseFormat(named("model"), "$model|base", fgCheck), {
     message: 'format names a modifier it does not implement: "|base"',
   });
 });
 
 test("a form after another modifier rejects naming the instrument and the form", () => {
-  assert.throws(() => parseFormat(named("path"), "$path|bold|absolute"), {
+  assert.throws(() => parseFormat(named("path"), "$path|bold|absolute", fgCheck), {
     message: 'format names a modifier it does not implement: "|absolute"',
   });
 });
 
 test("two forms on one variable reject on the second", () => {
-  assert.throws(() => parseFormat(named("path"), "$path|base|absolute"), {
+  assert.throws(() => parseFormat(named("path"), "$path|base|absolute", fgCheck), {
     message: 'format names a modifier it does not implement: "|absolute"',
   });
 });
 
 test("a form applies to its own variable only, so two cells' forms do not swap", () => {
-  const segments = parseFormat(named("path"), "$path|absolute/$path|base");
+  const segments = parseFormat(named("path"), "$path|absolute/$path|base", fgCheck);
   assert.deepEqual(segments.map((segment) => segment.kind === "variable" ? segment.form : String(segment.kind)), [
     "absolute", "literal", "base",
   ]);
 });
 
 test("a modifier on the bar rejects naming the bar and the modifier", () => {
-  assert.throws(() => parseFormat(named("context"), "$bar|bold"),
+  assert.throws(() => parseFormat(named("context"), "$bar|bold", fgCheck),
     { message: 'format puts a modifier on "$bar": "|bold"' });
 });
 
@@ -446,13 +449,13 @@ test("a modifier on the text closing a bar styles that text", () => {
 });
 
 test("a modifier after the bar and a space has nothing before it", () => {
-  assert.throws(() => parseFormat(named("context"), "$bar |dim"),
+  assert.throws(() => parseFormat(named("context"), "$bar |dim", fgCheck),
     { message: 'format has a modifier with nothing before it: "|dim"' });
 });
 
 test("a modifier with nothing before it rejects naming the instrument and the modifier", () => {
   for (const format of ["🧠 |dim $model", "|dim"]) {
-    assert.throws(() => parseFormat(named("model"), format),
+    assert.throws(() => parseFormat(named("model"), format, fgCheck),
       { message: 'format has a modifier with nothing before it: "|dim"' });
   }
 });
@@ -505,7 +508,7 @@ const shown: Readings = {
 };
 
 test("a plain format takes the same escape as a cell's format", () => {
-  assert.deepEqual(parseFormat(noticeInstrument, "Cache miss after $idle\\m idle", true), [
+  assert.deepEqual(parseFormat(noticeInstrument, "Cache miss after $idle\\m idle", fgCheck, true), [
     { kind: "literal", text: "Cache miss after ", modifiers: [] },
     { kind: "variable", name: "idle", modifiers: [] },
     { kind: "literal", text: "m idle", modifiers: [] },
@@ -513,7 +516,7 @@ test("a plain format takes the same escape as a cell's format", () => {
 });
 
 test("a plain format parses the composed values and no modifier", () => {
-  assert.deepEqual(parseFormat(noticeInstrument, "Cache miss: $tokens tokens re-billed$cost", true), [
+  assert.deepEqual(parseFormat(noticeInstrument, "Cache miss: $tokens tokens re-billed$cost", fgCheck, true), [
     { kind: "literal", text: "Cache miss: ", modifiers: [] },
     { kind: "variable", name: "tokens", modifiers: [] },
     { kind: "literal", text: " tokens re-billed", modifiers: [] },
@@ -528,21 +531,21 @@ test("a plain format rejects a modifier, a form, the cell's own variable and the
     ["$notice", 'names a variable it does not declare: "$notice"'],
     ["$bar", 'names a variable it does not declare: "$bar"'],
   ] as const) {
-    assert.throws(() => parseFormat(noticeInstrument, format, true),
+    assert.throws(() => parseFormat(noticeInstrument, format, fgCheck, true),
       { message: `format ${detail}` }, format);
   }
 });
 
 test("resolvePlain joins a literal and a value, an absent value as nothing", () => {
   const format = "Cache miss: $tokens tokens re-billed$cost";
-  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, true), shown),
+  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, fgCheck, true), shown),
     "Cache miss: 20k tokens re-billed (~$0.10)");
-  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, true), seed),
+  assert.equal(resolvePlain(noticeInstrument, parseFormat(noticeInstrument, format, fgCheck, true), seed),
     "Cache miss:  tokens re-billed", "an absent value is nothing, not a blank the cell blanks on");
 });
 
 test("the pre-resolved value wins over the declaration's resolver", () => {
-  const segments = parseFormat(noticeInstrument, "$notice");
+  const segments = parseFormat(noticeInstrument, "$notice", fgCheck);
   const theme = fakeTheme();
   assert.equal(resolveFormat(noticeInstrument, segments, {}, shown, 80, theme), "",
     "the declaration's own resolver yields nothing");

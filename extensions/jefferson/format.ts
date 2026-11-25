@@ -49,9 +49,11 @@ function formatError(detail: string): Error {
 /**
  * Parse a format against the declaration's variables, or in plain mode against a composed
  * format set's values. A plain format carries no modifier and no form: its text is one colour,
- * styled at the cell.
+ * styled at the cell. The check answers what a `|name` may be beyond Jefferson's own names.
  */
-export function parseFormat(declaration: InstrumentDeclaration, format: string, plain = false): FormatSegment[] {
+export function parseFormat(
+  declaration: InstrumentDeclaration, format: string, check: ForegroundCheck, plain = false,
+): FormatSegment[] {
   // A format's outer whitespace is not text (ADR 0006); collapse first so a trailing control character becomes a space the trim removes.
   format = collapse(format).trim();
   const segments: FormatSegment[] = [];

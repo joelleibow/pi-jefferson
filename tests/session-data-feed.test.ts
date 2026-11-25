@@ -5,6 +5,10 @@ import { test } from "node:test";
 import type { ExtensionAPI, ExtensionContext, MessageEndEvent, SessionEntry } from "@earendil-works/pi-coding-agent";
 
 import { feedSessionData, type FooterDatumSource } from "../extensions/jefferson/data/session-data-feed.ts";
+import { foregroundCheck } from "../extensions/jefferson/format.ts";
+import { fakeTheme } from "./fake-theme.ts";
+
+const fgCheck = foregroundCheck(fakeTheme());
 
 /** The host's `pi.on` register: the handlers a test can fire, and the releases the feed ran. */
 function fakePi() {
@@ -297,7 +301,7 @@ test("two status cells in one render ask the host once and read the same text", 
 
   const declaration = shippedInstrument("status");
   assert.ok(declaration);
-  const cell = instrumentBindings()(declaration);
+  const cell = instrumentBindings(fgCheck)(declaration);
   const created = createFooter(
     [{
       distribution: "equal",

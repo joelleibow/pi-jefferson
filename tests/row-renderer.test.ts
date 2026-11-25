@@ -5,8 +5,10 @@ import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 
 import type { Row } from "../extensions/jefferson/components/row/row.ts";
 import type { Instrument } from "../extensions/jefferson/components/instruments/instrument.ts";
-import { parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
+import { foregroundCheck, parseFormat, resolveFormat } from "../extensions/jefferson/format.ts";
 import { fakeTheme } from "./fake-theme.ts";
+
+const fgCheck = foregroundCheck(fakeTheme());
 import { shippedInstrument } from "./shipped-instrument.ts";
 import {
   createFooter,
@@ -194,7 +196,7 @@ test("the notice cell's text sits at its alignment", async () => {
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const declaration = shippedInstrument("notice");
   assert.ok(declaration);
-  const notice = instrumentBindings()(declaration);
+  const notice = instrumentBindings(fgCheck)(declaration);
   const live: Readings = { ...readings, notice: { kind: "miss", values: { tokens: "20k", cost: " (~$0.10)" }, shownUntil: 1 } };
   const text = "Notice: Cache miss: 20k tokens re-billed (~$0.10)";
   const at = (align: "left" | "center" | "right"): string => stripTerminalSequences(
@@ -212,7 +214,7 @@ test("a fill cell gives up the notice's columns and takes them back when its ins
   const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
   const declaration = shippedInstrument("notice");
   assert.ok(declaration);
-  const notice = instrumentBindings()(declaration);
+  const notice = instrumentBindings(fgCheck)(declaration);
   const text = "Notice: Cache miss: 20k tokens re-billed (~$0.10)";
   let current: Readings = { ...readings };
   const row: Row = {
@@ -486,7 +488,7 @@ test("invalidation drops cell memos and keeps the footer's three rows and their 
 test("two cells holding the model instrument resolve identical text", () => {
   const declaration = shippedInstrument("model");
   assert.ok(declaration);
-  const segments = parseFormat(declaration, declaration.defaultFormat);
+  const segments = parseFormat(declaration, declaration.defaultFormat, fgCheck);
   const model: Instrument = { fills: false, render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
   const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(

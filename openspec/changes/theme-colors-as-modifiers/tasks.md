@@ -82,7 +82,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
   of the pin is unchanged, because no file is added. Verify: R1 and the check's pair green,
   `pnpm typecheck` clean, and `pnpm test` green.
 
-- [ ] 1.2 Write the failing check first: three parameters become required, each with no optional or
+- [x] 1.2 Write the failing check first: three parameters become required, each with no optional or
   lenient default — `parseFormat(declaration, format, check: ForegroundCheck, plain = false)`,
   `adaptProvidedDeclaration(name, declaration, view, record, check: ForegroundCheck)` and
   `instrumentBindings(check: ForegroundCheck, configured: ReadonlyMap<string, ConfiguredInstrument> = new

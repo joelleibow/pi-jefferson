@@ -27,7 +27,7 @@ import {
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
 import type { Fault } from "./faults.ts";
-import { parseFormat, validateStyle, type FormatSegment } from "./format.ts";
+import { foregroundCheck, parseFormat, validateStyle, type ForegroundCheck, type FormatSegment } from "./format.ts";
 import { isProvidedName, normalizeName } from "./registration.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
@@ -140,7 +140,7 @@ interface InstrumentConfiguration {
  * `formats` when it declares one, so the check and the binding accept the same keys.
  */
 function checkProvidedSettings(
-  name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme,
+  name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme, check: ForegroundCheck,
 ): ConfiguredInstrument | { kind: string; part: string } {
   const consequence = "; it renders blank";
   if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
@@ -174,7 +174,7 @@ function checkProvidedSettings(
   }
   let segments: FormatSegment[];
   try {
-    segments = parseFormat(declaration, format ?? declaration.defaultFormat);
+    segments = parseFormat(declaration, format ?? declaration.defaultFormat, check);
   } catch (error) {
     // The table separates a format naming a variable the instrument lacks from one the language
     // refuses; the parse error is the only place that difference is visible.
@@ -224,7 +224,7 @@ function checkProvidedSettings(
         };
       }
       try {
-        formats[kind] = parseFormat(declaration, text, true);
+        formats[kind] = parseFormat(declaration, text, check, true);
       } catch {
         return {
           kind: "settings-formats-parse",
@@ -236,7 +236,9 @@ function checkProvidedSettings(
   return { segments, style, ...(label === undefined ? {} : { label }), ...(formats === undefined ? {} : { formats }) };
 }
 
-function readInstruments(raw: unknown, source: ConfigurationSource, reading: Reading): InstrumentConfiguration {
+function readInstruments(
+  raw: unknown, source: ConfigurationSource, reading: Reading, check: ForegroundCheck,
+): InstrumentConfiguration {
   const configured = new Map<string, ConfiguredInstrument>();
   const declaredSeconds = new Map<string, number>();
   if (raw === undefined) return { configured, declaredSeconds };
@@ -269,7 +271,7 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
     // A provided name answers to its own instrument alone, so a fault under it refuses that
     // instrument and never the document: one extension's mistake cannot take down a user's footer.
     if (isProvidedName(normalized)) {
-      const settings = checkProvidedSettings(normalized, value, declaration, source.theme);
+      const settings = checkProvidedSettings(normalized, value, declaration, source.theme, check);
       if ("part" in settings) {
         reading.refused.add(normalized);
         reading.faults.push({ scope: normalized, kind: settings.kind, part: settings.part });
@@ -295,7 +297,7 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
     }
     let segments: FormatSegment[];
     try {
-      segments = parseFormat(declaration, format ?? declaration.defaultFormat);
+      segments = parseFormat(declaration, format ?? declaration.defaultFormat, check);
     } catch (error) {
       if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
       throw error;
@@ -324,7 +326,7 @@ function readInstruments(raw: unknown, source: ConfigurationSource, reading: Rea
           throw new RejectedConfiguration(`instrument ${JSON.stringify(name)}'s formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
         }
         try {
-          formats[kind] = parseFormat(declaration, format, true);
+          formats[kind] = parseFormat(declaration, format, check, true);
         } catch (error) {
           if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
           throw error;
@@ -439,7 +441,9 @@ interface NormalizedDocument {
 }
 
 /** Normalize the document: a retired top-level key refuses it; otherwise its rows come from `rows`, or the default row when it declares none. */
-function normalizeDocument(document: unknown, reading: Reading, source: ConfigurationSource): NormalizedDocument {
+function normalizeDocument(
+  document: unknown, reading: Reading, source: ConfigurationSource, check: ForegroundCheck,
+): NormalizedDocument {
   if (typeof document !== "object" || document === null || Array.isArray(document)) {
     throw new RejectedConfiguration("the configuration file is not an object");
   }
@@ -479,8 +483,8 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
     rowGap = value;
   }
 
-  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, reading);
-  const binding = instrumentBindings(configured);
+  const { configured, declaredSeconds } = readInstruments(doc.instruments, source, reading, check);
+  const binding = instrumentBindings(check, configured);
   // Every provided instrument is bound through the outer boundary, at the reader's bind and the
   // watch's alike, so neither moment can miss it; Jefferson's own stay unwrapped (design 10).
   const bind: BindInstrument = declaration => isProvidedName(declaration.name)
@@ -508,7 +512,7 @@ function normalizeDocument(document: unknown, reading: Reading, source: Configur
     source.watch(name, (declaration) => {
       // (a) The same check the reader runs for a name already registered, on the value the document
       // held for it — so the outcome depends on the name and never on the load order.
-      const settings = checkProvidedSettings(name, raw, declaration, source.theme);
+      const settings = checkProvidedSettings(name, raw, declaration, source.theme, check);
       if ("part" in settings) {
         // (c) The fault refuses that instrument alone: every holder stays on the fallback.
         source.report({ scope: name, kind: settings.kind, part: settings.part });
@@ -547,7 +551,10 @@ export function configurationPaths(cwd: string): { agentPath: string; projectPat
  * yields the default row and a warning.
  */
 export function readConfiguration(source: ConfigurationSource): Configuration {
-  const bind = instrumentBindings();
+  // One check per read, built from the theme the read is handed: every parse below asks it, so the
+  // language reads no host state and the theme is asked once per boundary, not once per name.
+  const check = foregroundCheck(source.theme);
+  const bind = instrumentBindings(check);
   const path =
     source.projectTrusted && existsSync(source.projectPath) ? source.projectPath : source.agentPath;
   if (!existsSync(path)) {
@@ -579,7 +586,7 @@ export function readConfiguration(source: ConfigurationSource): Configuration {
     const reading: Reading = {
       unknownNames: [], holders: new Map(), held: new Map(), refused: new Set(), faults: [],
     };
-    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source);
+    const { rows, rowGap, noticeSeconds } = normalizeDocument(document, reading, source, check);
     return { rows, rowGap, noticeSeconds, path, unknownNames: reading.unknownNames, warning: undefined };
   } catch (error) {
     if (error instanceof RejectedConfiguration) {

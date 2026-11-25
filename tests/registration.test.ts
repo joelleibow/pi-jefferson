@@ -10,6 +10,7 @@ import { stripTerminalSequences, truncateToWidth, visibleWidth } from "@earendil
 
 import type { InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { adaptProvidedDeclaration } from "../extensions/jefferson/components/instruments/instrument-binding.ts";
+import { foregroundCheck } from "../extensions/jefferson/format.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { createProviderFields } from "../extensions/jefferson/data/provider-fields.ts";
 import { createFaultLedger } from "../extensions/jefferson/faults.ts";
@@ -26,6 +27,8 @@ import { SHIPPED } from "../extensions/jefferson/shipped.ts";
 import {
   harness, useTempAgentDir, writeAgentDocument, type FakeSession, type Harness,
 } from "./session-harness.ts";
+
+const fgCheck = foregroundCheck(fakeTheme());
 
 /**
  * The registration taiknr posts: one instrument whose one resolver reads the string field `saved`.
@@ -1959,7 +1962,7 @@ test("A1 a provider variable reads its view", () => {
     const view = { saved: `$${reads.length + 1}` };
     reads.push(view);
     return view;
-  }, () => {});
+  }, () => {}, fgCheck);
   assert.ok(!("refused" in adapted));
   const readings = {} as Readings;
   assert.equal(adapted.variables.saved?.(readings), "$1");
@@ -1968,20 +1971,20 @@ test("A1 a provider variable reads its view", () => {
 
 test("A1 a resolver that is not a function is refused", () => {
   const declaration = { ...registration.instruments[0]!, variables: { saved: "nope" } } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck),
     { refused: "resolver-not-function", variable: "saved" });
 });
 
 test("A1 a default label that is not a string is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}), { refused: "label-not-string" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck), { refused: "label-not-string" });
 });
 
 test("A1 a default format Jefferson cannot parse is refused", () => {
   const declaration = { ...registration.instruments[0]!, defaultFormat: "Spent $spent" } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}),
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", declaration, () => ({}), () => {}, fgCheck),
     { refused: "unparseable-default-format" });
   // The table's row order decides which fault a payload with two is refused for.
   const twice = { ...declaration, defaultLabel: 4 } as unknown as ProvidedDeclaration;
-  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}), { refused: "unparseable-default-format" });
+  assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}, fgCheck), { refused: "unparseable-default-format" });
 });
