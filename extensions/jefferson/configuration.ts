@@ -176,13 +176,14 @@ function checkProvidedSettings(
   try {
     segments = parseFormat(declaration, format ?? declaration.defaultFormat, check);
   } catch (error) {
+    if (!(error instanceof Error)) throw error;
     // The table separates a format naming a variable the instrument lacks from one the language
-    // refuses; the parse error is the only place that difference is visible.
-    const variable = error instanceof Error
-      ? /names a variable it does not declare: (".*")$/.exec(error.message)?.[1]
-      : undefined;
+    // refuses for another reason; the parse error is the only place that difference is visible. Every
+    // other fault forwards the parser's own sentence, so the offending name reads alike wherever it
+    // is reached (design, "One refusal message, owned by the parser and forwarded by every path").
+    const variable = /names a variable it does not declare: (".*")$/.exec(error.message)?.[1];
     return variable === undefined
-      ? { kind: "settings-parse", part: `${JSON.stringify(name)} is configured with a format Jefferson cannot parse${consequence}` }
+      ? { kind: "settings-parse", part: `${JSON.stringify(name)}'s ${error.message}${consequence}` }
       : {
         kind: "settings-variable",
         part: `${JSON.stringify(name)} is configured with a format naming ${variable}, which the instrument does not declare${consequence}`,

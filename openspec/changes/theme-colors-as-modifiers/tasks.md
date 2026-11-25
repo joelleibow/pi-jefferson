@@ -498,7 +498,7 @@ file. The docs pass does, after the implementation gate, from the list in the de
 
 ## 4. The document read forwards the parser's reason
 
-- [ ] 4.1 Write the failing test first: the settings-parse warning becomes `pi-jefferson: "<name>"'s <the
+- [x] 4.1 Write the failing test first: the settings-parse warning becomes `pi-jefferson: "<name>"'s <the
   parser's sentence>; it renders blank`, so `tests/registration.test.ts:950` expects `"taiknr.savings"'s
   format names neither a modifier Jefferson implements nor a foreground colour of the theme: "|wobble"; it
   renders blank`. That loop at `tests/registration.test.ts:936-968` is also the proof of the delta's
