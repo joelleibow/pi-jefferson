@@ -2,6 +2,7 @@
 import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
 import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
+import { DEFAULT_THRESHOLDS, layerThreshold, stateAt, type Threshold } from "../../thresholds.ts";
 import { timed } from "../visuals/timed.ts";
 import {
   collapse, foregroundCheck, parseFormat, resolveFormat, resolvePlain, type ForegroundCheck, type FormatSegment,
@@ -13,13 +14,57 @@ import type { ProvidedDeclaration } from "../../instrument-contract.ts";
 
 export type BindInstrument = (declaration: InstrumentDeclaration) => Instrument;
 
+/**
+ * The row's instrument, plus the top-level state's `fills` fixed at bind: the geometry a provided
+ * instrument keeps when its own render throws, since it needs no reading to answer
+ * (`design.md` `### Contracts`). Not exported: `containProvided` is its one reader, and the row
+ * never carries it.
+ */
+interface BoundInstrument extends Instrument {
+  readonly topLevelFills: boolean;
+}
+
+/** The settings one state of an instrument carries: what the document wrote, and nothing more. */
+type ThresholdSettings = Omit<ConfiguredInstrument, "thresholds">;
+
+/**
+ * What the document wrote for one instrument: the top level's settings, and the honoured threshold
+ * list. `segments` and `style` are absent when the document wrote neither, so the top level and every
+ * threshold share one shape and the binding's defaults complete it (`design.md` `### Contracts`).
+ */
 export interface ConfiguredInstrument {
-  segments: FormatSegment[];
-  style: ThemeStyle;
+  segments?: FormatSegment[];
+  style?: ThemeStyle;
   label?: string;
   /** A composed format set's configured text, by key; the declaration's defaults fill the rest. */
   formats?: Record<string, FormatSegment[]>;
+  /** The top-level fill after validation, layered on the style for the bar's filled columns. */
+  fill?: ThemeStyle;
+  /**
+   * The reader's honoured list, stored as it is: sorted ascending, at most four, none above 100.
+   * Absent means the defaults, and an empty list means no threshold at all (design DEC-2).
+   */
+  thresholds?: readonly Threshold<ThresholdSettings>[];
 }
+
+/**
+ * One state of an instrument, bound once when the instrument is bound: what its render reads, with
+ * nothing re-derived per frame (design DEC-4). At most five exist per instrument.
+ */
+interface BoundState {
+  readonly segments: readonly FormatSegment[];
+  readonly style: ThemeStyle;
+  readonly fill: ThemeStyle;
+  readonly fills: boolean;
+  readonly composed: InstrumentDeclaration["composed"] | undefined;
+  /** Every kind text this state renders, parsed: its own where it wrote one, else the default. */
+  readonly plain: Readonly<Record<string, FormatSegment[]>>;
+}
+
+/** What choosing a state for one sample answered: the reading and its state, or the throw it raised. */
+type Outcome =
+  | { readonly kind: "reading"; readonly reading: number | null | undefined; readonly state: BoundState }
+  | { readonly kind: "thrown"; readonly error: unknown };
 
 /**
  * The one home of decision 15's `<what>`: one word for each thing a value may be. Both a report that
@@ -263,10 +308,17 @@ export function adaptProvidedDeclaration(
  * guard cannot see. Jefferson's own instruments are never wrapped, so their defects fail the suite
  * (design 10; spec "Provider code costs one entry and no more").
  */
-export function containProvided(instrument: Instrument, name: string, record: (fault: Fault) => void): Instrument {
+export function containProvided(instrument: BoundInstrument, name: string, record: (fault: Fault) => void): Instrument {
   return {
-    get fills() {
-      return instrument.fills;
+    fills(readings) {
+      // While `fills` runs, the only provider code reached is the `bar` that chooses the state, and
+      // the row plans before it renders, so this catch records the sentence the ledger keeps.
+      try {
+        return instrument.fills(readings);
+      } catch {
+        record({ scope: name, kind: "resolver-threw", part: `${JSON.stringify(name)} failed to render: its bar threw` });
+        return instrument.topLevelFills;
+      }
     },
     render(readings, width, theme) {
       try {
@@ -281,49 +333,115 @@ export function containProvided(instrument: Instrument, name: string, record: (f
 
 export function instrumentBindings(
   check: ForegroundCheck, configured: ReadonlyMap<string, ConfiguredInstrument> = new Map(),
-): BindInstrument {
-  const bound = new Map<string, Instrument>();
+): (declaration: InstrumentDeclaration) => BoundInstrument {
+  const bound = new Map<string, BoundInstrument>();
   return declaration => {
     let instrument = bound.get(declaration.name);
     if (instrument === undefined) {
       const entry = configured.get(declaration.name);
-      const segments = entry?.segments ?? parseFormat(declaration, declaration.defaultFormat, check);
-      const style = entry?.style ?? {};
-      // The label carries no edge whitespace of its own, and one gap stands between it and its
-      // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
-      // `$bar` counts its column and the label's style covers it.
-      const label = collapse(entry?.label ?? declaration.defaultLabel ?? "").trim();
-      const gap = label !== "" && segments.length > 0 ? " " : "";
-      const labelled: FormatSegment[] = label === "" ? segments
-        : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
-      // A composed declaration's kind formats parse once, at the bind: the defaults here and
-      // the document's overrides already parsed by the configuration reader.
-      // Composed only when the format names the composed variable: a variable the format leaves out
-      // is never resolved, so its set's functions never run and cannot fault (decision 20).
-      const composed = segments.some(segment => segment.kind === "variable" && segment.form === undefined
-        && segment.name === declaration.composed?.variable) ? declaration.composed : undefined;
-      const plain: Readonly<Record<string, FormatSegment[]>> = composed === undefined ? {}
-        : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [key, parseFormat(declaration, format, check, true)]));
+      const { thresholds, ...written } = entry ?? {};
+      const top: ThresholdSettings = written;
+
+      /** Bind one state's settings as a whole instrument is bound: its own everything (DEC-4). */
+      const bindState = (settings: ThresholdSettings): BoundState => {
+        const segments = settings.segments ?? parseFormat(declaration, declaration.defaultFormat, check);
+        // The label carries no edge whitespace of its own, and one gap stands between it and its
+        // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
+        // `$bar` counts its column and the label's style covers it.
+        const label = collapse(settings.label ?? declaration.defaultLabel ?? "").trim();
+        const gap = label !== "" && segments.length > 0 ? " " : "";
+        const labelled: readonly FormatSegment[] = label === "" ? segments
+          : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
+        // Composed only when the format names the composed variable: a variable the format leaves
+        // out is never resolved, so its set's functions never run and cannot fault (decision 20).
+        const composed = segments.some(segment => segment.kind === "variable" && segment.form === undefined
+          && segment.name === declaration.composed?.variable) ? declaration.composed : undefined;
+        // A composed declaration's kind formats parse once, at the bind: the state's own where it
+        // wrote one, and the declaration's default for every kind it left out.
+        const plain: Record<string, FormatSegment[]> = composed === undefined ? {}
+          : Object.fromEntries(Object.entries(composed.formats).map(([key, format]) => [
+            key,
+            settings.formats !== undefined && Object.hasOwn(settings.formats, key)
+              ? settings.formats[key]!
+              : parseFormat(declaration, format, check, true),
+          ]));
+        return {
+          segments: labelled,
+          style: settings.style ?? {},
+          fill: settings.fill ?? {},
+          // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
+          fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),
+          composed,
+          plain,
+        };
+      };
+
+      const topState = bindState(top);
+      // Each honoured threshold is layered on the top level and on no other threshold, then bound.
+      const honoured = (thresholds ?? DEFAULT_THRESHOLDS).map(threshold => ({
+        activeAt: threshold.activeAt,
+        bound: bindState(layerThreshold<ThresholdSettings>(top, threshold.settings)),
+      }));
+      // Whether the reading can change what renders, decided once here: the top-level format names
+      // `$bar`, or an honoured threshold sets an option other than `fill` (design DEC-8). Neither
+      // record says who wrote the list, so the defaults follow the same rule.
+      const readsBar = topState.segments.some(segment => segment.kind === "bar")
+        || (thresholds ?? DEFAULT_THRESHOLDS).some(threshold =>
+          Object.keys(threshold.settings).some(key => key !== "fill"));
+
+      // One slot per bound instrument per sample: the reading and the state it chose, or the throw
+      // choosing one raised. A call with the same sample answers from it, a new sample replaces it,
+      // and it is never cleared (design DEC-6).
+      let slot: { readonly readings: Readings; readonly outcome: Outcome } | undefined;
+      const atSample = (readings: Readings): Outcome => {
+        if (slot !== undefined && slot.readings === readings) return slot.outcome;
+        let outcome: Outcome;
+        if (!readsBar) {
+          outcome = { kind: "reading", reading: undefined, state: topState };
+        } else {
+          try {
+            const reading = declaration.bar!(readings);
+            outcome = { kind: "reading", reading, state: stateAt(honoured, reading)?.bound ?? topState };
+          } catch (error) {
+            outcome = { kind: "thrown", error };
+          }
+        }
+        slot = { readings, outcome };
+        return outcome;
+      };
+
       instrument = {
-        // The parse in hand decides it: a `$bar` segment takes whatever columns its cell leaves.
-        fills: declaration.fills === true || segments.some(segment => segment.kind === "bar"),
+        topLevelFills: topState.fills,
+        fills: readings => {
+          const outcome = atSample(readings);
+          if (outcome.kind === "thrown") throw outcome.error;
+          return outcome.state.fills;
+        },
         render: (readings, width, renderTheme) => {
+          const outcome = atSample(readings);
+          if (outcome.kind === "thrown") throw outcome.error;
+          const state = outcome.state;
           let preResolved: Record<string, string> | undefined;
-          if (composed !== undefined) {
-            const key = composed.select(readings);
+          if (state.composed !== undefined) {
+            const key = state.composed.select(readings);
             // A key the provider chose is looked up as its own, never through `Object.prototype`: an
             // unknown key composes nothing, and inherited names are not entries at all.
             const chosen = key === undefined ? undefined
-              : entry?.formats !== undefined && Object.hasOwn(entry.formats, key) ? entry.formats[key]
-                : Object.hasOwn(plain, key) ? plain[key] : undefined;
+              : Object.hasOwn(state.plain, key) ? state.plain[key] : undefined;
             const composedText = chosen === undefined ? "" : resolvePlain(declaration, chosen, readings);
             // A composed set with nothing to compose leaves its place empty, and only a format that
             // names the composed variable is blanked by it: variables are never coupled, so a
             // neighbour's silence cannot take another variable's text with it (owner-rulings.md,
             // 2026-11-16, "Variables are never coupled").
-            if (composedText !== "") preResolved = { [composed.variable]: composedText };
+            if (composedText !== "") preResolved = { [state.composed.variable]: composedText };
           }
-          const text = resolveFormat(declaration, labelled, style, readings, width, renderTheme, preResolved);
+          // A state whose format names `$bar` is handed the slot's raw reading and its own fill; no
+          // other reader of the bar remains (design DEC-6, DEC-8).
+          const drawsBar = state.segments.some(segment => segment.kind === "bar");
+          const text = resolveFormat(
+            declaration, state.segments as FormatSegment[], state.style, readings, width, renderTheme, preResolved,
+            drawsBar ? { reading: outcome.reading, fill: state.fill } : undefined,
+          );
           // A timed declaration's whole text shows or hides: nothing to show renders as nothing,
           // so the cell drops its label and gap as it does for an unknown datum.
           return declaration.shownUntil === undefined

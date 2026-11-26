@@ -258,7 +258,8 @@ test("every shipped file's exported keys are pinned, and registration is the onl
     ["../extensions/jefferson/registration-listener.ts", ["createRegistrationListener"]],
     ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
     ["../extensions/jefferson/startup.ts", ["startUp"]],
-    ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
+    ["../extensions/jefferson/components/instruments/instrument.ts",
+      ["BAR_OPTIONS", "DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
     ["../extensions/jefferson/components/instruments/compact-count.ts", ["compactCount"]],
     ["../extensions/jefferson/components/instruments/blank.ts", ["blank"]],
     ["../extensions/jefferson/components/instruments/model.ts", ["model"]],
@@ -569,7 +570,7 @@ test("a rejected style warns with its exact envelope and installs the default fo
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, rows: [[{ instrument: "model" }]] });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
-  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has a style whose fg is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
   assert.equal(lines.length, 1, "the default row renders as one line");
   assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));

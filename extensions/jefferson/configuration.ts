@@ -29,6 +29,7 @@ import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "
 import type { Fault } from "./faults.ts";
 import { foregroundCheck, parseFormat, validateStyle, type ForegroundCheck, type FormatSegment } from "./format.ts";
 import { isProvidedName, normalizeName } from "./registration.ts";
+import { readThresholds, type Threshold, type ThresholdFault } from "./thresholds.ts";
 
 /** Whether a configuration value is one of `ALIGNMENTS`. */
 function isAlign(value: unknown): value is CellAlign {
@@ -122,6 +123,116 @@ interface Reading {
    * the user never had (the published rule is that only an accepted document's faults are reported).
    */
   faults: Fault[];
+}
+
+/** One settings object's parsed values: the shape the top level and every threshold share. */
+type InstrumentSettings = Omit<ConfiguredInstrument, "thresholds">;
+
+/** How one settings object's faults are worded: the top level's possessive, or a threshold's place. */
+interface FaultSentences {
+  /** A predicate the sentence's subject carries, as the top level writes it: `has a format …`. */
+  readonly predicate: (text: string) => never;
+  /** The parser's own sentence whose meaning is forwarded, the top level keeping its possessive. */
+  readonly forwarded: (text: string) => never;
+}
+
+/**
+ * The place one written threshold's fault names: the instrument as the path prints it, the key and
+ * the 1-based written position. One function serves both paths and names nothing else (ADR 0015;
+ * design DEC-14).
+ */
+function thresholdPlace(subject: string, position: number): string {
+  return `${subject}, thresholds ${position}:`;
+}
+
+/** What a fault the reader answers on its own says, on the path that prints `subject`. */
+function thresholdFaultSentence(subject: string, fault: ThresholdFault): string {
+  switch (fault.kind) {
+    case "settings-thresholds": return `${subject} has thresholds that is not a list`;
+    case "settings-threshold": return `${thresholdPlace(subject, fault.position)} is not an object`;
+    case "settings-threshold-active-at":
+      return `${thresholdPlace(subject, fault.position)} has an activeAt that is not a whole number at or above 0`;
+    case "settings-threshold-duplicate":
+      return `${thresholdPlace(subject, fault.position)} repeats the threshold at ${fault.activeAt}`;
+  }
+}
+
+/**
+ * One settings object's values, parsed — the top level's or one threshold's — so a value inside a
+ * threshold is checked exactly as the top level's is (design DEC-1, DEC-14). Only what the document
+ * wrote comes back: the binding completes the top level's defaults, and a threshold that left a key
+ * out takes the top level's.
+ */
+function ownValues(
+  declaration: InstrumentDeclaration,
+  settings: Readonly<Record<string, unknown>>,
+  theme: Theme,
+  check: ForegroundCheck,
+  sentences: FaultSentences,
+): InstrumentSettings {
+  let segments: FormatSegment[] | undefined;
+  const format = settings.format;
+  if (format !== undefined) {
+    if (typeof format !== "string") sentences.predicate("has a format that is not a string");
+    try {
+      segments = parseFormat(declaration, format, check);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      sentences.forwarded(error.message);
+    }
+  }
+  let label: string | undefined;
+  if (settings.label !== undefined) {
+    if (typeof settings.label !== "string") sentences.predicate("has a label that is not a string");
+    label = settings.label;
+  }
+  let style: ThemeStyle | undefined;
+  if (settings.style !== undefined) {
+    try {
+      style = validateStyle(settings.style, theme);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      sentences.predicate(error.message);
+    }
+  }
+  let fill: ThemeStyle | undefined;
+  if (settings.fill !== undefined) {
+    try {
+      fill = validateStyle(settings.fill, theme, "fill");
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      sentences.predicate(error.message);
+    }
+  }
+  let formats: Record<string, FormatSegment[]> | undefined;
+  const declaredFormats = settings.formats;
+  if (declaredFormats !== undefined) {
+    if (typeof declaredFormats !== "object" || declaredFormats === null || Array.isArray(declaredFormats)) {
+      sentences.predicate("has formats that is not an object");
+    }
+    formats = {};
+    for (const [kind, text] of Object.entries(declaredFormats)) {
+      if (declaration.composed === undefined || !Object.hasOwn(declaration.composed.formats, kind)) {
+        sentences.forwarded(`formats names a kind it does not carry: ${JSON.stringify(kind)}`);
+      }
+      if (typeof text !== "string") {
+        sentences.forwarded(`formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
+      }
+      try {
+        formats[kind] = parseFormat(declaration, text, check, true);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        sentences.forwarded(error.message);
+      }
+    }
+  }
+  return {
+    ...(segments === undefined ? {} : { segments }),
+    ...(style === undefined ? {} : { style }),
+    ...(label === undefined ? {} : { label }),
+    ...(formats === undefined ? {} : { formats }),
+    ...(fill === undefined ? {} : { fill }),
+  };
 }
 
 /** What a document says about its instruments: the binding's inputs, and the reader's own share. */
@@ -287,65 +398,53 @@ function readInstruments(
       throw new RejectedConfiguration(`the instruments configuration for ${JSON.stringify(name)} is not an object`);
     }
     const entry = value as Record<string, unknown>;
+    const subject = `instrument ${JSON.stringify(name)}`;
     for (const key of Object.keys(entry)) {
       if (!declaration.options.includes(key)) {
-        throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} carries an option its declaration does not have: ${JSON.stringify(key)}`);
+        throw new RejectedConfiguration(`${subject} carries an option its declaration does not have: ${JSON.stringify(key)}`);
       }
     }
-    const format = entry.format;
-    if (format !== undefined && typeof format !== "string") {
-      throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has a format that is not a string`);
-    }
-    let segments: FormatSegment[];
-    try {
-      segments = parseFormat(declaration, format ?? declaration.defaultFormat, check);
-    } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
-      throw error;
-    }
-    const label = entry.label;
-    if (label !== undefined && typeof label !== "string") {
-      throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has a label that is not a string`);
-    }
-    // `seconds` and `formats` are a composed instrument's two options; a plain one cannot carry them.
+    const settings = ownValues(declaration, entry, source.theme, check, {
+      predicate: text => { throw new RejectedConfiguration(`${subject} ${text}`); },
+      forwarded: text => { throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${text}`); },
+    });
+    // `seconds` is the reader's share, never the binding's, and it is judged only at the top level.
     const seconds = entry.seconds;
     if (seconds !== undefined
       && (typeof seconds !== "number" || !Number.isInteger(seconds) || seconds < 1 || seconds > 60)) {
       throw new RejectedConfiguration(`seconds must be a whole number from 1 to 60: ${JSON.stringify(seconds)}`);
     }
-    let formats: Record<string, FormatSegment[]> | undefined;
-    if (entry.formats !== undefined) {
-      if (typeof entry.formats !== "object" || entry.formats === null || Array.isArray(entry.formats)) {
-        throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} has formats that is not an object`);
-      }
-      formats = {};
-      for (const [kind, format] of Object.entries(entry.formats)) {
-        if (declaration.composed === undefined || !Object.hasOwn(declaration.composed.formats, kind)) {
-          throw new RejectedConfiguration(`instrument ${JSON.stringify(name)}'s formats names a kind it does not carry: ${JSON.stringify(kind)}`);
+    // The one reader, called whenever the key is present: `null` reaches it and answers its own
+    // fault, and this path's own per-value check is what it runs on every threshold written.
+    let thresholds: readonly Threshold<InstrumentSettings>[] | undefined;
+    let overFour: string | undefined;
+    if (entry.thresholds !== undefined) {
+      const read = readThresholds<InstrumentSettings, string>(entry.thresholds, subject, (values, position) => {
+        const place = thresholdPlace(subject, position);
+        for (const key of Object.keys(values)) {
+          // A threshold's keys are the declaration's options minus `thresholds`: no second list.
+          if (key === "thresholds" || !declaration.options.includes(key)) {
+            throw new RejectedConfiguration(`${place} carries an option its declaration does not have: ${JSON.stringify(key)}`);
+          }
         }
-        if (typeof format !== "string") {
-          throw new RejectedConfiguration(`instrument ${JSON.stringify(name)}'s formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
-        }
-        try {
-          formats[kind] = parseFormat(declaration, format, check, true);
-        } catch (error) {
-          if (error instanceof Error) throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${error.message}`);
-          throw error;
-        }
-      }
+        return {
+          settings: ownValues(declaration, values, source.theme, check, {
+            predicate: text => { throw new RejectedConfiguration(`${place} ${text}`); },
+            forwarded: text => { throw new RejectedConfiguration(`${place} ${text}`); },
+          }),
+        };
+      });
+      if ("fault" in read) throw new RejectedConfiguration(thresholdFaultSentence(subject, read.fault));
+      if ("refused" in read) throw new RejectedConfiguration(read.refused);
+      thresholds = read.honoured;
+      overFour = read.overFour;
     }
-    let style: ThemeStyle;
-    try {
-      style = validateStyle(entry.style, source.theme);
-    } catch (error) {
-      if (error instanceof Error) throw new RejectedConfiguration(`instrument ${JSON.stringify(name)} ${error.message}`);
-      throw error;
+    configured.set(declaration.name, { ...settings, ...(thresholds === undefined ? {} : { thresholds }) });
+    // The reader composed the count's sentence, and it moves only for an instrument whose settings
+    // were accepted, which is why it waits here rather than travelling with the reader.
+    if (overFour !== undefined) {
+      reading.faults.push({ scope: declaration.name, kind: "thresholds-over-four", part: overFour });
     }
-    configured.set(declaration.name, {
-      segments, style,
-      ...(label === undefined ? {} : { label }),
-      ...(formats === undefined ? {} : { formats }),
-    });
     // The visible time is the reader's, not the binding's: the binding renders, the reader gates.
     if (seconds !== undefined) declaredSeconds.set(declaration.name, seconds);
   }

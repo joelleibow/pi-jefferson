@@ -12,8 +12,12 @@ export const DEFAULT_CELL_TEXT =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor";
 
 export interface Instrument {
-  /** Whether the cell holding it fills the columns its row leaves, rather than taking its content's. */
-  readonly fills: boolean;
+  /**
+   * Whether the cell holding it fills the columns its row leaves, rather than taking its content's,
+   * for the sample it is handed: the state in force decides it, so one answer serves one sample
+   * (design DEC-7).
+   */
+  fills(readings: Readings): boolean;
   render(readings: Readings, width: number, theme: Theme): string;
 }
 
@@ -39,3 +43,10 @@ export type InstrumentDeclaration = Omit<ContractDeclaration<Readings>, "variabl
 };
 
 export const FOUNDATIONAL_OPTIONS = Object.freeze(["format", "style", "label"] as const);
+
+/**
+ * The two option names a declaration that can draw a bar may take, beside the foundational three.
+ * One home, read by the adapter for a provided declaration and listed by every shipped one that
+ * carries `bar` (design DEC-13): no code names an instrument, and a declaration decides.
+ */
+export const BAR_OPTIONS = Object.freeze(["thresholds", "fill"] as const);

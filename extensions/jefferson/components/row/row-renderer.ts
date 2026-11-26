@@ -50,13 +50,15 @@ export function createFooter(
       texts.set(width, text);
       return text;
     };
+    // Asked with this render's sample, on every plan and on every measure, and never copied when
+    // the tree is built: a registration can swap the holder, a filled cell that took the row's slack
+    // must give it back (design 9), and the state in force decides it (design DEC-7).
+    const fills = (): boolean => cell.holder.current.fills(current);
     return {
-      // Read on every plan, never copied when the tree is built: a registration can swap the holder,
-      // and a filled cell that took the row's slack must give it back (design 9).
       get fills() {
-        return cell.holder.current.fills;
+        return fills();
       },
-      contentWidth: () => cell.holder.current.fills ? 0 : visibleWidth(textAt(0)),
+      contentWidth: () => fills() ? 0 : visibleWidth(textAt(0)),
       render(cellWidth) {
         const lead = joint() ? " " : "";
         const clipped = truncateToWidth(lead + textAt(cellWidth), cellWidth);

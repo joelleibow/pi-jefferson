@@ -2330,3 +2330,28 @@ test("A1 a default format Jefferson cannot parse is refused", () => {
   assert.deepEqual(adaptProvidedDeclaration("taiknr.savings", twice, () => ({}), () => {}, fgCheck),
     { refused: "unparseable-default-format", message: 'format names a variable it does not declare: "$spent"' });
 });
+
+test("A57 a throw that escapes while the state is chosen costs one entry", async (t) => {
+  // The adapter's guard covers the provider's call and not the value it returned, so reading a
+  // `then` getter throws past it. The state choice is inside the wrapper, so the throw costs that
+  // entry and one fault, and the row renders (design DEC-9; instrument-registration, "A state is
+  // chosen inside a provided instrument's boundary").
+  const escape = { get then(): never { throw new Error("provider"); } };
+  const session = await registeredRow(t, {
+    extension: "taiknr",
+    instruments: [{
+      name: "usage",
+      variables: { saved: () => "x" },
+      bar: () => escape as unknown as number,
+      defaultFormat: "$bar",
+    }],
+  }, [{ instrument: "model" }, { instrument: "taiknr.usage" }]);
+  const drawn = line(session);
+  assert.ok(drawn.startsWith("Model: anthropic/claude-opus-4"), drawn);
+  assert.equal(drawn.includes("█"), false, "the entry renders nothing in the top-level geometry");
+  await settle();
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: "taiknr.usage" failed to render: its bar threw',
+    type: "warning",
+  }]);
+});

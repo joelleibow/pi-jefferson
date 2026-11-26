@@ -42,7 +42,7 @@ const readings: Readings = {
 function rowOf(count: number, text = "Lorem ipsum dolor sit amet"): Row {
   return {
     distribution: "equal",
-    cells: Array.from({ length: count }, () => ({ name: "test", holder: { current: { fills: false, render: () => text } }, align: "left" as const })),
+    cells: Array.from({ length: count }, () => ({ name: "test", holder: { current: { fills: () => false, render: () => text } }, align: "left" as const })),
   };
 }
 
@@ -89,8 +89,8 @@ test("an instrument resolving text wider than its cell is clipped and stays one 
   const row: Row = {
     distribution: "content",
     cells: [
-      { name: "test", holder: { current: { fills: false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
-      { name: "test", holder: { current: { fills: false, render: () => "thinking: high" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "thinking: high" } }, align: "left" },
     ],
   };
   const line = lineAt(row, 20);
@@ -151,8 +151,8 @@ test("text wider than its cell renders identically under any alignment", () => {
   const row: Row = {
     distribution: "equal",
     cells: [
-      { name: "test", holder: { current: { fills: false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
-      { name: "test", holder: { current: { fills: false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "provider: a-very-long-model-name" } }, align: "left" },
     ],
   };
   const left = lineAt(row, 21);
@@ -174,9 +174,9 @@ test("text wider than its cell renders identically under any alignment", () => {
 });
 
 test("A4 a holder swapped between two renders shows the new instrument under a fresh sample", () => {
-  const leading: Instrument = { fills: false, render: () => "a" };
-  const filling: Instrument = { fills: true, render: () => "A" };
-  const plain: Instrument = { fills: false, render: () => "BBBB" };
+  const leading: Instrument = { fills: () => false, render: () => "a" };
+  const filling: Instrument = { fills: () => true, render: () => "A" };
+  const plain: Instrument = { fills: () => false, render: () => "BBBB" };
   const held: Row["cells"][number] = { name: "test", holder: { current: filling }, align: "left" };
   // The sampler answers a fresh object every render, as the store does, so nothing is cached across
   // the swap but the plan and the fill flag the renderer keeps.
@@ -219,7 +219,7 @@ test("a fill cell gives up the notice's columns and takes them back when its ins
   let current: Readings = { ...readings };
   const row: Row = {
     distribution: "content",
-    cells: [{ name: "test", holder: { current: { fills: true, render: () => "a" } }, align: "left" }, { name: "notice", holder: { current: notice }, align: "left" }],
+    cells: [{ name: "test", holder: { current: { fills: () => true, render: () => "a" } }, align: "left" }, { name: "notice", holder: { current: notice }, align: "left" }],
   };
   const footer = createFooter([row], () => current, fakeTheme(), 0);
   const line = (): string => stripTerminalSequences(footer.render(80)[0] ?? "");
@@ -281,7 +281,7 @@ test("an ANSI-styled cell's pad carries no styling", () => {
   // one open per cell, and none between the cell's close and its pad.
   const styled = (text: string): Row => ({
     distribution: "equal",
-    cells: Array.from({ length: 3 }, () => ({ name: "test", holder: { current: { fills: false, render: () => text } }, align: "left" as const })),
+    cells: Array.from({ length: 3 }, () => ({ name: "test", holder: { current: { fills: () => false, render: () => text } }, align: "left" as const })),
   });
   for (const text of ["\x1b[31mab\x1b[0m", "\x1b[4mab"]) {
     const line = lineAt(styled(text), 20);
@@ -298,8 +298,8 @@ test("the host closes an open style between cells", () => {
   const row: Row = {
     distribution: "equal",
     cells: [
-      { name: "test", holder: { current: { fills: false, render: () => "\x1b[4mabcdefghij" } }, align: "left" },
-      { name: "test", holder: { current: { fills: false, render: () => "cd" } }, align: "right" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "\x1b[4mabcdefghij" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "cd" } }, align: "right" },
     ],
   };
   const line = lineAt(row, 20);
@@ -314,8 +314,8 @@ test("wide glyphs and ANSI escapes are measured in visible columns, not string l
     distribution: "equal",
     // String.length would under-pad the styled cell mid-line; allocation cannot repair it.
     cells: [
-      { name: "test", holder: { current: { fills: false, render: () => "\x1b[31mab\x1b[0m" } }, align: "left" },
-      { name: "test", holder: { current: { fills: false, render: () => "😀" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "\x1b[31mab\x1b[0m" } }, align: "left" },
+      { name: "test", holder: { current: { fills: () => false, render: () => "😀" } }, align: "left" },
     ],
   };
   const line = lineAt(row, 9);
@@ -400,7 +400,7 @@ test("the built-once tree keeps its cell memo when two renders share sample and 
   let resolves = 0;
   const footer = createFooter([{
     distribution: "equal",
-    cells: [{ name: "test", holder: { current: { fills: false, render: () => { resolves++; return "kept"; } } }, align: "left" }],
+    cells: [{ name: "test", holder: { current: { fills: () => false, render: () => { resolves++; return "kept"; } } }, align: "left" }],
   }], () => readings, fakeTheme(), 0);
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
   assert.equal(footer.render(30)[0], composed("kept".padEnd(30)));
@@ -438,7 +438,7 @@ test("one render samples the store exactly once, whatever the row and cell count
 test("an instrument resolves once per (sample, width) within a render, and again in the next render", () => {
   const handed: Array<{ readings: Readings; width: number }> = [];
   const capture: Instrument = {
-    fills: false,
+    fills: () => false,
     render(r, width) {
       handed.push({ readings: r, width });
       return "";
@@ -471,7 +471,7 @@ test("an instrument resolves once per (sample, width) within a render, and again
 
 test("invalidation drops cell memos and keeps the footer's three rows and their gaps", () => {
   let resolves = 0;
-  const capture: Instrument = { fills: false, render: () => { resolves++; return "text"; } };
+  const capture: Instrument = { fills: () => false, render: () => { resolves++; return "text"; } };
   const footer = createFooter([0, 1, 2].map(() => ({
     distribution: "equal",
     cells: [{ name: "capture", holder: { current: capture }, align: "left" }],
@@ -489,7 +489,7 @@ test("two cells holding the model instrument resolve identical text", () => {
   const declaration = shippedInstrument("model");
   assert.ok(declaration);
   const segments = parseFormat(declaration, declaration.defaultFormat, fgCheck);
-  const model: Instrument = { fills: false, render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
+  const model: Instrument = { fills: () => false, render: (readings, width, theme) => resolveFormat(declaration, segments, {}, readings, width, theme) };
   const live: Readings = { ...readings, provider: "anthropic", model: "claude-opus-4", thinkingLevel: "high" };
   const footer = createFooter(
     [{ distribution: "equal", cells: [{ name: "model", holder: { current: model }, align: "left" }, { name: "model", holder: { current: model }, align: "left" }] }],
@@ -504,7 +504,7 @@ test("two cells holding the model instrument resolve identical text", () => {
 test("a push between two renders shows up in the next render and not before", () => {
   const handed: Readings[] = [];
   const capture: Instrument = {
-    fills: false,
+    fills: () => false,
     render(r) {
       handed.push(r);
       return r.model ?? "";
@@ -547,7 +547,7 @@ function contentRowOf(count: number, text: string): Row {
 function contentRow(cells: Array<{ text: string; align?: "left" | "right" | "center" }>): Row {
   return {
     distribution: "content",
-    cells: cells.map(({ text, align = "left" }) => ({ name: "test", holder: { current: { fills: false, render: () => text } }, align })),
+    cells: cells.map(({ text, align = "left" }) => ({ name: "test", holder: { current: { fills: () => false, render: () => text } }, align })),
   };
 }
 
@@ -600,12 +600,12 @@ test("the probe is taken at width 0, not at the row's width", () => {
   // This text is 40 columns wide only when it is asked at 40, the row's own width: a probe at the
   // row width would be the only render that carries the '#', and it would reach the line.
   const spiky: Instrument = {
-    fills: false,
+    fills: () => false,
     render: (_readings: Readings, width: number) => width === 40 ? "ab" + "#".repeat(38) : "ab",
   };
   const row: Row = {
     distribution: "content",
-    cells: [{ name: "spiky", holder: { current: spiky }, align: "left" }, { name: "test", holder: { current: { fills: false, render: () => "cd" } }, align: "right" }],
+    cells: [{ name: "spiky", holder: { current: spiky }, align: "left" }, { name: "test", holder: { current: { fills: () => false, render: () => "cd" } }, align: "right" }],
   };
   const line = lineAt(row, 40);
   // The final text is resolved at the cell's own allocated width (38), never at the row's.
@@ -619,7 +619,7 @@ function cellOf(
   text: string,
   { fills = false, align = "left" }: { fills?: boolean; align?: "left" | "right" | "center" } = {},
 ): Row["cells"][number] {
-  return { name: "test", holder: { current: { fills, render: () => text } }, align };
+  return { name: "test", holder: { current: { fills: () => fills, render: () => text } }, align };
 }
 
 function rowOfCells(cells: Row["cells"]): Row {
@@ -806,7 +806,7 @@ test("when the content needs more than the row, every cell can give up columns, 
 
   // The same cells grow between two renders at the same width.
   let size = 5;
-  const growing: Instrument = { fills: false, render: () => "g".repeat(size) };
+  const growing: Instrument = { fills: () => false, render: () => "g".repeat(size) };
   const footer = createFooter([rowOfCells([
     { name: "growing", holder: { current: growing }, align: "left" },
     { name: "growing", holder: { current: growing }, align: "left" },
@@ -890,7 +890,7 @@ test("align in a content cell with no spare columns changes nothing", () => {
 test("a second render of the same sample asks for nothing new", () => {
   const calls: Record<string, number[]> = { a: [], b: [], c: [] };
   const fake = (name: "a" | "b" | "c", text: string): Instrument => ({
-    fills: false,
+    fills: () => false,
     render: (_readings: Readings, width: number) => {
       calls[name]!.push(width);
       return text;
@@ -918,7 +918,7 @@ test("a second render of the same sample asks for nothing new", () => {
 test("a new sample, or invalidate(), drops every cached width", () => {
   let resolves = 0;
   const fake: Instrument = {
-    fills: false,
+    fills: () => false,
     render: (sample: Readings) => {
       resolves += 1;
       return sample.model === "second" ? "y".repeat(10) : "ab";
@@ -951,9 +951,9 @@ test("the row re-seats when a cell's basis changes, not only when the window doe
   let thinking = "t".repeat(7);
   let current: Readings = readings;
   const cells = (): Row["cells"] => [
-    { name: "test", holder: { current: { fills: false, render: () => "a".repeat(15) } }, align: "left" },
-    { name: "test", holder: { current: { fills: false, render: () => "b".repeat(32) } }, align: "right" },
-    { name: "test", holder: { current: { fills: false, render: () => thinking } }, align: "right" },
+    { name: "test", holder: { current: { fills: () => false, render: () => "a".repeat(15) } }, align: "left" },
+    { name: "test", holder: { current: { fills: () => false, render: () => "b".repeat(32) } }, align: "right" },
+    { name: "test", holder: { current: { fills: () => false, render: () => thinking } }, align: "right" },
   ];
   const footer = createFooter([rowOfCells(cells())], () => current, fakeTheme(), 0);
   // [60, 32, 8]: the path text absorbs 45 columns, the joint sits before the thinking text.
@@ -987,8 +987,8 @@ test("the row re-seats when a cell's joint goes, not only when its basis changes
   let second = "b".repeat(8);
   let current: Readings = readings;
   const cells = (): Row["cells"] => [
-    { name: "test", holder: { current: { fills: false, render: () => "a".repeat(8) } }, align: "right" },
-    { name: "test", holder: { current: { fills: false, render: () => second } }, align: "right" },
+    { name: "test", holder: { current: { fills: () => false, render: () => "a".repeat(8) } }, align: "right" },
+    { name: "test", holder: { current: { fills: () => false, render: () => second } }, align: "right" },
   ];
   const footer = createFooter([rowOfCells(cells())], () => current, fakeTheme(), 0);
   assert.equal(visible(footer.render(17)[0] ?? ""), "a".repeat(8) + " " + "b".repeat(8), "the joint sits before the second text");

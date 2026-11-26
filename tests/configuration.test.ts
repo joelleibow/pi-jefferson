@@ -10,6 +10,7 @@ import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
 import type { Cell } from "../extensions/jefferson/components/row/row.ts";
 import type { Configuration } from "../extensions/jefferson/configuration.ts";
+import type { Fault } from "../extensions/jefferson/faults.ts";
 import {
   acceptedWarning,
   DEFAULT_CELLS,
@@ -1131,13 +1132,13 @@ test("the style attribute guard rejects non-booleans for all six attributes", ()
 
 test("the foreground value guard reports rejected types, wrong slots, colors and indices", () => {
   for (const fg of ["nope", "selectedBg", "", {}, true, null, 256, ["#bf5700"]]) {
-    rejected({ instruments: { model: { style: { fg } } } }, `instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: ${JSON.stringify(fg)}`);
+    rejected({ instruments: { model: { style: { fg } } } }, `instrument "model" has a style whose fg is neither a foreground-slot theme token nor a color pi's parser accepts: ${JSON.stringify(fg)}`);
   }
 });
 
 test("the background value guard reports rejected colors, wrong slots and fractional indices", () => {
   for (const bg of ["nope", "accent", 1.5, ["#bf5700"]]) {
-    rejected({ instruments: { model: { style: { bg } } } }, `instrument "model" has a bg that is neither a background-slot theme token nor a color pi's parser accepts: ${JSON.stringify(bg)}`);
+    rejected({ instruments: { model: { style: { bg } } } }, `instrument "model" has a style whose bg is neither a background-slot theme token nor a color pi's parser accepts: ${JSON.stringify(bg)}`);
   }
 });
 
@@ -1330,18 +1331,18 @@ test("blank fills, and so does an instrument whose format takes the width", () =
   });
   assert.equal(defaults.warning, undefined);
   assert.deepEqual(
-    defaults.rows[0]?.cells.map((cell) => cell.holder.current.fills),
+    defaults.rows[0]?.cells.map((cell) => cell.holder.current.fills(seed)),
     [true, false, false, false, false, false, false],
     "blank fills; context's default $percent/$window has no bar",
   );
 
   const configured = readDocument({ instruments: { context: { format: "$percent $bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(configured.warning, undefined);
-  assert.deepEqual(configured.rows[0]?.cells.map((cell) => cell.holder.current.fills), [true], "a configured bar fills");
+  assert.deepEqual(configured.rows[0]?.cells.map((cell) => cell.holder.current.fills(seed)), [true], "a configured bar fills");
 
   const escaped = readDocument({ instruments: { context: { format: "\\$percent \\$bar" } }, rows: [[{ instrument: "context" }]] });
   assert.equal(escaped.warning, undefined);
-  assert.deepEqual(escaped.rows[0]?.cells.map((cell) => cell.holder.current.fills), [false], "an escaped \\$bar is plain text");
+  assert.deepEqual(escaped.rows[0]?.cells.map((cell) => cell.holder.current.fills(seed)), [false], "an escaped \\$bar is plain text");
 });
 
 test("a notice cell takes the declared seconds, or the declared default of ten", () => {
@@ -1416,4 +1417,281 @@ test("a notice cell past the ten-cell ceiling does not count as placement", () =
   const { rows, noticeSeconds } = readDocument({ rows: [[...cells, { instrument: "notice" }]] });
   assert.equal(rows[0]?.cells.length, 10, "the ceiling truncates the notice cell");
   assert.equal(noticeSeconds, undefined, "the rows the root installs place no notice");
+});
+
+/** A read that also answers what it reported, for the checks about a warning's scope and kind. */
+function readReported(document: unknown, theme: Theme = fakeTheme()): { configuration: Configuration; reported: Fault[] } {
+  const dir = mkdtempSync(join(tmpdir(), "jefferson-config-test-"));
+  const agentPath = join(dir, "pi-jefferson.json");
+  writeFileSync(agentPath, JSON.stringify(document));
+  const { source, reported } = configurationSource({
+    agentPath, projectPath: join(dir, "missing.json"), projectTrusted: false, theme,
+  });
+  return { configuration: readConfiguration(source), reported };
+}
+
+/** The reading a percentage makes. */
+function at(percent: number): Readings {
+  return { ...seed, contextUsage: { tokens: 86400, percent, contextWindow: 200000 } };
+}
+
+/** One instrument's cell from a document that configures it, with its document accepted. */
+function configuredCell(settings: unknown, readings: Readings = seed, instrument = "context"): Cell {
+  const { rows, warning } = readDocument({ rows: [[{ instrument }]], instruments: { [instrument]: settings } });
+  assert.equal(warning, undefined, `the document is accepted: ${warning}`);
+  return rows[0]!.cells[0]!;
+}
+
+test("A23 a threshold's format and fill are in force at its percentage, and the top level's below it", () => {
+  const theme = fakeTheme();
+  const cell = configuredCell({
+    format: "$percent", label: "", style: { bold: true }, fill: { fg: "accent" },
+    thresholds: [{ activeAt: 70, format: "$percent $bar", fill: { fg: "error" } }],
+  });
+  assert.equal(cell.holder.current.render(at(50), 20, theme), theme.style("50.0%", { bold: true }),
+    "below the threshold the top level renders, with no bar");
+  const drawn = cell.holder.current.render(at(72), 20, theme);
+  const barWidth = 20 - "72.0% ".length;
+  const filled = Math.floor((72 / 100) * barWidth);
+  assert.equal(stripTerminalSequences(drawn), "72.0% " + "█".repeat(filled) + "░".repeat(barWidth - filled));
+  assert.ok(drawn.includes(theme.style("█".repeat(filled), { bold: true, fg: "error" })),
+    "the threshold's fill is in force, with the top level's style under it");
+});
+
+test("A24 one threshold leaves no default colour, and an empty list colours nothing", () => {
+  const theme = fakeTheme();
+  const one = configuredCell({ format: "$bar", label: "", thresholds: [{ activeAt: 90, fill: { fg: "error" } }] });
+  const below = one.holder.current.render(at(75), 10, theme);
+  assert.equal(below.includes(theme.getFgAnsi("warning")), false, "no default warning reaches the fill");
+  assert.equal(stripTerminalSequences(below), "█".repeat(7) + "░".repeat(3));
+  const none = configuredCell({ format: "$bar", label: "", thresholds: [] });
+  const at95 = none.holder.current.render(at(95), 10, theme);
+  assert.equal(at95.includes(theme.getFgAnsi("error")), false, "an empty list colours nothing");
+});
+
+test("A25 the default fill colours the bar at exactly seventy and ninety, and never the text", () => {
+  const theme = fakeTheme();
+  const cell = configuredCell({ format: "$percent $bar", label: "C:", style: { bold: true } });
+  const draw = (percent: number) => cell.holder.current.render(at(percent), 20, theme);
+  // The text is the instrument's, the fill is the state's: twelve columns of bar after "C: 70.0% ".
+  const barWidth = 20 - "C: 70.0% ".length;
+  const filled = Math.floor((70 / 100) * barWidth);
+  const at70 = draw(70);
+  assert.ok(at70.includes(theme.style("█".repeat(filled), { bold: true, fg: "warning" })), "exactly 70 is warning");
+  assert.ok(at70.startsWith(theme.style("C: ", { bold: true }) + theme.style("70.0%", { bold: true })),
+    "the text keeps the instrument's style and takes none of the threshold's colour");
+  const at90 = draw(90);
+  const filledAt90 = Math.floor((90 / 100) * (20 - "C: 90.0% ".length));
+  assert.ok(at90.includes(theme.style("█".repeat(filledAt90), { bold: true, fg: "error" })), "exactly 90 is error");
+  const below = draw(69.9);
+  assert.equal(below.includes(theme.getFgAnsi("warning")), false, "below 70 the style's own fill stands");
+});
+
+test("A25 a style with no fill covers the whole instrument, as an empty list does", () => {
+  const theme = fakeTheme();
+  // Below 70 no default applies, so the style alone is what the whole instrument takes.
+  for (const settings of [
+    { format: "$percent $bar", label: "C:", style: { bold: true } },
+    { format: "$percent $bar", label: "C:", style: { bold: true }, thresholds: [] },
+  ]) {
+    const cell = configuredCell(settings);
+    const drawn = cell.holder.current.render(at(50), 20, theme);
+    const barWidth = 20 - "C: 50.0% ".length;
+    const filled = Math.floor((50 / 100) * barWidth);
+    assert.ok(drawn.includes(theme.style("█".repeat(filled), { bold: true })),
+      "the filled part takes the style");
+    assert.ok(drawn.includes(theme.style("░".repeat(barWidth - filled), { bold: true, dim: true })),
+      "the track takes the style plus dim");
+    assert.equal(drawn.includes(theme.getFgAnsi("warning")), false, JSON.stringify(settings));
+  }
+  // An empty list means no threshold at all, so nothing colours the fill where the defaults would.
+  const none = configuredCell({ format: "$percent $bar", label: "C:", style: { bold: true }, thresholds: [] });
+  const drawn = none.holder.current.render(at(95), 20, theme);
+  assert.equal(drawn.includes(theme.getFgAnsi("error")), false, "95 takes no default colour under an empty list");
+});
+
+test("A26 a top-level fill colours the bar, and a default replaces only the key it names", () => {
+  const theme = fakeTheme();
+  const cell = configuredCell({ format: "$bar", label: "", fill: { fg: "accent", bold: true } });
+  const draw = (percent: number) => cell.holder.current.render(at(percent), 10, theme);
+  assert.ok(draw(50).includes(theme.style("█".repeat(5), { fg: "accent", bold: true })),
+    "below 70 the top-level fill colours the bar and keeps its other key");
+  assert.ok(draw(75).includes(theme.style("█".repeat(7), { fg: "warning", bold: true })),
+    "the default replaces the foreground it names and bold survives");
+});
+
+test("A27 a threshold's style colours the text and never the fill or the track", () => {
+  const theme = fakeTheme();
+  const cell = configuredCell({
+    format: "$percent $bar", label: "C:", fill: { fg: "accent" },
+    thresholds: [{ activeAt: 70, style: { fg: "error" } }],
+  });
+  const drawn = cell.holder.current.render(at(75), 20, theme);
+  assert.ok(drawn.startsWith(theme.style("C: ", { fg: "error" }) + theme.style("75.0%", { fg: "error" })),
+    "the threshold's style colours the text");
+  const barWidth = 20 - "C: 75.0% ".length;
+  const filled = Math.floor((75 / 100) * barWidth);
+  assert.ok(drawn.includes(theme.style("█".repeat(filled), { fg: "accent" })),
+    "the fill keeps the top level's fill, and the style never overrides it");
+  assert.ok(drawn.includes(theme.style("░".repeat(barWidth - filled), { fg: "error", dim: true })),
+    "the track takes the state's style plus dim");
+});
+
+test("A28 a label a threshold leaves out renders, and a second threshold inherits nothing", () => {
+  const theme = fakeTheme();
+  const cell = configuredCell({
+    format: "$percent", label: "C:",
+    thresholds: [{ activeAt: 30, label: "A:", style: { bg: "selectedBg" } }, { activeAt: 60, style: { fg: "error" } }],
+  });
+  assert.equal(cell.holder.current.render(at(45), 80, theme),
+    theme.style("A: ", { bg: "selectedBg" }) + theme.style("45.0%", { bg: "selectedBg" }),
+    "the threshold at 30 sets its own label");
+  assert.equal(cell.holder.current.render(at(65), 80, theme),
+    theme.style("C: ", { fg: "error" }) + theme.style("65.0%", { fg: "error" }),
+    "at 65 the label is the top level's and the background is not the one at 30");
+});
+
+test("A29 five thresholds choose the fourth from below, and warn once through the ledger", () => {
+  const labels = [10, 20, 30, 40, 50].map(activeAt => ({ activeAt, label: `L${activeAt}:` }));
+  const { configuration, reported } = readReported({
+    rows: [[{ instrument: "context" }]],
+    instruments: { context: { format: "$percent", thresholds: labels } },
+  });
+  assert.equal(configuration.warning, undefined, "five thresholds load");
+  const drawn = configuration.rows[0]!.cells[0]!.holder.current.render(at(60), 80, fakeTheme());
+  assert.equal(stripTerminalSequences(drawn), "L40: 60.0%", "the state at 40 applies and the fifth never renders");
+  assert.deepEqual(reported, [{
+    scope: "jefferson.default.context",
+    kind: "thresholds-over-four",
+    part: 'instrument "context" defines 5 thresholds, more than the maximum of 4; those beyond the 4 lowest are ignored',
+  }]);
+});
+
+test("A30 every own-path threshold sentence names the instrument, the key and the position", () => {
+  const rejectedWith = (thresholds: unknown, message: string): void => {
+    const { rows, warning } = readDocument({
+      rows: [[{ instrument: "context" }]], instruments: { context: { thresholds } },
+    });
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS, `${message}: the default row renders`);
+    assert.ok(warning?.includes(`(${message})`), `${message}: ${warning}`);
+  };
+  for (const thresholds of [{}, null, 70]) {
+    rejectedWith(thresholds, 'instrument "context" has thresholds that is not a list');
+  }
+  for (const entry of [70, null, []]) {
+    rejectedWith([entry], 'instrument "context", thresholds 1: is not an object');
+  }
+  for (const entry of [{ activeAt: -5 }, { activeAt: 70.5 }, { activeAt: "70" }, {}, { activeAt: 1e400 }]) {
+    rejectedWith([entry], 'instrument "context", thresholds 1: has an activeAt that is not a whole number at or above 0');
+  }
+  rejectedWith([{ activeAt: 70 }, { activeAt: 70 }], 'instrument "context", thresholds 2: repeats the threshold at 70');
+  rejectedWith([{ activeAt: 110 }, { activeAt: 110 }], 'instrument "context", thresholds 2: repeats the threshold at 110');
+  rejectedWith([{ activeAt: 0 }, { activeAt: -0 }], 'instrument "context", thresholds 2: repeats the threshold at 0');
+});
+
+test("A34 a state at 0 decides whether the bar blanks, and a null reading draws a dim track", () => {
+  const theme = fakeTheme();
+  const unknownUsage: Readings = { ...seed, contextUsage: undefined };
+  const drops = configuredCell(
+    { format: "no estimate $bar", thresholds: [{ activeAt: 0, format: "no estimate" }] }, unknownUsage,
+  );
+  assert.equal(stripTerminalSequences(drops.holder.current.render(unknownUsage, 80, theme)), "Context: no estimate");
+  const names = configuredCell(
+    { format: "no estimate", thresholds: [{ activeAt: 0, format: "no estimate $bar" }] }, unknownUsage,
+  );
+  assert.equal(names.holder.current.render(unknownUsage, 80, theme), "",
+    "the state's format names the bar, so the instrument blanks, label included");
+  const nullEstimate = configuredCell(
+    { format: "$bar", label: "", thresholds: [{ activeAt: 0, label: "hot" }] },
+    { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } },
+  );
+  const drawn = nullEstimate.holder.current.render(
+    { ...seed, contextUsage: { tokens: null, percent: null, contextWindow: 200000 } }, 10, theme,
+  );
+  assert.equal(drawn, "hot " + theme.style("░".repeat(6), { dim: true }),
+    "no fraction to fill draws the whole track dim, and the state at 0 owns the label");
+});
+
+test("A51 a reading between two printed values is compared, not the text it prints", () => {
+  const cell = configuredCell({ format: "$percent", thresholds: [{ activeAt: 70, label: "hot" }] });
+  assert.equal(stripTerminalSequences(cell.holder.current.render(at(69.99), 80, fakeTheme())), "Context: 70.0%",
+    "the printed text says 70.0, and the threshold at 70 does not apply");
+  assert.equal(stripTerminalSequences(cell.holder.current.render(at(70), 80, fakeTheme())), "hot 70.0%");
+});
+
+test("A58 a threshold's state changes only the keys it names, through Jefferson's own path", () => {
+  const cell = configuredCell({ format: "$percent", thresholds: [{ activeAt: 50, label: "hot" }] });
+  assert.equal(stripTerminalSequences(cell.holder.current.render(at(60), 80, fakeTheme())), "hot 60.0%",
+    "the label is the threshold's and the format the top level's, never the declaration's default");
+  assert.equal(stripTerminalSequences(cell.holder.current.render(at(40), 80, fakeTheme())), "Context: 40.0%");
+});
+
+test("A31 a fault inside a threshold rejects the document at its written position", () => {
+  const rejectedWith = (thresholds: readonly unknown[], message: string): void => {
+    const { rows, warning } = readDocument({
+      rows: [[{ instrument: "context" }]], instruments: { context: { thresholds } },
+    });
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS, `${message}: the default row renders`);
+    assert.ok(warning?.includes(`(${message})`), `${message}: ${warning}`);
+  };
+  const four = [10, 20, 30, 40].map(activeAt => ({ activeAt }));
+  // A `fill` the theme cannot use, on a threshold the reader drops: every threshold is checked.
+  rejectedWith([...four, { activeAt: 101, fill: { fg: "nope" } }],
+    'instrument "context", thresholds 5: has a fill whose fg is neither a foreground-slot theme token nor a color pi\'s parser accepts: "nope"');
+  // A format that does not parse, past the fourth.
+  rejectedWith([10, 20, 30, 40, 50].map(activeAt => ({ activeAt, format: activeAt === 50 ? "$nope" : "$percent" })),
+    'instrument "context", thresholds 5: format names a variable it does not declare: "$nope"');
+  // A position counted before the sort: written second though it applies first.
+  rejectedWith([{ activeAt: 90, format: "$percent" }, { activeAt: 10, format: "$nope" }],
+    'instrument "context", thresholds 2: format names a variable it does not declare: "$nope"');
+});
+
+test("A32 a key a threshold does not take is refused by the unknown-option rule", () => {
+  for (const key of ["width", "thresholds"]) {
+    const { rows, warning } = readDocument({
+      rows: [[{ instrument: "context" }]],
+      instruments: { context: { thresholds: [{ activeAt: 10, [key]: key === "width" ? 5 : [] }] } },
+    });
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS, "the default row renders");
+    assert.ok(warning?.includes(`(instrument "context", thresholds 1: carries an option its declaration does not have: ${JSON.stringify(key)})`),
+      warning ?? "");
+  }
+});
+
+test("A33 a Jefferson instrument without a bar refuses both keys", () => {
+  for (const key of ["thresholds", "fill"]) {
+    const { rows, warning } = readDocument({
+      rows: [[{ instrument: "model" }]], instruments: { model: { [key]: key === "fill" ? {} : [] } },
+    });
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS, `${key}: the default row renders`);
+    assert.ok(warning?.includes(`(instrument "model" carries an option its declaration does not have: ${JSON.stringify(key)})`),
+      `${key}: ${warning}`);
+  }
+});
+
+test("A35 a rejected document reports no over-four warning", () => {
+  const five = [10, 20, 30, 40, 50].map(activeAt => ({ activeAt }));
+  const { configuration, reported } = readReported({
+    // The instruments block is read before the rows, so the count is composed and then discarded.
+    rows: [[{ instrument: "context" }], []],
+    instruments: { context: { format: "$percent", thresholds: five } },
+  });
+  assert.match(configuration.warning ?? "", /was rejected \(row 2: is empty/);
+  assert.deepEqual(reported, [], "the rejected document installs nothing and warns nothing else");
+});
+
+test("A36 a fill fault names fill, and a fill key names the key", () => {
+  for (const [fill, message] of [
+    [{ fg: "nope" }, 'instrument "context" has a fill whose fg is neither a foreground-slot theme token nor a color pi\'s parser accepts: "nope"'],
+    [{ colour: "red" }, 'instrument "context" has a fill key that pi\'s ThemeStyle does not have: "colour"'],
+    [{ bold: "true" }, 'instrument "context" has a fill attribute that is not a boolean: "bold"'],
+    [[], 'instrument "context" has a fill that is not an object'],
+  ] as const) {
+    const { rows, warning } = readDocument({
+      rows: [[{ instrument: "context" }]], instruments: { context: { fill } },
+    });
+    assert.equal(rows[0]?.cells.length, DEFAULT_CELLS, `${message}: the default row renders`);
+    assert.ok(warning?.includes(`(${message})`), `${message}: ${warning}`);
+    assert.equal(warning?.includes(" has an fg that "), false, "a fill fault never reads as a style one");
+  }
 });

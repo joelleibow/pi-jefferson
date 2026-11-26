@@ -183,7 +183,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
 
 ## 2. The state reaches a bar Jefferson's own instrument draws
 
-- [ ] 2.1 The two option names have one runtime home. **Test first:** rewrite the pins — in
+- [x] 2.1 The two option names have one runtime home. **Test first:** rewrite the pins — in
   `tests/instrument.test.ts`, `:82`'s `slice(3)` expectation becomes `name === "notice" ? ["seconds",
   "formats"] : declaration.bar !== undefined ? ["thresholds", "fill"] : []`, so a declaration that
   carries `bar` expects `["thresholds", "fill"]`; `:81` stays, and so does `:84`'s frozen check; `:85`
@@ -203,7 +203,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   refuses both keys, green at the base) — and the pin is shown catching a mistake by writing
   `thresholds` alone in `context.ts` and watching it fail. **Done when:** the pins pass.
 
-- [ ] 2.2 `fills` answers per sample. **Test first:** no expectation changes; flip
+- [x] 2.2 `fills` answers per sample. **Test first:** no expectation changes; flip
   `Instrument.fills` to `(readings: Readings) => boolean` and run `pnpm typecheck` and `pnpm test`.
   The typecheck names the object literals that build an `Instrument` with a boolean `fills`, and
   `pnpm test` names the assertions that read `fills`. Three groups, and measured, they leave the
@@ -226,7 +226,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   changes; P1, P3 and P4 are the proof, passing unedited. **Done when:** `pnpm typecheck` and
   `pnpm test` are both green and no expectation moved.
 
-- [ ] 2.3 Every honoured state is bound, and chosen once per sample from one reading. **Test first:**
+- [x] 2.3 Every honoured state is bound, and chosen once per sample from one reading. **Test first:**
   A48 — a threshold whose format adds `$bar` ends the fill below 70 and starts it at 70, the same
   state at width 0 and at 200; with the top-level format `$percent $bar` and a threshold at 90
   giving `$percent`, `fills` answers true at 89 and false at 90, and at 90 the width-0 text equals
@@ -294,7 +294,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   label and gap and its composed choice) turns A56's (a) and (c) red, M23 (4.2) turns A56 (d)'s busy
   half red, and `pnpm test` is green with no pre-existing expectation moved.
 
-- [ ] 2.4 The drawing takes the reading and the fill it is handed. **Test first:** flip the
+- [x] 2.4 The drawing takes the reading and the fill it is handed. **Test first:** flip the
   strict-edge expectations at `tests/format.test.ts:147-153` to `warning` at exactly 70 and `error`
   at exactly 90 and run them red against today's `bar.ts`, which gives `accent` at exactly 70
   (A22); and retitle the test at `tests/format.test.ts:147` to name the inclusive rule ("the default
@@ -322,7 +322,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   clean, M1 (`drawBar` ignoring its fill) turns A21 red, and M7 (`resolveFormat` reading the
   declaration's `bar`) turns A50 red.
 
-- [ ] 2.5 Jefferson's own settings path accepts and applies a list and a fill. **Test first:**
+- [x] 2.5 Jefferson's own settings path accepts and applies a list and a fill. **Test first:**
   A23–A30, A34, A51 and A58 — a threshold's format and fill in force at 70 and the top level's at 50 (A23);
   one threshold at 90 leaving no default colour at 75, and `[]` colouring nothing at 95 (A24); at
   exactly 70 the fill is `warning`, at exactly 90 `error`, below 70 the style's own, and the text
@@ -386,7 +386,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   A23–A30, A34, A51 and A58 pass, M21 (4.2) turns A58 red, M8 (4.2) makes A29's `reported` list hold
   two, and `pnpm test` is green.
 
-- [ ] 2.6 A fault names its place. **Test first:** A31–A33 and A36 — the `fill` fault at position 5
+- [x] 2.6 A fault names its place. **Test first:** A31–A33 and A36 — the `fill` fault at position 5
   above 100, the parse fault at position 5 past the fourth and the parse fault at position 2 written
   after 90, each rejecting at its written position (A31); `"width": 5` and a nested `thresholds`
   both refused through the unknown-option rule, asserting the whole sentences `instrument "context",
@@ -413,14 +413,14 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   parse" (A31). **Done when:** A31–A33, A35 and A36 pass, M9 (a `fill` fault's sentence naming the
   key alone) turns A36 red, and `pnpm test` is green.
 
-- [ ] 2.7 The pins for the new file hold, re-run with no code. **Test first:** none — `pinned` in
+- [x] 2.7 The pins for the new file hold, re-run with no code. **Test first:** none — `pinned` in
   `tests/jefferson.test.ts` gained its `thresholds.ts` entry with the key set `### Contracts` states
   at 1.1, and `instrument.ts`'s entry gained `BAR_OPTIONS` at 2.1, so both are green by here.
   **Code:** none. **Boundary cases:** none. **Proves:** P2 (`bar.ts` still `["drawBar"]`, with
   `thresholds.ts` and `BAR_OPTIONS` pinned at 1.1 and 2.1) and P1 (the geometry cases at `:524-538`
   and `:685-727` unedited). **Done when:** P2 and P1 pass.
 
-- [ ] 2.8 `pnpm typecheck` and `pnpm test` green, with every pre-existing case unedited except the
+- [x] 2.8 `pnpm typecheck` and `pnpm test` green, with every pre-existing case unedited except the
   strict-edge pair flipped and retitled at 2.4 and the five expectations `### Contracts` names,
   which move with `validateStyle`'s sentences at 2.6.
 
