@@ -3,45 +3,46 @@
   "lens": "council-zoom-out",
   "paraphrase_proposes": "",
   "paraphrase_existing": "",
-  "recommendation": "Pass on scope, reuse, and responsibility placement, with one minor altitude cleanup: move test-helper implementation recipes out of design.md. The prior sample-ownership and thresholds-only provider findings are resolved without introducing extra architectural layers.",
+  "recommendation": "Pass on scope, reuse and responsibility placement, with one minor documentation-altitude finding. Review fixes introduce no unnecessary architectural layer: the shared binding owns sample outcomes, the pure threshold module owns threshold rules, and existing formatting, drawing and fault delivery remain in their established modules.",
   "findings": [
     {
       "id": "ZO4-1",
       "severity": "minor",
-      "location": "openspec/changes/bar-thresholds/design.md:115-116, Module & File Placement / Modified, tests/format.test.ts and tests/instrument.test.ts rows",
-      "finding": "The test file map drops from design-level responsibilities into helper implementation: it supplies the exact instrumentBindings(...).render(...) expression, per-call construction mechanics, argument preservation instructions, and an inventory of direct call sites.",
-      "rationale": "Zoom Out Standard §4 reserves helper internals for tasks or implementation. The architectural decision is simply that bar tests must exercise the real binding so defaults reach the visual through the production path. The exact helper expression and call-site editing checklist add maintenance detail without changing that boundary or contract.",
-      "concrete_case": "An implementer updating the rendered helper in tests/format.test.ts is instructed by design.md to use a specific nested constructor expression and preserve individually enumerated call arguments. A harmless helper refactor would make this high-level design stale even though the binding-to-visual contract and test coverage remain unchanged.",
-      "recommendation": "Keep the requirements to route bar tests through real binding, preserve existing geometry/blanking expectations, and flip the exact 70/90 assertions. Move the constructor expression, helper lifecycle recipe, direct-call inventory, and measured test counts into tasks.md or implementation notes."
+      "location": "openspec/changes/bar-thresholds/design.md:115-116 — Module & File Placement, tests/format.test.ts and tests/instrument.test.ts rows",
+      "finding": "The file map drops from design contracts into test-helper implementation recipes, including the exact instrumentBindings(...).render(...) expression, fresh-per-call construction, argument-preservation instructions, inventories of individual direct calls, and measured 89-of-89 and 39-of-39 test counts.",
+      "rationale": "Zoom Out Standard §4 places helper internals outside design.md. Routing existing bar tests through the real binding is necessary because the defaults and bar reading move there, but the concrete helper expression and call-site migration inventory do not establish an additional boundary or responsibility. Keeping them in the design duplicates implementation guidance and makes routine test refactoring require design maintenance.",
+      "concrete_case": "When implementing the moved default-threshold path, the reader encounters a prescribed helper body and an inventory of resolveFormat calls rather than just the requirement that bar tests exercise the real binding. An equivalent helper refactoring or added direct format test would stale this inventory without changing the architecture or its guarantees.",
+      "recommendation": "Keep the requirement that bar tests use the real binding, preserve geometry and blanking expectations, and flip the inclusive 70/90 assertions. Move helper-construction recipes, individual call-site migration instructions and measured test counts into tasks.md or supporting research."
     }
   ],
   "assumptions": [
     {
-      "assumption": "The earlier repeated-placement ownership finding is resolved by one sample outcome owned by the shared name-bound instrument, while the row retains only per-cell text memoization.",
+      "assumption": "A new pure extensions/jefferson/thresholds.ts has a justified domain-rule responsibility in the existing flat shared-module layout: configuration and binding both need its rules, and its dependencies point inward rather than importing either caller.",
       "status": "verified"
     },
     {
-      "assumption": "The earlier thresholds-only provider contradiction is resolved: the statusline scenario now explicitly removes default colours when a configured label-only list replaces the defaults.",
+      "assumption": "The Stage 1 sample-ownership gap is resolved by DEC-6 placing one sample outcome in the existing name-bound instrument shared across placements, while row-renderer retains only its per-cell text memo.",
       "status": "verified"
     },
     {
-      "assumption": "The new pure thresholds.ts has a justified domain-rule responsibility in this repository's existing flat shared-module layout; configuration and binding depend inward on it, and it imports neither.",
+      "assumption": "The thresholds-only provider scenario now replaces default colours when a configured list is supplied, so it requires no provider-specific second colour-selection path.",
       "status": "verified"
     },
     {
-      "assumption": "Existing format parsing, style validation, whole-instrument binding, provider containment, and fault-ledger delivery provide the reusable mechanisms needed; no additional framework, dependency, notification subsystem, or persistence layer is proposed.",
+      "assumption": "Existing parseFormat, validateStyle, full instrument binding and the standalone drawBar path supply the mechanisms this feature needs without a new validation framework, rendering framework or dependency.",
       "status": "verified"
     },
     {
-      "assumption": "The per-sample slot and bind-time topLevelFills contract address required sample consistency and provider-failure geometry rather than speculative caching or a general state-machine abstraction.",
+      "assumption": "The existing configuration report/watch paths and fault ledger supply warning delivery and per-instrument/session deduplication without a new notification subsystem; the design adds no persistence layer.",
       "status": "verified"
     }
   ],
   "owner_questions": [],
   "not_checked": [
-    "No files were edited and no tests, typechecking, or OpenSpec validation were executed.",
-    "No historical design snapshot or textual diff was available through the read-only tools; review-stage changes were assessed against the recorded Stage 1 and Stage 2 findings and the current artifacts.",
-    "External platform claims and reported test pass counts were not independently executed or revalidated.",
-    "Deferred documentation work was not treated as a feature blocker, consistent with the settled design brief."
+    "No files were edited and no tests, typechecking or OpenSpec validation were run.",
+    "Stage-to-stage changes were assessed using the recorded Stage 1 review and review synthesis against the current design, not a historical version-control diff.",
+    "Implementation readiness and tasks.md completeness were not evaluated.",
+    "External platform documentation and the reported experimental test counts were not independently revalidated.",
+    "Documentation hand-off work was not treated as a feature blocker, consistent with the recorded owner ruling."
   ]
 }
