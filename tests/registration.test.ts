@@ -2432,8 +2432,6 @@ test("A38 a provider that names thresholds alone applies a label and no default 
   const session = await usageDocument(t, { label: "S:", format: "$saved $bar", thresholds: [{ activeAt: 50, label: "hot" }] },
     usageProvider(["thresholds"], () => 75)).providerFirst();
   assert.ok(line(session).includes("hot $4.10"), line(session));
-  assert.ok(rawLine(session).includes(theme.getFgAnsi("accent")) || !rawLine(session).includes(theme.getFgAnsi("warning")),
-    "no default colour reaches the fill");
   assert.equal(rawLine(session).includes(theme.getFgAnsi("warning")), false,
     "a configured list replaces the defaults whole, whether or not the provider names fill");
   // A bar below zero sits below every threshold, so the top level renders and its own label stands.

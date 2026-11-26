@@ -106,9 +106,10 @@ test("A8 a fifth threshold is still checked, and its refusal answers at position
 });
 
 test("A9 every threshold is checked in written order, so the first refusal met ends the read", () => {
+  // Both are refused, so the answer names whichever the walk reached first: sorting first would
+  // answer `cold`, and the reading's position would name it.
   const written = [{ activeAt: 90, label: "hot" }, { activeAt: 10, label: "cold" }];
-  const answer = readThresholds<Settings, string>(written, SUBJECT, settings =>
-    settings.label === "hot" ? { refused: "hot" } : { settings });
+  const answer = readThresholds<Settings, string>(written, SUBJECT, settings => ({ refused: String(settings.label) }));
   assert.deepEqual(answer, { refused: "hot", position: 1 }, "the first written, though the other sorts first");
 });
 

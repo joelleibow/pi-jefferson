@@ -612,8 +612,8 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   A mutation that stays green means the check proves less than its row claims: report it in the
   change's notes rather than weakening or deleting the check.
 
-- [x] 4.3 `pnpm typecheck` and `pnpm test` green. Derek's copy of the finished change read 628 tests
-  and a clean typecheck against a base of 578.
+- [x] 4.3 `pnpm typecheck` and `pnpm test` green. The finished change reads 648 tests and a clean
+  typecheck against a base of 578; `openspec validate bar-thresholds --strict` reports it valid.
 
 ## 5. Joel's live observation
 
