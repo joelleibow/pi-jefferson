@@ -1,7 +1,7 @@
 # 20. Only a variable the format names can blank an instrument
 
 Date: 2026-11-16
-Status: Accepted. Retires the statusline rule that an unknown declared datum blanks the cell whatever the format is, and it overrules council ruling M18.
+Status: Accepted. Retires the statusline rule that an unknown declared datum blanks the cell whatever the format is, and it overrules council ruling M18. One sentence of its Decision is amended by [ADR 0022](0022-a-threshold-applies-at-its-own-percentage.md): blanking is judged against the format of the state in force, so `$bar` blanks the instrument when that format names it and a threshold's format that drops the bar renders, the state having been chosen first. The rule that only a variable the format names can blank an instrument stays in force. The ruling is Joel's of 2026-11-25, recorded in `openspec/changes/bar-thresholds/owner-rulings.md`, and the decision is that change's `design.md` (DEC-10, DEC-15).
 
 ## Context
 

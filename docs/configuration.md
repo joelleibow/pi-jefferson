@@ -73,7 +73,7 @@ One warning lists every row and name, in row order, joined with `; `. A name wri
 
 By default an instrument takes the columns its text needs, so its neighbours sit against it.
 
-An instrument that fills takes the columns the row leaves instead. `blank` fills, and so does any instrument whose format holds `$bar`. An instrument from another extension may also fill. Instruments that fill share the spare columns, and the earliest takes any odd one.
+An instrument that fills takes the columns the row leaves instead. `blank` fills, and so does an instrument whose format in force holds `$bar`, which is the format of the threshold that applies at the bar's current percentage. A threshold that adds or drops `$bar` therefore starts or ends the fill at its own number, and the row reflows there ([Thresholds and the fill](#thresholds-and-the-fill)). An instrument from another extension may also fill. Instruments that fill share the spare columns, and the earliest takes any odd one.
 
 When no instrument fills, the spare columns go to the last left-aligned instrument that has text. If no left-aligned instrument has text, they go to the first instrument that has text, or else to the first instrument, even when it has no text. An instrument with no text, because its data is unknown, takes no columns.
 
@@ -113,6 +113,58 @@ A key for an instrument that never registers draws no warning, whatever it holds
 
 An instrument the block does not configure renders its defaults.
 
+### Thresholds and the fill
+
+`context` draws a bar, so it takes two options the other instruments do not: `fill` and `thresholds`. An instrument from another extension takes them when its extension offers them ([Provide instruments from your extension](extension-authors.md#thresholds-and-fill)).
+
+`fill` styles the bar's filled part and nothing else. It takes `style`'s shape, so it carries `fg`, `bg` and the six boolean attributes. `style` still covers the whole instrument, `fill` overrides the keys it names on the filled part, and the unfilled track takes `style` plus `dim` whatever the fill says.
+
+```json
+{
+  "rows": [[{ "instrument": "context" }]],
+  "instruments": {
+    "context": { "format": "$percent $bar", "fill": { "fg": "accent" } }
+  }
+}
+```
+
+`thresholds` is a list. Each threshold carries an integer `activeAt` and any option the instrument takes, `thresholds` excepted, so a threshold can set a `format`, a `label`, a `style`, a `fill`, or one kind of a composed `formats`. The threshold with the highest `activeAt` at or below the bar's reading sets the instrument's state for that render, and the top-level settings apply when none does.
+
+```json
+{
+  "rows": [[{ "instrument": "context" }]],
+  "instruments": {
+    "context": {
+      "format": "$percent $bar",
+      "thresholds": [
+        { "activeAt": 50, "fill": { "fg": "accent" } },
+        { "activeAt": 80, "label": "Tight:", "format": "$percent/$window $bar", "fill": { "fg": "error" } }
+      ]
+    }
+  }
+}
+```
+
+A threshold applies at its own percentage, so the threshold at 50 applies at exactly 50% and above. The percentage compared is the bar's own reading, not the rounded text `$percent` prints, so a reading of 69.99 does not reach a threshold at 70 although `$percent` shows `70.0%`. A bar whose usage the host has not reported counts as 0, so a threshold at 0 applies while nothing is known.
+
+A threshold depends on the top level and on no other threshold. A key it leaves out comes from the top-level settings, or else from the instrument's default. `style`, `fill` and `formats` layer key by key, a `formats` kind included, so a threshold that sets one kind keeps the top level's others; a `format` and a `label` replace whole.
+
+The state decides how the instrument is sized, so a threshold whose format adds or drops `$bar` reflows the row at that percentage. A threshold's `format` and `label` reach their own text and their own gap, and a threshold that changes a composed `formats` changes that kind's text alone.
+
+With no `thresholds` written, two defaults colour the filled part: the theme's `warning` from 70% and its `error` from 90%. They are thresholds like any other, so they layer on your top-level `fill` and change no other key, and they reach every instrument that draws a bar, wherever it comes from. A list of your own replaces them whole, and `"thresholds": []` sets none, so nothing colours the fill at any percentage.
+
+At most four thresholds decide the state. More than four load with one warning, and the four lowest `activeAt` values apply:
+
+```
+pi-jefferson: instrument "context" defines 5 thresholds, more than the maximum of 4; those beyond the 4 lowest are ignored
+```
+
+A threshold above 100 applies at no percentage, and it drops without a warning. Every threshold is checked, honoured or not, so one written past the fourth, or above 100, rejects the file when it is malformed.
+
+`activeAt` must be a whole number at or above 0, and two thresholds must not share one. A malformed threshold rejects the configuration file, and so do a `thresholds` value that is not a list, a threshold that is not an object, and a key inside a threshold that the instrument does not take.
+
+`format`, `label` and `style` are the options every instrument takes. An instrument that cannot draw a bar takes neither of these two, so a `fill` or a `thresholds` written for one rejects the configuration file.
+
 ### An extension's instrument
 
 Jefferson checks the settings of an instrument from another extension once it has both the configuration file and that instrument's registration, whichever arrives second. A fault refuses that instrument alone: it renders as `blank` wherever a row names it, and one warning names it and the fault. The rest of the configuration file renders as configured.
@@ -128,12 +180,20 @@ Jefferson reports the first fault it finds, once per session, after startup comp
 | A format naming a variable the instrument does not have | `pi-jefferson: "taiknr.savings" is configured with a format naming "$spent", which the instrument does not declare; it renders blank` |
 | Any other format Jefferson cannot use | `pi-jefferson: "taiknr.savings"'s format names neither a modifier Jefferson implements nor a foreground colour of the theme: "\|acccent"; it renders blank` |
 | A style Jefferson cannot use | `pi-jefferson: "taiknr.savings" is configured with a style Jefferson cannot use; it renders blank` |
+| A fill Jefferson cannot use | `pi-jefferson: "taiknr.savings" is configured with a fill Jefferson cannot use; it renders blank` |
+| `thresholds` that is not a list | `pi-jefferson: "taiknr.savings" is configured with thresholds that is not a list; it renders blank` |
+| A threshold that is not an object | `pi-jefferson: "taiknr.savings", thresholds 2: is not an object; it renders blank` |
+| An `activeAt` that is missing, not whole or negative | `pi-jefferson: "taiknr.savings", thresholds 1: has an activeAt that is not a whole number at or above 0; it renders blank` |
+| Two thresholds at one number | `pi-jefferson: "taiknr.savings", thresholds 3: repeats the threshold at 70; it renders blank` |
+| A key inside a threshold that the instrument does not take | `pi-jefferson: "taiknr.savings", thresholds 1: is configured with "width", which the instrument does not declare; it renders blank` |
 | `formats` that is not an object | `pi-jefferson: "taiknr.savings" is configured with formats that is not an object; it renders blank` |
 | A kind the instrument does not have | `pi-jefferson: "taiknr.savings" is configured with a formats kind "sleepy", which the instrument does not carry; it renders blank` |
 | A kind whose text is not a string | `pi-jefferson: "taiknr.savings" is configured with a formats kind "busy" whose format is not a string; it renders blank` |
 | A kind whose text Jefferson cannot parse | `pi-jefferson: "taiknr.savings" is configured with a formats kind "busy" whose format Jefferson cannot parse; it renders blank` |
 
 When several warnings are due at once, they print as one line, joined with `; `. A configuration file that is rejected for another reason reports none of these.
+
+A fault inside a threshold names its place: the instrument, the key `thresholds` and the threshold's position in the list as you wrote it, counted from 1. The threshold written third reads `thresholds 3:`, whether or not one before it applies at any percentage. A fault in a `fill` names `fill` and never `style`.
 
 ## What a rejected configuration file renders
 
@@ -169,7 +229,8 @@ These faults reject the configuration file:
 - `instrument` is not a non-empty string.
 - `align` is not `left`, `right` or `center`.
 - `rowGap` is not a whole number from 0 to 3.
-- One of Jefferson's instruments is configured with a `format` or a `label` that is not a string, an option it does not take, a format Jefferson cannot parse, a style Jefferson cannot use, `seconds` outside 1 to 60, or a `formats` kind it cannot use.
+- One of Jefferson's instruments is configured with a `format` or a `label` that is not a string, an option it does not take, a format Jefferson cannot parse, a style or a `fill` Jefferson cannot use, `seconds` outside 1 to 60, or a `formats` kind it cannot use.
+- One of Jefferson's instruments is configured with a `thresholds` value that is malformed: not a list, a threshold that is not an object, an `activeAt` that is missing or not a whole number at or above 0, two thresholds at one number, or a key inside a threshold that the instrument does not take.
 - The `instruments` block configures one registered instrument under two spellings.
 
 A file that is not valid JSON renders the default row too, and its warning says the file could not be read or parsed.

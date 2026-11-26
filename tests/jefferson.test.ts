@@ -258,7 +258,8 @@ test("every shipped file's exported keys are pinned, and registration is the onl
     ["../extensions/jefferson/registration-listener.ts", ["createRegistrationListener"]],
     ["../extensions/jefferson/footer-setup.ts", ["installFooter"]],
     ["../extensions/jefferson/startup.ts", ["startUp"]],
-    ["../extensions/jefferson/components/instruments/instrument.ts", ["DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
+    ["../extensions/jefferson/components/instruments/instrument.ts",
+      ["BAR_OPTIONS", "DEFAULT_CELL_TEXT", "FOUNDATIONAL_OPTIONS"]],
     ["../extensions/jefferson/components/instruments/compact-count.ts", ["compactCount"]],
     ["../extensions/jefferson/components/instruments/blank.ts", ["blank"]],
     ["../extensions/jefferson/components/instruments/model.ts", ["model"]],
@@ -274,6 +275,7 @@ test("every shipped file's exported keys are pinned, and registration is the onl
     ["../extensions/jefferson/shipped.ts", ["FALLBACK", "NOTICE_GATE", "SHIPPED"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
     ["../extensions/jefferson/components/visuals/timed.ts", ["timed"]],
+    ["../extensions/jefferson/thresholds.ts", ["DEFAULT_THRESHOLDS", "layerThreshold", "readThresholds", "stateAt"]],
   ];
   const pinnedModules = new Map<string, Record<string, unknown>>();
   for (const [path, expected] of pinned) {
@@ -300,6 +302,30 @@ test("the contract and field-value strip to nothing", () => {
   const root = join(import.meta.dirname, "..", "extensions", "jefferson");
   for (const path of [join(root, "instrument-contract.ts"), join(root, "data", "field-value.ts")]) {
     assert.equal(stripTypeScriptTypes(readFileSync(path, "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").trim(), "", path);
+  }
+});
+
+/** Every import specifier a source file writes: `from "…"`, `import("…")` and bare `import "…"`. */
+function importSpecifiers(source: string): string[] {
+  return [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)"([^"]+)"/g)].map(match => match[1]!);
+}
+
+test("A60 a visual and the threshold reader import nothing of this package", () => {
+  // The bar is a visual another file mixes in, and the reader is the innermost rule in the change:
+  // each must depend on the platform alone, so neither can reach a row, a host or a settings path
+  // (ADR 0009; design DEC-1, DEC-3). The check reads the files rather than their exports, because a
+  // relative import is what would couple them.
+  const root = join(import.meta.dirname, "..", "extensions", "jefferson");
+  const visuals = join(root, "components", "visuals");
+  const files = [
+    ...readdirSync(visuals).filter(name => name.endsWith(".ts")).map(name => join(visuals, name)),
+    join(root, "thresholds.ts"),
+  ];
+  assert.ok(files.length > 2, "the visuals and the reader are the files read");
+  for (const path of files) {
+    for (const specifier of importSpecifiers(readFileSync(path, "utf8"))) {
+      assert.equal(specifier.startsWith("."), false, `${path} imports ${specifier}`);
+    }
   }
 });
 
@@ -544,7 +570,7 @@ test("a rejected style warns with its exact envelope and installs the default fo
   const agentDir = useTempAgentDir(t);
   writeAgentDocument(agentDir, { instruments: { model: { style: { fg: "nope" } } }, rows: [[{ instrument: "model" }]] });
   const session = await harness().start({ model: { provider: "anthropic", id: "claude-opus-4" } });
-  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has an fg that is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
+  assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${join(agentDir, "pi-jefferson.json")} was rejected (instrument "model" has a style whose fg is neither a foreground-slot theme token nor a color pi's parser accepts: "nope"); rendering the default row`, type: "warning" }]);
   const lines = session.lines(80);
   assert.equal(lines.length, 1, "the default row renders as one line");
   assert.equal(stripTerminalSequences(lines[0] ?? ""), stripTerminalSequences(truncateToWidth(DEFAULT_CELL_TEXT, 8)).repeat(10));

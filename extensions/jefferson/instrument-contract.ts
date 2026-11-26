@@ -46,7 +46,7 @@ export type ContractDeclaration<R> = {
   variableFg?: Readonly<Record<string, (value: string) => string | undefined>>;
   composed?: ComposedFormat<R>;
   /** The options a user may configure beyond format, style and label. */
-  options?: readonly "formats"[];
+  options?: readonly ("formats" | "thresholds" | "fill")[];
 };
 
 /** A provided instrument's declaration: the contract's declaration over the provider's view. */

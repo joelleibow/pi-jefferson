@@ -180,10 +180,14 @@ export function foregroundCheck(theme: Theme): ForegroundCheck {
   };
 }
 
-export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
+/**
+ * Validate one style-shaped option and answer it as the theme styles it. The option's name is the
+ * caller's, so a `fill` fault names `fill` and never "style" (design DEC-14).
+ */
+export function validateStyle(raw: unknown, theme: Theme, option: "style" | "fill" = "style"): ThemeStyle {
   if (raw === undefined) return {};
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error("has a style that is not an object");
+    throw new Error(`has a ${option} that is not an object`);
   }
   const isForeground = foregroundCheck(theme);
   /** The background half of the same question: only a style's `bg` asks it, never a `|name`. */
@@ -198,7 +202,7 @@ export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
   const validated: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!Object.hasOwn(STYLE_KEYS, key)) {
-      throw new Error(`has a style key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
+      throw new Error(`has a ${option} key that pi's ThemeStyle does not have: ${JSON.stringify(key)}`);
     }
     if (key === "fg" || key === "bg") {
       // A name of this key's own slot is kept as the name; anything else may still be a concrete
@@ -207,7 +211,7 @@ export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
         validated[key] = value;
         continue;
       }
-      const message = `has ${key === "fg" ? "an" : "a"} ${key} that is neither a ${key === "fg" ? "foreground" : "background"}-slot theme token nor a color pi's parser accepts: ${JSON.stringify(value)}`;
+      const message = `has a ${option} whose ${key} is neither a ${key === "fg" ? "foreground" : "background"}-slot theme token nor a color pi's parser accepts: ${JSON.stringify(value)}`;
       if (typeof value !== "string" && typeof value !== "number") throw new Error(message);
       try {
         validated[key] = parseColor(value);
@@ -216,7 +220,7 @@ export function validateStyle(raw: unknown, theme: Theme): ThemeStyle {
       }
     } else {
       if (typeof value !== "boolean") {
-        throw new Error(`has a style attribute that is not a boolean: ${JSON.stringify(key)}`);
+        throw new Error(`has a ${option} attribute that is not a boolean: ${JSON.stringify(key)}`);
       }
       validated[key] = value;
     }
@@ -260,6 +264,7 @@ export function resolveFormat(
   width: number,
   theme: Theme,
   preResolved?: Readonly<Record<string, string>>,
+  bar?: { readonly reading: number | null | undefined; readonly fill: ThemeStyle },
 ): string {
   // Only what the format names is resolved, so only that can blank the instrument: a declared
   // variable the format leaves out has no bearing on this render (owner-rulings.md, 2026-11-16).
@@ -292,19 +297,21 @@ export function resolveFormat(
   });
   const pieces = segments.map((segment, index) => segment.kind === "bar" ? ""
     : segment.modifiers.reduce((piece, modifier) => "mutate" in modifier ? modifier.mutate(piece) : piece, arrived[index]!));
-  let bar = "";
+  // `$bar` is a variable the format names, so its unknown blanks the instrument as any other's does.
+  // The reading and the fill are the state in force's, handed by the binding: this file asks the
+  // declaration for neither (design DEC-6, "The drawing path").
+  let drawn = "";
   if (segments.some(segment => segment.kind === "bar")) {
-    // `$bar` is a variable the format names, so its unknown blanks the instrument as any other's does.
-    const percent = declaration.bar!(readings);
+    const percent = bar?.reading;
     if (percent === undefined) return "";
     const nonBar = pieces.reduce((sum, piece) => sum + visibleWidth(piece), 0);
     const barWidth = Math.max(0, width - nonBar);
-    bar = drawBar(barWidth, percent, style)
+    drawn = drawBar(barWidth, percent, style, bar!.fill)
       .map(part => styledPiece(part.text, part.style, theme))
       .join("");
   }
   return segments.map((segment, index) => {
-    if (segment.kind === "bar") return bar;
+    if (segment.kind === "bar") return drawn;
     const merged = mergedStyle(style, segment.modifiers);
     // The format's own colour is the strongest, so the declared token is asked only for a piece the
     // format does not colour: a provider's colour function the user's format covers never runs, and

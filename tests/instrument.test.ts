@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { stripTerminalSequences } from "@earendil-works/pi-tui";
+
 import { DEFAULT_CELL_TEXT, type InstrumentDeclaration } from "../extensions/jefferson/components/instruments/instrument.ts";
 import { blank } from "../extensions/jefferson/components/instruments/blank.ts";
 import { SHIPPED } from "../extensions/jefferson/shipped.ts";
@@ -66,10 +68,17 @@ function named(name: string): InstrumentDeclaration {
   return declaration;
 }
 
+/**
+ * One render through the real binding, fresh per call: the defaults reach the bar by the binding's
+ * own path, and `label: ""` keeps the bound label out of a case that formats its own text.
+ */
 async function render(name: string, readings: Readings, format?: string): Promise<string> {
   const declaration = named(name);
-  const { parseFormat, resolveFormat } = await import("../extensions/jefferson/format.ts");
-  return resolveFormat(declaration, parseFormat(declaration, format ?? declaration.defaultFormat, fgCheck), {}, readings, 80, fakeTheme());
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const segments = parseFormat(declaration, format ?? declaration.defaultFormat, fgCheck);
+  return instrumentBindings(fgCheck, new Map([[declaration.name, { segments, style: {}, label: "" }]]))(declaration)
+    .render(readings, 80, fakeTheme());
 }
 
 test("the eleven shipped declarations own their names, variables, defaults and foundational options", () => {
@@ -79,7 +88,10 @@ test("the eleven shipped declarations own their names, variables, defaults and f
     assert.deepEqual(Object.keys(declaration.variables), variables);
     assert.equal(declaration.defaultFormat, format);
     assert.deepEqual(declaration.options.slice(0, 3), ["format", "style", "label"]);
-    assert.deepEqual(declaration.options.slice(3), name === "notice" ? ["seconds", "formats"] : []);
+    assert.deepEqual(declaration.options.slice(3), [
+      ...(name === "notice" ? ["seconds", "formats"] : []),
+      ...(declaration.bar !== undefined ? ["thresholds", "fill"] : []),
+    ], `${name}'s options beyond the foundational three follow its own bar`);
     declared[name] = declaration.defaultLabel;
     assert.equal(Object.isFrozen(declaration.options), true);
     assert.equal(typeof declaration.bar === "function", name === "context");
@@ -88,6 +100,11 @@ test("the eleven shipped declarations own their names, variables, defaults and f
   assert.equal(declarations.length, 11);
   assert.deepEqual(declared, labels, "every declaration's default label, and blank's absence");
   for (const declaration of declarations) assert.deepEqual(declaration.options.slice(0, 3), blank.options);
+  assert.deepEqual(
+    declarations.filter(declaration => declaration.bar !== undefined).map(declaration => declaration.name),
+    ["jefferson.default.context"],
+    "context is the only shipped declaration that carries a bar",
+  );
   assert.equal(shippedInstrument("blank"), blank);
 });
 
@@ -374,7 +391,7 @@ test("an instrument that does not fill renders the same text at width 0 and at w
   for (const [name] of shapes) {
     const instrument = bound(named(name));
     const atZero = instrument.render(seed, 0, theme);
-    if (instrument.fills) {
+    if (instrument.fills(seed)) {
       assert.equal(name, "blank", "blank is the only shipped default that fills");
       assert.equal(atZero, DEFAULT_CELL_TEXT, "a fill cell's text is its own, whatever the width");
       continue;
@@ -393,7 +410,7 @@ test("an instrument that does not fill renders the same text at width 0 and at w
     [named("context").name, { segments: parseFormat(named("context"), "$percent $bar", fgCheck), style: {} }],
   ]));
   const bar = configured(named("context"));
-  assert.equal(bar.fills, true, "a format holding $bar fills");
+  assert.equal(bar.fills(seed), true, "a format holding $bar fills");
   assert.notEqual(bar.render(seed, 0, theme), bar.render(seed, 200, theme), "and it is the one whose text the width changes");
 });
 
@@ -422,7 +439,7 @@ test("the notice's default text is its kind's, in the warning colour, and nothin
     assert.equal(bound.render(shown, 0, theme), bound.render(shown, 200, theme), "the width cannot change the text");
   }
   assert.equal(bound.render(seed, 80, theme), "", "no notice, no label and no gap");
-  assert.equal(bound.fills, false);
+  assert.equal(bound.fills(seed), false);
 });
 
 test("a notice's format colour beats warning while its text and columns are unchanged", async () => {
@@ -531,4 +548,198 @@ test("a configured kind's format renders the user's words around the declared va
   const shown: Readings = { ...seed, notice: { kind: "miss", values: { tokens: "125k", cost: " (~$0.38)" }, shownUntil: 1 } };
   assert.equal((await import("@earendil-works/pi-tui")).stripTerminalSequences(bound.render(shown, 80, fakeTheme())),
     "Notice: Spent 125k, paid (~$0.38)");
+});
+
+test("every shipped declaration that can draw a bar declares the two options, and none else does", () => {
+  // The invariant is derived from each declaration's own `bar`, so the next bar-capable instrument
+  // joins by declaration and no hand-kept list exists (statusline, "A shipped instrument with a bar").
+  for (const declaration of SHIPPED) {
+    const bar = declaration.bar !== undefined;
+    assert.equal(declaration.options.includes("thresholds"), bar, `${declaration.name} and thresholds`);
+    assert.equal(declaration.options.includes("fill"), bar, `${declaration.name} and fill`);
+  }
+});
+
+/** The reading a percentage makes, in the form every instrument test samples. */
+function pressured(percent: number): Readings {
+  return { ...seed, contextUsage: { tokens: 86400, percent, contextWindow: 200000 } };
+}
+
+test("A48 a threshold's format decides whether the instrument fills, at any width", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("context");
+  const segments = (format: string) => parseFormat(declaration, format, fgCheck);
+
+  const adding = instrumentBindings(fgCheck, new Map([[declaration.name, {
+    segments: segments("$percent"), style: {},
+    thresholds: [{ activeAt: 70, settings: { segments: segments("$percent $bar") } }],
+  }]]))(declaration);
+  assert.equal(adding.fills(pressured(69.9)), false, "below 70 the instrument takes its text's width");
+  assert.equal(adding.fills(pressured(70)), true, "at 70 the state's format adds the bar");
+
+  // The state comes from the reading and never from the width: the same state is in force at both.
+  const below = pressured(69.9);
+  assert.equal(adding.render(below, 0, theme), adding.render(below, 200, theme), "no bar below 70");
+  const at = pressured(70);
+  assert.equal(stripTerminalSequences(adding.render(at, 0, theme)), "Context: 70.0% ",
+    "at width 0 the same state renders its text, the format's own space, and no bar column");
+  assert.equal(stripTerminalSequences(adding.render(at, 200, theme)).startsWith("Context: 70.0%"), true);
+
+  const hiding = instrumentBindings(fgCheck, new Map([[declaration.name, {
+    segments: segments("$percent $bar"), style: {},
+    thresholds: [{ activeAt: 90, settings: { segments: segments("$percent") } }],
+  }]]))(declaration);
+  assert.equal(hiding.fills(pressured(89)), true, "below 90 the top level's bar fills");
+  assert.equal(hiding.fills(pressured(90)), false, "at 90 the state's format drops the bar");
+  const ninety = pressured(90);
+  assert.equal(hiding.render(ninety, 0, theme), hiding.render(ninety, 200, theme), "the width cannot change it");
+});
+
+test("A49 a declared fill outlasts a state whose format drops the bar", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const stripTerminal = (await import("@earendil-works/pi-tui")).stripTerminalSequences;
+  const filler: InstrumentDeclaration = {
+    name: "filler",
+    variables: { percent: () => "95.0%" },
+    bar: () => 95,
+    fills: true,
+    defaultFormat: "$percent $bar",
+    options: Object.freeze(["format", "style", "label"]),
+  };
+  const bound = instrumentBindings(fgCheck, new Map([[filler.name, {
+    segments: parseFormat(filler, "$percent $bar", fgCheck), style: {},
+    thresholds: [{ activeAt: 90, settings: { segments: parseFormat(filler, "$percent", fgCheck) } }],
+  }]]))(filler);
+  assert.equal(bound.fills(seed), true, "a declaration that fills fills at every reading");
+  assert.equal(stripTerminal(bound.render(seed, 80, fakeTheme())), "95.0%", "and the state's format still decides the text");
+});
+
+test("A55 the bar is never read when no state can change what the format renders", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  let reads = 0;
+  const counted: InstrumentDeclaration = {
+    ...named("context"),
+    name: "counted.context",
+    bar: () => { reads++; return 75; },
+  };
+  const segments = (format: string) => parseFormat(counted, format, fgCheck);
+  const entry = (settings: object) => new Map([[counted.name, {
+    segments: segments("$percent"), style: {}, thresholds: [{ activeAt: 50, settings }],
+  }]]);
+
+  const fillOnly = instrumentBindings(fgCheck, entry({ fill: { fg: "accent" } }))(counted);
+  const sample = pressured(75);
+  fillOnly.fills(sample);
+  fillOnly.render(sample, 80, theme);
+  assert.equal(reads, 0, "a list that changes only the fill needs no reading");
+
+  reads = 0;
+  const labelled = instrumentBindings(fgCheck, entry({ label: "hot" }))(counted);
+  const hot = pressured(75);
+  labelled.fills(hot);
+  assert.equal(stripTerminalSequences(labelled.render(hot, 80, theme)), "hot 75.0%");
+  assert.equal(reads, 1, "the state changes the label, so one reading serves the sample");
+});
+
+test("A56 a bound state carries its own label, format, composed choice and kind formats", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  const declaration = named("context");
+  const segments = (format: string) => parseFormat(declaration, format, fgCheck);
+  type Honoured = NonNullable<Parameters<typeof instrumentBindings>[1]> extends ReadonlyMap<string, infer E>
+    ? E extends { thresholds?: infer T } ? T : never : never;
+  const bound = (thresholds: NonNullable<Honoured>, format = "$percent") => instrumentBindings(fgCheck,
+    new Map([[declaration.name, { segments: segments(format), style: {}, thresholds }]]))(declaration);
+
+  // (a) A state that gives an empty label renders its text alone.
+  const blanked = bound([{ activeAt: 70, settings: { label: "" } }]);
+  assert.equal(stripTerminalSequences(blanked.render(pressured(75), 80, theme)), "75.0%");
+  assert.equal(stripTerminalSequences(blanked.render(pressured(50), 80, theme)), "Context: 50.0%");
+
+  // (b) A state whose format adds the bar after a label gives the label one gap and fills the row.
+  const adding = bound([{ activeAt: 70, settings: { segments: segments("$bar") } }]);
+  const sample = pressured(75);
+  assert.equal(stripTerminalSequences(adding.render(sample, 20, theme)),
+    "Context: " + "█".repeat(8) + "░".repeat(3));
+  assert.equal(adding.fills(sample), true);
+
+  // (c) A state whose format drops the composed variable never runs the set's `select`.
+  let selects = 0;
+  const composed: InstrumentDeclaration = {
+    name: "composed.fixture",
+    variables: { state: () => undefined, other: () => "other" },
+    bar: readings => readings.contextUsage?.percent,
+    composed: { variable: "state", variables: {}, select: () => { selects++; return "busy"; }, formats: { busy: "Busy" } },
+    defaultFormat: "$state",
+    options: FreeOptions,
+  };
+  const composedBound = instrumentBindings(fgCheck, new Map([[composed.name, {
+    segments: parseFormat(composed, "$state", fgCheck), style: {},
+    thresholds: [{ activeAt: 70, settings: { segments: parseFormat(composed, "$other", fgCheck) } }],
+  }]]))(composed);
+  assert.equal(composedBound.render(pressured(75), 80, theme), "other",
+    "the threshold's format names no composed variable");
+  assert.equal(selects, 0, "so the set's select never runs");
+  assert.equal(stripTerminalSequences(composedBound.render(pressured(50), 80, theme)), "Busy");
+  assert.equal(selects, 1);
+
+  // (d) A kind a threshold leaves out is the top level's, and one it sets is its own.
+  let chosen = "busy";
+  const stateful: InstrumentDeclaration = {
+    name: "stateful.fixture",
+    variables: { state: () => undefined },
+    bar: readings => readings.contextUsage?.percent,
+    composed: {
+      variable: "state", variables: {}, select: () => chosen,
+      formats: { busy: "A", idle: "B" },
+    },
+    defaultFormat: "$state",
+    defaultLabel: "State:",
+    options: FreeOptions,
+  };
+  const statefulBound = instrumentBindings(fgCheck, new Map([[stateful.name, {
+    segments: parseFormat(stateful, "$state", fgCheck), style: {}, label: "",
+    thresholds: [{ activeAt: 70, settings: { formats: { busy: parseFormat(stateful, "C", fgCheck, true) } } }],
+  }]]))(stateful);
+  const busy = pressured(75);
+  assert.equal(statefulBound.render(busy, 80, theme), "C", "the threshold's kind text, not the top level's");
+  chosen = "idle";
+  assert.equal(statefulBound.render(pressured(75), 80, theme), "B", "a kind the threshold leaves out stays the top level's");
+});
+
+/** An empty frozen option list, for a stand-in declaration that takes no configuration. */
+const FreeOptions: readonly string[] = Object.freeze([]);
+
+test("A50 one reading a sample: every render of one sample draws the reading it first took", async () => {
+  const { instrumentBindings } = await import("../extensions/jefferson/components/instruments/instrument-binding.ts");
+  const { parseFormat } = await import("../extensions/jefferson/format.ts");
+  const theme = fakeTheme();
+  let reads = 0;
+  const counted: InstrumentDeclaration = {
+    ...named("context"),
+    name: "sample.context",
+    // The first sample's read is 40, and every later one is 90: a second read would move the bar.
+    bar: () => (++reads === 1 ? 40 : 90),
+  };
+  const bound = instrumentBindings(fgCheck, new Map([[counted.name, {
+    segments: parseFormat(counted, "$bar", fgCheck), style: {}, label: "",
+  }]]))(counted);
+  const sample = pressured(50);
+  const first = stripTerminalSequences(bound.render(sample, 10, theme));
+  assert.equal(first, "█".repeat(4) + "░".repeat(6));
+  assert.equal(stripTerminalSequences(bound.render(sample, 10, theme)), first,
+    "the same sample draws the reading it first took");
+  bound.fills(sample);
+  assert.equal(reads, 1, "one sample, one reading");
+
+  const next = pressured(50);
+  assert.equal(stripTerminalSequences(bound.render(next, 10, theme)), "█".repeat(9) + "░".repeat(1),
+    "a new sample reads again");
+  assert.equal(reads, 2);
 });

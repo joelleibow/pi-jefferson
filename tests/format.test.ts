@@ -11,6 +11,7 @@ import type { InstrumentDeclaration } from "../extensions/jefferson/components/i
 import { shippedInstrument } from "./shipped-instrument.ts";
 import { notice as noticeInstrument } from "../extensions/jefferson/components/instruments/notice.ts";
 import { createFooter } from "../extensions/jefferson/components/row/row-renderer.ts";
+import { instrumentBindings } from "../extensions/jefferson/components/instruments/instrument-binding.ts";
 import type { Readings } from "../extensions/jefferson/data/session-data-store.ts";
 import { fakeTheme } from "./fake-theme.ts";
 
@@ -31,12 +32,20 @@ function named(name: string): InstrumentDeclaration {
   return declaration;
 }
 
+/**
+ * One render through the real binding, fresh per call: the defaults and the bar's fill come from the
+ * binding's own path, and `label: ""` keeps the bound label out of a case that formats its own text.
+ */
 function rendered(name: string, format: string, options: {
   readings?: Readings; width?: number; style?: ThemeStyle; theme?: Theme;
 } = {}): string {
   const declaration = named(name);
   const theme = options.theme ?? fakeTheme();
-  return resolveFormat(declaration, parseFormat(declaration, format, foregroundCheck(theme)), options.style ?? {}, options.readings ?? seed, options.width ?? 80, theme);
+  const segments = parseFormat(declaration, format, foregroundCheck(theme));
+  const bound = instrumentBindings(foregroundCheck(theme), new Map([
+    [declaration.name, { segments, style: options.style ?? {}, label: "" }],
+  ]))(declaration);
+  return bound.render(options.readings ?? seed, options.width ?? 80, theme);
 }
 
 test("an escaped dollar is literal text, not a variable", () => {
@@ -144,9 +153,9 @@ test("bar placement styles each prose segment so trailing prose keeps its config
   assert.equal(rendered("context", "[$bar] $percent", { width: 20, style: cellStyle, theme }), expected);
 });
 
-test("bar thresholds replace only foreground above seventy and ninety", () => {
+test("the default thresholds replace only the foreground, from seventy and from ninety", () => {
   const theme = fakeTheme();
-  for (const [percent, fg, filled] of [[70, "accent", 7], [70.1, "warning", 7], [90, "warning", 9], [90.1, "error", 9]] as const) {
+  for (const [percent, fg, filled] of [[69.9, "accent", 6], [70, "warning", 7], [70.1, "warning", 7], [90, "error", 9], [90.1, "error", 9]] as const) {
     const expected = theme.style("█".repeat(filled), { ...cellStyle, fg })
       + theme.style("░".repeat(10 - filled), { ...cellStyle, dim: true });
     assert.equal(rendered("context", "$bar", { width: 10, readings: pressure(percent), style: cellStyle, theme }), expected, String(percent));
@@ -180,7 +189,7 @@ test("formats and data carrying controls keep three clipped footer rows at one l
   const declaration = named("model");
   const segments = parseFormat(declaration, "L\n$model", fgCheck);
   let readings = { ...seed, model: "a\r\t\x1bb" };
-  const instrument = { fills: false, render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
+  const instrument = { fills: () => false, render: (r: Readings, width: number, theme: Theme) => resolveFormat(declaration, segments, {}, r, width, theme) };
   const footer = createFooter([0, 1, 2].map(index => ({ distribution: "equal" as const, cells: [{ name: "jefferson.default.model", holder: { current: instrument }, align: "left" }] })), () => readings, fakeTheme(), 1);
   const lines = footer.render(6);
   assert.equal(lines.length, 5, "three rows, an empty line between each pair");
@@ -243,8 +252,8 @@ test("style validation rejects wrong slots and invalid values at its own boundar
 });
 
 for (const [key, message] of [
-  ["fg", 'has an fg that is neither a foreground-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
-  ["bg", 'has a bg that is neither a background-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
+  ["fg", 'has a style whose fg is neither a foreground-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
+  ["bg", 'has a style whose bg is neither a background-slot theme token nor a color pi\'s parser accepts: ["#bf5700"]'],
 ] as const) {
   test(`style validation rejects an array-valued ${key} with its exact fragment`, () => {
     assert.throws(() => validateStyle({ [key]: ["#bf5700"] }, fakeTheme()), { message });
@@ -686,4 +695,16 @@ test("the pre-resolved value wins over the declaration's resolver", () => {
     "the declaration's own resolver yields nothing");
   assert.equal(resolveFormat(noticeInstrument, segments, {}, shown, 80, theme, { notice: "Cache miss: 20k" }),
     theme.style("Cache miss: 20k", { fg: "warning" }), "the composed text takes the cell's warning colour");
+});
+
+test("A21 the drawing applies the fill it is handed unchanged, and chooses no colour", async () => {
+  const { drawBar } = await import("../extensions/jefferson/components/visuals/bar.ts");
+  const style: ThemeStyle = { bold: true };
+  const fill: ThemeStyle = { fg: "accent", bg: "selectedBg" };
+  for (const percent of [0, 25, 50, 69.9, 70, 90, 100, null] as const) {
+    const [filled, track] = drawBar(10, percent, style, fill);
+    assert.deepEqual(filled.style, { ...style, ...fill }, String(percent));
+    assert.deepEqual(track.style, { ...style, dim: true }, "the fill never reaches the track");
+  }
+  assert.deepEqual(drawBar(10, 50, style, {})[0].style, style, "an empty fill is the style it was handed");
 });

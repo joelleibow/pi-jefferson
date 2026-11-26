@@ -1,0 +1,28 @@
+schema: marbleization
+created: 2026-11-25
+x-marbleization:
+  working_dir_state: existing_project
+  runs:
+    chidi: 241bb4a9-0086-48ab-92d0-f541fe68a4c1
+    eleanor: 8ac0625e-da2a-459d-9edd-db85d859ddfe
+    michael: 8c7d2556-714e-4d09-94b5-f87762be5cb9
+  gates:
+    council_owner: approved
+    design: approved
+    tasks: approved
+    implement: approved
+    validate: approved
+  progress:
+    - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
+    - "2026-11-25: Research done (Chidi, Eleanor). Michael orientation 433c0392: one question for Joel (Q1: does a threshold style replace or layer on the top-level style; Michael recommends layer). Also notes strict > copied pi 1.4.0 footer; Joel's >= ruling outranks it, ADR to record."
+    - "2026-11-25: Joel answered Q1: \"replaces only the keys it names\" (layer key by key), added to owner-rulings.md. Launched plan-1.js: proposal+specs, 7-lens council, Michael rulings, council.md."
+    - "2026-11-25: proposal/specs (Bambadjan 039d8ccc), council 7 lenses, Michael rulings 8c7d2556 (29 rows, all settled), council.md + revisions (0d6d2e0e). Owner decisions: none. Launched plan-2.js: design, design review 1-4, design-review.md, Derek red/green, gaps, tasks, Stage 5."
+    - "2026-11-25: plan-2 d564fbf4 ran design, DR stages 1-4, design-review.md, Derek red/green c096c4a4, gaps, tasks, Stage 5 r1-r2. Conductor clean-check bug (finding ids prefixed council-<lens>- were not matched to severities) counted rounds clean that were not. Recomputed: DR Stage 3 r1 (11 findings, 5 major fixed), r2 (critic refused, no report), r3 (6, 2 major fixed), r4 (3, 2 major fixed): zero clean rounds after 4 of 5; cap cannot be met. Stage 5 r1 (9 major fixed), r2 (3 major fixed): not clean, 3 rounds left. design gate NOT approved. Escalated to Joel: raise the Stage 3 cap or not."
+    - "2026-11-25: Joel: \"go 8 if need be\" (Stage 3 cap raised to 8 rounds). plan-3.js: Stage 3 r5-r8 with fixed clean check, Stage 4, tasks sync, Stage 5 r3-r5."
+    - "2026-11-25: plan-4 41acca71: DR Stage 3 converged (r5 clean, r6 zero findings); Stage 4 one minor (ZO4-1, carried). design gate approved. tasks sync: no change. Stage 5 r3 10 findings (not clean), r4 10 (not clean), r5 7 (clean, streak 1); cap 5 reached one clean round short. Asking Joel to extend Stage 5."
+    - "2026-11-25: Joel: \"Yeah, give it two more and then move on.\" plan-5.js: Stage 5 r6-r7 (streak carried at 1), then Implement (Derek) and Michael verdict loop up to 3."
+    - "2026-11-25: plan-5 cde067f5: Stage 5 r6 clean (streak 2, converged; 5 minor fixes). Derek 9ad5f3ca implemented groups 1-4 (4 commits, 647 pass). Michael verdict r1 failed to launch: retained session root removed by retention. plan-6: fresh Michael seeded with his own prior artifacts, then verdict loop."
+    - "2026-11-25: Joel to bed: \"get us through it and get us to implementation. we can wrap up after Thanksgiving\". Michael verdict r1 fe437ca3 changes_requested (3 must_change incl. two own-path warning sentences regressed). Derek resume failed (session cleared). plan-7: fresh Derek fix + fresh Michael verdict up to 3 rounds, then docs pass."
+    - "2026-11-26: Derek fix 43e3bfff (7 items, 2 commits); Michael verdict r2 63447f2d approve (648 pass). Docs pass 0443e15b: ADR 0022, status lines in ADR 0007/0009/0020, ARCHITECTURE, AGENTS, docs/*. Pushed; PR opened; Judge Gen validate launched."
+    - "2026-11-26: PR #26. Judge Gen verify f3bc2f39 (26/26 covered, 3 suggestions) and PR review 0711e9af (no must-fix). Michael validate bd065e65 approve with 4 minor required changes. validate-2: Derek applies, Michael confirms."
+    - "2026-11-26: Derek cb75480a applied the 4 Validate fixes (c4d397a, pushed; 648 pass). Michael validate r2 1f84514c approve. Waiting on Joel live check (task 5.1) after Thanksgiving, then archive (fix ADR 0022/0007/0009/0020 paths to the archive folder) and merge."

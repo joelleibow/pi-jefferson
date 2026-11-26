@@ -78,7 +78,7 @@ export const registration: Registration<"sample-provider"> = {
         },
         formats: { busy: "Saving $saved", idle: "Idle" },
       },
-      options: ["formats"],
+      options: ["formats", "thresholds", "fill"],
       defaultFormat: "$state $bar",
     },
   ],

@@ -141,7 +141,7 @@ An instrument can carry anything Jefferson's own instruments use. Each of these 
 | `fills` | Whether the instrument takes the row's spare columns. |
 | `variableFg` | A foreground colour for a variable, chosen from its text. |
 | `composed` | A set of formats, one per kind, chosen from your fields. |
-| `options` | `["formats"]`, which lets the user rewrite each kind's text. |
+| `options` | What the user may configure beyond `format`, `label` and `style`: `"formats"` for each kind's text, and `"thresholds"` or `"fill"` for an instrument that carries a `bar`. |
 
 This instrument uses all six:
 
@@ -215,13 +215,15 @@ A form is read before the theme's colours, so a form called `accent` still rende
 
 - A number fills that share of the bar. Below 0 the bar is empty, and above 100 it is full.
 - `null` draws the bar's track unfilled.
-- `undefined` means no value, so an instrument whose format names `$bar` renders nothing.
+- `undefined` means no value, so an instrument whose format in force names `$bar` renders nothing.
 
-The user places `$bar` anywhere in the format, and it takes the width the rest of the format leaves. Its colours and its limits are in [Formats](formats.md#the-bar). A format that holds `$bar` makes the instrument fill the row.
+The user places `$bar` anywhere in the format, and it takes the width the rest of the format leaves. Its colours and its limits are in [Formats](formats.md#the-bar). An instrument whose format in force holds `$bar` fills the row, and a threshold the user wrote can add or drop the bar at its own percentage ([`thresholds` and `fill`](#thresholds-and-fill)).
+
+Jefferson reads your `bar` once for each sample, and only when the reading can change what renders: when the top-level format names `$bar`, or when a threshold the user wrote sets something other than a `fill`. So under a format that draws no bar and a list that only colours the fill, your `bar` is never called, and a `bar` that throws is not reported for a bar nobody draws.
 
 ### `fills`
 
-`fills: true` makes the instrument take the row's spare columns, as `blank` does, whatever its format. Without it, the instrument fills only when its format holds `$bar`. [Configuration](configuration.md#how-a-row-fills-the-width) says how instruments that fill share the columns.
+`fills: true` makes the instrument take the row's spare columns, as `blank` does, whatever its format, so a user's thresholds cannot take that away. Without it, the instrument fills only when the format in force holds `$bar`, which a threshold can add or drop at its own percentage. [Configuration](configuration.md#how-a-row-fills-the-width) says how instruments that fill share the columns.
 
 ### `variableFg`
 
@@ -255,7 +257,67 @@ Above, while `working` is `true` the instrument reads `taiknr: Saving $4.12` and
 }
 ```
 
-A kind the user leaves out keeps your default text. Without `options`, a user's `formats` refuses the instrument. `formats` is the only option Jefferson offers beyond `format`, `label` and `style`, which every instrument takes.
+A kind the user leaves out keeps your default text. Without `options`, a user's `formats` refuses the instrument. `format`, `label` and `style` are options every instrument takes; beyond them Jefferson offers `formats`, and `thresholds` and `fill` for an instrument that carries a `bar` ([`thresholds` and `fill`](#thresholds-and-fill)).
+
+### `thresholds` and `fill`
+
+Two more option names let the user set where your bar changes colour and what its filled part looks like. Each is a separate opt-in, and each needs a `bar` on the declaration:
+
+- `"thresholds"` lets the user write a `thresholds` list against your instrument. A threshold sets the options your declaration lists, `format`, `label` and `style` among them, a kind of your composed `formats` when you also named `formats`, and `fill` when you also named that.
+- `"fill"` lets the user write a `fill`, at the top level and inside a threshold, which styles your bar's filled part and nothing else.
+
+Jefferson applies what the user writes exactly as it applies `context`'s, because one set of threshold rules serves every bar, so [Thresholds and the fill](configuration.md#thresholds-and-the-fill) documents your instrument too.
+
+```ts
+import type { Registration } from "pi-jefferson/instruments";
+
+const dollars = (value: number): string => `$${value.toFixed(2)}`;
+
+export const registration: Registration<"taiknr"> = {
+  extension: "taiknr",
+  fields: { saved: "number", budget: "number" },
+  instruments: [
+    {
+      name: "budget",
+      variables: {
+        saved: (readings) => {
+          const value = readings["saved"];
+          return typeof value === "number" ? dollars(value) : undefined;
+        },
+      },
+      bar: (readings) => {
+        const value = readings["budget"];
+        return typeof value === "number" ? value : null;
+      },
+      options: ["thresholds", "fill"],
+      defaultFormat: "$saved $bar",
+      defaultLabel: "taiknr:",
+    },
+  ],
+};
+```
+
+A user who wants the colour to turn at 50 and again at 90 writes this, and no change of yours is needed:
+
+```json
+{
+  "rows": [[{ "instrument": "taiknr.budget" }]],
+  "instruments": {
+    "taiknr.budget": {
+      "thresholds": [
+        { "activeAt": 50, "label": "Over half:", "fill": { "fg": "warning" } },
+        { "activeAt": 90, "fill": { "fg": "error" } }
+      ]
+    }
+  }
+}
+```
+
+A declaration that names either name without a `bar` is refused: `pi-jefferson: "taiknr.budget" declares "thresholds" without a bar`, and a row that places the instrument renders the placeholder. Naming neither is ordinary: your bar still takes the defaults, the theme's `warning` from 70% and `error` from 90%, because the defaults are the list in force for every bar.
+
+Those defaults are why `"thresholds": []` matters to a user: it is the one way to keep their own fill colour at every percentage, and an instrument that opted into `thresholds` is the only place they can write it.
+
+Both names need Jefferson 0.16.0 or later. An older Jefferson refuses a registration that names either, as it refuses any option it does not implement.
 
 ## What the user writes
 
@@ -279,6 +341,7 @@ Jefferson contains a fault in your functions to the instrument that has it:
 - A function that throws costs the instrument its text.
 - A function that returns a promise costs the instrument its text. Jefferson observes the promise's rejection, so pi keeps running.
 - A function that returns a value of the wrong kind costs the instrument its text.
+- A `bar` that throws while Jefferson chooses the state costs the instrument its text for that sample, and every placement of the instrument renders nothing in the width the top-level settings give it.
 - A composed value that faults renders as nothing in its place, as its `undefined` does.
 - A `variableFg` function that faults costs only its colour, and the instrument still renders.
 
@@ -308,6 +371,7 @@ Warnings about your registration and your updates carry no file path, because th
 | No `defaultFormat` | `pi-jefferson: "taiknr.savings" carries no default format` |
 | An optional member of the wrong shape | `pi-jefferson: "taiknr.savings" carries fills Jefferson cannot use`, with `bar`, `variableForms`, `variableFg`, `composed` or `options` in place of `fills` |
 | An option Jefferson does not offer | `pi-jefferson: "taiknr.savings" declares the option "seconds", which Jefferson does not implement` |
+| `thresholds` or `fill` named without a `bar` | `pi-jefferson: "taiknr.savings" declares "thresholds" without a bar` |
 | `formats` without `composed` | `pi-jefferson: "taiknr.savings" declares "formats" without a composed format set` |
 | A default format Jefferson cannot use | `pi-jefferson: "taiknr.savings"'s default format names neither a modifier Jefferson implements nor a foreground colour of the theme: "\|notacolour"`, or `pi-jefferson: "taiknr.savings"'s default format names a variable it does not declare: "$spent"` |
 | A `defaultLabel` that is not a string | `pi-jefferson: "taiknr.savings" carries a default label that is not a string` |
@@ -325,8 +389,9 @@ Warnings about your registration and your updates carry no file path, because th
 | A function that threw | `pi-jefferson: "taiknr.savings" failed to render: its variable threw` |
 | A function that returned a promise | `pi-jefferson: "taiknr.savings" failed to render: its variable returned a promise` |
 | A function that returned the wrong kind of value | `pi-jefferson: "taiknr.savings" failed to render: its variable returned a number, where text is declared` |
+| A `bar` that threw while Jefferson chose the state | `pi-jefferson: "taiknr.savings" failed to render: its bar threw` |
 
-The last three name the function that faulted: `variable` for a function in `variables`, `variableForms` or `composed.variables`; `select`; `bar`; or `colour` for a `variableFg` function. The wrong-value warning names what was declared: `text` for a variable or `select`, `a finite number or null` for `bar`, and `a theme colour` for a colour. A colour token the theme does not have is quoted: `its colour returned "nope", where a theme colour is declared`.
+The last four name the function that faulted: `variable` for a function in `variables`, `variableForms` or `composed.variables`; `select`; `bar`; or `colour` for a `variableFg` function. A `bar` that throws while Jefferson chooses the state prints `its bar threw`, and every placement of that instrument renders nothing for that sample. The wrong-value warning names what was declared: `text` for a variable or `select`, `a finite number or null` for `bar`, and `a theme colour` for a colour. A colour token the theme does not have is quoted: `its colour returned "nope", where a theme colour is declared`.
 
 The wrong-type and wrong-value warnings name a value with one of these: `a string`, `a number`, `a boolean`, `a bigint`, `a symbol`, `a function`, `an object` (arrays included), `null`, or `nothing` when an update has no value.
 
