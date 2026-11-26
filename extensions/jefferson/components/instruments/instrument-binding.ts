@@ -1,7 +1,7 @@
 /** Binds a configured format and style to an instrument declaration: the instrument that renders. */
 import type { Theme, ThemeColor, ThemeStyle } from "@earendil-works/pi-coding-agent";
 
-import { FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
+import { BAR_OPTIONS, FOUNDATIONAL_OPTIONS, type Instrument, type InstrumentDeclaration } from "./instrument.ts";
 import { DEFAULT_THRESHOLDS, layerThreshold, stateAt, type Threshold } from "../../thresholds.ts";
 import { timed } from "../visuals/timed.ts";
 import {
@@ -93,6 +93,7 @@ type OptionalMember = "fills" | "bar" | "variableForms" | "variableFg" | "compos
 export type ProvidedRefusal =
   | { refused: "member-unusable"; member: OptionalMember }
   | { refused: "option-unimplemented"; option: string }
+  | { refused: "option-without-bar"; option: string }
   | { refused: "formats-without-composed" }
   | { refused: "unparseable-default-format"; message: string }
   | { refused: "label-not-string" }
@@ -197,9 +198,13 @@ export function adaptProvidedDeclaration(
   }
   const declaredOptions = (members.options ?? []) as readonly string[];
   for (const option of declaredOptions) {
-    // Jefferson implements `formats` through a composed set; a foundational name changes nothing.
-    // Any other name would offer a setting that silently does nothing for a provided instrument.
-    if (option !== "formats" && !(FOUNDATIONAL_OPTIONS as readonly string[]).includes(option)) {
+    // The two bar options reach a declaration that carries `bar` and names them (design DEC-13): a
+    // name without a bar offers a setting that could colour nothing, so it is refused as its own
+    // kind. `formats` arrives through a composed set, and any other name Jefferson does not
+    // implement. The first offending name decides, as written.
+    const barOption = (BAR_OPTIONS as readonly string[]).includes(option);
+    if (barOption && members.bar === undefined) return { refused: "option-without-bar", option };
+    if (!barOption && option !== "formats" && !(FOUNDATIONAL_OPTIONS as readonly string[]).includes(option)) {
       return { refused: "option-unimplemented", option };
     }
   }

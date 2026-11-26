@@ -2355,3 +2355,365 @@ test("A57 a throw that escapes while the state is chosen costs one entry", async
     type: "warning",
   }]);
 });
+
+/** A bar-carrying registration, opting into exactly the options given. */
+function usageProvider(
+  options: ReadonlyArray<"formats" | "thresholds" | "fill"> = [],
+  bar: (readings: ReadingsView) => number | null | undefined = () => 50,
+): Registration<"taiknr"> {
+  return {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "usage",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      bar,
+      defaultFormat: "$saved $bar",
+      ...(options.length === 0 ? {} : { options }),
+    }],
+  };
+}
+
+/** A document configuring the bar-carrying `taiknr.usage`, and the two orders a provider may post in. */
+function usageDocument(
+  t: { after(fn: () => void): void }, settings: unknown, payload: Registration<"taiknr">,
+  reports: ReadonlyArray<{ extension: string; field: string; value: string | number | boolean }> = [saved("$4.10")],
+): { providerFirst: () => Promise<FakeSession>; jeffersonFirst: () => Promise<FakeSession> } {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    instruments: { "taiknr.usage": settings },
+    rows: [[{ instrument: "model" }, { instrument: "taiknr.usage" }]],
+  });
+  const options = { model: { provider: "anthropic", id: "claude-opus-4" } };
+  const send = (h: Harness): void => {
+    h.events.emit("jefferson:registration", payload);
+    for (const report of reports) h.events.emit("jefferson:update", report);
+  };
+  return {
+    providerFirst: async () => { const h = harness(); send(h); return h.start(options); },
+    jeffersonFirst: async () => { const h = harness(); return h.start({ ...options, afterSessionStart: () => send(h) }); },
+  };
+}
+
+/** One provided name read straight through the configuration reader: what it reported, kinds included. */
+function providedReported(
+  t: { after(fn: () => void): void }, payload: Registration<"taiknr">, settings: unknown,
+): Fault[] {
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, { instruments: { "taiknr.usage": settings }, rows: [[{ instrument: "taiknr.usage" }]] });
+  const { source, registry, reported } = configurationSource({
+    agentPath: join(agentDir, "pi-jefferson.json"), projectPath: join(agentDir, "missing.json"),
+    projectTrusted: false, theme: fakeTheme(),
+  });
+  const adapted = adaptProvidedDeclaration(
+    "taiknr.usage", payload.instruments[0] as unknown as ProvidedDeclaration,
+    () => ({}) as ReadingsView, () => {}, fgCheck,
+  );
+  assert.ok(!("refused" in adapted), "the declaration is accepted");
+  registry.accept("taiknr", [adapted]);
+  readConfiguration(source);
+  return reported;
+}
+
+test("A37 a provided instrument's threshold fill colours its bar from that percentage", async (t) => {
+  const theme = fakeTheme();
+  const settings = { label: "", format: "$saved $bar", thresholds: [{ activeAt: 50, fill: { fg: "error" } }] };
+  const above = await usageDocument(t, settings, usageProvider(["thresholds", "fill"], () => 60)).providerFirst();
+  assert.ok(line(above).includes("$4.10"), line(above));
+  assert.ok(rawLine(above).includes(theme.getFgAnsi("error")), "from 50 the threshold's fill colours the bar");
+  const below = await usageDocument(t, settings, usageProvider(["thresholds", "fill"], () => 40)).providerFirst();
+  assert.equal(rawLine(below).includes(theme.getFgAnsi("error")), false, "below 50 nothing colours the fill");
+  await settle();
+  assert.deepEqual([...above.notified, ...below.notified], []);
+});
+
+test("A38 a provider that names thresholds alone applies a label and no default colour", async (t) => {
+  const theme = fakeTheme();
+  const session = await usageDocument(t, { label: "S:", format: "$saved $bar", thresholds: [{ activeAt: 50, label: "hot" }] },
+    usageProvider(["thresholds"], () => 75)).providerFirst();
+  assert.ok(line(session).includes("hot $4.10"), line(session));
+  assert.ok(rawLine(session).includes(theme.getFgAnsi("accent")) || !rawLine(session).includes(theme.getFgAnsi("warning")),
+    "no default colour reaches the fill");
+  assert.equal(rawLine(session).includes(theme.getFgAnsi("warning")), false,
+    "a configured list replaces the defaults whole, whether or not the provider names fill");
+  // A bar below zero sits below every threshold, so the top level renders and its own label stands.
+  const negative = await usageDocument(t, { label: "S:", format: "$saved", thresholds: [{ activeAt: 0, label: "hot" }] },
+    usageProvider(["thresholds"], () => -1)).providerFirst();
+  assert.ok(line(negative).endsWith("S: $4.10"), line(negative));
+  assert.equal(line(negative).includes("hot"), false, "a negative reading is below the threshold at 0");
+});
+
+test("A39 a provider that names fill alone takes it below the defaults", async (t) => {
+  const theme = fakeTheme();
+  const settings = { label: "", format: "$saved $bar", fill: { fg: "accent" } };
+  const below = await usageDocument(t, settings, usageProvider(["fill"], () => 50)).providerFirst();
+  assert.ok(rawLine(below).includes(theme.getFgAnsi("accent")), "below 70 the top-level fill colours the bar");
+  const at75 = await usageDocument(t, settings, usageProvider(["fill"], () => 75)).providerFirst();
+  assert.ok(rawLine(at75).includes(theme.getFgAnsi("warning")), "the defaults colour it from 70");
+});
+
+test("A41 a fault under a provided name refuses only that instrument, in every kind", async (t) => {
+  const cases: Array<[unknown, string]> = [
+    [{ thresholds: [{ activeAt: 70.5 }] },
+      '"taiknr.usage", thresholds 1: has an activeAt that is not a whole number at or above 0; it renders blank'],
+    [{ thresholds: {} },
+      '"taiknr.usage" is configured with thresholds that is not a list; it renders blank'],
+    [{ thresholds: [70] }, '"taiknr.usage", thresholds 1: is not an object; it renders blank'],
+    [{ thresholds: [{ activeAt: 70 }, { activeAt: 70 }] },
+      '"taiknr.usage", thresholds 2: repeats the threshold at 70; it renders blank'],
+    [{ thresholds: [{ activeAt: 110 }, { activeAt: 110 }] },
+      '"taiknr.usage", thresholds 2: repeats the threshold at 110; it renders blank'],
+  ];
+  for (const [settings, part] of cases) {
+    const session = await usageDocument(t, settings, usageProvider(["thresholds", "fill"])).providerFirst();
+    assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), `${part}: the sibling renders`);
+    await settle();
+    assert.deepEqual(session.notified, [{ message: `pi-jefferson: ${part}`, type: "warning" }], part);
+  }
+});
+
+test("A41 a malformed threshold's kind is the reader's own, through the provided path", (t) => {
+  for (const [settings, kind] of [
+    [{ thresholds: {} }, "settings-thresholds"],
+    [{ thresholds: [70] }, "settings-threshold"],
+    [{ thresholds: [{ activeAt: 70.5 }] }, "settings-threshold-active-at"],
+    [{ thresholds: [{ activeAt: 70 }, { activeAt: 70 }] }, "settings-threshold-duplicate"],
+  ] as const) {
+    const reported = providedReported(t, usageProvider(["thresholds", "fill"]), settings);
+    assert.equal(reported.length, 1, JSON.stringify(settings));
+    assert.equal(reported[0]?.kind, kind);
+  }
+});
+
+test("A42 five thresholds warn once for the session, in either order", async (t) => {
+  const settings = { label: "", format: "$saved $bar", thresholds: [10, 20, 30, 40, 50].map(activeAt => ({ activeAt })) };
+  const payload = usageProvider(["thresholds", "fill"], () => 60);
+  const document = usageDocument(t, settings, payload);
+  const provider = await document.providerFirst();
+  provider.lines(80);
+  provider.lines(80);
+  await settle();
+  const expected = [{
+    message: 'pi-jefferson: "taiknr.usage" defines 5 thresholds, more than the maximum of 4; those beyond the 4 lowest are ignored',
+    type: "warning",
+  }];
+  assert.deepEqual(provider.notified, expected, "one sentence, once, for repeated renders");
+  const jefferson = await document.jeffersonFirst();
+  jefferson.lines(80);
+  await settle();
+  assert.deepEqual(jefferson.notified, expected, "the same sentence whichever side of the read the registration lands");
+});
+
+test("A45 a bar is never read where no state can change what renders, and the defaults reach one that is", async (t) => {
+  const theme = fakeTheme();
+  // A pin: a declaration with no opt-in, a format naming no `$bar`, and a bar that would throw.
+  const silent = await usageDocument(t, { label: "S:", format: "$saved" },
+    usageProvider([], () => { throw new Error("provider"); })).providerFirst();
+  assert.ok(line(silent).endsWith("S: $4.10"), line(silent));
+  await settle();
+  assert.deepEqual(silent.notified, [], "the bar is never read");
+  // The defaults are the list in force for a provider that wrote none.
+  const defaulted = await usageDocument(t, { label: "S:", format: "$saved $bar" },
+    usageProvider(["thresholds"], () => 70)).providerFirst();
+  assert.ok(rawLine(defaulted).includes(theme.getFgAnsi("warning")), "at exactly 70 the defaults colour the fill");
+});
+
+test("A46 a threshold takes only the keys its declaration lists, and a refused key names itself", async (t) => {
+  const inThreshold = await usageDocument(t, { label: "", format: "$saved $bar", thresholds: [{ activeAt: 50, fill: { fg: "accent" } }] },
+    usageProvider(["thresholds"])).providerFirst();
+  await settle();
+  assert.equal(inThreshold.notified.length, 1, "one warning for the only refused instrument");
+  const refusal = inThreshold.notified[0]?.message ?? "";
+  assert.ok(refusal.includes("thresholds 1:"), refusal);
+  assert.ok(refusal.includes('"fill"'), refusal);
+  // A pin: a provider that names neither option has its written `fill` refused alone.
+  const neither = await usageDocument(t, { label: "", format: "$saved $bar", fill: { fg: "accent" } },
+    usageProvider([])).providerFirst();
+  await settle();
+  assert.deepEqual(neither.notified, [{
+    message: 'pi-jefferson: "taiknr.usage" is configured with "fill", which the instrument does not declare; it renders blank',
+    type: "warning",
+  }]);
+});
+
+test("A47 a threshold the reader drops is still checked, and its refusal silences the count", async (t) => {
+  const thresholds: Array<Record<string, unknown>> = [10, 20, 30, 40].map(activeAt => ({ activeAt }));
+  thresholds.push({ activeAt: 101, fill: { fg: "nope" } });
+  const settings = { label: "", format: "$saved $bar", thresholds };
+  const payload = usageProvider(["thresholds", "fill"]);
+  const document = usageDocument(t, settings, payload);
+  for (const order of ["providerFirst", "jeffersonFirst"] as const) {
+    const session = await document[order]();
+    assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), `${order}: the sibling renders`);
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: "taiknr.usage", thresholds 5: is configured with a fill Jefferson cannot use; it renders blank',
+      type: "warning",
+    }], order);
+  }
+  const reported = providedReported(t, payload, settings);
+  assert.deepEqual(reported.map(fault => fault.kind), ["settings-fill"], "the refusal alone, no count");
+});
+
+test("A53 a provided bar nobody opted in for still gets the defaults", async (t) => {
+  const theme = fakeTheme();
+  const payload = usageProvider([], () => 70);
+  const session = await usageDocument(t, {}, payload, [saved("$4.10")]).providerFirst();
+  assert.ok(rawLine(session).includes(theme.getFgAnsi("warning")), "at exactly 70 the defaults colour the fill");
+  const below = await usageDocument(t, {}, usageProvider([], () => 69), [saved("$4.10")]).providerFirst();
+  assert.equal(rawLine(below).includes(theme.getFgAnsi("warning")), false, "at 69 they do not");
+});
+
+test("A54 a threshold's format that does not parse refuses only its instrument", async (t) => {
+  const settings = { label: "", format: "$saved $bar", thresholds: [{ activeAt: 50, format: "$nope" }] };
+  const session = await usageDocument(t, settings, usageProvider(["thresholds"]), [saved("$4.10")]).providerFirst();
+  assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), "the sibling renders");
+  await settle();
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: "taiknr.usage", thresholds 1: is configured with a format naming "$nope", which the instrument does not declare; it renders blank',
+    type: "warning",
+  }]);
+  const reported = providedReported(t, usageProvider(["thresholds"]), settings);
+  assert.deepEqual(reported.map(fault => fault.kind), ["settings-variable"]);
+});
+
+test("A59 a threshold's format decides whether a provided instrument fills", async (t) => {
+  const settings = { format: "$saved", thresholds: [{ activeAt: 50, label: "hot" }] };
+  const session = await usageDocument(t, settings, usageProvider(["thresholds"], () => 60)).providerFirst();
+  assert.ok(line(session).endsWith("hot $4.10"), line(session));
+  assert.equal(stripTerminalSequences(rawLine(session)).includes("█"), false, "the state's format names no bar");
+  assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), "the sibling renders");
+});
+
+/** A registration whose one instrument carries no bar at all. */
+function barlessProvider(options: readonly string[]): Registration<"taiknr"> {
+  return {
+    extension: "taiknr",
+    fields: { saved: "string" },
+    instruments: [{
+      name: "usage",
+      variables: { saved: (readings: ReadingsView) => typeof readings.saved === "string" ? readings.saved : undefined },
+      defaultFormat: "$saved",
+      ...(options.length === 0 ? {} : { options: options as ReadonlyArray<"thresholds" | "fill"> }),
+    }],
+  };
+}
+
+test("A40 a registration naming an option without a bar is refused, with its own kind", async (t) => {
+  for (const options of [["thresholds"], ["fill"]]) {
+    documentShowing(t, [["taiknr.usage"]]);
+    const h = harness();
+    h.events.emit("jefferson:registration", barlessProvider(options));
+    const session = await h.start();
+    assert.equal(line(session), placeholder(), `${options}: the row naming it renders the placeholder`);
+    await settle();
+    // The row names an instrument the refused registration never supplied, so it warns that too;
+    // the refusal is one warning of its own, and the placeholder is what the row draws.
+    const refusals = session.notified.filter(notified =>
+      notified.message === `pi-jefferson: "taiknr.usage" declares ${JSON.stringify(options[0])} without a bar`);
+    assert.equal(refusals.length, 1, JSON.stringify(options));
+    assert.equal(refusals[0]?.type, "warning");
+  }
+});
+
+test("A40 the first offending option decides, and each refusal names it", async (t) => {
+  const cases: Array<[string[], string]> = [
+    [["seconds", "thresholds"], '"taiknr.usage" declares the option "seconds", which Jefferson does not implement'],
+    [["thresholds", "seconds"], '"taiknr.usage" declares "thresholds" without a bar'],
+    [["fill"], '"taiknr.usage" declares "fill" without a bar'],
+  ];
+  for (const [options, part] of cases) {
+    documentShowing(t, [["taiknr.usage"]]);
+    const h = harness();
+    h.events.emit("jefferson:registration", barlessProvider(options));
+    const session = await h.start();
+    assert.equal(line(session), placeholder(), `${part}: the row renders the placeholder`);
+    await settle();
+    assert.ok(session.notified.some(notified => notified.message === `pi-jefferson: ${part}`), JSON.stringify(options));
+  }
+});
+
+test("A46 a provided declaration without a bar refuses a thresholds list, beside a sibling", async (t) => {
+  const session = await usageDocument(t, { thresholds: [] }, barlessProvider([])).providerFirst();
+  assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), "the sibling renders");
+  await settle();
+  assert.deepEqual(session.notified, [{
+    message: 'pi-jefferson: "taiknr.usage" is configured with "thresholds", which the instrument does not declare; it renders blank',
+    type: "warning",
+  }]);
+});
+
+test("A43 one reading a sample, through a provided instrument placed twice in a row and once in another", async (t) => {
+  let reads = 0;
+  const payload = usageProvider(["thresholds"], () => (++reads === 1 ? 69 : 71));
+  const agentDir = useTempAgentDir(t);
+  writeAgentDocument(agentDir, {
+    rows: [
+      [{ instrument: "taiknr.usage" }, { instrument: "taiknr.usage" }],
+      [{ instrument: "taiknr.usage" }],
+    ],
+    instruments: { "taiknr.usage": { label: "", format: "$saved", thresholds: [{ activeAt: 70, label: "hot" }] } },
+  });
+  const h = harness();
+  h.events.emit("jefferson:registration", payload);
+  h.events.emit("jefferson:update", saved("$4.10"));
+  const session = await h.start();
+  const drawn = session.lines(80);
+  assert.equal(drawn.length, 3, "two rows and the empty line between them");
+  assert.equal(drawn.some(one => one.includes("hot")), false, "no placement shows the first reading's state");
+  assert.equal(reads, 1, "the bar is read once per sample");
+  session.lines(80);
+  assert.equal(reads, 2, "the next render reads again");
+});
+
+test("A44 a state chosen inside a provided instrument's boundary keeps the top level's geometry", async (t) => {
+  const cases: Array<[string, string, (drawn: string) => boolean, string]> = [
+    ["$saved", "$saved $bar", drawn => drawn.startsWith("Model: anthropic/claude-opus-4"),
+      "no placement takes the spare columns when the state adds the bar"],
+    ["$saved $bar", "$saved", drawn => drawn.endsWith("Model: anthropic/claude-opus-4"),
+      "every placement still takes them when the state drops it"],
+  ];
+  for (const [format, stateFormat, holds, label] of cases) {
+    const escape = { get then(): never { throw new Error("provider"); } };
+    let reads = 0;
+    const payload = usageProvider(["thresholds"], () => { reads++; return escape as unknown as number; });
+    const agentDir = useTempAgentDir(t);
+    writeAgentDocument(agentDir, {
+      rows: [[{ instrument: "taiknr.usage" }, { instrument: "taiknr.usage" }, { instrument: "model" }], [{ instrument: "taiknr.usage" }]],
+      instruments: { "taiknr.usage": { label: "", format, thresholds: [{ activeAt: 50, format: stateFormat }] } },
+    });
+    const h = harness();
+    h.events.emit("jefferson:registration", payload);
+    h.events.emit("jefferson:update", saved("$4.10"));
+    const session = await h.start({ model: { provider: "anthropic", id: "claude-opus-4" } });
+    const [first = ""] = session.lines(80);
+    assert.ok(holds(stripTerminalSequences(first)), `${label}: ${stripTerminalSequences(first)}`);
+    assert.equal(reads, 1, `${label}: one reading for the sample`);
+    assert.equal(stripTerminalSequences(first).includes("$4.10"), false, `${label}: every placement renders nothing`);
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: 'pi-jefferson: "taiknr.usage" failed to render: its bar threw',
+      type: "warning",
+    }], label);
+  }
+});
+
+test("A52 a faulting bar counts as 0, so a state at 0 renders where its format allows", async (t) => {
+  const settings = {
+    label: "", format: "$saved $bar",
+    thresholds: [{ activeAt: 0, format: "$saved" }, { activeAt: 50, format: "$saved $bar" }],
+  };
+  for (const [bar, part] of [
+    [() => "50", "its bar returned a string, where a finite number or null is declared"],
+    [() => { throw new Error("provider"); }, "its bar threw"],
+  ] as const) {
+    const session = await usageDocument(t, settings, usageProvider(["thresholds"], bar as () => number)).providerFirst();
+    assert.ok(line(session).endsWith("$4.10"), `${part}: ${line(session)}`);
+    assert.ok(line(session).startsWith("Model: anthropic/claude-opus-4"), "the sibling renders");
+    await settle();
+    assert.deepEqual(session.notified, [{
+      message: `pi-jefferson: "taiknr.usage" failed to render: ${part}`,
+      type: "warning",
+    }], part);
+  }
+});

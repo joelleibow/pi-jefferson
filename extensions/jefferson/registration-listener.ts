@@ -216,6 +216,11 @@ function vetRegistration(
             scope: name, kind: "option-unimplemented",
             part: `${full} declares the option ${JSON.stringify(adapted.option)}, which Jefferson does not implement`,
           } };
+        case "option-without-bar":
+          return { refusal: {
+            scope: name, kind: "option-without-bar",
+            part: `${full} declares ${JSON.stringify(adapted.option)} without a bar`,
+          } };
         case "formats-without-composed":
           return { refusal: {
             scope: name, kind: "formats-without-composed",

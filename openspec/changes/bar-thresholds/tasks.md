@@ -426,7 +426,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
 
 ## 3. A provided instrument's bar
 
-- [ ] 3.1 A provided declaration opts in by name, and the opt-in reaches its bar. **Test first:**
+- [x] 3.1 A provided declaration opts in by name, and the opt-in reaches its bar. **Test first:**
   over the harness's real bus, A37 (`options: ["thresholds","fill"]`, a threshold at 50 setting a
   fill, the filled columns taking `error` from 50), A38 (`["thresholds"]` alone, a threshold at 50
   setting a label, and no default colour reaching the fill at any reading; extended: a bar reporting
@@ -502,7 +502,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   pre-existing cases are unedited, and every provider refusal in the file is asserted beside a
   sibling instrument that renders.
 
-- [ ] 3.2 Naming an option without a bar is refused, with its own kind. **Test first:** A40 — a
+- [x] 3.2 Naming an option without a bar is refused, with its own kind. **Test first:** A40 — a
   registration declaring `["thresholds"]` and no `bar` is refused, one warning reads
   `pi-jefferson: "taiknr.usage" declares "thresholds" without a bar`, and a row naming it renders
   the placeholder, asserted whole. Red before the kind exists. A40 extended, over the bus, adds
@@ -538,7 +538,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   unedited. **Done when:** A40 and A46 pass, each asserted beside a sibling instrument in the same
   document that renders, and M20 (4.2) turns A46's two halves red.
 
-- [ ] 3.3 The state choice holds for a provided instrument, with no new code. **Test first:** A43,
+- [x] 3.3 The state choice holds for a provided instrument, with no new code. **Test first:** A43,
   A44 and A52, each green on arrival once 3.1 lets a provider name `thresholds` — A43 (a bar read one
   sample with the instrument placed twice in row 1 and once in row 2: no placement shows the first
   reading's state, and the next render reads again), A44 (the discriminating pair: no placement takes
@@ -559,7 +559,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   statusline "One reading a sample" through a provider (A43). **Done when:** A43, A44 and A52 pass;
   M5 (the slot dropped) turns A43 red, M6 and M19 turn A44 red, and M12 turns A52 red.
 
-- [ ] 3.4 The fixture opts in. **Test first:** no check in `redgreen-derek.md` covers this file, and
+- [x] 3.4 The fixture opts in. **Test first:** no check in `redgreen-derek.md` covers this file, and
   `pnpm typecheck` does not read it — `tsconfig.json` includes `tests/**/*.ts` and not `.mts` — so
   the check is the CI step, reproduced by hand. **Code:** `progress`'s options (`provider.mts:81`)
   become `["formats", "thresholds", "fill"]`; it already carries `bar`, so the fixture's header
@@ -572,7 +572,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   jefferson. fails the type check` (`:119`). Show the check catching a mistake by misspelling an
   option name, which fails with `TS2820`.
 
-- [ ] 3.5 `pnpm typecheck` and `pnpm test` green.
+- [x] 3.5 `pnpm typecheck` and `pnpm test` green.
 
 ## 4. The finished change
 

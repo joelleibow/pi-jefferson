@@ -244,108 +244,163 @@ interface InstrumentConfiguration {
 }
 
 /**
- * Everything under a provided name's key — its shape, format, label, option, variable, modifier and
- * style — checked against what its registration declared, or the one part that refuses it. It runs
- * when the document and the registration are both in hand, whichever came second (design 13; J1(b)).
- * A provided instrument takes the options its adapted declaration lists: the foundational three, and
- * `formats` when it declares one, so the check and the binding accept the same keys.
+ * Everything under a provided name's key — its shape, format, label, option, formats, variable,
+ * modifier, style, fill and thresholds — checked against what its registration declared, or the one
+ * part that refuses it. It runs when the document and the registration are both in hand, whichever
+ * came second (design 13; J1(b)). A provided instrument takes the options its adapted declaration
+ * lists: the foundational three, `formats` when it declares a composed set, and `thresholds` or
+ * `fill` when it carries `bar` and names that option. The threshold rules are the reader's, which
+ * this path hands its own per-value check as `check` (design DEC-1): one set of rules, two origins.
  */
 function checkProvidedSettings(
   name: string, raw: unknown, declaration: InstrumentDeclaration, theme: Theme, check: ForegroundCheck,
-): ConfiguredInstrument | { kind: string; part: string } {
+): { settings: ConfiguredInstrument; warning?: string } | { kind: string; part: string } {
   const consequence = "; it renders blank";
+  const quoted = JSON.stringify(name);
   if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
-    return {
-      kind: "settings-shape",
-      part: `${JSON.stringify(name)} is configured with a value that is not an object${consequence}`,
-    };
+    return { kind: "settings-shape", part: `${quoted} is configured with a value that is not an object${consequence}` };
   }
   const entry = (raw ?? {}) as Record<string, unknown>;
-  const format = entry.format;
-  if (format !== undefined && typeof format !== "string") {
-    return {
-      kind: "settings-format",
-      part: `${JSON.stringify(name)} is configured with a format that is not a string${consequence}`,
-    };
-  }
-  const label = entry.label;
-  if (label !== undefined && typeof label !== "string") {
-    return {
-      kind: "settings-label",
-      part: `${JSON.stringify(name)} is configured with a label that is not a string${consequence}`,
-    };
-  }
-  for (const key of Object.keys(entry)) {
-    if (!declaration.options.includes(key)) {
-      return {
-        kind: "settings-option",
-        part: `${JSON.stringify(name)} is configured with ${JSON.stringify(key)}, which the instrument does not declare${consequence}`,
-      };
-    }
-  }
-  let segments: FormatSegment[];
-  try {
-    segments = parseFormat(declaration, format ?? declaration.defaultFormat, check);
-  } catch (error) {
-    if (!(error instanceof Error)) throw error;
-    // The table separates a format naming a variable the instrument lacks from one the language
-    // refuses for another reason; the parse error is the only place that difference is visible. Every
-    // other fault forwards the parser's own sentence, so the offending name reads alike wherever it
-    // is reached (design, "One refusal message, owned by the parser and forwarded by every path").
-    const variable = /names a variable it does not declare: (".*")$/.exec(error.message)?.[1];
-    return variable === undefined
-      ? { kind: "settings-parse", part: `${JSON.stringify(name)}'s ${error.message}${consequence}` }
-      : {
-        kind: "settings-variable",
-        part: `${JSON.stringify(name)} is configured with a format naming ${variable}, which the instrument does not declare${consequence}`,
-      };
-  }
-  let style: ThemeStyle;
-  try {
-    style = validateStyle(entry.style, theme);
-  } catch {
-    return {
-      kind: "settings-style",
-      part: `${JSON.stringify(name)} is configured with a style Jefferson cannot use${consequence}`,
-    };
-  }
-  // The composed set's kinds, checked as the whole-document rule checks Jefferson's own: shape, the
-  // kind it names, the text's type, then the parse — each refusing only this instrument (J1(b)).
-  let formats: Record<string, FormatSegment[]> | undefined;
-  const declaredFormats = entry.formats;
-  if (declaredFormats !== undefined) {
-    if (typeof declaredFormats !== "object" || declaredFormats === null || Array.isArray(declaredFormats)) {
-      return {
-        kind: "settings-formats",
-        part: `${JSON.stringify(name)} is configured with formats that is not an object${consequence}`,
-      };
-    }
-    formats = {};
-    const carried = declaration.composed?.formats;
-    for (const [kind, text] of Object.entries(declaredFormats)) {
-      if (carried === undefined || !Object.hasOwn(carried, kind)) {
-        return {
-          kind: "settings-formats-kind",
-          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)}, which the instrument does not carry${consequence}`,
-        };
+
+  /**
+   * One settings object's values, parsed, or the fault that refuses it: the same check for the top
+   * level and for every threshold, carrying only what the document wrote (design DEC-1). `at` opens
+   * the sentence — the name at the top level, the place phrase inside a threshold.
+   */
+  const values = (
+    settings: Readonly<Record<string, unknown>>,
+    at: { readonly predicate: string; readonly forwarded: string },
+    allowed: readonly string[],
+  ): { settings: InstrumentSettings } | { kind: string; part: string } => {
+    /** One fault, worded as this path words it: its predicate after the subject. */
+    const refuse = (kind: string, text: string) => ({ kind, part: `${at.predicate} ${text}${consequence}` });
+    /** The parser's own sentence, forwarded whole: the top level keeps its possessive. */
+    const forwarded = (kind: string, text: string) => ({ kind, part: `${at.forwarded} ${text}${consequence}` });
+    for (const key of Object.keys(settings)) {
+      if (!allowed.includes(key)) {
+        return refuse("settings-option", `is configured with ${JSON.stringify(key)}, which the instrument does not declare`);
       }
-      if (typeof text !== "string") {
-        return {
-          kind: "settings-formats-string",
-          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format is not a string${consequence}`,
-        };
-      }
+    }
+    let segments: FormatSegment[] | undefined;
+    const format = settings.format;
+    if (format !== undefined) {
+      if (typeof format !== "string") return refuse("settings-format", "is configured with a format that is not a string");
       try {
-        formats[kind] = parseFormat(declaration, text, check, true);
-      } catch {
-        return {
-          kind: "settings-formats-parse",
-          part: `${JSON.stringify(name)} is configured with a formats kind ${JSON.stringify(kind)} whose format Jefferson cannot parse${consequence}`,
-        };
+        segments = parseFormat(declaration, format, check);
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        // The table separates a format naming a variable the instrument lacks from one the language
+        // refuses for another reason; the parse error is the only place that difference is visible.
+        // Every other fault forwards the parser's own sentence, so the offending name reads alike
+        // wherever it is reached (design, "One refusal message, owned by the parser and forwarded by
+        // every path").
+        const variable = /names a variable it does not declare: (".*")$/.exec(error.message)?.[1];
+        return variable === undefined
+          ? forwarded("settings-parse", error.message)
+          : refuse("settings-variable", `is configured with a format naming ${variable}, which the instrument does not declare`);
       }
     }
+    let label: string | undefined;
+    if (settings.label !== undefined) {
+      if (typeof settings.label !== "string") return refuse("settings-label", "is configured with a label that is not a string");
+      label = settings.label;
+    }
+    let style: ThemeStyle | undefined;
+    if (settings.style !== undefined) {
+      try {
+        style = validateStyle(settings.style, theme);
+      } catch {
+        return refuse("settings-style", "is configured with a style Jefferson cannot use");
+      }
+    }
+    let fill: ThemeStyle | undefined;
+    if (settings.fill !== undefined) {
+      try {
+        fill = validateStyle(settings.fill, theme, "fill");
+      } catch {
+        return refuse("settings-fill", "is configured with a fill Jefferson cannot use");
+      }
+    }
+    // The composed set's kinds, checked as the whole-document rule checks Jefferson's own: shape, the
+    // kind it names, the text's type, then the parse — each refusing only this instrument (J1(b)).
+    let formats: Record<string, FormatSegment[]> | undefined;
+    const declaredFormats = settings.formats;
+    if (declaredFormats !== undefined) {
+      if (typeof declaredFormats !== "object" || declaredFormats === null || Array.isArray(declaredFormats)) {
+        return refuse("settings-formats", "is configured with formats that is not an object");
+      }
+      formats = {};
+      const carried = declaration.composed?.formats;
+      for (const [kind, text] of Object.entries(declaredFormats)) {
+        if (carried === undefined || !Object.hasOwn(carried, kind)) {
+          return refuse("settings-formats-kind", `is configured with a formats kind ${JSON.stringify(kind)}, which the instrument does not carry`);
+        }
+        if (typeof text !== "string") {
+          return refuse("settings-formats-string", `is configured with a formats kind ${JSON.stringify(kind)} whose format is not a string`);
+        }
+        try {
+          formats[kind] = parseFormat(declaration, text, check, true);
+        } catch {
+          return refuse("settings-formats-parse", `is configured with a formats kind ${JSON.stringify(kind)} whose format Jefferson cannot parse`);
+        }
+      }
+    }
+    return {
+      settings: {
+        ...(segments === undefined ? {} : { segments }),
+        ...(style === undefined ? {} : { style }),
+        ...(label === undefined ? {} : { label }),
+        ...(formats === undefined ? {} : { formats }),
+        ...(fill === undefined ? {} : { fill }),
+      },
+    };
+  };
+
+  const top = values(entry, { predicate: quoted, forwarded: `${quoted}'s` }, declaration.options);
+  if ("part" in top) return top;
+  // The reader's own faults take this path's sentences; the place phrase opens each one.
+  let thresholds: readonly Threshold<InstrumentSettings>[] | undefined;
+  let overFour: string | undefined;
+  if (entry.thresholds !== undefined) {
+    const allowed = declaration.options.filter(option => option !== "thresholds");
+    const read = readThresholds<InstrumentSettings, { kind: string; part: string }>(
+      entry.thresholds, quoted,
+      (settings, position) => {
+        const place = thresholdPlace(quoted, position);
+        const parsed = values(settings, { predicate: place, forwarded: place }, allowed);
+        return "part" in parsed ? { refused: parsed } : { settings: parsed.settings };
+      },
+    );
+    if ("fault" in read) return providedThresholdFault(quoted, read.fault);
+    if ("refused" in read) return read.refused;
+    thresholds = read.honoured;
+    overFour = read.overFour;
   }
-  return { segments, style, ...(label === undefined ? {} : { label }), ...(formats === undefined ? {} : { formats }) };
+  return {
+    settings: { ...top.settings, ...(thresholds === undefined ? {} : { thresholds }) },
+    ...(overFour === undefined ? {} : { warning: overFour }),
+  };
+}
+
+/** What a fault the reader answers on its own says under a provided name, and its kind. */
+function providedThresholdFault(quoted: string, fault: ThresholdFault): { kind: string; part: string } {
+  const consequence = "; it renders blank";
+  switch (fault.kind) {
+    case "settings-thresholds":
+      return { kind: fault.kind, part: `${quoted} is configured with thresholds that is not a list${consequence}` };
+    case "settings-threshold":
+      return { kind: fault.kind, part: `${thresholdPlace(quoted, fault.position)} is not an object${consequence}` };
+    case "settings-threshold-active-at":
+      return {
+        kind: fault.kind,
+        part: `${thresholdPlace(quoted, fault.position)} has an activeAt that is not a whole number at or above 0${consequence}`,
+      };
+    case "settings-threshold-duplicate":
+      return {
+        kind: fault.kind,
+        part: `${thresholdPlace(quoted, fault.position)} repeats the threshold at ${fault.activeAt}${consequence}`,
+      };
+  }
 }
 
 function readInstruments(
@@ -389,7 +444,11 @@ function readInstruments(
         reading.faults.push({ scope: normalized, kind: settings.kind, part: settings.part });
         continue;
       }
-      configured.set(normalized, settings);
+      configured.set(normalized, settings.settings);
+      // The count's sentence moves only for settings this name accepted (design DEC-11).
+      if (settings.warning !== undefined) {
+        reading.faults.push({ scope: normalized, kind: "thresholds-over-four", part: settings.warning });
+      }
       continue;
     }
 
@@ -619,9 +678,11 @@ function normalizeDocument(
         return;
       }
       // (b) The entry goes into the read's Map before the bind reads it, then every holder follows.
-      configured.set(name, settings);
+      configured.set(name, settings.settings);
       const bound = bind(declaration);
       for (const holder of holders) holder.current = bound;
+      // A provider that registers after the read warns through the ledger, after its settings land.
+      if (settings.warning !== undefined) source.report({ scope: name, kind: "thresholds-over-four", part: settings.warning });
     });
   }
   return { rows, rowGap, noticeSeconds };
