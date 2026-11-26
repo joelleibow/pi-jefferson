@@ -4,7 +4,7 @@ Each task names the failing check that runs before its code, by the label `redgr
 it. `A1`–`A50` went red at the base or in the partially built spike and green once the change the
 task makes landed; `P1`–`P4` were green at the base and must stay green. `A51`–`A56` are checks these
 tasks write first, red before their task's code, and `redgreen-derek.md` has no entry for them. M1–M9
-are `redgreen-derek.md`'s Mutations; M10–M16 are defined once, in 4.2, and a task that cites one
+are `redgreen-derek.md`'s Mutations; M10–M17 are defined once, in 4.2, and a task that cites one
 before 4.2 points there. A task that changes only a signature, a pin's shape or a fixture has no
 check of its own in that report; it says so and names the command that shows its check catching a
 mistake.
@@ -421,9 +421,12 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   discriminating pair: no placement takes the spare columns when a threshold's format adds `$bar` to
   a `$bar`-less top level, and the sibling starts the row when a threshold drops `$bar` from a
   `$bar`-bearing top level; both with one read, every placement blank, one notice carrying
-  `"taiknr.usage" failed to render: its bar threw`), A47 (five thresholds whose third sets a fill the
-  theme lacks: only the refusal, naming position 3, and no over-four warning, in both of A42's
-  orders), A52 (`options: ["thresholds"]`, the default format `$saved $bar`, thresholds at 0 giving
+  `"taiknr.usage" failed to render: its bar threw`), A47 (thresholds at 10, 20, 30, 40 and 101 whose
+  fifth, at 101, sets a `fill` the theme lacks, beside a sibling: only the refusal is reported, its
+  kind is `settings-fill`, and its part names `fill` and position 5; no over-four warning is
+  reported, the sibling renders, and all of this holds in both of A42's orders — `redgreen-derek.md`
+  placed A47 at the third, and at 101 the same case also proves the provided path checks a threshold
+  it drops), A52 (`options: ["thresholds"]`, the default format `$saved $bar`, thresholds at 0 giving
   `format: "$saved"` and at 50 giving `format: "$saved $bar"`, and `saved` reported as `$4.10`,
   beside a sibling: a `bar` returning the string `"50"` renders `$4.10` with one notice reading
   `"taiknr.usage" failed to render: its bar returned a string, where a finite number or null is
@@ -448,8 +451,8 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   Jefferson-first half), "A threshold fault under a provided name" (A41) and "A provider's faulty
   entry" (A54). **Done when:**
   A41–A44 and A47 pass, M5 (the slot dropped) and M6 (`containProvided` no longer wrapping `fills`)
-  each turn one of them red, and every provider refusal in the file is asserted beside a sibling
-  instrument that renders.
+  each turn one of them red, M17 (4.2) turns A47 red, and every provider refusal in the file is
+  asserted beside a sibling instrument that renders.
 
 - [ ] 3.4 The fixture opts in. **Test first:** no check in `redgreen-derek.md` covers this file, and
   `pnpm typecheck` does not read it — `tsconfig.json` includes `tests/**/*.ts` and not `.mts` — so
@@ -475,7 +478,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   (A8, A10, A11), the pins in `tests/jefferson.test.ts` (P2) and the helpers in
   `tests/instrument.test.ts` (A48–A50, P4).
 
-- [ ] 4.2 Show each check catching its own mistake. Re-run M1–M9 (`redgreen-derek.md`) and M10–M16
+- [ ] 4.2 Show each check catching its own mistake. Re-run M1–M9 (`redgreen-derek.md`) and M10–M17
   (defined here) against the finished code, one at a time and restoring after each: M1 (`drawBar` ignoring its fill) → A21; M2 (only the
   first four thresholds checked) → A8; M3 (`<` for `<=`) → A15; M4 (a record replaced whole) → A19; M5
   (the slot dropped) → A43; M6 (`containProvided` no longer wrapping `fills`) → A44; M7
@@ -487,9 +490,10 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   judged against the top-level format) → A34, A52; M13 (the bar read whenever the settings carry
   thresholds) → A55; M14 (the defaults applied only when the declaration names `thresholds`) → A53;
   M15 (a state taking the top-level label and gap and its composed choice) → A56's (a) and (c); M16
-  (the reading compared rounded to one decimal) → A51. A mutation that stays green means the check
-  proves less than its row claims: report it in the change's notes rather than weakening or deleting
-  the check.
+  (the reading compared rounded to one decimal) → A51; M17 (the provided path running its per-value
+  check over the honoured list after the reader, instead of handing that check to the reader) → A47.
+  A mutation that stays green means the check proves less than its row claims: report it in the
+  change's notes rather than weakening or deleting the check.
 
 - [ ] 4.3 `pnpm typecheck` and `pnpm test` green. Derek's copy of the finished change read 628 tests
   and a clean typecheck against a base of 578.

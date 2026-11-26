@@ -257,10 +257,10 @@ happens. Source: `council.md`, the warning-path row; `owner-rulings.md`, 2026-11
 
 #### Scenario: A refused provided instrument says nothing of the count
 
-- **WHEN** a provided instrument, which opted in, is given five thresholds and the third sets a
-  `fill` the theme does not have
-- **THEN** only the refusal is reported, naming the instrument, `fill` and position 3, and no
-  over-four warning is reported
+- **WHEN** a provided instrument, which opted in, is given thresholds at 10, 20, 30, 40 and 101, and
+  the one at 101 sets a `fill` the theme does not have
+- **THEN** only the refusal is reported, naming the instrument, `fill` and position 5, and no
+  over-four warning is reported, because the threshold the reader drops is still checked
 
 #### Scenario: A provider that registers after the read
 
