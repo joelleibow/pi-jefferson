@@ -33,18 +33,18 @@ statusline, "A threshold's format decides whether the instrument fills".
 
 - **WHEN** a provided `bar`'s result has a `then` getter that throws, under thresholds that change the
   format
-- **THEN** that entry renders nothing, takes the top-level settings' geometry, one fault is reported,
-  and every row renders
+- **THEN** every placement of that instrument renders nothing for that sample, takes the top-level
+  settings' geometry, one fault is reported, every row renders, and the next sample tries again
 
 ## MODIFIED Requirements
 
 ### Requirement: Provider code costs one entry and no more
 
 A function a provider supplies that throws, or returns a value outside its declared result type, a
-promise included, MUST cost only that entry: a resolver, a form or a `bar` blanks it, label included,
-a select composes nothing, a composed value renders nothing in its place, and a colour falls back to
-the entry's style. Its geometry, the row and every other row MUST render, and pi MUST keep running.
-Jefferson MUST wrap a provided instrument's render, not its own. The next render MUST try again.
+promise included, MUST cost only that entry: a resolver or a form blanks it, label included, a select
+composes nothing, a composed value renders nothing in its place, and a colour falls back to the
+entry's style. Its geometry, the row and every other row MUST render, and pi MUST keep running.
+Jefferson MUST wrap a provided instrument, not its own. The next render MUST try again.
 
 #### Scenario: A resolver that throws
 

@@ -184,8 +184,8 @@ as **E**, and `specs/instrument-registration/spec.md` as **I**.
    "Don't invent what we don't have to".
    *Landed* S "A provided instrument takes only the options Jefferson implements" (body, plus "A
    provider that names thresholds alone", "A provider that names fill alone", "A provided instrument's
-   thresholds", "A provider that names neither"); S "A registration naming an option without a bar is
-   refused".
+   thresholds", "A provider that names neither"); S "A registration naming an option Jefferson cannot
+   honour is refused".
 3. **A non-opted-in provider and a key it does not take.** It is refused, its entries render `blank`,
    and one warning names the instrument and the key. "Draws the default bar" describes only a
    non-opted-in provider whose settings carry neither key.
@@ -197,8 +197,11 @@ as **E**, and `specs/instrument-registration/spec.md` as **I**.
    `option-unimplemented` stays true for names outside the accepted set.
    *Decided by* `registration-listener.ts`'s separate kinds for `option-unimplemented` and
    `formats-without-composed`.
-   *Landed* S "A registration naming an option without a bar is refused", with "An option outside the
-   accepted set"; P Impact, the registration path bullet naming `registration-listener.ts`.
+   *Landed* S "A registration naming an option Jefferson cannot honour is refused", with "An option
+   outside the accepted set". That requirement is now the one home of the living sentence the MODIFIED
+   provided-options body no longer carries: a registration declaring an option Jefferson does not
+   implement for a provided instrument is refused. Also P Impact, the registration path bullet naming
+   `registration-listener.ts`.
 5. **The fifth threshold.** Replaced with explicit values: 10, 20, 30, 40, 50 and a reading of 55 use
    the state at 40; the one at 50 never applies; one warning names the instrument. Choosing the state
    is one rule over the checked, filtered and capped list.
@@ -376,8 +379,11 @@ as **E**, and `specs/instrument-registration/spec.md` as **I**.
     nothing.
     *Landed* S "$bar takes the width the rest of the format leaves" (Source added); S "Only a variable
     the format names can blank an instrument" (Source extended); every other requirement in S, E and I
-    cites an owner ruling, an ADR, `AGENTS.md` or this council. P's Why paragraph keeps the orientation
-    as background, where it reports provenance.
+    cites an owner ruling, an ADR, `AGENTS.md` or this council, except I "Provider code costs one entry
+    and no more". That requirement states no rule of its own: the bar's cost is "A faulting bar is
+    unknown, and blanks only a drawn bar" and the state choice is "A state is chosen inside a provided
+    instrument's boundary", and each carries its own Source. P's Why paragraph keeps the orientation as
+    background, where it reports provenance.
 29. **Tests.** Michael holds this at the Implementation Readiness gate, not in the deltas: the flipped
     edge test written first and run red, a sibling entry beside every provider refusal, the exact
     over-four sentence asserted, the 0, 100, 101 and four-plus-one-above-100 cases covered, and only

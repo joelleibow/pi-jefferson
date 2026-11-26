@@ -170,7 +170,7 @@ checked as a `style` is. Source: `owner-rulings.md`, 2026-11-25 (the `fill` ruli
 
 - **WHEN** `fill` carries a key `style` does not have, or a colour or attribute `style` refuses
 - **THEN** the settings are rejected as they are for such a `style`, and the warning names the
-  instrument, `fill` and the threshold's position
+  instrument and `fill`, and, for a `fill` inside a threshold, that threshold's position
 
 #### Scenario: A fill inside a threshold
 
@@ -245,15 +245,22 @@ state, and an ignored entry MUST play no part when the instrument renders. Sourc
 
 More than four thresholds MUST be reported once per instrument per session, as one sentence naming
 the instrument, saying more than the maximum were defined, and saying entries past the four lowest
-are ignored. A rejected document MUST report no such warning, and the sentence MUST be the same
-whichever side of the document's read the registration happens. Source: `council.md`, the
-warning-path row; `owner-rulings.md`, 2026-11-25.
+are ignored. Neither a rejected document nor a refused provided instrument MUST report such a
+warning, and the sentence MUST be the same whichever side of the document's read the registration
+happens. Source: `council.md`, the warning-path row; `owner-rulings.md`, 2026-11-25.
 
 #### Scenario: A rejected document stays silent
 
-- **WHEN** a document gives one of Jefferson's own instruments five thresholds and one malformed
-  entry
+- **WHEN** a document gives one of Jefferson's own instruments five well-formed thresholds, and a row
+  the configuration read rejects
 - **THEN** the document is rejected, and no over-four warning is reported beside the rejection
+
+#### Scenario: A refused provided instrument says nothing of the count
+
+- **WHEN** a provided instrument, which opted in, is given five thresholds and the third sets a
+  `fill` the theme does not have
+- **THEN** only the refusal is reported, naming the instrument, `fill` and position 3, and no
+  over-four warning is reported
 
 #### Scenario: A provider that registers after the read
 
@@ -317,11 +324,31 @@ warning. Source: `owner-rulings.md`, 2026-11-25 ("int only").
 
 ### Requirement: Every value inside a threshold is checked as a top-level value is
 
-Every value inside a threshold MUST be checked exactly as the same value at the top level is, and a
-`thresholds` value that is not a list, or an entry that is not an object, MUST be a fault of its own.
-Each fault MUST reject the whole document for Jefferson's own instrument and only that instrument for
-a provider's. Source: `owner-rulings.md`, 2026-11-25 ("The meanings need to stay the same");
+Every value inside every threshold written, honoured or not, MUST be checked exactly as the same value
+at the top level is, and a `thresholds` value that is not a list, or an entry that is not an object,
+MUST be a fault of its own. Each fault MUST reject the whole document for Jefferson's own instrument
+and only that instrument for a provider's. Source: `owner-rulings.md`, 2026-11-25 ("The meanings need to stay the same");
 `council.md`, the malformed-input row.
+
+#### Scenario: A fault in a threshold above 100
+
+- **WHEN** thresholds are written at 10, 20, 30, 40 and 101, and the one at 101 carries a `fill`
+  colour the theme does not have
+- **THEN** the settings are rejected as this requirement says, and the warning names the instrument,
+  `fill` and position 5
+
+#### Scenario: A fault past the fourth
+
+- **WHEN** thresholds are written at 10, 20, 30, 40 and 50, and the one at 50 carries a format that
+  does not parse
+- **THEN** the settings are rejected as this requirement says, and the warning names the instrument,
+  the format and position 5
+
+#### Scenario: A position counted before the sort
+
+- **WHEN** thresholds are written at 90 and then 10, and the one at 10 carries a format that does not
+  parse
+- **THEN** the warning names position 2, the place it was written, though that threshold sorts first
 
 #### Scenario: A thresholds value that is not a list
 
@@ -422,24 +449,31 @@ the format of the state in force. Source: `owner-rulings.md`, 2026-11-25 ("unkno
 
 #### Scenario: A state at 0 that drops the bar
 
-- **WHEN** the host reports no usage, the top-level format is `$percent $bar`, and a threshold at 0
-  gives `$percent`
-- **THEN** the state at 0 applies and the instrument renders, because that state's format names no
-  `$bar`
+- **WHEN** the host reports no usage, the top-level format is `no estimate $bar`, and a threshold at
+  0 gives `no estimate`
+- **THEN** the state at 0 applies and the instrument renders `no estimate` after its label, because
+  that state's format names no `$bar` and no variable. The top-level format alone renders nothing
 
 #### Scenario: A state at 0 that names the bar
 
-- **WHEN** the host reports no usage, the top-level format is `$percent`, and a threshold at 0 gives
-  `$percent $bar`
-- **THEN** the instrument renders nothing, label included, because the state's format names `$bar`
+- **WHEN** the host reports no usage, the top-level format is `no estimate`, and a threshold at 0
+  gives `no estimate $bar`
+- **THEN** the instrument renders nothing, label included, because the state's format names `$bar`.
+  The top-level format alone renders `no estimate`
 
 ### Requirement: A threshold's format decides whether the instrument fills
 
-The state in force MUST decide the instrument's width: a threshold whose format adds `$bar` MUST make
-the instrument fill from that percentage, and one whose format drops it MUST end the fill, so the row
-reflows as the state changes. The state MUST NOT depend on the width, and MUST be chosen at most once
-per instrument per sample, from one bar reading. Source: `AGENTS.md` (the width-0 rule); `council.md`,
-the one-reading row.
+A declaration with `fills: true` MUST fill at every reading, because `fills` is the declaration's,
+not a threshold's. Otherwise the state in force MUST decide the width: a threshold whose format adds
+`$bar` MUST fill from that percentage, and one that drops it MUST end the fill. The state MUST NOT
+depend on the width, and MUST be chosen once per instrument per sample, from one reading.
+Source: `owner-rulings.md`, 2026-11-25; instrument-registration; `council.md`, the one-reading row.
+
+#### Scenario: A declared fill outlasts the state
+
+- **WHEN** a provided instrument declares `bar` and `fills: true`, its top-level format is
+  `$percent $bar`, and a threshold at 90 gives `$percent`
+- **THEN** it still fills at 90 and above
 
 #### Scenario: A threshold that shows the bar
 
@@ -460,8 +494,9 @@ the one-reading row.
 
 #### Scenario: One reading a sample
 
-- **WHEN** one sample renders the instrument for its `fills`, at width 0 and at the row's width
-- **THEN** the bar is read once, and that one reading decides the state each time and fills the bar
+- **WHEN** one sample renders an instrument placed twice in one row and once in another, for each
+  placement's `fills`, at width 0 and at its own width
+- **THEN** the bar is read once, and every placement renders the state that reading chose
 
 ### Requirement: The bar is read only when its reading can change what renders
 
@@ -513,12 +548,13 @@ statusline, "An instrument is declared once".
 - **WHEN** a document gives an instrument that carries a bar a `fill` and a `thresholds` list
 - **THEN** the document is accepted and the settings apply as these requirements say
 
-### Requirement: A registration naming an option without a bar is refused
+### Requirement: A registration naming an option Jefferson cannot honour is refused
 
-A registration naming `thresholds` or `fill` on a declaration that carries no `bar` MUST be refused,
-with a warning whose sentence says the declaration named that option without a bar. It MUST be a
-refusal of its own kind, never the one for an option Jefferson does not implement. Source:
-`council.md`, the refusal-kind row; `owner-rulings.md`, 2026-11-25.
+A registration declaring an option Jefferson does not implement for a provided instrument, `seconds`
+included, MUST be refused with a warning that says so. A registration naming `thresholds` or `fill` on
+a declaration that carries no `bar` MUST be refused with a refusal of its own kind, whose warning says
+the declaration named that option without a bar. Source: `council.md`, the refusal-kind row;
+`owner-rulings.md`, 2026-11-25.
 
 #### Scenario: An option named without a bar
 
@@ -610,8 +646,9 @@ does not take. Source: `owner-rulings.md`, 2026-11-25 ("That's exactly it").
 
 - **WHEN** a provided instrument declares `bar` and `options: ["thresholds"]`, and the block gives it
   a threshold at 50 setting a label
-- **THEN** that label applies from 50, and the defaults still colour the fill, because the two names
-  are separate opt-ins
+- **THEN** that label applies from 50, and no default colour reaches the fill at any reading, because
+  a configured list replaces the defaults whole whether or not the provider names `fill`; the fill
+  takes only what the state's effective `style` gives it
 
 #### Scenario: A provider that names fill alone
 
@@ -639,7 +676,8 @@ Jefferson MUST check everything under a provided name's key in the `instruments`
 format, label, option, formats, variable, modifier, style, fill and thresholds — once both the
 document and that registration are in hand, whichever comes second, whether or not a row places the
 name. A fault MUST refuse that instrument alone: its entries render `blank`, a warning names it and
-the fault, and the rest of the document renders as configured.
+the fault, and the rest of the document renders as configured. Source: `council.md`, the check-list
+row.
 
 #### Scenario: A variable the registration does not declare
 

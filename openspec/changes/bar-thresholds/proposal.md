@@ -113,9 +113,10 @@ These belong to the design, and it must close each:
 - **Each state's bound form.** A threshold may set a format, a label, a composed choice or `formats`,
   so each honoured state is bound once as a whole instrument is: its own segments, its label and gap,
   its composed choice, its `fills`, and its effective style and fill.
-- **One over-four warning: one wording, two deliveries.** The sentence is composed once. The reader's
-  fault list delivers it for a document that installs, and `source.report` delivers it for a check
-  that runs later. `Configuration.warning` carries no such warning, and startup needs no change.
+- **One over-four warning: one wording, one channel, two moments.** The sentence is composed once and
+  reaches the fault ledger through `source.report` at either moment: from the read's fault list for a
+  document that installs, and from the watch for a check that runs later. `Configuration.warning`
+  carries no such warning, and startup needs no change.
 - **One threshold reader** serving both settings paths, so the rules above are written once.
 - **Where the state is chosen**: once per instrument per sample, with one reading, inside the
   provider's boundary, and handed to the drawing in place of its own call to `bar`.
