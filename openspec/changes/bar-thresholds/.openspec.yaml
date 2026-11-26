@@ -9,6 +9,7 @@ x-marbleization:
   gates:
     council_owner: approved
     design: approved
+    tasks: approved
   progress:
     - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
     - "2026-11-25: Research done (Chidi, Eleanor). Michael orientation 433c0392: one question for Joel (Q1: does a threshold style replace or layer on the top-level style; Michael recommends layer). Also notes strict > copied pi 1.4.0 footer; Joel's >= ruling outranks it, ADR to record."
@@ -18,3 +19,4 @@ x-marbleization:
     - "2026-11-25: Joel: \"go 8 if need be\" (Stage 3 cap raised to 8 rounds). plan-3.js: Stage 3 r5-r8 with fixed clean check, Stage 4, tasks sync, Stage 5 r3-r5."
     - "2026-11-25: plan-4 41acca71: DR Stage 3 converged (r5 clean, r6 zero findings); Stage 4 one minor (ZO4-1, carried). design gate approved. tasks sync: no change. Stage 5 r3 10 findings (not clean), r4 10 (not clean), r5 7 (clean, streak 1); cap 5 reached one clean round short. Asking Joel to extend Stage 5."
     - "2026-11-25: Joel: \"Yeah, give it two more and then move on.\" plan-5.js: Stage 5 r6-r7 (streak carried at 1), then Implement (Derek) and Michael verdict loop up to 3."
+    - "2026-11-25: plan-5 cde067f5: Stage 5 r6 clean (streak 2, converged; 5 minor fixes). Derek 9ad5f3ca implemented groups 1-4 (4 commits, 647 pass). Michael verdict r1 failed to launch: retained session root removed by retention. plan-6: fresh Michael seeded with his own prior artifacts, then verdict loop."
