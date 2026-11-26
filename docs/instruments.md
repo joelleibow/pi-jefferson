@@ -36,6 +36,8 @@ Every instrument takes three options, set in the `instruments` block ([Configura
 
 `notice` also takes `seconds` and `formats`.
 
+`context` draws a bar, so it also takes `thresholds` and `fill`: where the bar changes colour, and what its filled part looks like ([Configuration](configuration.md#thresholds-and-the-fill)). An instrument from another extension takes them when its extension offers them.
+
 Jefferson refuses a setting it cannot use, such as an option the instrument does not take. For one of Jefferson's instruments, a refused setting rejects the whole configuration file ([Configuration](configuration.md#what-a-rejected-configuration-file-renders)). For an instrument from another extension, it refuses that instrument alone ([Configuration](configuration.md#an-extensions-instrument)).
 
 ## The label
@@ -63,6 +65,6 @@ A configured label replaces the default, so `label: ""` removes it.
 
 ## Instruments from other extensions
 
-Another extension can add instruments to the footer. Place one by its full name, such as `taiknr.savings`. Configure it in the `instruments` block as you configure Jefferson's own: `format`, `label` and `style`, plus `formats` when its extension offers that option. Its variables, default format and default label come from that extension's documentation.
+Another extension can add instruments to the footer. Place one by its full name, such as `taiknr.savings`. Configure it in the `instruments` block as you configure Jefferson's own: `format`, `label` and `style`, plus `formats`, `thresholds` and `fill` when its extension offers them. Its variables, default format and default label come from that extension's documentation.
 
 [Provide instruments from your extension](extension-authors.md) describes what the extension writes.

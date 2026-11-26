@@ -87,9 +87,9 @@ The escape changed meaning in an earlier release. A format written `\|` used to 
 
 ## The bar
 
-`$bar` draws a bar. `context` has it, and so can an instrument from another extension. The bar takes the width the rest of the format leaves, and it shrinks to nothing when none is left. A format that holds `$bar` makes its instrument fill the row; [Configuration](configuration.md#how-a-row-fills-the-width) says how instruments that fill share the spare columns.
+`$bar` draws a bar. `context` has it, and so can an instrument from another extension. The bar takes the width the rest of the format leaves, and it shrinks to nothing when none is left. An instrument whose format holds `$bar` fills the row, and the bar can come and go with the percentage: a threshold whose own format adds or drops it starts or ends that fill there ([Configuration](configuration.md#how-a-row-fills-the-width) says how instruments that fill share the spare columns).
 
-A format holds at most one `$bar`, and no modifier follows it. The filled part takes the theme's `warning` colour above 70% and its `error` colour above 90%. When the instrument has data but no percentage, such as `context` without an estimate from the host, the bar draws an unfilled, dim track. When the instrument has no data at all, `$bar` has no value, and the instrument renders nothing.
+A format holds at most one `$bar`, and no modifier follows it. The filled part takes the colour your settings give the fill: the theme's `warning` from 70% and its `error` from 90% unless you write a `thresholds` list of your own, and whatever colour you name for the percentages you choose ([Thresholds and the fill](configuration.md#thresholds-and-the-fill)). The bar's track is the instrument's `style` plus `dim`, and nothing you set for a fill reaches it. When the instrument has data but no percentage, such as `context` without an estimate from the host, the bar draws an unfilled, dim track. When the instrument has no data at all, `$bar` has no value, and an instrument whose format names it renders nothing, label included.
 
 ## Styles
 

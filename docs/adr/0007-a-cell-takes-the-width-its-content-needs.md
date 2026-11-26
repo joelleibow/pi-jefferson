@@ -1,7 +1,7 @@
 # 7. A cell takes the width its content needs, and a row option restores equal shares
 
 Date: 2026-11-07
-Status: Accepted. Narrows [ADR 0002](0002-rows-span-the-full-width.md): both stay in force. The equal rule it records is reachable only from code now, because no configuration selects it ([ADR 0016](0016-the-equal-distribution-stays-in-the-code.md)); the content rule alone is what a configuration file gets.
+Status: Accepted. Narrows [ADR 0002](0002-rows-span-the-full-width.md): both stay in force. The equal rule it records is reachable only from code now, because no configuration selects it ([ADR 0016](0016-the-equal-distribution-stays-in-the-code.md)); the content rule alone is what a configuration file gets. One sentence of its Decision is amended by [ADR 0022](0022-a-threshold-applies-at-its-own-percentage.md): holding `$bar` in a format no longer decides the fill on its own, because the format of the state in force decides it and a threshold's format can add or drop the bar at its percentage. Everything else here stays in force. The ruling is Joel's of 2026-11-25, recorded in `openspec/changes/bar-thresholds/owner-rulings.md`, and the decision is that change's `design.md` (DEC-15).
 
 ## Context
 

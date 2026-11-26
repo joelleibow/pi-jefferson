@@ -1,7 +1,7 @@
 # 9. Components hold the parts, and the bar stands alone
 
 Date: 2026-11-10
-Status: Accepted. Revises [ADR 0005](0005-source-is-laid-out-by-responsibility.md)'s `visuals/` bullet and its import sentence; the rest of ADR 0005 stays in force. Restates a sentence of [ADR 0007](0007-a-cell-takes-the-width-its-content-needs.md) under its new path.
+Status: Accepted. Revises [ADR 0005](0005-source-is-laid-out-by-responsibility.md)'s `visuals/` bullet and its import sentence; the rest of ADR 0005 stays in force. Restates a sentence of [ADR 0007](0007-a-cell-takes-the-width-its-content-needs.md) under its new path. One sentence of its Decision is amended by [ADR 0022](0022-a-threshold-applies-at-its-own-percentage.md): the bar's threshold colours no longer live in its drawing, which takes the fill it is handed, because where the fill changes is a setting now. The bar still stands alone and still imports no file of this package. The ruling is Joel's of 2026-11-25, recorded in `openspec/changes/bar-thresholds/owner-rulings.md`, and the decision is that change's `design.md` (DEC-3, DEC-15).
 
 ## Context
 
