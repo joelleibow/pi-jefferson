@@ -576,7 +576,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
 
 ## 4. The finished change
 
-- [ ] 4.1 Re-run every scenario's proof against the finished code. `pnpm test`, `pnpm typecheck` and
+- [x] 4.1 Re-run every scenario's proof against the finished code. `pnpm test`, `pnpm typecheck` and
   `openspec validate --strict` — the last one to prove the deltas still describe what the code does.
   Then re-run the checks whose proof a later task could have moved: the flipped pair and the routed
   helper in `tests/format.test.ts` (A22, P3), the reader's seam cases in `tests/thresholds.test.ts`
@@ -584,7 +584,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   (P1, P2, A60) and the
   helpers in `tests/instrument.test.ts` (A48–A50, P4).
 
-- [ ] 4.2 Show each check catching its own mistake. Re-run M1–M9 (`redgreen-derek.md`) and M10–M24
+- [x] 4.2 Show each check catching its own mistake. Re-run M1–M9 (`redgreen-derek.md`) and M10–M24
   (defined here) against the finished code, one at a time and restoring after each: M1 (`drawBar` ignoring its fill) → A21; M2 (only the
   first four thresholds checked) → A8 and A4 extended; M3 (`<` for `<=`) → A15; M4 (a record replaced whole) → A19; M5
   (the slot dropped) → A43; M6 (`containProvided` no longer wrapping `fills`) → A57 and A44; M7
@@ -612,7 +612,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   A mutation that stays green means the check proves less than its row claims: report it in the
   change's notes rather than weakening or deleting the check.
 
-- [ ] 4.3 `pnpm typecheck` and `pnpm test` green. Derek's copy of the finished change read 628 tests
+- [x] 4.3 `pnpm typecheck` and `pnpm test` green. Derek's copy of the finished change read 628 tests
   and a clean typecheck against a base of 578.
 
 ## 5. Joel's live observation

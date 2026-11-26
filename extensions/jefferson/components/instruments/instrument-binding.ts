@@ -52,7 +52,7 @@ export interface ConfiguredInstrument {
  * nothing re-derived per frame (design DEC-4). At most five exist per instrument.
  */
 interface BoundState {
-  readonly segments: readonly FormatSegment[];
+  readonly segments: FormatSegment[];
   readonly style: ThemeStyle;
   readonly fill: ThemeStyle;
   readonly fills: boolean;
@@ -355,7 +355,7 @@ export function instrumentBindings(
         // `$bar` counts its column and the label's style covers it.
         const label = collapse(settings.label ?? declaration.defaultLabel ?? "").trim();
         const gap = label !== "" && segments.length > 0 ? " " : "";
-        const labelled: readonly FormatSegment[] = label === "" ? segments
+        const labelled: FormatSegment[] = label === "" ? segments
           : [{ kind: "literal", text: label + gap, modifiers: [] }, ...segments];
         // Composed only when the format names the composed variable: a variable the format leaves
         // out is never resolved, so its set's functions never run and cannot fault (decision 20).
@@ -444,7 +444,7 @@ export function instrumentBindings(
           // other reader of the bar remains (design DEC-6, DEC-8).
           const drawsBar = state.segments.some(segment => segment.kind === "bar");
           const text = resolveFormat(
-            declaration, state.segments as FormatSegment[], state.style, readings, width, renderTheme, preResolved,
+            declaration, state.segments, state.style, readings, width, renderTheme, preResolved,
             drawsBar ? { reading: outcome.reading, fill: state.fill } : undefined,
           );
           // A timed declaration's whole text shows or hides: nothing to show renders as nothing,
