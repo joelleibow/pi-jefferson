@@ -23,6 +23,7 @@ import {
   instrumentBindings,
   type BindInstrument,
   type ConfiguredInstrument,
+  type InstrumentSettings,
 } from "./components/instruments/instrument-binding.ts";
 import type { InstrumentDeclaration } from "./components/instruments/instrument.ts";
 import { ALIGNMENTS, DISTRIBUTIONS, type Cell, type CellAlign, type Row } from "./components/row/row.ts";
@@ -125,13 +126,15 @@ interface Reading {
   faults: Fault[];
 }
 
-/** One settings object's parsed values: the shape the top level and every threshold share. */
-type InstrumentSettings = Omit<ConfiguredInstrument, "thresholds">;
-
 /** How one settings object's faults are worded: the top level's possessive, or a threshold's place. */
 interface FaultSentences {
   /** A predicate the sentence's subject carries, as the top level writes it: `has a format …`. */
   readonly predicate: (text: string) => never;
+  /**
+   * A sentence about one of the instrument's own keys, which the parser does not own: at the top
+   * level it keeps the whole-document rule's `instrument "<name>"'s …` (design.md:317-319).
+   */
+  readonly possessive: (text: string) => never;
   /** The parser's own sentence whose meaning is forwarded, the top level keeping its possessive. */
   readonly forwarded: (text: string) => never;
 }
@@ -213,10 +216,10 @@ function ownValues(
     formats = {};
     for (const [kind, text] of Object.entries(declaredFormats)) {
       if (declaration.composed === undefined || !Object.hasOwn(declaration.composed.formats, kind)) {
-        sentences.forwarded(`formats names a kind it does not carry: ${JSON.stringify(kind)}`);
+        sentences.possessive(`formats names a kind it does not carry: ${JSON.stringify(kind)}`);
       }
       if (typeof text !== "string") {
-        sentences.forwarded(`formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
+        sentences.possessive(`formats has a kind whose format is not a string: ${JSON.stringify(kind)}`);
       }
       try {
         formats[kind] = parseFormat(declaration, text, check, true);
@@ -465,6 +468,7 @@ function readInstruments(
     }
     const settings = ownValues(declaration, entry, source.theme, check, {
       predicate: text => { throw new RejectedConfiguration(`${subject} ${text}`); },
+      possessive: text => { throw new RejectedConfiguration(`${subject}'s ${text}`); },
       forwarded: text => { throw new RejectedConfiguration(`${JSON.stringify(name)}'s ${text}`); },
     });
     // `seconds` is the reader's share, never the binding's, and it is judged only at the top level.
@@ -489,6 +493,7 @@ function readInstruments(
         return {
           settings: ownValues(declaration, values, source.theme, check, {
             predicate: text => { throw new RejectedConfiguration(`${place} ${text}`); },
+            possessive: text => { throw new RejectedConfiguration(`${place} ${text}`); },
             forwarded: text => { throw new RejectedConfiguration(`${place} ${text}`); },
           }),
         };

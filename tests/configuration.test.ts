@@ -1398,6 +1398,18 @@ test("a formats key the notice's declaration does not carry rejects the document
   }
 });
 
+test("a formats fault keeps the instrument's possessive, whole", () => {
+  // These two are the whole-document rule's own sentences, not the parser's: they name the
+  // instrument as every other own-path sentence does, rather than the parser's `"<name>"'s`.
+  for (const [formats, message] of [
+    [{ warm: "x" }, 'instrument "notice"\'s formats names a kind it does not carry: "warm"'],
+    [{ miss: 5 }, 'instrument "notice"\'s formats has a kind whose format is not a string: "miss"'],
+  ] as const) {
+    const { warning } = readDocument({ rows: [[{ instrument: "notice" }]], instruments: { notice: { formats } } });
+    assert.ok(warning?.includes(`(${message})`), `${message} in the warning: ${warning}`);
+  }
+});
+
 test("a formats value that is not a string, and formats that is not an object, each reject", () => {
   const notString = readDocument({ rows: [[{ instrument: "notice" }]], instruments: { notice: { formats: { miss: 5 } } } });
   assert.ok(notString.warning?.includes("has a kind whose format is not a string"), notString.warning ?? "");

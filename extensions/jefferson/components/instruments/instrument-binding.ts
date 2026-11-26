@@ -24,8 +24,8 @@ interface BoundInstrument extends Instrument {
   readonly topLevelFills: boolean;
 }
 
-/** The settings one state of an instrument carries: what the document wrote, and nothing more. */
-type ThresholdSettings = Omit<ConfiguredInstrument, "thresholds">;
+/** One settings object, the top level's or a threshold's: what the document wrote, and nothing more. */
+export type InstrumentSettings = Omit<ConfiguredInstrument, "thresholds">;
 
 /**
  * What the document wrote for one instrument: the top level's settings, and the honoured threshold
@@ -44,7 +44,7 @@ export interface ConfiguredInstrument {
    * The reader's honoured list, stored as it is: sorted ascending, at most four, none above 100.
    * Absent means the defaults, and an empty list means no threshold at all (design DEC-2).
    */
-  thresholds?: readonly Threshold<ThresholdSettings>[];
+  thresholds?: readonly Threshold<InstrumentSettings>[];
 }
 
 /**
@@ -345,10 +345,10 @@ export function instrumentBindings(
     if (instrument === undefined) {
       const entry = configured.get(declaration.name);
       const { thresholds, ...written } = entry ?? {};
-      const top: ThresholdSettings = written;
+      const top: InstrumentSettings = written;
 
       /** Bind one state's settings as a whole instrument is bound: its own everything (DEC-4). */
-      const bindState = (settings: ThresholdSettings): BoundState => {
+      const bindState = (settings: InstrumentSettings): BoundState => {
         const segments = settings.segments ?? parseFormat(declaration, declaration.defaultFormat, check);
         // The label carries no edge whitespace of its own, and one gap stands between it and its
         // content (ADR 0006): the gap is due from the document, and the label's segment holds it so
@@ -385,7 +385,7 @@ export function instrumentBindings(
       // Each honoured threshold is layered on the top level and on no other threshold, then bound.
       const honoured = (thresholds ?? DEFAULT_THRESHOLDS).map(threshold => ({
         activeAt: threshold.activeAt,
-        bound: bindState(layerThreshold<ThresholdSettings>(top, threshold.settings)),
+        bound: bindState(layerThreshold<InstrumentSettings>(top, threshold.settings)),
       }));
       // Whether the reading can change what renders, decided once here: the top-level format names
       // `$bar`, or an honoured threshold sets an option other than `fill` (design DEC-8). Neither

@@ -40,12 +40,6 @@ export type ThresholdsRead<S, R> =
   | { readonly refused: R; readonly position: number }
   | { readonly honoured: readonly Threshold<S>[]; readonly overFour?: string };
 
-/**
- * Read one `thresholds` value: every threshold written is judged, in the order it was written, and
- * the first fault met ends the read. A fault's position is its written position, whether or not an
- * ignored threshold stands before it (design DEC-14). The value is the document's, so it is read as
- * `unknown` and every shape is judged here.
- */
 /** A record a layering merges key by key: what `style`, `fill` and `formats` are. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -81,6 +75,12 @@ export function stateAt<E extends { readonly activeAt: number }>(
   return chosen;
 }
 
+/**
+ * Read one `thresholds` value: every threshold written is judged, in the order it was written, and
+ * the first fault met ends the read. A fault's position is its written position, whether or not an
+ * ignored threshold stands before it (design DEC-14). The value is the document's, so it is read as
+ * `unknown` and every shape is judged here.
+ */
 export function readThresholds<S, R>(
   raw: unknown,
   subject: string,
@@ -100,16 +100,14 @@ export function readThresholds<S, R>(
     if (typeof activeAt !== "number" || !Number.isInteger(activeAt) || activeAt < 0) {
       return { fault: { kind: "settings-threshold-active-at", position } };
     }
-    // `-0` and `0` are one number: JSON cannot tell them apart, so the list stores the 0 they both
-    // are, and the threshold at 0 is the threshold `activeAt: -0` wrote (owner-rulings.md, 2026-11-25).
-    const number = activeAt === 0 ? 0 : activeAt;
-    const earlier = honoured.find(threshold => threshold.activeAt === number);
+    const earlier = honoured.find(threshold => threshold.activeAt === activeAt);
     if (earlier !== undefined) {
-      return { fault: { kind: "settings-threshold-duplicate", position, activeAt: number } };
+      return { fault: { kind: "settings-threshold-duplicate", position, activeAt } };
     }
     const checked = check(settings, position);
     if ("refused" in checked) return { refused: checked.refused, position };
-    honoured.push({ activeAt: number, settings: checked.settings });
+    // Stored as parsed, with no normalisation: the honoured list is the numbers the document wrote.
+    honoured.push({ activeAt, settings: checked.settings });
   }
   // Only now, with every threshold written checked: a threshold above 100 applies at no percentage,
   // so it drops; the rest sort and the four lowest decide the state (owner-rulings.md, 2026-11-25).
