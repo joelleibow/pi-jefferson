@@ -127,13 +127,13 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   here, A60 passes, and `pnpm typecheck` is clean.
 
 - [x] 1.2 The walk's order, the four-item cap, and the over-four sentence. **Test first:** A1, A8–A14 — a list
-  written 70 then 30 answers honoured 30 then 70 (A1); a fifth threshold at 101 is still checked and
-  its refusal answers at position 5 (A8); thresholds written 90 and
-  then 10, each refused by `check`, answer the refusal at position 1, the first written, so every
+  written 70 then 30 answers honoured 30 then 70 (A1); a fifth threshold at 101 is still checked, and
+  the refusal `check` composes for the fifth, at 101, carries position 5 (A8); thresholds written 90
+  and then 10, each refused by `check`, answer the first written threshold's refusal, so every
   threshold is checked in written order and the first refusal met ends the read (A9); a duplicate
   written before a refused threshold is the
-  fault answered (A10); a threshold that sorts first keeps its written position, and thresholds written 101, then 10, then
-  20 whose third a `check` refuses answer that refusal at position 3 (A11, which proves "A fault in
+  fault answered (A10); the refusal composed for the threshold that sorts first carries position 2,
+  and for the third of 101, 10, 20 carries position 3 (A11, which proves "A fault in
   the third entry"); five written
   warn once, name the instrument, say more were defined than the maximum and that the thresholds
   past the four lowest are ignored, and only four are honoured (A12); thresholds at 10, 20, 30, 40
@@ -612,8 +612,8 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   A mutation that stays green means the check proves less than its row claims: report it in the
   change's notes rather than weakening or deleting the check.
 
-- [x] 4.3 `pnpm typecheck` and `pnpm test` green. The finished change reads 648 tests and a clean
-  typecheck against a base of 578; `openspec validate bar-thresholds --strict` reports it valid.
+- [x] 4.3 `pnpm typecheck` and `pnpm test` green against a base of 578 on main;
+  `openspec validate bar-thresholds --strict` reports it valid.
 
 ## 5. Joel's live observation
 

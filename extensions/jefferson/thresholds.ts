@@ -37,7 +37,7 @@ export const DEFAULT_THRESHOLDS = Object.freeze([
 /** One of the three things a written list can answer. */
 export type ThresholdsRead<S, R> =
   | { readonly fault: ThresholdFault }
-  | { readonly refused: R; readonly position: number }
+  | { readonly refused: R }
   | { readonly honoured: readonly Threshold<S>[]; readonly overFour?: string };
 
 /** A record a layering merges key by key: what `style`, `fill` and `formats` are. */
@@ -105,7 +105,7 @@ export function readThresholds<S, R>(
       return { fault: { kind: "settings-threshold-duplicate", position, activeAt } };
     }
     const checked = check(settings, position);
-    if ("refused" in checked) return { refused: checked.refused, position };
+    if ("refused" in checked) return { refused: checked.refused };
     // Stored as parsed, with no normalisation: the honoured list is the numbers the document wrote.
     honoured.push({ activeAt, settings: checked.settings });
   }

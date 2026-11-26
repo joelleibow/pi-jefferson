@@ -83,7 +83,7 @@ claim to be.
 | Path | The one responsibility it owns |
 |---|---|
 | `extensions/jefferson/thresholds.ts` | The threshold vocabulary and the one reader: the written-order walk that checks every threshold, `check` included, before the drop above 100, the sort and the four-item cap, as `### Contracts`'s "The reader's result" states, the state chosen at a reading, one threshold's settings layered on the top level, the 70 and 90 defaults, and the over-four sentence. The reader's input contract — the element's shape, and every input it accepts, rejects or ignores — is the statusline delta's and this design restates none of it: "A threshold sets the instrument's state at a percentage", "Only the four lowest thresholds are honoured", "A malformed threshold rejects the settings", "Every value inside a threshold is checked as a top-level value is" and "A key a threshold does not take is refused". Pure: it imports nothing from `configuration.ts`, `instrument-binding.ts`, the row or the visuals, and reads no host data. Its four runtime exports, and each of their signatures, are `### Contracts`'s "`thresholds.ts`'s surface" and "The reader's result". |
-| `tests/thresholds.test.ts` | That reader's own rules, exercised directly: the check → warn → drop → sort → cap order, `-0`, `70.0`, `7e1` and `1e400`, a duplicate above 100, the state at exactly 0 and exactly 100, unknown as 0, layering a key and layering a `formats` kind, the defaults, and three cases on the seam with `check`: a `check` that refuses a threshold above 100, or the fifth of five, makes the reader answer that refusal at its written position; a duplicate written before a refused threshold is the fault answered; and a threshold that sorts first keeps its written position. Each case asserts the reader's answer and never the calls `check` received. |
+| `tests/thresholds.test.ts` | That reader's own rules, exercised directly: the check → warn → drop → sort → cap order, `-0`, `70.0`, `7e1` and `1e400`, a duplicate above 100, the state at exactly 0 and exactly 100, unknown as 0, layering a key and layering a `formats` kind, the defaults, and three cases on the seam with `check`: a `check` that refuses the fifth, at 101, refuses with the position it was handed, and the reader answers that refusal; a duplicate written before a refused threshold is the fault answered; and a threshold that sorts first is refused with the position it was handed, which the reader answers. Each case asserts the reader's answer and never a record of calls. |
 
 **Why the reader cannot live in an existing file.** `bar.ts` is the drawing: it imports no file of
 this package and its runtime surface is pinned to `drawBar`, so a default cannot live there
@@ -238,7 +238,7 @@ nothing.
   path (`configuration.ts:292`), and `"<normalized name>"` on the provided path (`:275`). It is the
   same subject the place phrase below opens with.
 - `ThresholdsRead<S, R>` is one of `{ readonly fault: ThresholdFault }`,
-  `{ readonly refused: R; readonly position: number }` and
+  `{ readonly refused: R }` and
   `{ readonly honoured: readonly Threshold<S>[]; readonly overFour?: string }`.
 - `ThresholdFault` is one of `{ readonly kind: "settings-thresholds" }`,
   `{ readonly kind: "settings-threshold" | "settings-threshold-active-at"; readonly position: number
@@ -262,7 +262,8 @@ nothing.
   has passed does the reader warn on the written count, drop those above 100, sort ascending and keep
   four.
 - It answers one of the three results above: `{ fault }` is its own fault, at the kind and position
-  `ThresholdFault` names; `{ refused, position }` is the first refusal `check` answered;
+  `ThresholdFault` names; `{ refused }` is the first refusal `check` answered, which `check`
+  composed from the written position it was handed;
   `{ honoured, overFour? }` is the honoured list, with the over-four sentence present when more than
   four were written.
 - **The over-four sentence** (RDY-R1-5) is exactly `${subject} defines ${count} thresholds, more than

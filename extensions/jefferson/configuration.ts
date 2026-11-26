@@ -374,7 +374,14 @@ function checkProvidedSettings(
         return "part" in parsed ? { refused: parsed } : { settings: parsed.settings };
       },
     );
-    if ("fault" in read) return providedThresholdFault(quoted, read.fault);
+    if ("fault" in read) {
+      // The reader's own faults keep the own path's predicate after this path's subject; only a
+      // value that is not a list takes this path's `is configured with` form, as `formats` does.
+      const sentence = read.fault.kind === "settings-thresholds"
+        ? `${quoted} is configured with thresholds that is not a list`
+        : thresholdFaultSentence(quoted, read.fault);
+      return { kind: read.fault.kind, part: `${sentence}${consequence}` };
+    }
     if ("refused" in read) return read.refused;
     thresholds = read.honoured;
     overFour = read.overFour;
@@ -383,27 +390,6 @@ function checkProvidedSettings(
     settings: { ...top.settings, ...(thresholds === undefined ? {} : { thresholds }) },
     ...(overFour === undefined ? {} : { warning: overFour }),
   };
-}
-
-/** What a fault the reader answers on its own says under a provided name, and its kind. */
-function providedThresholdFault(quoted: string, fault: ThresholdFault): { kind: string; part: string } {
-  const consequence = "; it renders blank";
-  switch (fault.kind) {
-    case "settings-thresholds":
-      return { kind: fault.kind, part: `${quoted} is configured with thresholds that is not a list${consequence}` };
-    case "settings-threshold":
-      return { kind: fault.kind, part: `${thresholdPlace(quoted, fault.position)} is not an object${consequence}` };
-    case "settings-threshold-active-at":
-      return {
-        kind: fault.kind,
-        part: `${thresholdPlace(quoted, fault.position)} has an activeAt that is not a whole number at or above 0${consequence}`,
-      };
-    case "settings-threshold-duplicate":
-      return {
-        kind: fault.kind,
-        part: `${thresholdPlace(quoted, fault.position)} repeats the threshold at ${fault.activeAt}${consequence}`,
-      };
-  }
 }
 
 function readInstruments(

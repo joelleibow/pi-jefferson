@@ -99,18 +99,18 @@ test("A1 a list reads as honoured states, ascending", () => {
 });
 
 test("A8 a fifth threshold is still checked, and its refusal answers at position five", () => {
-  const written = [10, 20, 30, 40, 101].map(activeAt => ({ activeAt }));
-  const answer = readThresholds<Settings, "refused">(written, SUBJECT, (settings, position) =>
-    position === 5 ? { refused: "refused" } : { settings });
-  assert.deepEqual(answer, { refused: "refused", position: 5 });
+  const written = [...[10, 20, 30, 40].map(activeAt => ({ activeAt })), { activeAt: 101, label: "fifth" }];
+  const answer = readThresholds<Settings, number>(written, SUBJECT, (settings, position) =>
+    settings.label === "fifth" ? { refused: position } : { settings });
+  assert.deepEqual(answer, { refused: 5 });
 });
 
 test("A9 every threshold is checked in written order, so the first refusal met ends the read", () => {
   // Both are refused, so the answer names whichever the walk reached first: sorting first would
-  // answer `cold`, and the reading's position would name it.
+  // answer `cold`.
   const written = [{ activeAt: 90, label: "hot" }, { activeAt: 10, label: "cold" }];
   const answer = readThresholds<Settings, string>(written, SUBJECT, settings => ({ refused: String(settings.label) }));
-  assert.deepEqual(answer, { refused: "hot", position: 1 }, "the first written, though the other sorts first");
+  assert.deepEqual(answer, { refused: "hot" }, "the first written, though the other sorts first");
 });
 
 test("A10 a duplicate written before a refused threshold is the fault answered", () => {
@@ -121,12 +121,12 @@ test("A10 a duplicate written before a refused threshold is the fault answered",
 });
 
 test("A11 a threshold that sorts first keeps its written position", () => {
-  const sortedFirst = readThresholds<Settings, "refused">([{ activeAt: 90 }, { activeAt: 10 }], SUBJECT,
-    (settings, position) => position === 2 ? { refused: "refused" } : { settings });
-  assert.deepEqual(sortedFirst, { refused: "refused", position: 2 });
-  const third = readThresholds<Settings, "refused">([{ activeAt: 101 }, { activeAt: 10 }, { activeAt: 20 }], SUBJECT,
-    (settings, position) => position === 3 ? { refused: "refused" } : { settings });
-  assert.deepEqual(third, { refused: "refused", position: 3 }, "a fault in the third entry names 3");
+  const sortedFirst = readThresholds<Settings, number>([{ activeAt: 90 }, { activeAt: 10, label: "early" }], SUBJECT,
+    (settings, position) => settings.label === "early" ? { refused: position } : { settings });
+  assert.deepEqual(sortedFirst, { refused: 2 });
+  const third = readThresholds<Settings, number>([{ activeAt: 101 }, { activeAt: 10 }, { activeAt: 20, label: "third" }], SUBJECT,
+    (settings, position) => settings.label === "third" ? { refused: position } : { settings });
+  assert.deepEqual(third, { refused: 3 }, "a fault in the third entry names 3");
 });
 
 test("A12 five written warn once, name the instrument and honour the four lowest", () => {

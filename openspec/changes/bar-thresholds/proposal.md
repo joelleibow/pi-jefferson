@@ -89,8 +89,8 @@ None. The change adds behaviour to capabilities the project already has.
   `tests/instrument.test.ts` pins each shipped declaration's options and its `bar`; and new cases
   cover a configured threshold, the defaults at exactly 70 and 90, a rejected document, the
   four-entry cap, the empty list, the unknown-as-0 case and a provider's refusal.
-  `tests/fixtures/sample-provider/provider.mts` gains an instrument that opts in, so the opt-in is
-  exercised through the real registration path.
+  `tests/fixtures/sample-provider/provider.mts`'s `progress` instrument, which already carries `bar`,
+  opts in, so the opt-in is exercised through the real registration path.
 - Documentation the change makes false, for the docs pass: `docs/formats.md` ("above 70"),
   `docs/configuration.md` ("any instrument whose format holds `$bar`" fills), `docs/instruments.md`
   ("Every instrument takes three options"), `docs/extension-authors.md` (`formats` as the only extra
