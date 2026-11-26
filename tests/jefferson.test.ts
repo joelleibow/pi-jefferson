@@ -274,6 +274,7 @@ test("every shipped file's exported keys are pinned, and registration is the onl
     ["../extensions/jefferson/shipped.ts", ["FALLBACK", "NOTICE_GATE", "SHIPPED"]],
     ["../extensions/jefferson/components/visuals/bar.ts", ["drawBar"]],
     ["../extensions/jefferson/components/visuals/timed.ts", ["timed"]],
+    ["../extensions/jefferson/thresholds.ts", ["DEFAULT_THRESHOLDS", "layerThreshold", "readThresholds", "stateAt"]],
   ];
   const pinnedModules = new Map<string, Record<string, unknown>>();
   for (const [path, expected] of pinned) {
@@ -300,6 +301,30 @@ test("the contract and field-value strip to nothing", () => {
   const root = join(import.meta.dirname, "..", "extensions", "jefferson");
   for (const path of [join(root, "instrument-contract.ts"), join(root, "data", "field-value.ts")]) {
     assert.equal(stripTypeScriptTypes(readFileSync(path, "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").trim(), "", path);
+  }
+});
+
+/** Every import specifier a source file writes: `from "…"`, `import("…")` and bare `import "…"`. */
+function importSpecifiers(source: string): string[] {
+  return [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)"([^"]+)"/g)].map(match => match[1]!);
+}
+
+test("A60 a visual and the threshold reader import nothing of this package", () => {
+  // The bar is a visual another file mixes in, and the reader is the innermost rule in the change:
+  // each must depend on the platform alone, so neither can reach a row, a host or a settings path
+  // (ADR 0009; design DEC-1, DEC-3). The check reads the files rather than their exports, because a
+  // relative import is what would couple them.
+  const root = join(import.meta.dirname, "..", "extensions", "jefferson");
+  const visuals = join(root, "components", "visuals");
+  const files = [
+    ...readdirSync(visuals).filter(name => name.endsWith(".ts")).map(name => join(visuals, name)),
+    join(root, "thresholds.ts"),
+  ];
+  assert.ok(files.length > 2, "the visuals and the reader are the files read");
+  for (const path of files) {
+    for (const specifier of importSpecifiers(readFileSync(path, "utf8"))) {
+      assert.equal(specifier.startsWith("."), false, `${path} imports ${specifier}`);
+    }
   }
 });
 

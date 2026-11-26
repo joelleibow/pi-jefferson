@@ -508,7 +508,8 @@ when-the-bar-is-read row.
 
 #### Scenario: A format that leaves the bar out
 
-- **WHEN** an instrument's top-level format is `$percent` and a threshold sets a format or a label
+- **WHEN** an instrument's top-level format is `$percent` and a threshold sets a label, or a format
+  that names no `$bar`
 - **THEN** the state is chosen from the bar's reading and the instrument renders, with `$bar` never
   resolved
 

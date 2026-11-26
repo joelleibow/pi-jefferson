@@ -29,6 +29,11 @@ reader's result, the drawing path, every fault's kind and what its sentence name
 in `design.md` `### Contracts`. A task names what the coder types at that step, and where it repeats
 a shape from there, `### Contracts` is the one home and governs.
 
+Where a delta scenario writes a fill's foreground as `muted` and a check sends that fill through a
+settings path, the check writes `accent` instead, because the test theme carries no `muted`
+(`tests/fake-theme.ts:6-11`) and the harness's theme is fixed (`tests/session-harness.ts:158`), and
+the scenario's rule does not depend on the token.
+
 ## File Boundary
 
 ### Create
@@ -77,7 +82,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
 
 ## 1. The threshold rules, in one pure source file
 
-- [ ] 1.1 The reader's shape and number rules. **Test first:** before the file exists, add
+- [x] 1.1 The reader's shape and number rules. **Test first:** before the file exists, add
   `["../extensions/jefferson/thresholds.ts", ["DEFAULT_THRESHOLDS", "layerThreshold",
   "readThresholds", "stateAt"]]` to `pinned` in `tests/jefferson.test.ts` (`:234-277`). That key set
   is `### Contracts`'s, and it is also the list the shipped-file assertion at `:293` reads; the pin
@@ -103,11 +108,13 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   the drop, the sort and the cap. Red at the base because neither the file nor its functions exist —
   unavoidable for a new one, which is why each of these rules is exercised again through
   Jefferson's own settings path at 2.5 (A30) and 2.6 (A32).
-  **Code:** create `extensions/jefferson/thresholds.ts`, whose exports and signatures are
-  `### Contracts`'s "`thresholds.ts`'s surface" and "The reader's result", with the walk over the
+  **Code:** create `extensions/jefferson/thresholds.ts` with `readThresholds` and the three types,
+  whose signatures and walk are `### Contracts`'s "The reader's result": the walk runs over the
   written list, judging shape, then the parsed number (`typeof value === "number"`, then
   `Number.isInteger`, then `>= 0`), then whether an earlier threshold wrote that number, then
-  `check`, and answering one of the three results `ThresholdsRead` names. **Boundary cases:** `{}`,
+  `check`, and answering one of the three results `ThresholdsRead` names. `stateAt` and
+  `DEFAULT_THRESHOLDS` land at 1.3 and `layerThreshold` at 1.4, completing "`thresholds.ts`'s
+  surface". **Boundary cases:** `{}`,
   `null` and `70` as the list, `70`, `null` and `[]` as a threshold, a missing `activeAt`, a numeric
   string, a decimal, a negative, `1e400`, `-0`, `70.0`, `7e1`, a duplicate at 0, a duplicate at 110.
   The honoured list stores the parsed number as it is (redgreen-3). `-0`'s behaviour is proved by A6
@@ -119,7 +126,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   (A60). **Done when:** `node --test tests/thresholds.test.ts` passes A2–A7 in the halves listed
   here, A60 passes, and `pnpm typecheck` is clean.
 
-- [ ] 1.2 The walk's order, the four-item cap, and the over-four sentence. **Test first:** A1, A8–A14 — a list
+- [x] 1.2 The walk's order, the four-item cap, and the over-four sentence. **Test first:** A1, A8–A14 — a list
   written 70 then 30 answers honoured 30 then 70 (A1); a fifth threshold at 101 is still checked and
   its refusal answers at position 5 (A8); thresholds written 90 and
   then 10, each refused by `check`, answer the refusal at position 1, the first written, so every
@@ -145,7 +152,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   with one above 100", "The boundaries", and "A fault in the third entry" (A11).
   **Done when:** A1 and A8–A14 pass and the whole file is green.
 
-- [ ] 1.3 The state a reading chooses, and the 70 and 90 defaults. **Test first:** A15–A18 and A20, and A5's `stateAt` half —
+- [x] 1.3 The state a reading chooses, and the 70 and 90 defaults. **Test first:** A15–A18 and A20, and A5's `stateAt` half —
   the state is the highest `activeAt` at or below the reading, its own number included (A15); 0 and
   100 apply at their own numbers (A16); an unknown reading counts as 0 and the top level stays in
   force otherwise (A17); a negative reading sits below every threshold (A18); a stored `-0` is chosen
@@ -159,7 +166,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   90" (the values), "An unknown percentage" and "A negative reading". **Done when:** A15–A18,
   A20 and A5's `stateAt` half pass.
 
-- [ ] 1.4 Layering one level deep, and the two values that replace whole. **Test first:** A19 — a
+- [x] 1.4 Layering one level deep, and the two values that replace whole. **Test first:** A19 — a
   record merges one level, a parsed format list and a label replace whole, and a `formats` kind a
   threshold leaves out is the top level's. Red before `layerThreshold` exists. **Code:** add
   `layerThreshold` to `thresholds.ts` with the signature and merging rule `### Contracts` gives,
@@ -170,7 +177,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   first", "A formats kind a threshold leaves out" (its reader half; 2.3's A56 (d) proves it through
   the binding). **Done when:** A19 passes and the whole file is green.
 
-- [ ] 1.5 `pnpm typecheck` and `pnpm test` green. Nothing imports `thresholds.ts` yet, so the suite
+- [x] 1.5 `pnpm typecheck` and `pnpm test` green. Nothing imports `thresholds.ts` yet, so the suite
   is the base's 578 tests, A60, and every check in `tests/thresholds.test.ts`, all of them passing
   (`redgreen-derek.md`, "The base, measured"), and the pin passes with its new entry.
 
@@ -301,7 +308,9 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   **Code:** `bar.ts`'s `drawBar(barWidth, percent, style, fill)` with the filled part taking
   `{ ...style, ...fill }` and the track `{ ...style, dim: true }`; `format.ts`'s `resolveFormat`
   gaining the trailing `bar?: { reading, fill }`, never calling `declaration.bar`, and blanking as
-  `undefined` does when `bar` is absent; the binding handing `bar`, carrying the slot's raw reading
+  `undefined` does when `bar` is absent — the drawn-text local `bar` (`format.ts:295`, assigned at
+  `:302` and read at `:307`) being renamed `drawn`, so the parameter keeps the name `### Contracts`
+  gives it and `preResolved` keeps its seventh position; the binding handing `bar`, carrying the slot's raw reading
   and the state's effective fill, whenever the state's segments name `$bar`, and no other reader of
   the bar remaining. **Boundary cases:** 0, 69.9, exactly 70, 70.1, exactly 90, 90.1, 100, a `null`
   reading, an unknown reading. **Proves:** statusline "Exactly 70", "Exactly 90", "Below the first
@@ -319,13 +328,17 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   exactly 70 the fill is `warning`, at exactly 90 `error`, below 70 the style's own, and the text
   never takes the threshold's colour, and a `style` of `{bold: true}` with no `fill` at a reading of
   50 makes the filled part and the label bold and the track bold plus `dim`, as `"thresholds": []`
-  at 95 does (A25, which proves "Style still covers the whole instrument"); a top-level `fill` of `{fg, bold}`, a default replacing only
-  the key it names and bold surviving (A26); a threshold's `style` colouring text and never the
-  fill or the track (A27); a label a threshold leaves out rendering, and a second threshold
-  inheriting nothing (A28); 10/20/30/40/50 at 60 choosing 40 with the fifth never rendering, and
-  exactly one `thresholds-over-four` fault naming `"context"` on the `reported` list
-  `configurationSource` returns, which records every report without the ledger's deduplication
-  (`tests/configuration-source.ts:21`, `:34`) (A29); the rebuilt pair of "A state at 0 that drops the bar" and "A state at 0 that names the
+  at 95 does (A25, which proves "Style still covers the whole instrument"); a top-level `fill` of
+  `{ "fg": "accent", "bold": true }`, a default replacing only the key it names and bold surviving
+  (A26); a top-level `fill` of `{ "fg": "accent" }` beside a threshold's `"style": { "fg":
+  "error" }`, the style colouring text and never the fill or the track (A27); a label a threshold
+  leaves out rendering, and a second threshold inheriting nothing (A28); 10/20/30/40/50 at 60
+  choosing 40 with the fifth never rendering, and exactly one fault on the `reported` list
+  `configurationSource` returns — which records every report without the ledger's deduplication
+  (`tests/configuration-source.ts:21`, `:34`) — whose `kind` is `thresholds-over-four`, whose `scope`
+  is `jefferson.default.context` (the instrument's full name, per `### Contracts`'s fault table), and
+  whose `part` is asserted whole as `instrument "context" defines 5 thresholds, more than the maximum
+  of 4; those beyond the 4 lowest are ignored` (A29); the rebuilt pair of "A state at 0 that drops the bar" and "A state at 0 that names the
   bar" through `readConfiguration`, where the names-the-bar half renders nothing, label included, and the
   drops-the-bar half renders `Context: no estimate`, and a `null` reading under a state at 0 draws
   the whole track `dim` (A34); and A51 — `context` with the format `$percent`, a threshold at 70
@@ -419,7 +432,7 @@ deduplicates by scope and kind); `components/instruments/blank.ts` and `componen
   setting a label, and no default colour reaching the fill at any reading; extended: a bar reporting
   `-1` with a threshold at 0 setting a label renders the top level without that label), A39
   (`["fill"]` alone,
-  a muted top-level fill below 70 and the default `warning` at 75), A41 (a decimal `activeAt` under a
+  an `accent` top-level fill below 70 and the default `warning` at 75), A41 (a decimal `activeAt` under a
   provided name refuses only that instrument, one warning reading `"taiknr.usage", thresholds 1: has
   an activeAt that is not a whole number at or above 0; it renders blank`; extended: under a
   provided name beside a sibling, `"thresholds": {}` and `"thresholds": [70]` each refuse only that
