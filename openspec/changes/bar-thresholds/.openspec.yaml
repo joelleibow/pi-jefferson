@@ -11,6 +11,7 @@ x-marbleization:
     design: approved
     tasks: approved
     implement: approved
+    validate: approved
   progress:
     - "2026-11-25: change opened from a 2026-11-25 Explore session on main at e44cb8c (0.15.0). Branch bar-thresholds. owner-rulings.md and plan-context.md written. Research (Chidi + Eleanor) launched."
     - "2026-11-25: Research done (Chidi, Eleanor). Michael orientation 433c0392: one question for Joel (Q1: does a threshold style replace or layer on the top-level style; Michael recommends layer). Also notes strict > copied pi 1.4.0 footer; Joel's >= ruling outranks it, ADR to record."
@@ -24,3 +25,4 @@ x-marbleization:
     - "2026-11-25: Joel to bed: \"get us through it and get us to implementation. we can wrap up after Thanksgiving\". Michael verdict r1 fe437ca3 changes_requested (3 must_change incl. two own-path warning sentences regressed). Derek resume failed (session cleared). plan-7: fresh Derek fix + fresh Michael verdict up to 3 rounds, then docs pass."
     - "2026-11-26: Derek fix 43e3bfff (7 items, 2 commits); Michael verdict r2 63447f2d approve (648 pass). Docs pass 0443e15b: ADR 0022, status lines in ADR 0007/0009/0020, ARCHITECTURE, AGENTS, docs/*. Pushed; PR opened; Judge Gen validate launched."
     - "2026-11-26: PR #26. Judge Gen verify f3bc2f39 (26/26 covered, 3 suggestions) and PR review 0711e9af (no must-fix). Michael validate bd065e65 approve with 4 minor required changes. validate-2: Derek applies, Michael confirms."
+    - "2026-11-26: Derek cb75480a applied the 4 Validate fixes (c4d397a, pushed; 648 pass). Michael validate r2 1f84514c approve. Waiting on Joel live check (task 5.1) after Thanksgiving, then archive (fix ADR 0022/0007/0009/0020 paths to the archive folder) and merge."
